@@ -40,34 +40,33 @@
         }
 
         /* Top Bar & Enhanced Pincode */
-        .top-bar { 
-            background: var(--dark); 
-            color: #FFF; 
-            display: flex; 
-            justify-content: center; 
+        .top-bar {
+            background: var(--dark);
+            color: #FFF;
+            display: flex;
             align-items: center;
-            padding: 0.75rem 5%; 
-            font-size: 0.7rem; 
-            letter-spacing: 1.5px; 
-            position: relative; 
+            min-height: 42px;
+            padding: 0 5%;
+            font-size: 0.68rem;
+            letter-spacing: 1.2px;
+            position: relative;
             text-transform: uppercase;
+            overflow: hidden;
         }
-        .top-bar-currency { position: absolute; right: 5%; cursor: pointer;}
-        .top-bar-text { animation: topBarFlash 2.4s ease-in-out infinite; }
-        @keyframes topBarFlash {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; color: #A8E6CF; }
-        }
-        
-        .pincode-container { 
-            position: absolute; left: 5%; display: flex; flex-direction: column; align-items: stretch; gap: 0.25rem;
-            background: rgba(255, 255, 255, 0.15); padding: 0.25rem 0.4rem; border-radius: 20px;
-            border: 1px solid rgba(255, 255, 255, 0.2); backdrop-filter: blur(4px); text-transform: none;
-        }
-        .pincode-controls { display: flex; align-items: center; gap: 0.4rem; }
-        .pincode-container span.pin-icon { font-size: 0.85rem; margin-left: 0.3rem; }
+        .top-bar-section { display: flex; align-items: center; min-width: 0; height: 42px; }
+        .top-bar-left { flex: 0 1 360px; min-width: 300px; padding-right: 1.25rem; }
+        .top-bar-center { flex: 1 1 auto; min-width: 0; border-left: 1px solid rgba(255,255,255,0.16); border-right: 1px solid rgba(255,255,255,0.16); }
+        .top-bar-right { flex: 0 0 130px; justify-content: flex-end; padding-left: 1.25rem; white-space: nowrap; }
+        .top-bar-currency { cursor: pointer; }
+        .marquee { width: 100%; overflow: hidden; white-space: nowrap; }
+        .marquee-track { display: inline-flex; width: max-content; animation: marqueeScroll 28s linear infinite; }
+        .marquee-text { display: inline-block; padding-right: 4rem; color: #E8E6E1; }
+        @keyframes marqueeScroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+        .pincode-container { width: 100%; display: flex; align-items: center; min-width: 0; gap: 0.45rem; }
+        .pincode-controls { display: flex; align-items: center; flex: 0 0 auto; gap: 0.4rem; }
+        .pincode-container span.pin-icon { color: #E45757; font-size: 0.9rem; line-height: 1; }
         .pincode-container input { 
-            padding: 0.2rem 0.5rem; border: none; font-size: 0.75rem; 
+            padding: 0.2rem 0.1rem; border: none; font-size: 0.7rem;
             font-family: 'Inter', sans-serif; width: 110px; outline: none;
             background: transparent; color: #FFF;
         }
@@ -77,9 +76,8 @@
             cursor: pointer; border-radius: 15px; font-weight: 600; font-size: 0.7rem; transition: background 0.3s;
         }
         .pincode-container button:hover { background: #EAEAEA; }
-        #pin-msg { font-size: 0.7rem; font-weight: 500; margin-left: 0.2rem; margin-right: 0.5rem; }
-        #pin-msg { max-width: 260px; }
-        #pin-location { display: none; font-size: 0.7rem; color: #FFF; white-space: nowrap; padding: 0.1rem 0.4rem 0.15rem; }
+        #pin-msg { font-size: 0.62rem; font-weight: 500; white-space: nowrap; }
+        #pin-location { display: inline-block; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: 0.65rem; color: #FFF; white-space: nowrap; }
 
         /* Navbar */
         .navbar { 
@@ -307,7 +305,14 @@
         @media (max-width: 760px) {
             .hero { grid-template-columns: 1fr; }
             .hero-left { min-height: 360px; padding: 3.5rem 7%; }
-            .pincode-container { display: none; }
+            .top-bar { padding: 0 0.75rem; font-size: 0.58rem; }
+            .top-bar-left { flex: 0 0 195px; min-width: 195px; padding-right: 0.6rem; }
+            .top-bar-center { min-width: 0; }
+            .top-bar-right { flex: 0 0 88px; padding-left: 0.6rem; font-size: 0.56rem; }
+            .pincode-container input { width: 64px; font-size: 0.64rem; }
+            .pincode-container button { padding: 0.25rem 0.5rem; font-size: 0.6rem; }
+            #pin-msg { display: none; }
+            #pin-location { font-size: 0.58rem; }
             .nav-links { display: none; } /* Simplified for mobile */
             .auth-card { padding: 2rem 1.25rem; }
         }
@@ -317,19 +322,28 @@
 
     <!-- Top Bar -->
     <div class="top-bar">
-        <!-- Beautified Pincode Search -->
-        <div class="pincode-container">
-            <div class="pincode-controls">
-                <span class="pin-icon">📍</span>
-                <input type="text" id="pincode-input" placeholder="Enter Pincode" maxlength="6" aria-label="Enter delivery pincode">
-                <button onclick="validatePincode()">CHECK</button>
-                <span id="pin-msg" role="status" aria-live="polite"></span>
+        <div class="top-bar-section top-bar-left">
+            <div class="pincode-container">
+                <div class="pincode-controls">
+                    <span class="pin-icon" aria-hidden="true">📍</span>
+                    <input type="text" id="pincode-input" value="700092" maxlength="6" aria-label="Enter delivery pincode">
+                    <button onclick="validatePincode()">CHECK</button>
+                    <span id="pin-msg" role="status" aria-live="polite"></span>
+                </div>
+                <span id="pin-location" aria-live="polite">700092 • Kolkata, West Bengal</span>
             </div>
-            <span id="pin-location" aria-live="polite"></span>
         </div>
-        
-        <div class="top-bar-text">FREE SHIPPING ON ALL ORDERS ABOVE ₹2,999 | 100% HALLMARKED SILVER</div>
-        <div class="top-bar-currency">India (INR) ⌄</div>
+        <div class="top-bar-section top-bar-center">
+            <div class="marquee" aria-label="Store announcements">
+                <div class="marquee-track">
+                    <span class="marquee-text">FREE SHIPPING ON ALL ORDERS ABOVE ₹2,999 &nbsp; • &nbsp; 100% HALLMARKED SILVER &nbsp; • &nbsp; COMPLIMENTARY GIFT PACKAGING &nbsp; • &nbsp;</span>
+                    <span class="marquee-text" aria-hidden="true">FREE SHIPPING ON ALL ORDERS ABOVE ₹2,999 &nbsp; • &nbsp; 100% HALLMARKED SILVER &nbsp; • &nbsp; COMPLIMENTARY GIFT PACKAGING &nbsp; • &nbsp;</span>
+                </div>
+            </div>
+        </div>
+        <div class="top-bar-section top-bar-right">
+            <div class="top-bar-currency">INDIA (INR) ˅</div>
+        </div>
     </div>
 
     <!-- Navigation -->
