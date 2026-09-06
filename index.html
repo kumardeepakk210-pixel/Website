@@ -72,6 +72,7 @@
         }
         .pincode-container button:hover { background: #EAEAEA; }
         #pin-msg { font-size: 0.7rem; font-weight: 500; margin-left: 0.2rem; margin-right: 0.5rem; }
+        #pin-msg { max-width: 260px; }
 
         /* Navbar */
         .navbar { 
@@ -778,6 +779,18 @@
                 setAuthMessage('register-message', error.message, 'error');
                 return;
             }
+
+            const customerResponse = await fetch('/api/customer-phone', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mobile: pendingRegistrationPhone.replace('+', '') })
+            });
+            const customerResult = await customerResponse.json();
+            if (!customerResponse.ok || !customerResult.success) {
+                setAuthMessage('register-message', customerResult.error || 'Unable to complete registration.', 'error');
+                return;
+            }
+
             isLoggedIn = true;
             updateAuthDropdown();
             navigateTo('profile');
@@ -791,13 +804,35 @@
         }
 
         // --- Pincode Validation ---
-        function validatePincode() {
+        async function validatePincode() {
             const pinInput = document.getElementById('pincode-input').value.trim();
             const msgElement = document.getElementById('pin-msg');
-            if (pinInput.length === 6 && !isNaN(pinInput)) {
-                msgElement.innerText = "✓ Delivery Available"; msgElement.style.color = "#A8E6CF";
-            } else {
+            if (!/^\d{6}$/.test(pinInput)) {
                 msgElement.innerText = "✕ Invalid Pincode"; msgElement.style.color = "#FF8A80";
+                return;
+            }
+
+            msgElement.innerText = "Checking delivery location...";
+            msgElement.style.color = "rgba(255,255,255,0.8)";
+
+            try {
+                const response = await fetch(`https://api.postalpincode.in/pincode/${pinInput}`);
+                if (!response.ok) throw new Error('Pincode lookup failed');
+
+                const [result] = await response.json();
+                const location = result?.Status === 'Success' && result.PostOffice?.[0];
+                if (!location) {
+                    msgElement.innerText = "✕ Pincode not found";
+                    msgElement.style.color = "#FF8A80";
+                    return;
+                }
+
+                const locationName = [location.District, location.State].filter(Boolean).join(', ');
+                msgElement.innerText = `✓ Delivery Available: ${locationName}`;
+                msgElement.style.color = "#A8E6CF";
+            } catch (error) {
+                msgElement.innerText = "✕ Unable to verify pincode";
+                msgElement.style.color = "#FF8A80";
             }
         }
 
