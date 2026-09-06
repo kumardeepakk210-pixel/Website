@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Wishrite | Premium Silver Jewellery</title>
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+    <script src="config.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         /* Base Reset & Variables */
         :root {
@@ -149,6 +151,17 @@
         .auth-card .btn-solid { width: 100%; display: block; text-align: center; margin-top: 1rem; border: none;}
         .auth-links { margin-top: 1.5rem; font-size: 0.85rem; color: var(--text-muted); }
         .auth-links a { color: var(--dark); text-decoration: underline; cursor: pointer; }
+        .auth-tabs { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 2rem; }
+        .auth-tab { flex: 1; padding: 0.8rem; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--text-muted); cursor: pointer; font: inherit; }
+        .auth-tab.active { border-bottom-color: var(--dark); color: var(--dark); }
+        .auth-message { min-height: 1.2rem; margin-top: 1rem; font-size: 0.85rem; color: var(--text-muted); }
+        .auth-message.error { color: #b42318; }
+        .auth-message.success { color: #18794e; }
+        .phone-input { display: flex; gap: 0.5rem; }
+        .phone-input select { width: 82px; border: 1px solid var(--border); background: #FFF; padding: 0.8rem 0.4rem; font-family: inherit; }
+        .phone-input input { flex: 1; }
+        .otp-step { display: none; }
+        .otp-step.show { display: block; }
 
         /* Profile */
         .profile-header { text-align: center; padding: 4rem 5% 2rem; background: var(--light-bg); }
@@ -288,6 +301,7 @@
             .hero-left { min-height: 360px; padding: 3.5rem 7%; }
             .pincode-container { display: none; }
             .nav-links { display: none; } /* Simplified for mobile */
+            .auth-card { padding: 2rem 1.25rem; }
         }
     </style>
 </head>
@@ -449,16 +463,25 @@
         <div id="login-view" style="display: none;" class="auth-section">
             <div class="auth-card">
                 <h2>Login</h2>
+                <div class="auth-tabs" role="tablist" aria-label="Login method">
+                    <button type="button" class="auth-tab active" id="email-login-tab" onclick="switchLoginMethod('email')">Email</button>
+                    <button type="button" class="auth-tab" id="mobile-login-tab" onclick="switchLoginMethod('mobile')">Mobile</button>
+                </div>
                 <form onsubmit="handleLogin(event)">
-                    <div class="form-group">
-                        <label>Email Address</label>
-                        <input type="email" required>
+                    <div class="form-group" id="email-login-field">
+                        <label for="login-email">Email Address</label>
+                        <input id="login-email" type="email" autocomplete="email" required>
+                    </div>
+                    <div class="form-group" id="mobile-login-field" style="display: none;">
+                        <label for="login-mobile">Mobile Number</label>
+                        <div class="phone-input"><select id="login-country-code" aria-label="Country code"><option value="+91">+91</option></select><input id="login-mobile" type="tel" inputmode="numeric" pattern="[0-9]{10}" maxlength="10" placeholder="10-digit mobile number" autocomplete="tel"></div>
                     </div>
                     <div class="form-group">
-                        <label>Password</label>
-                        <input type="password" required>
+                        <label for="login-password">Password</label>
+                        <input id="login-password" type="password" autocomplete="current-password" required>
                     </div>
                     <button type="submit" class="btn-solid">Sign In</button>
+                    <p id="login-message" class="auth-message" role="alert"></p>
                 </form>
                 <div class="auth-links">Don't have an account? <a onclick="navigateTo('register')">Create one</a></div>
             </div>
@@ -468,11 +491,19 @@
         <div id="register-view" style="display: none;" class="auth-section">
             <div class="auth-card">
                 <h2>Create Account</h2>
-                <form onsubmit="handleRegister(event)">
-                    <div class="form-group"><label>Full Name</label><input type="text" required></div>
-                    <div class="form-group"><label>Email Address</label><input type="email" required></div>
-                    <div class="form-group"><label>Password</label><input type="password" required></div>
-                    <button type="submit" class="btn-solid">Register</button>
+                <form id="register-form" onsubmit="handleRegister(event)">
+                    <div class="registration-fields">
+                        <div class="form-group"><label for="register-name">Full Name</label><input id="register-name" type="text" autocomplete="name" required></div>
+                        <div class="form-group"><label for="register-email">Email Address</label><input id="register-email" type="email" autocomplete="email" required></div>
+                        <div class="form-group"><label for="register-mobile">Mobile Number (required)</label><div class="phone-input"><select id="register-country-code" aria-label="Country code"><option value="+91">+91</option></select><input id="register-mobile" type="tel" inputmode="numeric" pattern="[0-9]{10}" maxlength="10" placeholder="10-digit mobile number" autocomplete="tel" required></div></div>
+                        <div class="form-group"><label for="register-password">Password</label><input id="register-password" type="password" autocomplete="new-password" minlength="6" required></div>
+                        <button type="submit" class="btn-solid">Send OTP</button>
+                    </div>
+                    <div id="otp-step" class="otp-step">
+                        <div class="form-group"><label for="register-otp">Enter the OTP sent to your mobile</label><input id="register-otp" type="text" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" required></div>
+                        <button type="button" class="btn-solid" onclick="verifyRegistrationOtp()">Verify Mobile &amp; Register</button>
+                    </div>
+                    <p id="register-message" class="auth-message" role="alert"></p>
                 </form>
                 <div class="auth-links">Already have an account? <a onclick="navigateTo('login')">Login here</a></div>
             </div>
@@ -511,6 +542,8 @@
         let cart = [];
         let wishlist = new Set();
         let isLoggedIn = false;
+        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        let pendingRegistrationPhone = '';
 
         // --- Product Rendering & State Modifiers ---
         function createProductHTML(product) {
@@ -639,6 +672,28 @@
         });
 
         // --- Auth & Dropdown Logic ---
+        function setAuthMessage(elementId, message, type = '') {
+            const element = document.getElementById(elementId);
+            element.innerText = message;
+            element.className = `auth-message ${type}`;
+        }
+
+        function getPhoneNumber(countryCode, inputId) {
+            const number = document.getElementById(inputId).value.trim().replace(/\D/g, '');
+            return { number, phone: `${countryCode}${number}` };
+        }
+
+        function switchLoginMethod(method) {
+            const emailMode = method === 'email';
+            document.getElementById('email-login-field').style.display = emailMode ? 'block' : 'none';
+            document.getElementById('mobile-login-field').style.display = emailMode ? 'none' : 'block';
+            document.getElementById('login-email').required = emailMode;
+            document.getElementById('login-mobile').required = !emailMode;
+            document.getElementById('email-login-tab').classList.toggle('active', emailMode);
+            document.getElementById('mobile-login-tab').classList.toggle('active', !emailMode);
+            setAuthMessage('login-message', '');
+        }
+
         function updateAuthDropdown() {
             const dropdown = document.getElementById('user-dropdown');
             dropdown.innerHTML = isLoggedIn ? 
@@ -657,9 +712,83 @@
             }
         }
 
-        function handleLogin(e) { e.preventDefault(); isLoggedIn = true; updateAuthDropdown(); navigateTo('profile'); }
-        function handleRegister(e) { e.preventDefault(); isLoggedIn = true; updateAuthDropdown(); navigateTo('profile'); }
-        function handleLogout() { isLoggedIn = false; updateAuthDropdown(); navigateTo('home'); }
+        async function handleLogin(e) {
+            e.preventDefault();
+            setAuthMessage('login-message', 'Signing you in...');
+            const emailMode = document.getElementById('email-login-field').style.display !== 'none';
+            const password = document.getElementById('login-password').value;
+            const credentials = emailMode
+                ? { email: document.getElementById('login-email').value.trim(), password }
+                : { phone: getPhoneNumber(document.getElementById('login-country-code').value, 'login-mobile').phone, password };
+
+            if (!emailMode && getPhoneNumber(document.getElementById('login-country-code').value, 'login-mobile').number.length !== 10) {
+                setAuthMessage('login-message', 'Enter a valid 10-digit mobile number.', 'error');
+                return;
+            }
+
+            const { error } = await supabaseClient.auth.signInWithPassword(credentials);
+            if (error) {
+                setAuthMessage('login-message', error.message, 'error');
+                return;
+            }
+            isLoggedIn = true;
+            updateAuthDropdown();
+            navigateTo('profile');
+        }
+
+        async function handleRegister(e) {
+            e.preventDefault();
+            const mobile = getPhoneNumber(document.getElementById('register-country-code').value, 'register-mobile');
+            if (mobile.number.length !== 10) {
+                setAuthMessage('register-message', 'A valid 10-digit mobile number is required.', 'error');
+                return;
+            }
+
+            setAuthMessage('register-message', 'Sending OTP...');
+            const { error } = await supabaseClient.auth.signUp({
+                phone: mobile.phone,
+                password: document.getElementById('register-password').value,
+                options: {
+                    data: {
+                        full_name: document.getElementById('register-name').value.trim(),
+                        email: document.getElementById('register-email').value.trim()
+                    }
+                }
+            });
+            if (error) {
+                setAuthMessage('register-message', error.message, 'error');
+                return;
+            }
+            pendingRegistrationPhone = mobile.phone;
+            document.querySelector('.registration-fields').style.display = 'none';
+            document.getElementById('otp-step').classList.add('show');
+            setAuthMessage('register-message', 'OTP sent. Verify your mobile number to complete registration.', 'success');
+            document.getElementById('register-otp').focus();
+        }
+
+        async function verifyRegistrationOtp() {
+            const otp = document.getElementById('register-otp').value.trim();
+            if (!/^\d{6}$/.test(otp)) {
+                setAuthMessage('register-message', 'Enter the 6-digit OTP sent to your mobile.', 'error');
+                return;
+            }
+            setAuthMessage('register-message', 'Verifying mobile number...');
+            const { error } = await supabaseClient.auth.verifyOtp({ phone: pendingRegistrationPhone, token: otp, type: 'sms' });
+            if (error) {
+                setAuthMessage('register-message', error.message, 'error');
+                return;
+            }
+            isLoggedIn = true;
+            updateAuthDropdown();
+            navigateTo('profile');
+        }
+
+        async function handleLogout() {
+            await supabaseClient.auth.signOut();
+            isLoggedIn = false;
+            updateAuthDropdown();
+            navigateTo('home');
+        }
 
         // --- Pincode Validation ---
         function validatePincode() {
