@@ -313,16 +313,45 @@
         @media (max-width: 760px) {
             .hero { grid-template-columns: 1fr; }
             .hero-left { min-height: 360px; padding: 3.5rem 7%; }
+            .navbar { padding: 1rem 5%; flex-wrap: wrap; row-gap: 0.75rem; }
+            .logo { flex: 1 1 auto; min-width: 0; text-align: left; }
+            .logo-main { font-size: 1.65rem; letter-spacing: 0.16em; }
+            .nav-icons { margin-left: auto; gap: 0.8rem; font-size: 1.05rem; flex-wrap: wrap; justify-content: flex-end; }
             .top-bar { padding: 0 0.75rem; font-size: 0.58rem; }
             .top-bar-center { min-width: 0; }
             .top-bar-right { flex: 0 0 88px; padding-left: 0.6rem; font-size: 0.56rem; }
-            .nav-pincode-container { width: 150px; margin-left: 0; }
+            .nav-pincode-container { flex: 1 0 100%; width: 100%; margin-left: 0; }
             .nav-pincode-container input { width: 48px; font-size: 0.64rem; }
             .nav-pincode-container button { padding: 0.25rem 0.4rem; font-size: 0.58rem; }
             .nav-pincode-container #pin-msg { display: none; }
             .nav-pincode-container #pin-location { font-size: 0.52rem; }
             .nav-links { display: none; } /* Simplified for mobile */
+            .hero h1 { font-size: 2.7rem; }
+            .hero p { font-size: 0.92rem; }
+            .hero-buttons { flex-wrap: wrap; gap: 0.75rem; }
+            .hero-buttons .btn-solid, .hero-buttons .btn-outline { padding: 0.85rem 1.25rem; }
+            .section-header { align-items: flex-start; flex-direction: column; gap: 1.5rem; margin-bottom: 2.5rem; }
+            .section-header h2, .shop-header h1 { font-size: 2.5rem; }
+            .section-header p, .shop-header p { font-size: 0.95rem; }
+            .bestsellers { padding: 5rem 5%; }
+            .shop-header { padding: 4rem 5% 2rem; }
+            .shop-controls { flex-wrap: wrap; gap: 1rem; padding: 1.25rem 5%; }
+            .shop-controls select { max-width: 100%; }
+            .shop-grid { grid-template-columns: 1fr; gap: 2.5rem; padding: 3rem 5%; }
+            .product-image { height: min(110vw, 380px); }
+            .cart-item { align-items: flex-start; gap: 1rem; flex-wrap: wrap; }
+            .cart-item-info { min-width: 0; }
+            .cart-summary { text-align: left; }
             .auth-card { padding: 2rem 1.25rem; }
+        }
+
+        @media (max-width: 420px) {
+            .top-bar-right { flex-basis: 78px; font-size: 0.5rem; }
+            .logo-main { font-size: 1.4rem; }
+            .nav-icons { gap: 0.55rem; }
+            .nav-pincode-container .pincode-controls { min-height: 34px; }
+            .nav-pincode-container input { width: auto; }
+            .product-image { height: 88vw; }
         }
     </style>
 </head>
