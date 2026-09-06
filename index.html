@@ -82,7 +82,7 @@
         .nav-pincode-container input { color: #4B4547; width: auto; flex: 1 1 auto; border-bottom: none; letter-spacing: 0; font-size: 0.78rem; }
         .nav-pincode-container input::placeholder { color: var(--text-muted); }
         .nav-pincode-container .pin-icon { color: #A62451; font-size: 1rem; }
-        .nav-pincode-container button { width: 100px; height: 36px; padding: 0; display: grid; place-items: center; font-size: 0.68rem; background: linear-gradient(135deg, #A62451, #7B173B); color: #FFF; border-radius: 999px; letter-spacing: 0.8px; }
+        .nav-pincode-container button { flex: 0 0 100px; width: 100px; height: 36px; padding: 0; display: grid; place-items: center; visibility: visible; opacity: 1; border: 0; font-size: 0.68rem; background: linear-gradient(135deg, #A62451, #7B173B); color: #FFF; border-radius: 999px; letter-spacing: 0.8px; }
         .nav-pincode-container button::after { content: none; }
         .nav-pincode-container button:hover { background: #3F252C; }
         .nav-pincode-container #pin-msg { color: var(--text-muted); }
@@ -92,7 +92,7 @@
             .navbar { padding: 1.1rem 5%; }
             .nav-links { gap: 1.75rem; }
             .nav-icons { gap: 1rem; }
-            .nav-pincode-container { width: 220px; }
+            .nav-pincode-container { flex: 0 0 220px; width: 220px; }
         }
 
         /* Navbar */
@@ -330,7 +330,7 @@
             .top-bar-right { flex: 0 0 88px; padding-left: 0.6rem; font-size: 0.56rem; }
             .nav-pincode-container { flex: 1 0 100%; width: 100%; margin-left: 0; }
             .nav-pincode-container input { width: 48px; font-size: 0.64rem; }
-            .nav-pincode-container button { width: 92px; height: 30px; font-size: 0.62rem; }
+            .nav-pincode-container button { flex-basis: 92px; width: 92px; height: 30px; font-size: 0.62rem; }
             .nav-pincode-container #pin-msg { display: none; }
             .nav-pincode-container #pin-location { font-size: 0.52rem; }
             .nav-links { display: none; } /* Simplified for mobile */
