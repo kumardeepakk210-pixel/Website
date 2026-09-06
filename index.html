@@ -362,22 +362,68 @@
         .footer-links a:hover { color: #FFF; }
         .copyright { color: #888; font-size: 0.75rem; }
         
+        /* --- Refactored Mobile Navbar layout --- */
         @media (max-width: 760px) {
             .hero { grid-template-columns: 1fr; }
             .hero-left { min-height: 360px; padding: 3.5rem 7%; }
-            .navbar { padding: 1rem 5%; flex-wrap: wrap; row-gap: 0.75rem; }
-            .logo { flex: 1 1 auto; min-width: 0; text-align: left; }
-            .logo-main { font-size: 1.65rem; letter-spacing: 0.16em; }
-            .nav-icons { margin-left: auto; gap: 0.8rem; font-size: 1.05rem; flex-wrap: wrap; justify-content: flex-end; }
+            
+            /* Navbar Structuring */
+            .navbar { 
+                padding: 1rem 5%; 
+                display: flex;
+                flex-wrap: wrap;
+                justify-content: space-between;
+                align-items: center;
+                gap: 1rem;
+            }
+            .logo { 
+                flex: 1 1 auto;
+                text-align: left; 
+                order: 1; /* First row, left */
+            }
+            .logo-main { font-size: 1.8rem; letter-spacing: 0.15em; }
+            .logo-sub { display: none; } 
+            
+            .nav-icons { 
+                flex: 0 0 auto;
+                display: flex; 
+                justify-content: flex-end; 
+                gap: 0.8rem; 
+                font-size: 1.1rem;
+                order: 2; /* First row, right */
+            }
+            
+            .nav-pincode-container { 
+                flex: 0 0 100%;
+                width: 100%; 
+                max-width: 100%;
+                margin: 0; 
+                order: 3; /* Second row, full width */
+            }
+            .nav-pincode-container .pincode-controls { height: 40px; }
+            .nav-pincode-container input { width: auto; font-size: 0.8rem; }
+            .nav-pincode-container button { height: 40px; padding: 0 1.2rem; font-size: 0.75rem; }
+            .nav-pincode-container #pin-msg { display: none; }
+            .nav-pincode-container #pin-location { font-size: 0.52rem; }
+            
+            /* Restore Navigation Links on Mobile (Scrollable) */
+            .nav-links { 
+                flex: 0 0 100%;
+                display: flex; 
+                overflow-x: auto;
+                gap: 1.5rem;
+                padding: 0.8rem 0 0.2rem;
+                border-top: 1px solid var(--border);
+                order: 4; /* Third row, below pincode */
+                -webkit-overflow-scrolling: touch;
+            } 
+            .nav-links::-webkit-scrollbar { display: none; }
+
+            /* Top Bar Mobile Tweaks */
             .top-bar { padding: 0 0.75rem; font-size: 0.58rem; }
             .top-bar-center { min-width: 0; }
             .top-bar-right { flex: 0 0 88px; padding-left: 0.6rem; font-size: 0.56rem; }
-            .nav-pincode-container { flex: 1 0 100%; width: 100%; margin-left: 0; }
-            .nav-pincode-container input { width: auto; font-size: 0.8rem; }
-            .nav-pincode-container button { padding: 0 1.2rem; font-size: 0.75rem; }
-            .nav-pincode-container #pin-msg { display: none; }
-            .nav-pincode-container #pin-location { font-size: 0.52rem; }
-            .nav-links { display: none; }
+            
             .hero h1 { font-size: 2.7rem; }
             .hero p { font-size: 0.92rem; }
             .hero-buttons { flex-wrap: wrap; gap: 0.75rem; }
