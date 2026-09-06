@@ -77,14 +77,14 @@
         .pincode-container button:hover { background: #EAEAEA; }
         #pin-msg { font-size: 0.62rem; font-weight: 500; white-space: nowrap; }
         #pin-location { display: inline-block; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: 0.65rem; color: #FFF; white-space: nowrap; }
-        .nav-pincode-container { position: relative; width: 190px; display: flex; flex-direction: column; align-items: stretch; gap: 0.15rem; margin-left: 0.25rem; color: var(--dark); }
-        .nav-pincode-container .pincode-controls { width: 100%; }
-        .nav-pincode-container input { color: var(--dark); width: 70px; border-bottom: 1px solid var(--border); }
+        .nav-pincode-container { position: relative; width: 250px; display: flex; flex-direction: column; align-items: stretch; gap: 0.3rem; margin-left: 0.25rem; color: var(--dark); }
+        .nav-pincode-container .pincode-controls { width: 100%; border: 1px solid var(--border); padding: 0.25rem 0.4rem; }
+        .nav-pincode-container input { color: var(--dark); width: auto; flex: 1 1 auto; border-bottom: 1px solid var(--border); }
         .nav-pincode-container input::placeholder { color: var(--text-muted); }
         .nav-pincode-container .pin-icon { color: #E45757; }
         .nav-pincode-container button { padding: 0.3rem 0.55rem; font-size: 0.62rem; }
         .nav-pincode-container #pin-msg { color: var(--text-muted); }
-        .nav-pincode-container #pin-location { display: none; color: var(--text-muted); padding-left: 1.35rem; font-size: 0.58rem; }
+        .nav-pincode-container #pin-location { display: none; color: var(--text-muted); padding: 0 0.4rem; font-size: 0.62rem; line-height: 1.2; }
 
         /* Navbar */
         .navbar { 
@@ -315,7 +315,7 @@
             .top-bar { padding: 0 0.75rem; font-size: 0.58rem; }
             .top-bar-center { min-width: 0; }
             .top-bar-right { flex: 0 0 88px; padding-left: 0.6rem; font-size: 0.56rem; }
-            .nav-pincode-container { width: 125px; margin-left: 0; }
+            .nav-pincode-container { width: 150px; margin-left: 0; }
             .nav-pincode-container input { width: 48px; font-size: 0.64rem; }
             .nav-pincode-container button { padding: 0.25rem 0.4rem; font-size: 0.58rem; }
             .nav-pincode-container #pin-msg { display: none; }
@@ -860,9 +860,9 @@
                 }
 
                 const locationName = [location.District, location.State].filter(Boolean).join(', ');
-                msgElement.innerText = "✓ Delivery Available";
-                msgElement.style.color = "#A8E6CF";
-                locationElement.innerText = `📍 ${locationName}`;
+                msgElement.innerText = "";
+                locationElement.innerText = `✓ ${locationName} - Delivery Available`;
+                locationElement.style.color = "#18794E";
                 locationElement.style.display = "inline";
             } catch (error) {
                 msgElement.innerText = "✕ Unable to verify pincode";
