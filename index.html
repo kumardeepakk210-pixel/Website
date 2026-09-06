@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wishrite | Premium Silver Jewellery</title>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+    <style>
+        /* Base Reset & Variables */
+        :root {
+            --dark: #1A1A1A;
+            --light-bg: #FAF9F6;
+            --border: #E8E6E1;
+            --text-muted: #555555;
+            --accent: #8C8C8C;
+            --transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body { 
+            font-family: 'Inter', sans-serif; 
+            color: var(--dark); 
+            background: #FFFFFF; 
+            -webkit-font-smoothing: antialiased;
+        }
+
+        h1, h2, h3, .logo-main, .script-text { 
+            font-family: 'Playfair Display', serif; 
+            font-weight: 400; 
+        }
+
+        .img-bg { 
+            background-color: var(--border); 
+            background-size: cover; 
+            background-position: center; 
+            transition: transform 0.8s ease;
+        }
+
+        /* Top Bar & Enhanced Pincode */
+        .top-bar { 
+            background: var(--dark); 
+            color: #FFF; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center;
+            padding: 0.75rem 5%; 
+            font-size: 0.7rem; 
+            letter-spacing: 1.5px; 
+            position: relative; 
+            text-transform: uppercase;
+        }
+        .top-bar-currency { position: absolute; right: 5%; cursor: pointer;}
+        
+        .pincode-container { 
+            position: absolute; left: 5%; display: flex; align-items: center; gap: 0.4rem;
+            background: rgba(255, 255, 255, 0.15); padding: 0.25rem 0.4rem; border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.2); backdrop-filter: blur(4px); text-transform: none;
+        }
+        .pincode-container span.pin-icon { font-size: 0.85rem; margin-left: 0.3rem; }
+        .pincode-container input { 
+            padding: 0.2rem 0.5rem; border: none; font-size: 0.75rem; 
+            font-family: 'Inter', sans-serif; width: 110px; outline: none;
+            background: transparent; color: #FFF;
+        }
+        .pincode-container input::placeholder { color: rgba(255,255,255,0.7); }
+        .pincode-container button { 
+            padding: 0.3rem 0.8rem; border: none; background: #FFF; color: var(--dark); 
+            cursor: pointer; border-radius: 15px; font-weight: 600; font-size: 0.7rem; transition: background 0.3s;
+        }
+        .pincode-container button:hover { background: #EAEAEA; }
+        #pin-msg { font-size: 0.7rem; font-weight: 500; margin-left: 0.2rem; margin-right: 0.5rem; }
+
+        /* Navbar */
+        .navbar { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            padding: 1.5rem 5%; 
+            border-bottom: 1px solid var(--border); 
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .logo { text-align: center; cursor: pointer; }
+        .logo-main { font-size: 2.2rem; letter-spacing: 5px; color: var(--dark); }
+        .logo-sub { font-size: 0.6rem; letter-spacing: 2.5px; color: var(--accent); margin-top: 4px;}
+        .nav-links { display: flex; gap: 2.5rem; }
+        .nav-links a { 
+            text-decoration: none; 
+            color: var(--dark); 
+            font-size: 0.85rem; 
+            position: relative;
+            transition: var(--transition);
+            cursor: pointer;
+        }
+        .nav-links a::after {
+            content: ''; position: absolute; width: 0; height: 1px;
+            bottom: -4px; left: 0; background-color: var(--dark);
+            transition: var(--transition);
+        }
+        .nav-links a:hover::after, .nav-links a.active::after { width: 100%; }
+        .nav-icons { display: flex; gap: 1.5rem; font-size: 1.2rem; align-items: center; cursor: pointer; }
+        
+        /* Search, Cart & Wishlist */
+        .search-wrapper { position: relative; display: flex; align-items: center; }
+        .search-input { 
+            position: absolute; right: 30px; width: 0; padding: 0; border: none; 
+            border-bottom: 1px solid var(--dark); background: #FFF; outline: none; 
+            font-family: 'Inter', sans-serif; transition: all 0.3s ease; opacity: 0; z-index: 10;
+        }
+        .search-input.active { width: 220px; padding: 0.4rem; opacity: 1; }
+        .cart-icon, .wishlist-icon { position: relative; }
+        .cart-count { 
+            position: absolute; top: -6px; right: -10px; 
+            background: var(--dark); color: #FFF; 
+            font-size: 0.6rem; border-radius: 50%; 
+            width: 18px; height: 18px; display: flex; 
+            align-items: center; justify-content: center;
+        }
+        #nav-wishlist { display: none; color: #e74c3c; }
+
+        /* User Dropdown Menu */
+        .user-menu-wrapper { position: relative; }
+        .user-dropdown {
+            display: none; position: absolute; right: 0; top: 30px;
+            background: #FFF; border: 1px solid var(--border);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.05); min-width: 160px;
+            flex-direction: column; text-align: left; z-index: 101;
+        }
+        .user-dropdown.show { display: flex; }
+        .user-dropdown a { 
+            padding: 0.8rem 1.2rem; color: var(--dark); font-size: 0.85rem; 
+            text-decoration: none; border-bottom: 1px solid var(--border); transition: background 0.3s;
+        }
+        .user-dropdown a:hover { background: var(--light-bg); }
+        .user-dropdown a:last-child { border-bottom: none; }
+
+        /* Auth Forms */
+        .auth-section { display: flex; justify-content: center; align-items: center; padding: 6rem 5%; background: var(--light-bg); min-height: 70vh;}
+        .auth-card { background: #FFF; padding: 3rem; border: 1px solid var(--border); width: 100%; max-width: 450px; text-align: center;}
+        .auth-card h2 { font-size: 2.5rem; margin-bottom: 2rem; }
+        .form-group { text-align: left; margin-bottom: 1.5rem; }
+        .form-group label { display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem; }
+        .form-group input { width: 100%; padding: 0.8rem; border: 1px solid var(--border); font-family: 'Inter', sans-serif; outline: none; transition: border-color 0.3s;}
+        .form-group input:focus { border-color: var(--dark); }
+        .auth-card .btn-solid { width: 100%; display: block; text-align: center; margin-top: 1rem; border: none;}
+        .auth-links { margin-top: 1.5rem; font-size: 0.85rem; color: var(--text-muted); }
+        .auth-links a { color: var(--dark); text-decoration: underline; cursor: pointer; }
+
+        /* Profile */
+        .profile-header { text-align: center; padding: 4rem 5% 2rem; background: var(--light-bg); }
+        .profile-content { max-width: 800px; margin: 0 auto; padding: 4rem 5%; }
+        .order-card { border: 1px solid var(--border); padding: 1.5rem; margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center;}
+
+        /* Hero Section */
+        .hero {
+            display: grid;
+            grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+            align-items: stretch;
+            min-height: 430px;
+            background: var(--light-bg);
+        }
+        .hero-left {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            padding: 4rem 8%;
+        }
+        .hero-carousel {
+            position: relative;
+            min-height: 430px;
+            overflow: hidden;
+            background: #e9e5dc;
+        }
+        .hero-slide {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            background-size: cover;
+            background-position: center;
+            transform: scale(1.04);
+            transition: opacity 0.8s ease, transform 6s ease;
+        }
+        .hero-slide.active { opacity: 1; transform: scale(1); }
+        .hero-carousel::after {
+            content: ''; position: absolute; inset: 0;
+            background: linear-gradient(90deg, rgba(26,26,26,0.08), transparent 45%), linear-gradient(0deg, rgba(26,26,26,0.25), transparent 35%);
+            pointer-events: none;
+        }
+        .hero-dots { position: absolute; z-index: 2; left: 2rem; bottom: 1.75rem; display: flex; gap: 0.5rem; }
+        .hero-dot {
+            width: 28px; height: 3px; border: 0; padding: 0;
+            background: rgba(255,255,255,0.55); cursor: pointer; transition: var(--transition);
+        }
+        .hero-dot.active { background: #FFF; width: 46px; }
+        .hero-slide-label {
+            position: absolute; z-index: 2; right: 2rem; bottom: 1.7rem;
+            color: #FFF; font-size: 0.65rem; letter-spacing: 2px; text-transform: uppercase;
+        }
+        .hero-subtitle { font-size: 0.75rem; letter-spacing: 3px; margin-bottom: 1.5rem; color: var(--accent); }
+        .hero h1 { font-size: clamp(2.5rem, 4vw, 4.5rem); line-height: 1.05; margin-bottom: 1.25rem; color: var(--dark); }
+        .hero p { font-size: 1rem; color: var(--text-muted); margin-bottom: 2rem; line-height: 1.6; font-weight: 300;}
+        .hero-buttons { display: flex; gap: 1.5rem; }
+        .btn-solid, .btn-outline {
+            padding: 1rem 2.5rem; text-decoration: none; font-size: 0.8rem; 
+            letter-spacing: 1.5px; text-transform: uppercase; transition: var(--transition); cursor: pointer; display: inline-block;
+        }
+        .btn-solid { background: var(--dark); color: #FFF; border: 1px solid var(--dark); }
+        .btn-solid:hover { background: #333; }
+        .btn-outline { background: transparent; color: var(--dark); border: 1px solid var(--dark); }
+        .btn-outline:hover { background: var(--dark); color: #FFF; }
+
+        /* Trust Badges */
+        .trust-badges { 
+            display: flex; justify-content: space-around; padding: 4rem 5%; flex-wrap: wrap; gap: 2rem;
+            background: var(--light-bg); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); 
+        }
+        .badge { display: flex; align-items: center; gap: 1.2rem; font-size: 0.85rem; color: var(--dark); line-height: 1.5; font-weight: 500;}
+        .badge span { color: var(--text-muted); font-weight: 300; }
+
+        /* Product Cards */
+        .product-card { cursor: pointer; display: flex; flex-direction: column; }
+        .product-card:hover .product-image { background-size: 105%; }
+        .product-image { 
+            height: 380px; margin-bottom: 1.5rem; position: relative; 
+            display: flex; align-items: flex-end; padding: 1.5rem; 
+            background-size: 100%; background-repeat: no-repeat;
+            transition: background-size 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+        .heart-icon { 
+            position: absolute; top: 1.5rem; right: 1.5rem; background: rgba(255,255,255,0.9); 
+            width: 36px; height: 36px; border-radius: 50%; display: flex; 
+            align-items: center; justify-content: center; font-size: 1.2rem; 
+            transition: var(--transition); color: var(--text-muted);
+        }
+        .heart-icon:hover { background: var(--dark); color: #FFF; }
+        .heart-icon.active { color: #e74c3c; }
+        .heart-icon.active:hover { background: var(--light-bg); color: #e74c3c; }
+        .tag { font-size: 0.65rem; padding: 6px 12px; letter-spacing: 1.5px; text-transform: uppercase; background: #FFF; font-weight: 500;}
+        .tag-dark { background: var(--dark); color: #FFF; }
+        .product-card h3 { font-size: 1.2rem; margin-bottom: 0.5rem; font-family: 'Inter', sans-serif; font-weight: 400; }
+        .product-card p { font-size: 1.1rem; font-weight: 400; color: var(--text-muted); margin-bottom: 1rem; }
+        .add-to-cart-btn { 
+            margin-top: auto; padding: 0.75rem; border: 1px solid var(--dark); 
+            background: transparent; color: var(--dark); cursor: pointer; 
+            text-transform: uppercase; letter-spacing: 1px; font-size: 0.75rem; transition: all 0.3s;
+        }
+        .add-to-cart-btn:hover { background: var(--dark); color: #FFF; }
+
+        /* Bestsellers */
+        .bestsellers { padding: 8rem 5%; }
+        .section-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 4rem; }
+        .sub-label { font-size: 0.75rem; letter-spacing: 3px; color: var(--accent); text-transform: uppercase; display: block; margin-bottom: 1rem; }
+        .section-header h2 { font-size: 3.5rem; margin-bottom: 0.5rem; }
+        .section-header p { color: var(--text-muted); font-weight: 300; font-size: 1.1rem; }
+        .view-all { color: var(--dark); text-decoration: none; font-weight: 400; font-size: 0.9rem; border-bottom: 1px solid var(--dark); padding-bottom: 4px; letter-spacing: 1px; transition: var(--transition); cursor: pointer; }
+        .product-carousel { display: flex; gap: 2rem; overflow-x: auto; padding-bottom: 2rem; scrollbar-width: none; }
+        .product-carousel .product-card { min-width: 300px; flex: 1; }
+
+        /* Shop Grid */
+        .shop-header { text-align: center; padding: 6rem 5% 3rem; background: var(--light-bg); }
+        .shop-header h1 { font-size: 3.5rem; margin-bottom: 1rem; }
+        .shop-header p { color: var(--text-muted); font-weight: 300; font-size: 1.1rem; }
+        .shop-controls { display: flex; justify-content: space-between; padding: 2rem 5%; border-bottom: 1px solid var(--border); }
+        .shop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 3rem; padding: 4rem 5%; }
+
+        /* Cart View */
+        .cart-container { max-width: 900px; margin: 2rem auto 6rem; padding: 0 5%; min-height: 40vh; }
+        .cart-item { display: flex; justify-content: space-between; align-items: center; padding: 1.5rem 0; border-bottom: 1px solid var(--border); }
+        .cart-item-info { display: flex; align-items: center; gap: 1.5rem; }
+        .cart-img { width: 90px; height: 90px; background-size: cover; background-position: center; border-radius: 4px; }
+        .cart-summary { text-align: right; margin-top: 3rem; padding-top: 2rem; border-top: 2px solid var(--dark); }
+        .cart-summary h3 { font-size: 1.8rem; margin-bottom: 1.5rem; font-family: 'Inter', sans-serif; font-weight: 400; }
+
+        /* Footer */
+        .site-footer { background: var(--dark); color: #FFF; text-align: center; padding: 4rem 5% 2rem; }
+        .site-footer .logo-main { color: #FFF; margin-bottom: 2rem;}
+        .footer-links { margin-bottom: 2rem; }
+        .footer-links a { color: #CCC; text-decoration: none; margin: 0 1rem; font-size: 0.85rem; cursor: pointer; transition: 0.3s;}
+        .footer-links a:hover { color: #FFF; }
+        .copyright { color: #888; font-size: 0.75rem; }
+        
+        @media (max-width: 760px) {
+            .hero { grid-template-columns: 1fr; }
+            .hero-left { min-height: 360px; padding: 3.5rem 7%; }
+            .pincode-container { display: none; }
+            .nav-links { display: none; } /* Simplified for mobile */
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Top Bar -->
+    <div class="top-bar">
+        <!-- Beautified Pincode Search -->
+        <div class="pincode-container">
+            <span class="pin-icon">📍</span>
+            <input type="text" id="pincode-input" placeholder="Enter Pincode" maxlength="6" aria-label="Enter delivery pincode">
+            <button onclick="validatePincode()">CHECK</button>
+            <span id="pin-msg"></span>
+        </div>
+        
+        <div class="top-bar-text">FREE SHIPPING ON ALL ORDERS ABOVE ₹2,999 | 100% HALLMARKED SILVER</div>
+        <div class="top-bar-currency">India (INR) ⌄</div>
+    </div>
+
+    <!-- Navigation -->
+    <header class="navbar">
+        <div class="logo" onclick="navigateTo('home')">
+            <div class="logo-main">WISHRITE</div>
+            <div class="logo-sub">SILVER FOR A BRIGHTER YOU</div>
+        </div>
+        <nav class="nav-links">
+            <a onclick="navigateTo('home')" id="nav-home" class="active">Home</a>
+            <a onclick="navigateTo('shop')" id="nav-shop">Shop</a>
+            <a onclick="navigateTo('about')" id="nav-about">Our Story</a>
+        </nav>
+        <div class="nav-icons">
+            <!-- Search Widget -->
+            <div class="search-wrapper">
+                <input type="text" id="nav-search-input" class="search-input" placeholder="Search products..." oninput="handleSearch(this.value)">
+                <span class="icon" onclick="toggleSearch(event)">🔍</span>
+            </div>
+            
+            <!-- Dynamic Wishlist Icon -->
+            <span class="icon wishlist-icon" id="nav-wishlist" onclick="navigateTo('wishlist')">❤️<span class="cart-count" id="wishlist-count">0</span></span>
+            
+            <!-- Auth Dropdown -->
+            <div class="user-menu-wrapper">
+                <span class="icon" onclick="toggleUserDropdown(event)">👤</span>
+                <div class="user-dropdown" id="user-dropdown"></div>
+            </div>
+
+            <span class="icon cart-icon" onclick="navigateTo('cart')">🛍️<span class="cart-count" id="cart-count">0</span></span>
+        </div>
+    </header>
+
+    <!-- VIEWS CONTAINER -->
+    <main>
+        
+        <!-- HOME VIEW -->
+        <div id="home-view">
+            <!-- Hero Section -->
+            <section class="hero">
+                <div class="hero-left">
+                    <div class="hero-subtitle">TIMELESS | VERSATILE | YOURS</div>
+                    <h1>Modern Silver.<br>Lasting Stories.</h1>
+                    <p>Thoughtfully crafted silver jewellery for<br>everyday elegance and life's special moments.</p>
+                    <div class="hero-buttons">
+                        <a onclick="navigateTo('shop')" class="btn-solid">SHOP NOW →</a>
+                        <a onclick="navigateTo('about')" class="btn-outline">OUR STORY</a>
+                    </div>
+                </div>
+                <div class="hero-carousel" id="hero-carousel">
+                    <div class="hero-slide active" style="background-image: url('https://images.unsplash.com/photo-1617038220319-276d3cfab638?auto=format&fit=crop&w=1200&q=85')"></div>
+                    <div class="hero-slide" style="background-image: url('https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?auto=format&fit=crop&w=1200&q=85')"></div>
+                    <div class="hero-slide" style="background-image: url('https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?auto=format&fit=crop&w=1200&q=85')"></div>
+                    <div class="hero-dots">
+                        <button class="hero-dot active"></button>
+                        <button class="hero-dot"></button>
+                        <button class="hero-dot"></button>
+                    </div>
+                    <span class="hero-slide-label">More than jewellery</span>
+                </div>
+            </section>
+
+            <!-- Trust Badges -->
+            <section class="trust-badges">
+                <div class="badge">💎 <span>925<br>Hallmarked Silver</span></div>
+                <div class="badge">🚚 <span>Free Shipping<br>Above ₹2,999</span></div>
+                <div class="badge">🎁 <span>Elegant Packaging<br>For Every Order</span></div>
+                <div class="badge">🛡️ <span>Trusted by<br>10,000+ Customers</span></div>
+            </section>
+
+            <!-- Bestsellers -->
+            <section class="bestsellers">
+                <div class="section-header">
+                    <div>
+                        <span class="sub-label">CURATED FOR YOU</span>
+                        <h2>Bestsellers</h2>
+                        <p>Loved by many, made for you.</p>
+                    </div>
+                    <a onclick="navigateTo('shop')" class="view-all">View All →</a>
+                </div>
+                
+                <div class="product-carousel" id="bestsellers-container"></div>
+            </section>
+        </div>
+
+        <!-- SHOP / SEARCH VIEW -->
+        <div id="shop-view" style="display: none;">
+            <div class="shop-header">
+                <h1 id="shop-title">All Collections</h1>
+                <p>Discover our complete range of premium 925 sterling silver.</p>
+            </div>
+            
+            <div class="shop-controls">
+                <div class="filter-group">
+                    <select><option>Category: All</option><option>Earrings</option><option>Necklaces</option></select>
+                </div>
+                <div class="sort-group">
+                    <select><option>Sort by: Featured</option><option>Price: Low to High</option></select>
+                </div>
+            </div>
+
+            <div class="shop-grid" id="shop-grid-container"></div>
+        </div>
+
+        <!-- CART VIEW -->
+        <div id="cart-view" style="display: none;">
+            <div class="shop-header">
+                <h1>Shopping Cart</h1>
+                <p>Review your selected pieces.</p>
+            </div>
+            
+            <div class="cart-container">
+                <div id="cart-items-container">
+                    <p style="text-align: center; color: var(--text-muted); margin-top: 3rem;">Your cart is currently empty.</p>
+                </div>
+                <div class="cart-summary" id="cart-summary" style="display: none;">
+                    <h3>Subtotal: <span id="cart-total">₹0</span></h3>
+                    <p style="color: var(--text-muted); margin-bottom: 2rem; font-size: 0.9rem;">Shipping and taxes calculated at checkout.</p>
+                    <button class="btn-solid" style="padding: 1rem 3rem; font-size: 0.9rem;">PROCEED TO CHECKOUT</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- WISHLIST VIEW -->
+        <div id="wishlist-view" style="display: none;">
+            <div class="shop-header">
+                <h1>My Wishlist</h1>
+                <p>Pieces you've saved for later.</p>
+            </div>
+            <div class="shop-grid" id="wishlist-grid-container"></div>
+        </div>
+
+        <!-- ABOUT VIEW -->
+        <div id="about-view" style="display: none;">
+            <div class="about-header">
+                <h1>Our Story</h1>
+                <p>At WishRite, we believe silver is more than a metal — it's a story of self-expression, heritage, and a brighter tomorrow.</p>
+            </div>
+        </div>
+
+        <!-- LOGIN VIEW -->
+        <div id="login-view" style="display: none;" class="auth-section">
+            <div class="auth-card">
+                <h2>Login</h2>
+                <form onsubmit="handleLogin(event)">
+                    <div class="form-group">
+                        <label>Email Address</label>
+                        <input type="email" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Password</label>
+                        <input type="password" required>
+                    </div>
+                    <button type="submit" class="btn-solid">Sign In</button>
+                </form>
+                <div class="auth-links">Don't have an account? <a onclick="navigateTo('register')">Create one</a></div>
+            </div>
+        </div>
+
+        <!-- REGISTER VIEW -->
+        <div id="register-view" style="display: none;" class="auth-section">
+            <div class="auth-card">
+                <h2>Create Account</h2>
+                <form onsubmit="handleRegister(event)">
+                    <div class="form-group"><label>Full Name</label><input type="text" required></div>
+                    <div class="form-group"><label>Email Address</label><input type="email" required></div>
+                    <div class="form-group"><label>Password</label><input type="password" required></div>
+                    <button type="submit" class="btn-solid">Register</button>
+                </form>
+                <div class="auth-links">Already have an account? <a onclick="navigateTo('login')">Login here</a></div>
+            </div>
+        </div>
+
+        <!-- PROFILE VIEW -->
+        <div id="profile-view" style="display: none;">
+            <div class="profile-header">
+                <h1>My Profile</h1>
+                <p>Welcome back! Manage your account and view recent orders.</p>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Global Footer -->
+    <footer class="site-footer">
+        <div class="logo-main" style="cursor:pointer;" onclick="navigateTo('home')">WISHRITE</div>
+        <p class="copyright">&copy; 2026 Wishrite. All Rights Reserved.</p>
+    </footer>
+
+    <script>
+        // --- Database Payload ---
+        const productsDB = [
+            { id: 1, name: "Petal Drop Earrings", price: "2,499", image: "https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?auto=format&fit=crop&w=600&q=80", tag: "BESTSELLER", isBestseller: true },
+            { id: 2, name: "Luna Pendant", price: "2,999", image: "https://images.unsplash.com/photo-1599643478514-4a4e0f6c2dc1?auto=format&fit=crop&w=600&q=80", tag: "NEW", isBestseller: true },
+            { id: 3, name: "Eternal Ring", price: "1,999", image: "https://images.unsplash.com/photo-1605100804763-247f67b2548e?auto=format&fit=crop&w=600&q=80", tag: "", isBestseller: true },
+            { id: 4, name: "Bloom Bracelet", price: "2,299", image: "https://images.unsplash.com/photo-1611591437281-460bfbe1220a?auto=format&fit=crop&w=600&q=80", tag: "", isBestseller: true },
+            { id: 5, name: "Radiance Anklet", price: "1,899", image: "https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?auto=format&fit=crop&w=600&q=80", tag: "", isBestseller: false },
+            { id: 6, name: "Onyx Men's Band", price: "2,799", image: "https://images.unsplash.com/photo-1588444837495-c6cfeb53f32d?auto=format&fit=crop&w=600&q=80", tag: "", isBestseller: false },
+            { id: 7, name: "Heritage Silver Set", price: "5,499", image: "https://images.unsplash.com/photo-1549439602-43ebca2327af?auto=format&fit=crop&w=600&q=80", tag: "GIFT SET", isBestseller: false },
+            { id: 8, name: "Solitaire Stacker", price: "1,499", image: "https://images.unsplash.com/photo-1605100804763-247f67b2548e?auto=format&fit=crop&w=600&q=80", tag: "", isBestseller: false }
+        ];
+
+        // --- State Management ---
+        let cart = [];
+        let wishlist = new Set();
+        let isLoggedIn = false;
+
+        // --- Product Rendering & State Modifiers ---
+        function createProductHTML(product) {
+            const tagHTML = product.tag ? `<span class="tag tag-dark">${product.tag}</span>` : '';
+            const isActive = wishlist.has(product.id) ? 'active' : '';
+            return `
+                <div class="product-card">
+                    <div class="product-image img-bg" style="background-image: url('${product.image}')" onclick="navigateTo('shop')">
+                        ${tagHTML}
+                        <span class="heart-icon ${isActive}" onclick="toggleWishlist(${product.id}, event)">${isActive ? '❤️' : '♡'}</span>
+                    </div>
+                    <h3>${product.name}</h3>
+                    <p>₹${product.price}</p>
+                    <button class="add-to-cart-btn" onclick="addToCart(${product.id}, event)">Add to Cart</button>
+                </div>
+            `;
+        }
+
+        function renderProductsToContainer(products, containerId) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = products.length ? products.map(createProductHTML).join('') : '<p style="grid-column: 1/-1; text-align: center; color: var(--text-muted);">No products found.</p>';
+        }
+
+        function mapProductsToUI() {
+            renderProductsToContainer(productsDB.filter(p => p.isBestseller), 'bestsellers-container');
+            renderProductsToContainer(productsDB, 'shop-grid-container');
+            if (document.getElementById('wishlist-view').style.display === 'block') renderWishlist();
+        }
+
+        // --- Cart Logic ---
+        function addToCart(id, event) {
+            if (event) event.stopPropagation();
+            const product = productsDB.find(p => p.id === id);
+            cart.push(product);
+            document.getElementById('cart-count').innerText = cart.length;
+            renderCart();
+            // Subtle flash feedback
+            const btn = event.target;
+            const originalText = btn.innerText;
+            btn.innerText = "Added!";
+            btn.style.background = "var(--dark)"; btn.style.color = "#FFF";
+            setTimeout(() => { btn.innerText = originalText; btn.style.background = ""; btn.style.color = ""; }, 1000);
+        }
+
+        function removeFromCart(index) {
+            cart.splice(index, 1);
+            document.getElementById('cart-count').innerText = cart.length;
+            renderCart();
+        }
+
+        function renderCart() {
+            const container = document.getElementById('cart-items-container');
+            const summary = document.getElementById('cart-summary');
+            
+            if(cart.length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: var(--text-muted); margin-top: 3rem;">Your cart is currently empty.</p>';
+                summary.style.display = 'none';
+                return;
+            }
+            
+            let total = 0;
+            container.innerHTML = cart.map((item, index) => {
+                total += parseInt(item.price.replace(/,/g, ''));
+                return `
+                    <div class="cart-item">
+                        <div class="cart-item-info">
+                            <div class="cart-img" style="background-image: url('${item.image}')"></div>
+                            <div>
+                                <h4 style="font-weight: 500; font-family: 'Inter', sans-serif;">${item.name}</h4>
+                                <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 0.3rem;">₹${item.price}</p>
+                            </div>
+                        </div>
+                        <button class="add-to-cart-btn" style="border: none; border-bottom: 1px solid var(--dark); padding: 0.2rem;" onclick="removeFromCart(${index})">Remove</button>
+                    </div>
+                `;
+            }).join('');
+            
+            summary.style.display = 'block';
+            document.getElementById('cart-total').innerText = '₹' + total.toLocaleString('en-IN');
+        }
+
+        // --- Wishlist Logic ---
+        function toggleWishlist(id, event) {
+            if (event) event.stopPropagation();
+            wishlist.has(id) ? wishlist.delete(id) : wishlist.add(id);
+            
+            // Update UI components
+            const icon = document.getElementById('nav-wishlist');
+            document.getElementById('wishlist-count').innerText = wishlist.size;
+            icon.style.display = wishlist.size > 0 ? 'inline-block' : 'none';
+            
+            mapProductsToUI(); 
+        }
+
+        function renderWishlist() {
+            const wishlistProducts = productsDB.filter(p => wishlist.has(p.id));
+            if (wishlistProducts.length === 0) {
+                document.getElementById('wishlist-grid-container').innerHTML = '<p style="grid-column: 1/-1; text-align:center; color: var(--text-muted);">Your wishlist is empty.</p>';
+            } else {
+                renderProductsToContainer(wishlistProducts, 'wishlist-grid-container');
+            }
+        }
+
+        // --- Search Logic ---
+        function toggleSearch(event) {
+            event.stopPropagation();
+            const input = document.getElementById('nav-search-input');
+            input.classList.toggle('active');
+            if(input.classList.contains('active')) input.focus();
+        }
+
+        function handleSearch(query) {
+            if (document.getElementById('shop-view').style.display === 'none') navigateTo('shop');
+            const lowerQuery = query.toLowerCase();
+            const filtered = productsDB.filter(p => p.name.toLowerCase().includes(lowerQuery));
+            document.getElementById('shop-title').innerText = query ? `Search Results for "${query}"` : 'All Collections';
+            renderProductsToContainer(filtered, 'shop-grid-container');
+        }
+
+        // Close search on outside click
+        document.addEventListener('click', (e) => {
+            const searchInput = document.getElementById('nav-search-input');
+            if (searchInput.classList.contains('active') && !e.target.closest('.search-wrapper')) {
+                searchInput.classList.remove('active');
+            }
+        });
+
+        // --- Auth & Dropdown Logic ---
+        function updateAuthDropdown() {
+            const dropdown = document.getElementById('user-dropdown');
+            dropdown.innerHTML = isLoggedIn ? 
+                `<a onclick="navigateTo('profile')">My Profile</a><a onclick="handleLogout()">Logout</a>` : 
+                `<a onclick="navigateTo('login')">Login</a><a onclick="navigateTo('register')">Register</a>`;
+        }
+
+        function toggleUserDropdown(event) {
+            event.stopPropagation();
+            document.getElementById('user-dropdown').classList.toggle('show');
+        }
+
+        window.onclick = function(event) {
+            if (!event.target.matches('.user-menu-wrapper .icon')) {
+                document.querySelectorAll(".user-dropdown").forEach(d => d.classList.remove('show'));
+            }
+        }
+
+        function handleLogin(e) { e.preventDefault(); isLoggedIn = true; updateAuthDropdown(); navigateTo('profile'); }
+        function handleRegister(e) { e.preventDefault(); isLoggedIn = true; updateAuthDropdown(); navigateTo('profile'); }
+        function handleLogout() { isLoggedIn = false; updateAuthDropdown(); navigateTo('home'); }
+
+        // --- Pincode Validation ---
+        function validatePincode() {
+            const pinInput = document.getElementById('pincode-input').value.trim();
+            const msgElement = document.getElementById('pin-msg');
+            if (pinInput.length === 6 && !isNaN(pinInput)) {
+                msgElement.innerText = "✓ Delivery Available"; msgElement.style.color = "#A8E6CF";
+            } else {
+                msgElement.innerText = "✕ Invalid Pincode"; msgElement.style.color = "#FF8A80";
+            }
+        }
+
+        // --- Router ---
+        const views = ['home', 'shop', 'about', 'login', 'register', 'profile', 'cart', 'wishlist'];
+        function navigateTo(viewId) {
+            views.forEach(v => { const el = document.getElementById(v + '-view'); if(el) el.style.display = 'none'; });
+            document.querySelectorAll('.nav-links a').forEach(a => a.classList.remove('active'));
+
+            const targetView = document.getElementById(viewId + '-view');
+            if(targetView) targetView.style.display = (viewId === 'login' || viewId === 'register') ? 'flex' : 'block';
+            
+            const activeNav = document.getElementById('nav-' + viewId);
+            if (activeNav) activeNav.classList.add('active');
+            
+            if (viewId === 'wishlist') renderWishlist();
+
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            document.getElementById('user-dropdown').classList.remove('show');
+        }
+
+        // --- Init ---
+        document.addEventListener('DOMContentLoaded', () => {
+            mapProductsToUI();
+            updateAuthDropdown();
+            renderCart();
+            
+            // Basic Hero Carousel Init
+            const slides = document.querySelectorAll('.hero-slide');
+            const dots = document.querySelectorAll('.hero-dot');
+            if(slides.length) {
+                let current = 0;
+                setInterval(() => {
+                    slides[current].classList.remove('active');
+                    dots[current].classList.remove('active');
+                    current = (current + 1) % slides.length;
+                    slides[current].classList.add('active');
+                    dots[current].classList.add('active');
+                }, 5000);
+            }
+        });
+    </script>
+</body>
+</html>
