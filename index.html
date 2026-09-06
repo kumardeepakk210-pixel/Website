@@ -54,7 +54,6 @@
             overflow: hidden;
         }
         .top-bar-section { display: flex; align-items: center; min-width: 0; height: 42px; }
-        .top-bar-left { flex: 0 1 360px; min-width: 300px; padding-right: 1.25rem; }
         .top-bar-center { flex: 1 1 auto; min-width: 0; border-left: 1px solid rgba(255,255,255,0.16); border-right: 1px solid rgba(255,255,255,0.16); }
         .top-bar-right { flex: 0 0 130px; justify-content: flex-end; padding-left: 1.25rem; white-space: nowrap; }
         .top-bar-currency { cursor: pointer; }
@@ -78,6 +77,14 @@
         .pincode-container button:hover { background: #EAEAEA; }
         #pin-msg { font-size: 0.62rem; font-weight: 500; white-space: nowrap; }
         #pin-location { display: inline-block; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: 0.65rem; color: #FFF; white-space: nowrap; }
+        .nav-pincode-container { position: relative; width: 190px; display: flex; flex-direction: column; align-items: stretch; gap: 0.15rem; margin-left: 0.25rem; color: var(--dark); }
+        .nav-pincode-container .pincode-controls { width: 100%; }
+        .nav-pincode-container input { color: var(--dark); width: 70px; border-bottom: 1px solid var(--border); }
+        .nav-pincode-container input::placeholder { color: var(--text-muted); }
+        .nav-pincode-container .pin-icon { color: #E45757; }
+        .nav-pincode-container button { padding: 0.3rem 0.55rem; font-size: 0.62rem; }
+        .nav-pincode-container #pin-msg { color: var(--text-muted); }
+        .nav-pincode-container #pin-location { display: none; color: var(--text-muted); padding-left: 1.35rem; font-size: 0.58rem; }
 
         /* Navbar */
         .navbar { 
@@ -306,13 +313,13 @@
             .hero { grid-template-columns: 1fr; }
             .hero-left { min-height: 360px; padding: 3.5rem 7%; }
             .top-bar { padding: 0 0.75rem; font-size: 0.58rem; }
-            .top-bar-left { flex: 0 0 195px; min-width: 195px; padding-right: 0.6rem; }
             .top-bar-center { min-width: 0; }
             .top-bar-right { flex: 0 0 88px; padding-left: 0.6rem; font-size: 0.56rem; }
-            .pincode-container input { width: 64px; font-size: 0.64rem; }
-            .pincode-container button { padding: 0.25rem 0.5rem; font-size: 0.6rem; }
-            #pin-msg { display: none; }
-            #pin-location { font-size: 0.58rem; }
+            .nav-pincode-container { width: 125px; margin-left: 0; }
+            .nav-pincode-container input { width: 48px; font-size: 0.64rem; }
+            .nav-pincode-container button { padding: 0.25rem 0.4rem; font-size: 0.58rem; }
+            .nav-pincode-container #pin-msg { display: none; }
+            .nav-pincode-container #pin-location { font-size: 0.52rem; }
             .nav-links { display: none; } /* Simplified for mobile */
             .auth-card { padding: 2rem 1.25rem; }
         }
@@ -322,17 +329,6 @@
 
     <!-- Top Bar -->
     <div class="top-bar">
-        <div class="top-bar-section top-bar-left">
-            <div class="pincode-container">
-                <div class="pincode-controls">
-                    <span class="pin-icon" aria-hidden="true">📍</span>
-                    <input type="text" id="pincode-input" value="700092" maxlength="6" aria-label="Enter delivery pincode">
-                    <button onclick="validatePincode()">CHECK</button>
-                    <span id="pin-msg" role="status" aria-live="polite"></span>
-                </div>
-                <span id="pin-location" aria-live="polite">700092 • Kolkata, West Bengal</span>
-            </div>
-        </div>
         <div class="top-bar-section top-bar-center">
             <div class="marquee" aria-label="Store announcements">
                 <div class="marquee-track">
@@ -374,6 +370,15 @@
             </div>
 
             <span class="icon cart-icon" onclick="navigateTo('cart')">🛍️<span class="cart-count" id="cart-count">0</span></span>
+            <div class="pincode-container nav-pincode-container">
+                <div class="pincode-controls">
+                    <span class="pin-icon" aria-hidden="true">📍</span>
+                    <input type="text" id="pincode-input" value="" maxlength="6" placeholder="Pincode" aria-label="Enter delivery pincode">
+                    <button onclick="validatePincode()">CHECK</button>
+                    <span id="pin-msg" role="status" aria-live="polite"></span>
+                </div>
+                <span id="pin-location" aria-live="polite"></span>
+            </div>
         </div>
     </header>
 
