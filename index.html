@@ -53,12 +53,18 @@
             text-transform: uppercase;
         }
         .top-bar-currency { position: absolute; right: 5%; cursor: pointer;}
+        .top-bar-text { animation: topBarFlash 2.4s ease-in-out infinite; }
+        @keyframes topBarFlash {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; color: #A8E6CF; }
+        }
         
         .pincode-container { 
-            position: absolute; left: 5%; display: flex; align-items: center; gap: 0.4rem;
+            position: absolute; left: 5%; display: flex; flex-direction: column; align-items: stretch; gap: 0.25rem;
             background: rgba(255, 255, 255, 0.15); padding: 0.25rem 0.4rem; border-radius: 20px;
             border: 1px solid rgba(255, 255, 255, 0.2); backdrop-filter: blur(4px); text-transform: none;
         }
+        .pincode-controls { display: flex; align-items: center; gap: 0.4rem; }
         .pincode-container span.pin-icon { font-size: 0.85rem; margin-left: 0.3rem; }
         .pincode-container input { 
             padding: 0.2rem 0.5rem; border: none; font-size: 0.75rem; 
@@ -73,7 +79,7 @@
         .pincode-container button:hover { background: #EAEAEA; }
         #pin-msg { font-size: 0.7rem; font-weight: 500; margin-left: 0.2rem; margin-right: 0.5rem; }
         #pin-msg { max-width: 260px; }
-        #pin-location { display: none; font-size: 0.7rem; color: #FFF; white-space: nowrap; }
+        #pin-location { display: none; font-size: 0.7rem; color: #FFF; white-space: nowrap; padding: 0.1rem 0.4rem 0.15rem; }
 
         /* Navbar */
         .navbar { 
@@ -313,10 +319,12 @@
     <div class="top-bar">
         <!-- Beautified Pincode Search -->
         <div class="pincode-container">
-            <span class="pin-icon">📍</span>
-            <input type="text" id="pincode-input" placeholder="Enter Pincode" maxlength="6" aria-label="Enter delivery pincode">
-            <button onclick="validatePincode()">CHECK</button>
-            <span id="pin-msg" role="status" aria-live="polite"></span>
+            <div class="pincode-controls">
+                <span class="pin-icon">📍</span>
+                <input type="text" id="pincode-input" placeholder="Enter Pincode" maxlength="6" aria-label="Enter delivery pincode">
+                <button onclick="validatePincode()">CHECK</button>
+                <span id="pin-msg" role="status" aria-live="polite"></span>
+            </div>
             <span id="pin-location" aria-live="polite"></span>
         </div>
         
