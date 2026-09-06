@@ -78,14 +78,15 @@
         #pin-msg { font-size: 0.62rem; font-weight: 500; white-space: nowrap; }
         #pin-location { display: inline-block; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: 0.65rem; color: #FFF; white-space: nowrap; }
         .nav-pincode-container { position: relative; width: 250px; display: flex; flex-direction: column; align-items: stretch; gap: 0.3rem; margin-left: 0.25rem; color: var(--dark); }
-        .nav-pincode-container .pincode-controls { width: 100%; min-height: 36px; border: 1px solid #D7C9C9; border-radius: 999px; overflow: hidden; padding: 0.3rem 0.45rem; background: #FCFAF8; box-shadow: 0 4px 14px rgba(74, 42, 48, 0.06); }
-        .nav-pincode-container input { color: var(--dark); width: auto; flex: 1 1 auto; border-bottom: none; letter-spacing: 1.5px; }
+        .nav-pincode-container .pincode-controls { width: 100%; min-height: 42px; border: 1px solid #D7C9C9; border-radius: 999px; overflow: hidden; padding: 0.25rem 0.35rem 0.25rem 0.75rem; background: #FFF; box-shadow: 0 6px 18px rgba(74, 42, 48, 0.08); }
+        .nav-pincode-container input { color: var(--dark); width: auto; flex: 1 1 auto; border-bottom: none; letter-spacing: 1.5px; font-size: 0.78rem; }
         .nav-pincode-container input::placeholder { color: var(--text-muted); }
-        .nav-pincode-container .pin-icon { color: #8B4651; }
-        .nav-pincode-container button { padding: 0.35rem 0.8rem; font-size: 0.62rem; background: #5A343D; color: #FFF; border-radius: 999px; letter-spacing: 1.2px; }
+        .nav-pincode-container .pin-icon { color: #D94A4A; font-size: 1rem; }
+        .nav-pincode-container button { width: 34px; height: 34px; padding: 0; display: grid; place-items: center; font-size: 0; background: #5A343D; color: #FFF; border-radius: 50%; letter-spacing: 0; }
+        .nav-pincode-container button::after { content: '✓'; font-size: 0.85rem; line-height: 1; }
         .nav-pincode-container button:hover { background: #3F252C; }
         .nav-pincode-container #pin-msg { color: var(--text-muted); }
-        .nav-pincode-container #pin-location { display: none; color: #5A343D; padding: 0 0.4rem; font-size: 0.62rem; line-height: 1.2; letter-spacing: 0.3px; }
+        .nav-pincode-container #pin-location { display: none; color: #5A343D; padding: 0 0.75rem; font-size: 0.62rem; line-height: 1.2; letter-spacing: 0.3px; }
 
         @media (min-width: 761px) {
             .navbar { padding: 1.1rem 5%; }
@@ -329,7 +330,7 @@
             .top-bar-right { flex: 0 0 88px; padding-left: 0.6rem; font-size: 0.56rem; }
             .nav-pincode-container { flex: 1 0 100%; width: 100%; margin-left: 0; }
             .nav-pincode-container input { width: 48px; font-size: 0.64rem; }
-            .nav-pincode-container button { padding: 0.25rem 0.4rem; font-size: 0.58rem; }
+            .nav-pincode-container button { width: 30px; height: 30px; }
             .nav-pincode-container #pin-msg { display: none; }
             .nav-pincode-container #pin-location { font-size: 0.52rem; }
             .nav-links { display: none; } /* Simplified for mobile */
