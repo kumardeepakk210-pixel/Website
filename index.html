@@ -73,6 +73,7 @@
         .pincode-container button:hover { background: #EAEAEA; }
         #pin-msg { font-size: 0.7rem; font-weight: 500; margin-left: 0.2rem; margin-right: 0.5rem; }
         #pin-msg { max-width: 260px; }
+        #pin-location { display: none; font-size: 0.7rem; color: #FFF; white-space: nowrap; }
 
         /* Navbar */
         .navbar { 
@@ -315,7 +316,8 @@
             <span class="pin-icon">📍</span>
             <input type="text" id="pincode-input" placeholder="Enter Pincode" maxlength="6" aria-label="Enter delivery pincode">
             <button onclick="validatePincode()">CHECK</button>
-            <span id="pin-msg"></span>
+            <span id="pin-msg" role="status" aria-live="polite"></span>
+            <span id="pin-location" aria-live="polite"></span>
         </div>
         
         <div class="top-bar-text">FREE SHIPPING ON ALL ORDERS ABOVE ₹2,999 | 100% HALLMARKED SILVER</div>
@@ -807,6 +809,9 @@
         async function validatePincode() {
             const pinInput = document.getElementById('pincode-input').value.trim();
             const msgElement = document.getElementById('pin-msg');
+            const locationElement = document.getElementById('pin-location');
+            locationElement.innerText = '';
+            locationElement.style.display = 'none';
             if (!/^\d{6}$/.test(pinInput)) {
                 msgElement.innerText = "✕ Invalid Pincode"; msgElement.style.color = "#FF8A80";
                 return;
@@ -828,8 +833,10 @@
                 }
 
                 const locationName = [location.District, location.State].filter(Boolean).join(', ');
-                msgElement.innerText = `✓ Delivery Available: ${locationName}`;
+                msgElement.innerText = "✓ Delivery Available";
                 msgElement.style.color = "#A8E6CF";
+                locationElement.innerText = `📍 ${locationName}`;
+                locationElement.style.display = "inline";
             } catch (error) {
                 msgElement.innerText = "✕ Unable to verify pincode";
                 msgElement.style.color = "#FF8A80";
