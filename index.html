@@ -78,14 +78,21 @@
         #pin-msg { font-size: 0.62rem; font-weight: 500; white-space: nowrap; }
         #pin-location { display: inline-block; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: 0.65rem; color: #FFF; white-space: nowrap; }
         .nav-pincode-container { position: relative; width: 250px; display: flex; flex-direction: column; align-items: stretch; gap: 0.3rem; margin-left: 0.25rem; color: var(--dark); }
-        .nav-pincode-container .pincode-controls { width: 100%; min-height: 36px; border: 1px solid #D7C9C9; padding: 0.3rem 0.45rem; background: #FCFAF8; box-shadow: 0 4px 14px rgba(74, 42, 48, 0.06); }
-        .nav-pincode-container input { color: var(--dark); width: auto; flex: 1 1 auto; border-bottom: 1px solid #D7C9C9; letter-spacing: 1.5px; }
+        .nav-pincode-container .pincode-controls { width: 100%; min-height: 36px; border: 1px solid #D7C9C9; border-radius: 999px; overflow: hidden; padding: 0.3rem 0.45rem; background: #FCFAF8; box-shadow: 0 4px 14px rgba(74, 42, 48, 0.06); }
+        .nav-pincode-container input { color: var(--dark); width: auto; flex: 1 1 auto; border-bottom: none; letter-spacing: 1.5px; }
         .nav-pincode-container input::placeholder { color: var(--text-muted); }
         .nav-pincode-container .pin-icon { color: #8B4651; }
-        .nav-pincode-container button { padding: 0.35rem 0.7rem; font-size: 0.62rem; background: #5A343D; color: #FFF; border-radius: 2px; letter-spacing: 1.2px; }
+        .nav-pincode-container button { padding: 0.35rem 0.8rem; font-size: 0.62rem; background: #5A343D; color: #FFF; border-radius: 999px; letter-spacing: 1.2px; }
         .nav-pincode-container button:hover { background: #3F252C; }
         .nav-pincode-container #pin-msg { color: var(--text-muted); }
         .nav-pincode-container #pin-location { display: none; color: #5A343D; padding: 0 0.4rem; font-size: 0.62rem; line-height: 1.2; letter-spacing: 0.3px; }
+
+        @media (min-width: 761px) {
+            .navbar { padding: 1.1rem 5%; }
+            .nav-links { gap: 1.75rem; }
+            .nav-icons { gap: 1rem; }
+            .nav-pincode-container { width: 220px; }
+        }
 
         /* Navbar */
         .navbar { 
