@@ -57,6 +57,7 @@
             <a onclick="navigateTo('shop'); currentFilters.category='All'; currentSort='newest'; applyFiltersAndSort();">New Arrivals</a>
             <a onclick="navigateTo('shop'); currentFilters.category='All'; currentSort='featured'; applyFiltersAndSort();">Best Sellers</a>
             <a onclick="navigateTo('about')" id="nav-about">About</a>
+            <a onclick="navigateTo('admin')" id="nav-admin">Admin</a>
         </nav>
 
         <!-- Header Actions -->
@@ -596,6 +597,9 @@
             </div>
         </div>
 
+        <!-- ═══ ADMIN VIEW ═══ -->
+        <div id="admin-view" style="display: none;"></div>
+
     </main>
 
     <!-- ═══ MOBILE STICKY CTA ═══ -->
@@ -635,6 +639,7 @@
                 <h4>Company</h4>
                 <a onclick="navigateTo('about')">About WishRite</a>
                 <a onclick="navigateTo('shop')">Collections</a>
+                <a onclick="navigateTo('admin')">Admin Control</a>
                 <a href="#">Contact Us</a>
             </div>
             <div class="footer-column">
@@ -663,6 +668,8 @@
     </footer>
 
     <!-- ═══ SCRIPTS ═══ -->
+    <script src="js/shipping.js"></script>
+    <script src="js/image-manager.js"></script>
     <script src="js/products.js"></script>
     <script src="js/cart.js"></script>
     <script src="js/wishlist.js"></script>

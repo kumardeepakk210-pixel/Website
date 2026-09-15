@@ -1,10 +1,10 @@
 /* ============================================
    WISHRITE — APP
-   Router, state management, initialization
+   Router, state management, dynamic inventory sync, admin view
    ============================================ */
 
 // All available views
-const views = ['home', 'shop', 'about', 'login', 'register', 'profile', 'cart', 'wishlist', 'product'];
+const views = ['home', 'shop', 'about', 'login', 'register', 'profile', 'cart', 'wishlist', 'product', 'admin'];
 
 function getCurrentView() {
     for (const v of views) {
@@ -31,7 +31,7 @@ function navigateTo(viewId, param) {
     }
 
     // Set active nav
-    const navMap = { home: 'nav-home', shop: 'nav-shop', about: 'nav-about' };
+    const navMap = { home: 'nav-home', shop: 'nav-shop', about: 'nav-about', admin: 'nav-admin' };
     const activeNav = document.getElementById(navMap[viewId]);
     if (activeNav) activeNav.classList.add('active');
 
@@ -40,40 +40,36 @@ function navigateTo(viewId, param) {
         case 'home':
             renderHomeSections();
             setHomeSEO();
+            try { history.pushState({ view: 'home' }, '', '/'); } catch(e){}
             break;
         case 'shop':
             buildSidebarFilters();
             buildMobileFilters();
             applyFiltersAndSort();
             setShopSEO(currentFilters.category);
+            try { history.pushState({ view: 'shop' }, '', '/shop'); } catch(e){}
             break;
         case 'product':
-            if (param) {
-                const product = getProductBySlug(param);
-                if (product) {
-                    currentPdpProduct = product;
-                    currentPdpImageIndex = 0;
-                    pdpQty = 1;
-                    targetView.innerHTML = renderProductDetail(product);
-                    setProductSEO(product);
-                    // Show sticky CTA on mobile
-                    updateStickyCTA(product);
-                    // Init swipe after render
-                    setTimeout(() => initPdpSwipe(), 100);
-                }
-            }
+            handleProductViewNavigation(param, targetView);
             break;
         case 'about':
             setAboutSEO();
+            try { history.pushState({ view: 'about' }, '', '/about'); } catch(e){}
             break;
         case 'wishlist':
             renderWishlist();
+            try { history.pushState({ view: 'wishlist' }, '', '/wishlist'); } catch(e){}
             break;
         case 'cart':
             renderCart();
+            try { history.pushState({ view: 'cart' }, '', '/cart'); } catch(e){}
             break;
         case 'register':
             resetRegistration();
+            break;
+        case 'admin':
+            renderAdminProductManagement();
+            try { history.pushState({ view: 'admin' }, '', '/admin'); } catch(e){}
             break;
     }
 
@@ -89,14 +85,59 @@ function navigateTo(viewId, param) {
     setTimeout(initScrollReveal, 100);
 }
 
+async function handleProductViewNavigation(param, targetView) {
+    if (!param || !targetView) return;
+
+    let product = getProductBySlug(param) || getProductById(param);
+
+    // If product not yet in memory, wait for inventory sync
+    if (!product) {
+        targetView.innerHTML = `
+            <div class="container" style="padding:100px 0;text-align:center;">
+                <div class="loading-spinner" style="margin:0 auto 20px;"></div>
+                <p style="font-family:var(--wr-font-heading);font-size:1.1rem;color:var(--wr-primary);">Loading WishRite Piece...</p>
+            </div>
+        `;
+        await loadProductsFromInventory();
+        product = getProductBySlug(param) || getProductById(param);
+    }
+
+    if (product) {
+        currentPdpProduct = product;
+        currentPdpImageIndex = 0;
+        pdpQty = 1;
+        targetView.innerHTML = renderProductDetail(product);
+        setProductSEO(product);
+        updateStickyCTA(product);
+        setTimeout(() => {
+            if (typeof initPdpSwipe === 'function') initPdpSwipe();
+        }, 100);
+
+        try {
+            history.pushState({ view: 'product', param: product.slug }, '', `/product/${product.slug}`);
+        } catch (e) {}
+    } else {
+        targetView.innerHTML = `
+            <div class="container" style="padding:100px 0;text-align:center;">
+                <h2 style="font-family:var(--wr-font-heading);color:var(--wr-primary);">Jewellery Piece Not Found</h2>
+                <p style="color:var(--wr-text-muted);margin:12px 0 24px;">The selected jewellery item is currently unavailable or has been archived.</p>
+                <button class="btn btn-primary" onclick="navigateTo('shop')">Explore Available Collection</button>
+            </div>
+        `;
+    }
+}
+
 // Update mobile sticky CTA for PDP
 function updateStickyCTA(product) {
     const cta = document.getElementById('sticky-cta');
     if (!cta) return;
     if (product && getCurrentView() === 'product') {
-        cta.innerHTML = `
-            <button class="btn btn-primary" onclick="addToCart(${product.id})">Add to Cart — ${formatPrice(product.sellingPrice)}</button>
-            <button class="btn btn-secondary" onclick="addToCart(${product.id}); navigateTo('cart');">Buy Now</button>
+        const isOutOfStock = product.stockQuantity <= 0;
+        cta.innerHTML = !isOutOfStock ? `
+            <button class="btn btn-primary" onclick="addToCart('${product.id}')">Add to Bag — ${formatPrice(product.sellingPrice)}</button>
+            <button class="btn btn-secondary" onclick="buyNowFromPDP('${product.id}')">Buy Now</button>
+        ` : `
+            <button class="btn btn-primary btn-disabled" disabled style="width:100%;">Out of Stock</button>
         `;
         cta.style.display = 'flex';
     } else {
@@ -106,27 +147,217 @@ function updateStickyCTA(product) {
 
 // Render home page sections
 function renderHomeSections() {
-    // Bestsellers
-    renderProductsToContainer(productsDB.filter(p => p.isBestseller), 'bestsellers-container');
+    const inStock = productsDB.filter(p => p.stockQuantity > 0);
+    const pool = inStock.length > 0 ? inStock : productsDB;
 
-    // New Arrivals
-    renderProductsToContainer(productsDB.filter(p => p.isNew), 'new-arrivals-container');
+    // Bestsellers: prefer marked bestsellers or top stock
+    let bestsellers = pool.filter(p => p.isBestseller);
+    if (bestsellers.length < 4) bestsellers = pool.slice(0, 8);
+    renderProductsToContainer(bestsellers.slice(0, 8), 'bestsellers-container');
+
+    // New Arrivals: recent or newly added
+    let newArrivals = pool.filter(p => p.isNew);
+    if (newArrivals.length < 4) newArrivals = pool.slice(8, 16);
+    renderProductsToContainer(newArrivals.slice(0, 8), 'new-arrivals-container');
 }
 
+/**
+ * Admin Product & Image Management View
+ */
+function renderAdminProductManagement(filterText = '') {
+    const container = document.getElementById('admin-view');
+    if (!container) return;
+
+    const term = filterText.toLowerCase();
+    const filtered = productsDB.filter(p => 
+        (p.name && p.name.toLowerCase().includes(term)) ||
+        (p.sku && p.sku.toLowerCase().includes(term)) ||
+        (p.category && p.category.toLowerCase().includes(term))
+    );
+
+    container.innerHTML = `
+        <div class="container" style="padding:40px 0 80px;">
+            <div class="admin-view-header">
+                <div>
+                    <span class="admin-badge">ADMIN CONTROL</span>
+                    <h1 style="font-family:var(--wr-font-heading);font-size:2rem;margin:6px 0 4px;color:var(--wr-primary);">Product & Inventory Management</h1>
+                    <p style="color:var(--wr-text-muted);font-size:0.9rem;margin:0;">Source of Truth: Supabase <code>inventory</code> table (${productsDB.length} active items loaded)</p>
+                </div>
+                <div class="admin-view-actions">
+                    <button class="btn btn-outline btn-sm" onclick="openBulkImageUploadModal()">
+                        <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" fill="none" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                        Bulk SKU Upload
+                    </button>
+                    <button class="btn btn-primary btn-sm" onclick="refreshInventoryData()">
+                        ⟳ Sync Database
+                    </button>
+                </div>
+            </div>
+
+            <!-- Search & Filter Bar -->
+            <div class="admin-filter-bar" style="margin:24px 0 16px;display:flex;gap:12px;align-items:center;">
+                <div style="flex:1;position:relative;">
+                    <input 
+                        type="text" 
+                        class="admin-search-input" 
+                        placeholder="Search products by SKU, name, or category..." 
+                        value="${filterText}" 
+                        oninput="renderAdminProductManagement(this.value)"
+                    />
+                </div>
+                <span style="font-size:0.85rem;color:var(--wr-text-muted);white-space:nowrap;">Showing ${filtered.length} products</span>
+            </div>
+
+            <!-- Product Table -->
+            <div class="admin-table-wrapper">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th style="width:70px;">Preview</th>
+                            <th style="width:110px;">SKU / Code</th>
+                            <th>Product Name</th>
+                            <th>Category</th>
+                            <th>Weight</th>
+                            <th>Selling Price</th>
+                            <th>Stock</th>
+                            <th>Status</th>
+                            <th style="text-align:right;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${filtered.map(p => {
+                            const isOut = p.stockQuantity <= 0;
+                            const customImgs = (typeof getProductImages === 'function') ? getProductImages(p) : [];
+                            const hasCustom = customImgs.length > 0 && !customImgs[0].isPlaceholder;
+                            const previewUrl = customImgs[0]?.url || p.image;
+
+                            return `
+                                <tr>
+                                    <td>
+                                        <div class="admin-thumb-wrap" onclick="navigateTo('product', '${p.slug}')" title="View PDP">
+                                            <img src="${previewUrl}" alt="${p.name}" loading="lazy">
+                                        </div>
+                                    </td>
+                                    <td><strong style="font-family:monospace;color:var(--wr-primary);">${p.sku || p.code}</strong></td>
+                                    <td>
+                                        <div style="font-weight:500;">${p.name}</div>
+                                        <div style="font-size:0.75rem;color:var(--wr-text-muted);">${p.slug}</div>
+                                    </td>
+                                    <td><span class="admin-cat-pill">${p.category}</span></td>
+                                    <td>${p.weight || '—'}</td>
+                                    <td><strong>${formatPrice(p.sellingPrice)}</strong></td>
+                                    <td>
+                                        <span class="admin-stock-val ${isOut ? 'out' : ''}">${p.stockQuantity}</span>
+                                    </td>
+                                    <td>
+                                        ${!isOut 
+                                            ? '<span class="status-pill active">In Stock</span>' 
+                                            : '<span class="status-pill out">Out of Stock</span>'}
+                                        ${hasCustom ? '<span class="img-status-pill custom" title="Has custom images">Custom Img</span>' : '<span class="img-status-pill placeholder" title="Using hallmark placeholder">Default</span>'}
+                                    </td>
+                                    <td style="text-align:right;">
+                                        <div style="display:inline-flex;gap:6px;">
+                                            <button class="btn btn-outline btn-xs" onclick="openImageManagerForProduct('${p.id}')">
+                                                📷 Manage Images
+                                            </button>
+                                            <button class="btn btn-outline btn-xs" onclick="navigateTo('product', '${p.slug}')">
+                                                View
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+}
+
+function openBulkImageUploadModal() {
+    if (productsDB.length > 0) {
+        openImageManagerForProduct(productsDB[0]);
+        setTimeout(() => switchAdminImageTab('bulk'), 50);
+    }
+}
+
+async function refreshInventoryData() {
+    showToast('Syncing products with Supabase inventory...', 'info');
+    await loadProductsFromInventory();
+    renderAdminProductManagement();
+    renderHomeSections();
+    showToast('Inventory synchronization complete!', 'success');
+}
+
+// ── Browser URL Navigation & History Handling ──
+function handleInitialURLRoute() {
+    const path = window.location.pathname;
+    if (path.startsWith('/product/')) {
+        const slug = path.replace('/product/', '').replace(/\/$/, '');
+        if (slug) {
+            navigateTo('product', slug);
+            return;
+        }
+    } else if (path === '/shop') {
+        navigateTo('shop');
+        return;
+    } else if (path === '/about') {
+        navigateTo('about');
+        return;
+    } else if (path === '/cart') {
+        navigateTo('cart');
+        return;
+    } else if (path === '/wishlist') {
+        navigateTo('wishlist');
+        return;
+    } else if (path === '/admin') {
+        navigateTo('admin');
+        return;
+    }
+
+    // Default home view
+    navigateTo('home');
+}
+
+window.addEventListener('popstate', (e) => {
+    if (e.state && e.state.view) {
+        navigateTo(e.state.view, e.state.param);
+    } else {
+        handleInitialURLRoute();
+    }
+});
+
 // ── Initialization ──
-document.addEventListener('DOMContentLoaded', () => {
-    // Render initial content
+document.addEventListener('DOMContentLoaded', async () => {
+    // 1. Initial local render for zero perceived latency
     renderHomeSections();
     updateAuthDropdown();
     updateCartCount();
     updateWishlistCount();
     renderCart();
 
-    // Init UI components
+    // 2. UI listeners
     initHeroCarousel();
     initHeaderScroll();
     initScrollReveal();
 
-    // Set initial SEO
-    setHomeSEO();
+    // 3. Route to current path
+    handleInitialURLRoute();
+
+    // 4. Asynchronously sync live inventory from Supabase database
+    try {
+        await loadProductsFromInventory();
+        // Re-render home sections and current views with live inventory
+        renderHomeSections();
+        if (getCurrentView() === 'shop') {
+            buildSidebarFilters();
+            buildMobileFilters();
+            applyFiltersAndSort();
+        } else if (getCurrentView() === 'admin') {
+            renderAdminProductManagement();
+        }
+    } catch (err) {
+        console.warn('Initial inventory load completed with fallback:', err);
+    }
 });
