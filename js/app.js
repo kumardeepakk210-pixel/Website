@@ -68,8 +68,18 @@ function navigateTo(viewId, param) {
             renderCart();
             try { history.pushState({ view: 'cart' }, '', '/cart'); } catch(e){}
             break;
+        case 'profile':
+            if (typeof renderProfileAccountDetails === 'function') {
+                renderProfileAccountDetails();
+            }
+            try { history.pushState({ view: 'profile' }, '', '/account'); } catch(e){}
+            break;
+        case 'login':
+            try { history.pushState({ view: 'login' }, '', '/login'); } catch(e){}
+            break;
         case 'register':
             resetRegistration();
+            try { history.pushState({ view: 'register' }, '', '/register'); } catch(e){}
             break;
         case 'admin':
             renderAdminProductManagement();
@@ -345,6 +355,19 @@ async function refreshInventoryData() {
 // ── Browser URL Navigation & History Handling ──
 function handleInitialURLRoute() {
     const path = window.location.pathname;
+    const hash = window.location.hash;
+    const search = window.location.search;
+
+    // Detect Supabase Auth Callback (path /auth/callback, or token hashes / search params)
+    if (path === '/auth/callback' || path.startsWith('/auth/callback') ||
+        hash.includes('access_token=') || hash.includes('error=') ||
+        search.includes('code=') || search.includes('error=')) {
+        if (typeof handleAuthCallback === 'function') {
+            handleAuthCallback();
+            return;
+        }
+    }
+
     if (path.startsWith('/product/')) {
         const slug = path.replace('/product/', '').replace(/\/$/, '');
         if (slug) {
@@ -362,6 +385,15 @@ function handleInitialURLRoute() {
         return;
     } else if (path === '/wishlist') {
         navigateTo('wishlist');
+        return;
+    } else if (path === '/account' || path === '/profile') {
+        navigateTo('profile');
+        return;
+    } else if (path === '/login') {
+        navigateTo('login');
+        return;
+    } else if (path === '/register') {
+        navigateTo('register');
         return;
     } else if (path === '/admin') {
         navigateTo('admin');

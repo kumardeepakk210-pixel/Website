@@ -9,6 +9,22 @@
       "destination": "/index.html"
     },
     {
+      "source": "/auth/callback",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/auth/:path*",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/account",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/profile",
+      "destination": "/index.html"
+    },
+    {
       "source": "/product/:slug",
       "destination": "/index.html"
     },
