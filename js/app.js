@@ -15,6 +15,10 @@ function getCurrentView() {
 }
 
 function navigateTo(viewId, param) {
+    // 1. Immediately reset product state and completely unmount sticky product action bar
+    currentPdpProduct = null;
+    unmountStickyCTA();
+
     // Hide all views
     views.forEach(v => {
         const el = document.getElementById(v + '-view');
@@ -86,7 +90,14 @@ function navigateTo(viewId, param) {
 }
 
 async function handleProductViewNavigation(param, targetView) {
-    if (!param || !targetView) return;
+    if (!param || !targetView) {
+        unmountStickyCTA();
+        return;
+    }
+
+    // Ensure sticky CTA is completely unmounted while resolving/loading product
+    unmountStickyCTA();
+    currentPdpProduct = null;
 
     let product = getProductBySlug(param) || getProductById(param);
 
@@ -102,13 +113,19 @@ async function handleProductViewNavigation(param, targetView) {
         product = getProductBySlug(param) || getProductById(param);
     }
 
-    if (product) {
+    // Guard: Ensure user is STILL on the product route after async wait
+    if (getCurrentView() !== 'product') {
+        unmountStickyCTA();
+        return;
+    }
+
+    if (product && product.id) {
         currentPdpProduct = product;
         currentPdpImageIndex = 0;
         pdpQty = 1;
         targetView.innerHTML = renderProductDetail(product);
         setProductSEO(product);
-        updateStickyCTA(product);
+        renderStickyCTA(product);
         setTimeout(() => {
             if (typeof initPdpSwipe === 'function') initPdpSwipe();
         }, 100);
@@ -117,6 +134,7 @@ async function handleProductViewNavigation(param, targetView) {
             history.pushState({ view: 'product', param: product.slug }, '', `/product/${product.slug}`);
         } catch (e) {}
     } else {
+        unmountStickyCTA();
         targetView.innerHTML = `
             <div class="container" style="padding:100px 0;text-align:center;">
                 <h2 style="font-family:var(--wr-font-heading);color:var(--wr-primary);">Jewellery Piece Not Found</h2>
@@ -127,21 +145,55 @@ async function handleProductViewNavigation(param, targetView) {
     }
 }
 
-// Update mobile sticky CTA for PDP
-function updateStickyCTA(product) {
+// Completely unmount and clear sticky product action bar
+function unmountStickyCTA() {
     const cta = document.getElementById('sticky-cta');
     if (!cta) return;
-    if (product && getCurrentView() === 'product') {
-        const isOutOfStock = product.stockQuantity <= 0;
-        cta.innerHTML = !isOutOfStock ? `
-            <button class="btn btn-primary" onclick="addToCart('${product.id}')">Add to Bag — ${formatPrice(product.sellingPrice)}</button>
-            <button class="btn btn-secondary" onclick="buyNowFromPDP('${product.id}')">Buy Now</button>
-        ` : `
-            <button class="btn btn-primary btn-disabled" disabled style="width:100%;">Out of Stock</button>
+    cta.innerHTML = '';
+    cta.classList.remove('active');
+    cta.style.display = 'none';
+    cta.setAttribute('aria-hidden', 'true');
+}
+
+// Render sticky product action bar ONLY when on valid PDP with loaded product
+function renderStickyCTA(product) {
+    const cta = document.getElementById('sticky-cta');
+    if (!cta) return;
+
+    // Strict guard: Must be currently viewing a product page, with valid product & ID
+    const isProductPage = getCurrentView() === 'product';
+    if (!isProductPage || !product || !product.id || product.sellingPrice === undefined) {
+        unmountStickyCTA();
+        return;
+    }
+
+    const isOutOfStock = (product.stockQuantity <= 0);
+    const priceFormatted = (typeof formatPrice === 'function')
+        ? formatPrice(product.sellingPrice)
+        : `₹${Number(product.sellingPrice).toLocaleString('en-IN')}`;
+
+    if (!isOutOfStock) {
+        cta.innerHTML = `
+            <button class="btn btn-primary" onclick="addToCart('${product.id}')">ADD TO CART — ${priceFormatted}</button>
+            <button class="btn btn-secondary" onclick="buyNowFromPDP('${product.id}')">BUY NOW</button>
         `;
-        cta.style.display = 'flex';
     } else {
-        cta.style.display = '';
+        cta.innerHTML = `
+            <button class="btn btn-primary btn-disabled" disabled style="width:100%;">OUT OF STOCK</button>
+        `;
+    }
+
+    cta.classList.add('active');
+    cta.style.display = 'flex';
+    cta.setAttribute('aria-hidden', 'false');
+}
+
+// Backward compatibility helper
+function updateStickyCTA(product) {
+    if (getCurrentView() === 'product' && product && product.id) {
+        renderStickyCTA(product);
+    } else {
+        unmountStickyCTA();
     }
 }
 
@@ -330,6 +382,9 @@ window.addEventListener('popstate', (e) => {
 
 // ── Initialization ──
 document.addEventListener('DOMContentLoaded', async () => {
+    // 0. Ensure sticky CTA is completely unmounted initially
+    unmountStickyCTA();
+
     // 1. Initial local render for zero perceived latency
     renderHomeSections();
     updateAuthDropdown();

@@ -199,8 +199,12 @@
         flex-direction: column;
     }
 
-    /* Sticky CTA on mobile */
+    /* Sticky CTA on mobile (only when active on PDP) */
     .sticky-cta {
+        display: none;
+    }
+
+    .sticky-cta.active {
         display: flex;
     }
 
