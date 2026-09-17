@@ -29,6 +29,30 @@
       "destination": "/index.html"
     },
     {
+      "source": "/collections",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/collections/:slug",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/new-arrivals",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/best-sellers",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/cart",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/wishlist",
+      "destination": "/index.html"
+    },
+    {
       "source": "/shop",
       "destination": "/index.html"
     },

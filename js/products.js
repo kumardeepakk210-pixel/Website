@@ -480,16 +480,16 @@ const productsService = {
         return productsDB.filter(p => p.occasions && p.occasions.includes(occasion));
     },
 
-    getNewArrivals(limit = 12) {
-        return [...productsDB]
-            .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-            .slice(0, limit);
+    getNewArrivals(limit = 0) {
+        const sorted = [...productsDB]
+            .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        return (limit && limit > 0) ? sorted.slice(0, limit) : sorted;
     },
 
-    getBestSellers(limit = 12) {
-        return [...productsDB]
-            .sort((a, b) => (b.salesCount - a.salesCount) || ((b.stockQuantity > 0 ? 1 : 0) - (a.stockQuantity > 0 ? 1 : 0)))
-            .slice(0, limit);
+    getBestSellers(limit = 0) {
+        const sorted = [...productsDB]
+            .sort((a, b) => (b.salesCount - a.salesCount) || ((b.stockQuantity > 0 ? 1 : 0) - (a.stockQuantity > 0 ? 1 : 0)));
+        return (limit && limit > 0) ? sorted.slice(0, limit) : sorted;
     },
 
     searchProducts(query) {
@@ -547,9 +547,13 @@ const productsService = {
 window.productsService = productsService;
 window.loadProductsFromInventory = () => productsService.ensureLoaded();
 window.getProductBySlug = (slug) => productsService.getProductBySlug(slug);
+window.productsService = productsService;
 window.getProductById = (id) => productsService.getProductById(id);
 window.getProductByCode = (code) => productsService.getProductByCode(code);
 window.getProductsByCategory = (cat) => productsService.getProductsByCategory(cat);
+window.getProductsByCollection = (col) => productsService.getProductsByCollection(col);
+window.getNewArrivals = (limit) => productsService.getNewArrivals(limit);
+window.getBestSellers = (limit) => productsService.getBestSellers(limit);
 window.getCategories = () => productsService.getCategories();
 window.getCollections = () => productsService.getCollections();
 window.createProductCardHTML = createProductCardHTML;

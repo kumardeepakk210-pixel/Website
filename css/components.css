@@ -890,4 +890,50 @@ select.form-input {
     margin: var(--space-6) 0;
 }
 
+/* ═══════════════════════════════════════════
+   COLLECTION FEATURE CARDS & LUXURY HOVER
+   ═══════════════════════════════════════════ */
+.collection-feature-card {
+    cursor: pointer;
+    background: var(--wr-white);
+    border: 1px solid var(--wr-border);
+    border-radius: var(--radius-sm, 6px);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    transition: transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94), box-shadow 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    outline: none;
+}
+
+.collection-feature-card:hover,
+.collection-feature-card:focus-visible {
+    transform: translateY(-5px);
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.1);
+}
+
+.collection-feature-image {
+    position: relative;
+    aspect-ratio: 16/10;
+    overflow: hidden;
+}
+
+.collection-feature-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.collection-feature-card:hover .collection-feature-image img,
+.collection-feature-card:focus-visible .collection-feature-image img {
+    transform: scale(1.05);
+}
+
+.collection-feature-card:hover .btn-primary,
+.collection-feature-card:focus-visible .btn-primary {
+    background: var(--wr-primary-dark, #4A2829);
+    border-color: var(--wr-primary-dark, #4A2829);
+}
+
+
 

@@ -178,3 +178,37 @@ function setCollectionsSEO() {
     });
 }
 
+function setCollectionDetailSEO(collection) {
+    if (!collection) return;
+    updateSEO({
+        title: `${collection.name} | Curated Silver Jewellery | WishRite`,
+        description: collection.description || `Discover the ${collection.name} at WishRite. Handcrafted in hallmarked 925 sterling silver with luminous elegance.`,
+        keywords: [collection.name, '925 sterling silver collection', 'WishRite collection', 'silver jewellery India'],
+        canonical: `${getSiteOrigin()}/collections/${collection.slug}`
+    });
+}
+
+function setNewArrivalsSEO() {
+    updateSEO({
+        title: 'New Arrivals | Latest 925 Sterling Silver Jewellery | WishRite',
+        description: 'Discover the latest additions to WishRite. Freshly designed 925 hallmarked sterling silver earrings, rings, necklaces, and bracelets.',
+        keywords: ['new arrivals silver jewellery', 'latest silver designs', 'new 925 sterling silver', 'WishRite new arrivals'],
+        canonical: getSiteOrigin() + '/new-arrivals'
+    });
+}
+
+function setBestSellersSEO() {
+    updateSEO({
+        title: 'Best Sellers | Most Loved 925 Sterling Silver Jewellery | WishRite',
+        description: 'Discover the pieces our customers love. WishRite most popular 925 sterling silver jewellery, crafted for timeless elegance.',
+        keywords: ['best sellers silver jewellery', 'popular silver jewellery', 'top selling 925 silver', 'WishRite bestsellers'],
+        canonical: getSiteOrigin() + '/best-sellers'
+    });
+}
+
+window.setCollectionsSEO = setCollectionsSEO;
+window.setCollectionDetailSEO = setCollectionDetailSEO;
+window.setNewArrivalsSEO = setNewArrivalsSEO;
+window.setBestSellersSEO = setBestSellersSEO;
+
+

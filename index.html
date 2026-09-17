@@ -54,8 +54,8 @@
         <nav class="header-nav" aria-label="Main navigation">
             <a onclick="navigateToShopWithFilter('category', 'All', 'featured', 'All Jewellery')" id="nav-shop">Jewellery</a>
             <a onclick="navigateTo('collections')" id="nav-collections">Collections</a>
-            <a onclick="navigateToShopWithFilter('sort', 'newest', 'newest', 'New Arrivals')">New Arrivals</a>
-            <a onclick="navigateToShopWithFilter('sort', 'featured', 'featured', 'Best Sellers')">Best Sellers</a>
+            <a onclick="navigateTo('new-arrivals')" id="nav-new-arrivals">New Arrivals</a>
+            <a onclick="navigateTo('best-sellers')" id="nav-bestsellers">Best Sellers</a>
             <a onclick="navigateTo('about')" id="nav-about">About</a>
         </nav>
 
@@ -99,8 +99,8 @@
         <nav class="mobile-menu-nav" aria-label="Mobile navigation">
             <a onclick="closeMobileMenu(); navigateToShopWithFilter('category', 'All', 'featured', 'All Jewellery')">Jewellery</a>
             <a onclick="closeMobileMenu(); navigateTo('collections')">Collections</a>
-            <a onclick="closeMobileMenu(); navigateToShopWithFilter('sort', 'newest', 'newest', 'New Arrivals')">New Arrivals</a>
-            <a onclick="closeMobileMenu(); navigateToShopWithFilter('sort', 'featured', 'featured', 'Best Sellers')">Best Sellers</a>
+            <a onclick="closeMobileMenu(); navigateTo('new-arrivals')">New Arrivals</a>
+            <a onclick="closeMobileMenu(); navigateTo('best-sellers')">Best Sellers</a>
             <a onclick="closeMobileMenu(); navigateTo('about')">About WishRite</a>
         </nav>
         <div class="mobile-menu-footer">
@@ -244,7 +244,7 @@
                         <h2>New Arrivals</h2>
                         <p>The latest additions to our collection.</p>
                     </div>
-                    <a class="view-all" onclick="navigateToShopWithFilter('sort', 'newest', 'newest', 'New Arrivals')">View All →</a>
+                    <a class="view-all" onclick="navigateTo('new-arrivals')">View All →</a>
                 </div>
                 <div class="product-grid" id="new-arrivals-container"></div>
             </section>
@@ -257,7 +257,7 @@
                         <h2>Bestsellers</h2>
                         <p>Loved by many, made for you.</p>
                     </div>
-                    <a class="view-all" onclick="navigateToShopWithFilter('sort', 'featured', 'featured', 'Best Sellers')">View All →</a>
+                    <a class="view-all" onclick="navigateTo('best-sellers')">View All →</a>
                 </div>
                 <div class="product-grid" id="bestsellers-container"></div>
             </section>
@@ -382,6 +382,65 @@
 
         <!-- ═══ COLLECTIONS VIEW ═══ -->
         <div id="collections-view" style="display: none;"></div>
+
+        <!-- ═══ COLLECTION DETAIL VIEW ═══ -->
+        <div id="collection-detail-view" style="display: none;">
+            <div class="shop-hero" id="collection-detail-hero"></div>
+            <div class="shop-toolbar">
+                <div class="shop-toolbar-left">
+                    <span class="shop-toolbar-count" id="collection-detail-count">Loading products...</span>
+                </div>
+            </div>
+            <div class="container" style="padding: 24px 20px 80px;">
+                <div class="product-grid" id="collection-detail-grid"></div>
+            </div>
+        </div>
+
+        <!-- ═══ NEW ARRIVALS VIEW ═══ -->
+        <div id="new-arrivals-view" style="display: none;">
+            <div class="shop-hero">
+                <div class="container" style="max-width:800px;margin:0 auto;text-align:center;">
+                    <div class="breadcrumbs" style="margin-bottom:12px;font-size:0.85rem;color:var(--wr-text-muted);">
+                        <a onclick="navigateTo('home')" style="cursor:pointer;color:inherit;">Home</a>
+                        <span style="margin:0 8px;">/</span>
+                        <span style="color:var(--wr-primary);font-weight:500;">New Arrivals</span>
+                    </div>
+                    <h1>New Arrivals</h1>
+                    <p>Discover the latest additions to WishRite.</p>
+                </div>
+            </div>
+            <div class="shop-toolbar">
+                <div class="shop-toolbar-left">
+                    <span class="shop-toolbar-count" id="new-arrivals-count">Loading products...</span>
+                </div>
+            </div>
+            <div class="container" style="padding: 24px 20px 80px;">
+                <div class="product-grid" id="new-arrivals-grid"></div>
+            </div>
+        </div>
+
+        <!-- ═══ BEST SELLERS VIEW ═══ -->
+        <div id="best-sellers-view" style="display: none;">
+            <div class="shop-hero">
+                <div class="container" style="max-width:800px;margin:0 auto;text-align:center;">
+                    <div class="breadcrumbs" style="margin-bottom:12px;font-size:0.85rem;color:var(--wr-text-muted);">
+                        <a onclick="navigateTo('home')" style="cursor:pointer;color:inherit;">Home</a>
+                        <span style="margin:0 8px;">/</span>
+                        <span style="color:var(--wr-primary);font-weight:500;">Best Sellers</span>
+                    </div>
+                    <h1>Best Sellers</h1>
+                    <p>Discover the pieces our customers love.</p>
+                </div>
+            </div>
+            <div class="shop-toolbar">
+                <div class="shop-toolbar-left">
+                    <span class="shop-toolbar-count" id="best-sellers-count">Loading products...</span>
+                </div>
+            </div>
+            <div class="container" style="padding: 24px 20px 80px;">
+                <div class="product-grid" id="best-sellers-grid"></div>
+            </div>
+        </div>
 
         <!-- ═══ SHOP VIEW ═══ -->
         <div id="shop-view" style="display: none;">

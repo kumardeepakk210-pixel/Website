@@ -6,7 +6,44 @@
    ============================================ */
 
 // All customer-facing storefront views
-const views = ['home', 'shop', 'collections', 'about', 'login', 'register', 'profile', 'cart', 'wishlist', 'product'];
+const views = ['home', 'shop', 'collections', 'collection-detail', 'new-arrivals', 'best-sellers', 'about', 'login', 'register', 'profile', 'cart', 'wishlist', 'product'];
+
+const COLLECTIONS_CONFIG = [
+    {
+        slug: '925-silver-signature',
+        name: '925 Silver Signature Collection',
+        tagline: 'Timeless Hallmarked Essentials',
+        description: 'The foundation of true silver luxury. Classic chains, rope designs, minimalist balis, and timeless bracelets crafted in pure 925 sterling silver.',
+        image: 'https://images.unsplash.com/photo-1599643477877-530eb83abc8e?auto=format&fit=crop&w=800&q=80',
+        queryCol: '925 Silver Signature Collection'
+    },
+    {
+        slug: 'daily-elegance',
+        name: 'Daily Elegance',
+        tagline: 'Workday Minimalism & Daily Grace',
+        description: 'Understated brilliance designed for everyday wear. Lightweight toe rings, sleek silver bands, refined studs, and delicate nose pins for effortless daily style.',
+        image: 'https://images.unsplash.com/photo-1603561591411-07134e71a2a9?auto=format&fit=crop&w=800&q=80',
+        queryCol: 'Daily Elegance'
+    },
+    {
+        slug: 'occasion-evening-edit',
+        name: 'The Occasion & Evening Edit',
+        tagline: 'Luminous Statements for Celebrated Moments',
+        description: 'Crafted to captivate. Intricate jewellery sets, sparkling drop earrings, and statement chokers designed to elevate festive celebrations and special occasions.',
+        image: 'https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?auto=format&fit=crop&w=800&q=80',
+        queryCol: 'The Occasion & Evening Edit'
+    },
+    {
+        slug: 'modern-solitaires-keepsakes',
+        name: 'Modern Solitaires & Keepsakes',
+        tagline: 'Auspicious Silver & Meaningful Gifting',
+        description: 'Timeless tokens of love, auspicious pure silver rakhis, radiant solitaire motifs, and keepsake pendants designed to celebrate life’s most cherished moments.',
+        image: 'https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?auto=format&fit=crop&w=800&q=80',
+        queryCol: 'Modern Solitaires & Keepsakes'
+    }
+];
+window.COLLECTIONS_CONFIG = COLLECTIONS_CONFIG;
+let currentCollectionSlug = null;
 
 function getCurrentView() {
     for (const v of views) {
@@ -43,7 +80,15 @@ function navigateTo(viewId, param, pushHistory = true) {
     }
 
     // Set active nav
-    const navMap = { home: 'nav-home', shop: 'nav-shop', collections: 'nav-collections', about: 'nav-about' };
+    const navMap = {
+        home: 'nav-home',
+        shop: 'nav-shop',
+        collections: 'nav-collections',
+        'collection-detail': 'nav-collections',
+        'new-arrivals': 'nav-new-arrivals',
+        'best-sellers': 'nav-bestsellers',
+        about: 'nav-about'
+    };
     const activeNav = document.getElementById(navMap[viewId]);
     if (activeNav) activeNav.classList.add('active');
 
@@ -65,6 +110,20 @@ function navigateTo(viewId, param, pushHistory = true) {
             renderCollectionsPage();
             if (typeof setCollectionsSEO === 'function') setCollectionsSEO();
             if (pushHistory) { try { history.pushState({ view: 'collections' }, '', '/collections'); } catch(e){} }
+            break;
+        case 'collection-detail':
+            renderCollectionDetailPage(param);
+            if (pushHistory) { try { history.pushState({ view: 'collection-detail', param: param }, '', `/collections/${param}`); } catch(e){} }
+            break;
+        case 'new-arrivals':
+            renderNewArrivalsPage();
+            if (typeof setNewArrivalsSEO === 'function') setNewArrivalsSEO();
+            if (pushHistory) { try { history.pushState({ view: 'new-arrivals' }, '', '/new-arrivals'); } catch(e){} }
+            break;
+        case 'best-sellers':
+            renderBestSellersPage();
+            if (typeof setBestSellersSEO === 'function') setBestSellersSEO();
+            if (pushHistory) { try { history.pushState({ view: 'best-sellers' }, '', '/best-sellers'); } catch(e){} }
             break;
         case 'product':
             handleProductViewNavigation(param, targetView, pushHistory);
@@ -270,55 +329,30 @@ window.addEventListener('wishrite:productsLoaded', () => {
         applyFiltersAndSort();
     } else if (current === 'collections') {
         renderCollectionsPage();
+    } else if (current === 'collection-detail') {
+        if (currentCollectionSlug) renderCollectionDetailPage(currentCollectionSlug);
+    } else if (current === 'new-arrivals') {
+        renderNewArrivalsPage();
+    } else if (current === 'best-sellers') {
+        renderBestSellersPage();
     }
 });
 
 /**
- * Render dedicated Collections Page connected to real product data
+ * Render dedicated Collections Overview Page connected to real product data
  */
 function renderCollectionsPage() {
     const container = document.getElementById('collections-view');
     if (!container) return;
 
-    const collections = [
-        {
-            name: '925 Silver Signature Collection',
-            tagline: 'Timeless Hallmarked Essentials',
-            description: 'The foundation of true silver luxury. Classic chains, rope designs, minimalist balis, and timeless bracelets crafted in pure 925 sterling silver.',
-            image: 'https://images.unsplash.com/photo-1599643477877-530eb83abc8e?auto=format&fit=crop&w=800&q=80',
-            queryCol: '925 Silver Signature Collection'
-        },
-        {
-            name: 'Daily Elegance',
-            tagline: 'Workday Minimalism & Daily Grace',
-            description: 'Understated brilliance designed for everyday wear. Lightweight toe rings, sleek silver bands, refined studs, and delicate nose pins for effortless daily style.',
-            image: 'https://images.unsplash.com/photo-1603561591411-07134e71a2a9?auto=format&fit=crop&w=800&q=80',
-            queryCol: 'Daily Elegance'
-        },
-        {
-            name: 'The Occasion & Evening Edit',
-            tagline: 'Luminous Statements for Celebrated Moments',
-            description: 'Crafted to captivate. Intricate jewellery sets, sparkling drop earrings, and statement chokers designed to elevate festive celebrations and special occasions.',
-            image: 'https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?auto=format&fit=crop&w=800&q=80',
-            queryCol: 'The Occasion & Evening Edit'
-        },
-        {
-            name: 'Modern Solitaires & Keepsakes',
-            tagline: 'Auspicious Silver & Meaningful Gifting',
-            description: 'Timeless tokens of love, auspicious pure silver rakhis, radiant solitaire motifs, and keepsake pendants designed to celebrate life’s most cherished moments.',
-            image: 'https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?auto=format&fit=crop&w=800&q=80',
-            queryCol: 'Modern Solitaires & Keepsakes'
-        }
-    ];
-
-    const cardsHTML = collections.map(col => {
+    const cardsHTML = COLLECTIONS_CONFIG.map(col => {
         const count = typeof productsService !== 'undefined' 
             ? productsService.getProductsByCollection(col.queryCol).length 
             : 0;
         return `
-            <div class="collection-feature-card" style="background:#fff;border:1px solid var(--wr-border);border-radius:6px;overflow:hidden;transition:transform 0.3s ease, box-shadow 0.3s ease;display:flex;flex-direction:column;">
-                <div class="collection-feature-image" style="position:relative;aspect-ratio:16/10;overflow:hidden;">
-                    <img src="${col.image}" alt="${col.name}" loading="lazy" width="600" height="400" style="width:100%;height:100%;object-fit:cover;">
+            <div class="collection-feature-card" onclick="navigateTo('collection-detail', '${col.slug}')" role="link" tabindex="0" onkeydown="if(event.key==='Enter') navigateTo('collection-detail', '${col.slug}')" aria-label="Explore ${col.name}">
+                <div class="collection-feature-image">
+                    <img src="${col.image}" alt="${col.name}" loading="lazy" width="600" height="400">
                     <span class="collection-badge" style="position:absolute;bottom:12px;right:12px;background:rgba(94,52,53,0.92);color:#fff;font-size:0.75rem;padding:4px 10px;border-radius:2px;letter-spacing:0.5px;font-weight:500;">
                         ${count} Pieces Available
                     </span>
@@ -327,7 +361,7 @@ function renderCollectionsPage() {
                     <span class="sub-label" style="font-size:0.75rem;letter-spacing:2px;color:var(--wr-primary);text-transform:uppercase;font-weight:600;margin-bottom:6px;">${col.tagline}</span>
                     <h3 class="collection-feature-title" style="font-family:var(--wr-font-heading);font-size:1.4rem;color:var(--wr-primary);margin-bottom:10px;">${col.name}</h3>
                     <p class="collection-feature-desc" style="font-size:0.9rem;color:var(--wr-text-muted);line-height:1.6;margin-bottom:20px;flex:1;">${col.description}</p>
-                    <button class="btn btn-primary" onclick="navigateToShopWithFilter('collection', '${col.queryCol}', 'featured', '${col.name}')">
+                    <button class="btn btn-primary" onclick="event.stopPropagation(); navigateTo('collection-detail', '${col.slug}')">
                         Explore Collection
                     </button>
                 </div>
@@ -353,6 +387,159 @@ function renderCollectionsPage() {
     `;
 }
 
+/**
+ * Render dedicated Collection Detail Page with real product grid & counts
+ */
+async function renderCollectionDetailPage(slug) {
+    currentCollectionSlug = slug;
+    const heroEl = document.getElementById('collection-detail-hero');
+    const countEl = document.getElementById('collection-detail-count');
+    const gridEl = document.getElementById('collection-detail-grid');
+    if (!heroEl || !gridEl) return;
+
+    const col = COLLECTIONS_CONFIG.find(c => c.slug === slug || c.queryCol.toLowerCase() === (slug || '').toLowerCase() || c.name.toLowerCase() === (slug || '').toLowerCase()) || COLLECTIONS_CONFIG[0];
+
+    if (typeof setCollectionDetailSEO === 'function') {
+        setCollectionDetailSEO(col);
+    }
+
+    heroEl.innerHTML = `
+        <div class="container" style="max-width:800px;margin:0 auto;text-align:center;">
+            <div class="breadcrumbs" style="margin-bottom:12px;font-size:0.85rem;color:var(--wr-text-muted);">
+                <a onclick="navigateTo('home')" style="cursor:pointer;color:inherit;">Home</a>
+                <span style="margin:0 8px;">/</span>
+                <a onclick="navigateTo('collections')" style="cursor:pointer;color:inherit;">Collections</a>
+                <span style="margin:0 8px;">/</span>
+                <span style="color:var(--wr-primary);font-weight:500;">${col.name}</span>
+            </div>
+            <span class="sub-label" style="font-size:0.8rem;letter-spacing:2px;color:var(--wr-primary);text-transform:uppercase;font-weight:600;">${col.tagline}</span>
+            <h1 style="margin-top:8px;">${col.name}</h1>
+            <p style="max-width:650px;margin:12px auto 0;">${col.description}</p>
+        </div>
+    `;
+
+    const isLoaded = productsDB && productsDB.length > 0;
+    if (!isLoaded) {
+        if (countEl) countEl.textContent = 'Loading products...';
+        if (typeof renderProductLoadingSkeletons === 'function') {
+            renderProductLoadingSkeletons('collection-detail-grid', 8);
+        }
+        if (typeof productsService !== 'undefined') {
+            try {
+                await productsService.ensureLoaded();
+            } catch (e) {}
+        }
+    }
+
+    const products = typeof productsService !== 'undefined'
+        ? productsService.getProductsByCollection(col.queryCol)
+        : [];
+
+    if (countEl) {
+        countEl.textContent = products.length > 0 ? `${products.length} Pieces Available` : '';
+    }
+
+    if (products.length === 0) {
+        gridEl.innerHTML = `
+            <div class="cart-empty" style="grid-column:1/-1;padding:60px 20px;text-align:center;">
+                <p style="font-size:1.1rem;color:var(--wr-primary);font-family:var(--wr-font-heading);margin-bottom:8px;">No products found in this collection.</p>
+                <p style="color:var(--wr-text-muted);font-size:0.9rem;margin-bottom:20px;">Explore our other curated silver collections or view all jewellery.</p>
+                <button class="btn btn-primary btn-sm" onclick="navigateTo('collections')">View All Collections</button>
+            </div>
+        `;
+    } else {
+        if (typeof renderProductsToContainer === 'function') {
+            renderProductsToContainer(products, 'collection-detail-grid');
+        }
+    }
+}
+
+/**
+ * Render dedicated New Arrivals Page sorted newest first by created_at descending
+ */
+async function renderNewArrivalsPage() {
+    const countEl = document.getElementById('new-arrivals-count');
+    const gridEl = document.getElementById('new-arrivals-grid');
+    if (!gridEl) return;
+
+    const isLoaded = productsDB && productsDB.length > 0;
+    if (!isLoaded) {
+        if (countEl) countEl.textContent = 'Loading products...';
+        if (typeof renderProductLoadingSkeletons === 'function') {
+            renderProductLoadingSkeletons('new-arrivals-grid', 8);
+        }
+        if (typeof productsService !== 'undefined') {
+            try {
+                await productsService.ensureLoaded();
+            } catch (e) {}
+        }
+    }
+
+    const products = typeof productsService !== 'undefined'
+        ? productsService.getNewArrivals(0)
+        : [];
+
+    if (countEl) {
+        countEl.textContent = products.length > 0 ? `Showing ${products.length} Pieces` : '';
+    }
+
+    if (products.length === 0) {
+        gridEl.innerHTML = `
+            <div class="cart-empty" style="grid-column:1/-1;padding:60px 20px;text-align:center;">
+                <p style="font-size:1.1rem;color:var(--wr-primary);font-family:var(--wr-font-heading);margin-bottom:8px;">No products found.</p>
+                <button class="btn btn-primary btn-sm" onclick="navigateTo('shop')">Explore All Jewellery</button>
+            </div>
+        `;
+    } else {
+        if (typeof renderProductsToContainer === 'function') {
+            renderProductsToContainer(products, 'new-arrivals-grid');
+        }
+    }
+}
+
+/**
+ * Render dedicated Best Sellers Page ranked by real sales data and availability
+ */
+async function renderBestSellersPage() {
+    const countEl = document.getElementById('best-sellers-count');
+    const gridEl = document.getElementById('best-sellers-grid');
+    if (!gridEl) return;
+
+    const isLoaded = productsDB && productsDB.length > 0;
+    if (!isLoaded) {
+        if (countEl) countEl.textContent = 'Loading products...';
+        if (typeof renderProductLoadingSkeletons === 'function') {
+            renderProductLoadingSkeletons('best-sellers-grid', 8);
+        }
+        if (typeof productsService !== 'undefined') {
+            try {
+                await productsService.ensureLoaded();
+            } catch (e) {}
+        }
+    }
+
+    const products = typeof productsService !== 'undefined'
+        ? productsService.getBestSellers(0)
+        : [];
+
+    if (countEl) {
+        countEl.textContent = products.length > 0 ? `Showing ${products.length} Pieces` : '';
+    }
+
+    if (products.length === 0) {
+        gridEl.innerHTML = `
+            <div class="cart-empty" style="grid-column:1/-1;padding:60px 20px;text-align:center;">
+                <p style="font-size:1.1rem;color:var(--wr-primary);font-family:var(--wr-font-heading);margin-bottom:8px;">No products found.</p>
+                <button class="btn btn-primary btn-sm" onclick="navigateTo('shop')">Explore All Jewellery</button>
+            </div>
+        `;
+    } else {
+        if (typeof renderProductsToContainer === 'function') {
+            renderProductsToContainer(products, 'best-sellers-grid');
+        }
+    }
+}
+
 // ── Browser URL Navigation & History Handling ──
 function handleInitialURLRoute(pushHistory = false) {
     const path = window.location.pathname;
@@ -375,11 +562,23 @@ function handleInitialURLRoute(pushHistory = false) {
             navigateTo('product', slug, pushHistory);
             return;
         }
-    } else if (path === '/shop') {
-        navigateTo('shop', null, pushHistory);
-        return;
+    } else if (path.startsWith('/collections/')) {
+        const slug = path.replace('/collections/', '').replace(/\/$/, '');
+        if (slug) {
+            navigateTo('collection-detail', slug, pushHistory);
+            return;
+        }
     } else if (path === '/collections') {
         navigateTo('collections', null, pushHistory);
+        return;
+    } else if (path === '/new-arrivals') {
+        navigateTo('new-arrivals', null, pushHistory);
+        return;
+    } else if (path === '/best-sellers') {
+        navigateTo('best-sellers', null, pushHistory);
+        return;
+    } else if (path === '/shop') {
+        navigateTo('shop', null, pushHistory);
         return;
     } else if (path === '/about') {
         navigateTo('about', null, pushHistory);
