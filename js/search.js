@@ -136,22 +136,27 @@ function renderPopularSearches() {
 
 function searchByCategory(category) {
     closeSearch();
-    navigateTo('shop');
-    setTimeout(() => {
-        currentFilters.category = category;
-        applyFiltersAndSort();
-        document.getElementById('shop-title').textContent = category;
-    }, 50);
+    if (typeof navigateToShopWithFilter === 'function') {
+        navigateToShopWithFilter('category', category, 'featured', category);
+    } else {
+        navigateTo('shop');
+        setTimeout(() => handleCategoryFilter(category), 50);
+    }
 }
 
 function searchByCollection(collection) {
     closeSearch();
-    navigateTo('shop');
-    setTimeout(() => {
-        currentFilters.collection = collection;
-        applyFiltersAndSort();
-        document.getElementById('shop-title').textContent = collection + ' Collection';
-    }, 50);
+    if (typeof navigateToShopWithFilter === 'function') {
+        navigateToShopWithFilter('collection', collection, 'featured', collection + ' Collection');
+    } else {
+        navigateTo('shop');
+        setTimeout(() => {
+            currentFilters.collection = collection;
+            applyFiltersAndSort();
+            const t = document.getElementById('shop-title');
+            if (t) t.textContent = collection + ' Collection';
+        }, 50);
+    }
 }
 
 // Close search on Escape

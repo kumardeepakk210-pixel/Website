@@ -10,8 +10,26 @@
 var WR_SUPABASE_URL = window.SUPABASE_URL || (typeof SUPABASE_URL !== 'undefined' ? SUPABASE_URL : 'https://ptpuepejciqiktmcpuon.supabase.co');
 var WR_SUPABASE_ANON_KEY = window.SUPABASE_ANON_KEY || (typeof SUPABASE_ANON_KEY !== 'undefined' ? SUPABASE_ANON_KEY : 'sb_publishable_ZHwzEtRBkW9u4T2d_0R2Ag_BX1EeJRX');
 
+// Icon SVG Constants
+window.ICONS = {
+    heart: `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+    chevronDown: `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><polyline points="6 9 12 15 18 9" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+    chevronRight: `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><polyline points="9 18 15 12 9 6" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+    check: `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><polyline points="20 6 9 17 4 12" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+    shield: `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+    truck: `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="3" width="15" height="13" stroke-linecap="round" stroke-linejoin="round"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>`,
+    gift: `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><polyline points="20 12 20 22 4 22 4 12" stroke-linecap="round" stroke-linejoin="round"/><rect x="2" y="7" width="20" height="5" stroke-linecap="round" stroke-linejoin="round"/><line x1="12" y1="22" x2="12" y2="7" stroke-linecap="round"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+    diamond: `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M6 3h12l4 6-10 13L2 9z" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 9h20" stroke-linecap="round"/><path d="M10 3l-4 6 6 13 6-13-4-6" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+    sparkle: `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8L12 2z" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+    lock: `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`,
+    rotate: `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>`,
+    camera: `<svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" fill="none" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>`
+};
+var ICONS = window.ICONS;
+
 // Global stores & indices
 let productsDB = [];
+window.productsDB = productsDB;
 let productSlugMap = new Map();
 let productCodeMap = new Map();
 let productSalesMap = new Map();
@@ -23,6 +41,7 @@ let inventorySyncError = null;
 function formatPrice(amount) {
     return '₹' + Number(amount || 0).toLocaleString('en-IN');
 }
+window.formatPrice = formatPrice;
 
 /**
  * Deterministic SEO slug generator
@@ -70,6 +89,10 @@ function normalizeCategory(raw) {
         'Nose Pin': 'Nose Pins',
         'Bali': 'Balis & Hoops',
         'Set': 'Jewellery Sets',
+        'Gift Sets': 'Jewellery Sets',
+        'Gift Set': 'Jewellery Sets',
+        'Sets': 'Jewellery Sets',
+        'Jewellery Set': 'Jewellery Sets',
         'Silver Jewellery': 'Silver Jewellery',
         'Fashion Jewellery': 'Fashion Jewellery',
         'Accessories': 'Accessories',
@@ -77,6 +100,7 @@ function normalizeCategory(raw) {
     };
     return map[clean] || (clean.endsWith('s') ? clean : clean + 's');
 }
+window.normalizeCategory = normalizeCategory;
 
 /**
  * Map products into curated collections based on silver craftsmanship
@@ -311,6 +335,7 @@ const productsService = {
                 sortedBySales.slice(0, 12).forEach(p => { p.isBestseller = true; });
 
                 productsDB = mapped;
+                window.productsDB = mapped;
 
                 // Rebuild fast index maps
                 productSlugMap.clear();
@@ -332,6 +357,21 @@ const productsService = {
                 } catch (e) {}
 
                 console.info(`✓ Loaded ${mapped.length} active products dynamically from WishRite Supabase database.`);
+
+                // Automatically update waiting UI sections across pages
+                try {
+                    window.dispatchEvent(new CustomEvent('wishrite:productsLoaded', { detail: { products: mapped } }));
+                    if (typeof renderHomeSections === 'function' && typeof getCurrentView === 'function' && getCurrentView() === 'home') {
+                        renderHomeSections();
+                    }
+                    if (typeof applyFiltersAndSort === 'function' && typeof getCurrentView === 'function' && getCurrentView() === 'shop') {
+                        applyFiltersAndSort();
+                    }
+                    if (typeof renderCollectionsPage === 'function' && typeof getCurrentView === 'function' && getCurrentView() === 'collections') {
+                        renderCollectionsPage();
+                    }
+                } catch (uiErr) {}
+
                 return productsDB;
             } catch (err) {
                 console.error('Supabase inventory sync error:', err);
@@ -467,7 +507,25 @@ const productsService = {
     },
 
     getCategories() {
-        return [...new Set(productsDB.map(p => p.category))].filter(Boolean);
+        if (productsDB && productsDB.length > 0) {
+            const set = [...new Set(productsDB.map(p => p.category))].filter(Boolean);
+            if (set.length > 0) return set;
+        }
+        return [
+            'Anklets',
+            'Earrings',
+            'Bracelets',
+            'Necklaces',
+            'Nose Pins',
+            'Chains',
+            'Pendants',
+            'Jewellery Sets',
+            'Rings',
+            'Toe Rings',
+            'Balis & Hoops',
+            'Silver Rakhis',
+            'Accessories'
+        ];
     },
 
     getCollections() {
@@ -494,6 +552,10 @@ window.getProductByCode = (code) => productsService.getProductByCode(code);
 window.getProductsByCategory = (cat) => productsService.getProductsByCategory(cat);
 window.getCategories = () => productsService.getCategories();
 window.getCollections = () => productsService.getCollections();
+window.createProductCardHTML = createProductCardHTML;
+window.renderProductCard = createProductCardHTML;
+window.renderProductsToContainer = renderProductsToContainer;
+window.renderProductLoadingSkeletons = renderProductLoadingSkeletons;
 
 /**
  * Render loading skeleton cards

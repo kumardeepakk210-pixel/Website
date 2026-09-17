@@ -22,7 +22,8 @@ function closeMobileMenu() {
 
 // ── Scroll Reveal ──
 function initScrollReveal() {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    if (typeof IntersectionObserver === 'undefined') return;
 
     const observer = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
@@ -172,36 +173,113 @@ async function applyFiltersAndSort() {
     }
 }
 
+/**
+ * Universal cross-page shop router with filter, sort, and title sync
+ */
+function navigateToShopWithFilter(filterType, filterValue, sortOption = 'featured', customTitle = null) {
+    currentFilters = {
+        category: 'All',
+        collection: 'All',
+        priceRange: 'All',
+        occasion: 'All'
+    };
+
+    if (filterType === 'category') {
+        currentFilters.category = filterValue || 'All';
+    } else if (filterType === 'collection') {
+        currentFilters.collection = filterValue || 'All';
+    } else if (filterType === 'occasion') {
+        currentFilters.occasion = filterValue || 'All';
+    } else if (filterType === 'priceRange') {
+        currentFilters.priceRange = filterValue || 'All';
+    }
+
+    currentSort = sortOption || 'featured';
+
+    if (typeof navigateTo === 'function') {
+        navigateTo('shop', null, true);
+    }
+
+    const titleEl = document.getElementById('shop-title');
+    if (titleEl) {
+        if (customTitle) {
+            titleEl.textContent = customTitle;
+        } else if (filterType === 'category' && filterValue !== 'All') {
+            titleEl.textContent = filterValue;
+        } else if (filterType === 'collection' && filterValue !== 'All') {
+            titleEl.textContent = filterValue;
+        } else if (filterType === 'occasion' && filterValue !== 'All') {
+            titleEl.textContent = `${filterValue} Jewellery`;
+        } else if (sortOption === 'newest') {
+            titleEl.textContent = 'New Arrivals';
+        } else if (sortOption === 'featured') {
+            titleEl.textContent = 'Best Sellers';
+        } else {
+            titleEl.textContent = 'All Jewellery';
+        }
+    }
+
+    const sortSelect = document.getElementById('shop-sort-select') || document.querySelector('.shop-sort select');
+    if (sortSelect) {
+        sortSelect.value = currentSort;
+    }
+
+    buildSidebarFilters();
+    buildMobileFilters();
+    applyFiltersAndSort();
+}
+window.navigateToShopWithFilter = navigateToShopWithFilter;
+
 function handleCategoryFilter(category) {
     currentFilters.category = category;
+    if (typeof getCurrentView === 'function' && getCurrentView() !== 'shop') {
+        navigateTo('shop', null, true);
+    }
     applyFiltersAndSort();
     // Update shop title
     const title = document.getElementById('shop-title');
     if (title) title.textContent = category === 'All' ? 'All Jewellery' : category;
     // Update active state on sidebar
     document.querySelectorAll('.filter-option-cat').forEach(el => {
-        el.classList.toggle('active', el.dataset.value === category);
+        const isMatch = el.dataset.value === category;
+        el.classList.toggle('active', isMatch);
+        const radio = el.querySelector('input[type="radio"]');
+        if (radio) radio.checked = isMatch;
     });
 }
 
 function handleSort(value) {
     currentSort = value;
+    const sortSelect = document.getElementById('shop-sort-select') || document.querySelector('.shop-sort select');
+    if (sortSelect) sortSelect.value = value;
     applyFiltersAndSort();
 }
 
 function handleOccasionFilter(occasion) {
     currentFilters.occasion = occasion;
+    if (typeof getCurrentView === 'function' && getCurrentView() !== 'shop') {
+        navigateTo('shop', null, true);
+    }
     applyFiltersAndSort();
+    const title = document.getElementById('shop-title');
+    if (title) title.textContent = occasion === 'All' ? 'All Jewellery' : `${occasion} Jewellery`;
 }
 
 function handlePriceFilter(range) {
     currentFilters.priceRange = range;
+    if (typeof getCurrentView === 'function' && getCurrentView() !== 'shop') {
+        navigateTo('shop', null, true);
+    }
     applyFiltersAndSort();
 }
 
 function resetFilters() {
     currentFilters = { category: 'All', collection: 'All', priceRange: 'All', occasion: 'All' };
     currentSort = 'featured';
+    const sortSelect = document.getElementById('shop-sort-select') || document.querySelector('.shop-sort select');
+    if (sortSelect) sortSelect.value = 'featured';
+    buildSidebarFilters();
+    buildMobileFilters();
     applyFiltersAndSort();
     const title = document.getElementById('shop-title');
     if (title) title.textContent = 'All Jewellery';
@@ -270,7 +348,8 @@ function buildSidebarFilters() {
     const sidebar = document.getElementById('shop-sidebar');
     if (!sidebar) return;
 
-    const categories = ['All', ...getCategories()];
+    const rawCategories = typeof getCategories === 'function' ? getCategories() : [];
+    const categories = ['All', ...rawCategories.filter(c => c !== 'All')];
     const occasions = ['All', 'Everyday', 'Office', 'Date Night', 'Festive', 'Gifting', 'Special Occasions'];
     const priceRanges = [
         { label: 'All', value: 'All' },
@@ -283,22 +362,22 @@ function buildSidebarFilters() {
     sidebar.innerHTML = `
         <h4 class="filter-group-title">Category</h4>
         ${categories.map(c => `
-            <label class="filter-option filter-option-cat" data-value="${c}">
-                <input type="radio" name="category" ${c === 'All' ? 'checked' : ''} onchange="handleCategoryFilter('${c}')"> ${c}
+            <label class="filter-option filter-option-cat ${c === currentFilters.category ? 'active' : ''}" data-value="${c}">
+                <input type="radio" name="category" ${c === currentFilters.category ? 'checked' : ''} onchange="handleCategoryFilter('${c}')"> ${c}
             </label>
         `).join('')}
 
         <h4 class="filter-group-title">Price</h4>
         ${priceRanges.map(r => `
-            <label class="filter-option">
-                <input type="radio" name="price" ${r.value === 'All' ? 'checked' : ''} onchange="handlePriceFilter('${r.value}')"> ${r.label}
+            <label class="filter-option ${r.value === currentFilters.priceRange ? 'active' : ''}">
+                <input type="radio" name="price" ${r.value === currentFilters.priceRange ? 'checked' : ''} onchange="handlePriceFilter('${r.value}')"> ${r.label}
             </label>
         `).join('')}
 
         <h4 class="filter-group-title">Occasion</h4>
         ${occasions.map(o => `
-            <label class="filter-option">
-                <input type="radio" name="occasion" ${o === 'All' ? 'checked' : ''} onchange="handleOccasionFilter('${o}')"> ${o}
+            <label class="filter-option ${o === currentFilters.occasion ? 'active' : ''}">
+                <input type="radio" name="occasion" ${o === currentFilters.occasion ? 'checked' : ''} onchange="handleOccasionFilter('${o}')"> ${o}
             </label>
         `).join('')}
     `;
@@ -309,8 +388,9 @@ function buildMobileFilters() {
     const sheet = document.getElementById('filter-sheet-body');
     if (!sheet) return;
 
-    const categories = ['All', ...getCategories()];
-    const occasions = ['All', 'Everyday', 'Office', 'Date Night', 'Festive', 'Gifting'];
+    const rawCategories = typeof getCategories === 'function' ? getCategories() : [];
+    const categories = ['All', ...rawCategories.filter(c => c !== 'All')];
+    const occasions = ['All', 'Everyday', 'Office', 'Date Night', 'Festive', 'Gifting', 'Special Occasions'];
     const priceRanges = [
         { label: 'All', value: 'All' },
         { label: 'Under ₹2,000', value: '0-2000' },
@@ -322,21 +402,21 @@ function buildMobileFilters() {
     sheet.innerHTML = `
         <h4 class="filter-group-title">Category</h4>
         ${categories.map(c => `
-            <label class="filter-option">
+            <label class="filter-option ${c === currentFilters.category ? 'active' : ''}">
                 <input type="radio" name="m-category" ${c === currentFilters.category ? 'checked' : ''} onchange="currentFilters.category='${c}'"> ${c}
             </label>
         `).join('')}
 
         <h4 class="filter-group-title">Price</h4>
         ${priceRanges.map(r => `
-            <label class="filter-option">
+            <label class="filter-option ${r.value === currentFilters.priceRange ? 'active' : ''}">
                 <input type="radio" name="m-price" ${r.value === currentFilters.priceRange ? 'checked' : ''} onchange="currentFilters.priceRange='${r.value}'"> ${r.label}
             </label>
         `).join('')}
 
         <h4 class="filter-group-title">Occasion</h4>
         ${occasions.map(o => `
-            <label class="filter-option">
+            <label class="filter-option ${o === currentFilters.occasion ? 'active' : ''}">
                 <input type="radio" name="m-occasion" ${o === currentFilters.occasion ? 'checked' : ''} onchange="currentFilters.occasion='${o}'"> ${o}
             </label>
         `).join('')}

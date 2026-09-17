@@ -229,10 +229,15 @@ function updateStickyCTA(product) {
 
 // Render home page sections with live Supabase products or skeletons
 async function renderHomeSections() {
-    if (!productsDB || productsDB.length === 0) {
+    const bsEl = document.getElementById('bestsellers-container');
+    const naEl = document.getElementById('new-arrivals-container');
+
+    const hasProducts = productsDB && productsDB.length > 0;
+
+    if (!hasProducts) {
         if (typeof renderProductLoadingSkeletons === 'function') {
-            renderProductLoadingSkeletons('bestsellers-container', 4);
-            renderProductLoadingSkeletons('new-arrivals-container', 4);
+            if (bsEl) renderProductLoadingSkeletons('bestsellers-container', 4);
+            if (naEl) renderProductLoadingSkeletons('new-arrivals-container', 4);
         }
         try {
             if (typeof productsService !== 'undefined') {
@@ -245,16 +250,28 @@ async function renderHomeSections() {
 
     const bestsellers = (typeof productsService !== 'undefined') 
         ? productsService.getBestSellers(8) 
-        : productsDB.slice(0, 8);
+        : (window.productsDB || productsDB).slice(0, 8);
     const newArrivals = (typeof productsService !== 'undefined') 
         ? productsService.getNewArrivals(8) 
-        : productsDB.slice(0, 8);
+        : (window.productsDB || productsDB).slice(0, 8);
 
     if (typeof renderProductsToContainer === 'function') {
-        renderProductsToContainer(bestsellers, 'bestsellers-container');
-        renderProductsToContainer(newArrivals, 'new-arrivals-container');
+        if (bsEl) renderProductsToContainer(bestsellers, 'bestsellers-container');
+        if (naEl) renderProductsToContainer(newArrivals, 'new-arrivals-container');
     }
 }
+
+// Listen for async inventory sync and automatically update active views
+window.addEventListener('wishrite:productsLoaded', () => {
+    const current = getCurrentView();
+    if (current === 'home') {
+        renderHomeSections();
+    } else if (current === 'shop') {
+        applyFiltersAndSort();
+    } else if (current === 'collections') {
+        renderCollectionsPage();
+    }
+});
 
 /**
  * Render dedicated Collections Page connected to real product data
@@ -310,7 +327,7 @@ function renderCollectionsPage() {
                     <span class="sub-label" style="font-size:0.75rem;letter-spacing:2px;color:var(--wr-primary);text-transform:uppercase;font-weight:600;margin-bottom:6px;">${col.tagline}</span>
                     <h3 class="collection-feature-title" style="font-family:var(--wr-font-heading);font-size:1.4rem;color:var(--wr-primary);margin-bottom:10px;">${col.name}</h3>
                     <p class="collection-feature-desc" style="font-size:0.9rem;color:var(--wr-text-muted);line-height:1.6;margin-bottom:20px;flex:1;">${col.description}</p>
-                    <button class="btn btn-primary" onclick="navigateTo('shop'); currentFilters.collection='${col.queryCol}'; currentFilters.category='All'; applyFiltersAndSort(); document.getElementById('shop-title').textContent='${col.name}';">
+                    <button class="btn btn-primary" onclick="navigateToShopWithFilter('collection', '${col.queryCol}', 'featured', '${col.name}')">
                         Explore Collection
                     </button>
                 </div>

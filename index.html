@@ -52,10 +52,10 @@
 
         <!-- Desktop Navigation -->
         <nav class="header-nav" aria-label="Main navigation">
-            <a onclick="navigateTo('shop'); handleCategoryFilter('All')" id="nav-shop">Jewellery</a>
+            <a onclick="navigateToShopWithFilter('category', 'All', 'featured', 'All Jewellery')" id="nav-shop">Jewellery</a>
             <a onclick="navigateTo('collections')" id="nav-collections">Collections</a>
-            <a onclick="navigateTo('shop'); currentFilters.category='All'; currentSort='newest'; applyFiltersAndSort();">New Arrivals</a>
-            <a onclick="navigateTo('shop'); currentFilters.category='All'; currentSort='featured'; applyFiltersAndSort();">Best Sellers</a>
+            <a onclick="navigateToShopWithFilter('sort', 'newest', 'newest', 'New Arrivals')">New Arrivals</a>
+            <a onclick="navigateToShopWithFilter('sort', 'featured', 'featured', 'Best Sellers')">Best Sellers</a>
             <a onclick="navigateTo('about')" id="nav-about">About</a>
         </nav>
 
@@ -97,10 +97,10 @@
             </button>
         </div>
         <nav class="mobile-menu-nav" aria-label="Mobile navigation">
-            <a onclick="closeMobileMenu(); navigateTo('shop')">Jewellery</a>
+            <a onclick="closeMobileMenu(); navigateToShopWithFilter('category', 'All', 'featured', 'All Jewellery')">Jewellery</a>
             <a onclick="closeMobileMenu(); navigateTo('collections')">Collections</a>
-            <a onclick="closeMobileMenu(); navigateTo('shop'); setTimeout(()=>{currentSort='newest';applyFiltersAndSort();},50)">New Arrivals</a>
-            <a onclick="closeMobileMenu(); navigateTo('shop'); setTimeout(()=>{currentSort='featured';applyFiltersAndSort();},50)">Best Sellers</a>
+            <a onclick="closeMobileMenu(); navigateToShopWithFilter('sort', 'newest', 'newest', 'New Arrivals')">New Arrivals</a>
+            <a onclick="closeMobileMenu(); navigateToShopWithFilter('sort', 'featured', 'featured', 'Best Sellers')">Best Sellers</a>
             <a onclick="closeMobileMenu(); navigateTo('about')">About WishRite</a>
         </nav>
         <div class="mobile-menu-footer">
@@ -163,8 +163,8 @@
                     <h1>Timeless Silver.<br>Modern Elegance.</h1>
                     <p>Thoughtfully crafted 925 sterling silver jewellery for everyday moments, meaningful occasions, and unforgettable gifts.</p>
                     <div class="hero-buttons">
-                        <a class="btn btn-primary btn-lg" onclick="navigateTo('shop')">Shop Jewellery</a>
-                        <a class="btn btn-ghost btn-lg" style="border-color:rgba(255,255,255,0.5);color:#fff;" onclick="navigateTo('shop')">Explore Collections</a>
+                        <a class="btn btn-primary btn-lg" onclick="navigateToShopWithFilter('category', 'All', 'featured', 'All Jewellery')">Shop Jewellery</a>
+                        <a class="btn btn-ghost btn-lg" style="border-color:rgba(255,255,255,0.5);color:#fff;" onclick="navigateTo('collections')">Explore Collections</a>
                     </div>
                 </div>
                 <div class="hero-dots">
@@ -184,7 +184,7 @@
                 </div>
                 <div class="trust-badge">
                     <div class="trust-badge-icon">
-                        <svg viewBox="0 0 24 24"><rect x="1" y="3" width="15" height="13" rx="2"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+                        <svg viewBox="0 0 24 24"><rect x="1" y="3" width="15" height="13" rx="2"/><polygon points="16 8 20 8 23 11 23 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
                     </div>
                     <div class="trust-badge-text">Insured Express Shipping<span>Pan-India Delivery</span></div>
                 </div>
@@ -209,27 +209,27 @@
                     <h2>Shop by Category</h2>
                 </div>
                 <div class="categories-grid">
-                    <div class="category-card" onclick="navigateTo('shop'); setTimeout(()=>handleCategoryFilter('Rings'),50)">
+                    <div class="category-card" onclick="navigateToShopWithFilter('category', 'Rings', 'featured', 'Rings')">
                         <img src="https://images.unsplash.com/photo-1603561591411-07134e71a2a9?auto=format&fit=crop&w=500&q=80" alt="Silver rings collection" loading="lazy" width="500" height="667">
                         <div class="category-card-overlay"><span class="category-card-name">Rings</span></div>
                     </div>
-                    <div class="category-card" onclick="navigateTo('shop'); setTimeout(()=>handleCategoryFilter('Earrings'),50)">
+                    <div class="category-card" onclick="navigateToShopWithFilter('category', 'Earrings', 'featured', 'Earrings')">
                         <img src="https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?auto=format&fit=crop&w=500&q=80" alt="Silver earrings collection" loading="lazy" width="500" height="667">
                         <div class="category-card-overlay"><span class="category-card-name">Earrings</span></div>
                     </div>
-                    <div class="category-card" onclick="navigateTo('shop'); setTimeout(()=>handleCategoryFilter('Necklaces'),50)">
+                    <div class="category-card" onclick="navigateToShopWithFilter('category', 'Necklaces', 'featured', 'Necklaces')">
                         <img src="https://images.unsplash.com/photo-1599643477877-530eb83abc8e?auto=format&fit=crop&w=500&q=80" alt="Silver necklaces collection" loading="lazy" width="500" height="667">
                         <div class="category-card-overlay"><span class="category-card-name">Necklaces</span></div>
                     </div>
-                    <div class="category-card" onclick="navigateTo('shop'); setTimeout(()=>handleCategoryFilter('Bracelets'),50)">
+                    <div class="category-card" onclick="navigateToShopWithFilter('category', 'Bracelets', 'featured', 'Bracelets')">
                         <img src="https://images.unsplash.com/photo-1611591437281-460bfbe1220a?auto=format&fit=crop&w=500&q=80" alt="Silver bracelets collection" loading="lazy" width="500" height="667">
                         <div class="category-card-overlay"><span class="category-card-name">Bracelets</span></div>
                     </div>
-                    <div class="category-card" onclick="navigateTo('shop'); setTimeout(()=>handleCategoryFilter('Anklets'),50)">
+                    <div class="category-card" onclick="navigateToShopWithFilter('category', 'Anklets', 'featured', 'Anklets')">
                         <img src="https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?auto=format&fit=crop&w=500&q=80" alt="Silver anklets collection" loading="lazy" width="500" height="667">
                         <div class="category-card-overlay"><span class="category-card-name">Anklets</span></div>
                     </div>
-                    <div class="category-card" onclick="navigateTo('shop'); setTimeout(()=>handleCategoryFilter('Gift Sets'),50)">
+                    <div class="category-card" onclick="navigateToShopWithFilter('category', 'Jewellery Sets', 'featured', 'Jewellery Sets')">
                         <img src="https://images.unsplash.com/photo-1549439602-43ebca2327af?auto=format&fit=crop&w=500&q=80" alt="Silver gift sets" loading="lazy" width="500" height="667">
                         <div class="category-card-overlay"><span class="category-card-name">Gift Sets</span></div>
                     </div>
@@ -244,7 +244,7 @@
                         <h2>New Arrivals</h2>
                         <p>The latest additions to our collection.</p>
                     </div>
-                    <a class="view-all" onclick="navigateTo('shop'); setTimeout(()=>{currentSort='newest';applyFiltersAndSort();},50)">View All →</a>
+                    <a class="view-all" onclick="navigateToShopWithFilter('sort', 'newest', 'newest', 'New Arrivals')">View All →</a>
                 </div>
                 <div class="product-grid" id="new-arrivals-container"></div>
             </section>
@@ -257,7 +257,7 @@
                         <h2>Bestsellers</h2>
                         <p>Loved by many, made for you.</p>
                     </div>
-                    <a class="view-all" onclick="navigateTo('shop')">View All →</a>
+                    <a class="view-all" onclick="navigateToShopWithFilter('sort', 'featured', 'featured', 'Best Sellers')">View All →</a>
                 </div>
                 <div class="product-grid" id="bestsellers-container"></div>
             </section>
@@ -270,37 +270,37 @@
                     <p style="margin:0 auto;">Silver jewellery for every moment.</p>
                 </div>
                 <div class="occasions-grid">
-                    <div class="occasion-card" onclick="navigateTo('shop'); setTimeout(()=>handleOccasionFilter('Everyday'),50)">
+                    <div class="occasion-card" onclick="navigateToShopWithFilter('occasion', 'Everyday', 'featured', 'Everyday Jewellery')">
                         <div class="occasion-card-image">
                             <img src="https://images.unsplash.com/photo-1611591437281-460bfbe1220a?auto=format&fit=crop&w=300&q=80" alt="Everyday jewellery" loading="lazy" width="300" height="300">
                         </div>
                         <span class="occasion-card-name">Everyday</span>
                     </div>
-                    <div class="occasion-card" onclick="navigateTo('shop'); setTimeout(()=>handleOccasionFilter('Office'),50)">
+                    <div class="occasion-card" onclick="navigateToShopWithFilter('occasion', 'Office', 'featured', 'Office Wear Jewellery')">
                         <div class="occasion-card-image">
                             <img src="https://images.unsplash.com/photo-1573408301185-9146fe634ad0?auto=format&fit=crop&w=300&q=80" alt="Office jewellery" loading="lazy" width="300" height="300">
                         </div>
                         <span class="occasion-card-name">Office</span>
                     </div>
-                    <div class="occasion-card" onclick="navigateTo('shop'); setTimeout(()=>handleOccasionFilter('Date Night'),50)">
+                    <div class="occasion-card" onclick="navigateToShopWithFilter('occasion', 'Date Night', 'featured', 'Date Night Jewellery')">
                         <div class="occasion-card-image">
                             <img src="https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?auto=format&fit=crop&w=300&q=80" alt="Date night jewellery" loading="lazy" width="300" height="300">
                         </div>
                         <span class="occasion-card-name">Date Night</span>
                     </div>
-                    <div class="occasion-card" onclick="navigateTo('shop'); setTimeout(()=>handleOccasionFilter('Festive'),50)">
+                    <div class="occasion-card" onclick="navigateToShopWithFilter('occasion', 'Festive', 'featured', 'Festive Jewellery')">
                         <div class="occasion-card-image">
                             <img src="https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?auto=format&fit=crop&w=300&q=80" alt="Festive jewellery" loading="lazy" width="300" height="300">
                         </div>
                         <span class="occasion-card-name">Festive</span>
                     </div>
-                    <div class="occasion-card" onclick="navigateTo('shop'); setTimeout(()=>handleOccasionFilter('Gifting'),50)">
+                    <div class="occasion-card" onclick="navigateToShopWithFilter('occasion', 'Gifting', 'featured', 'Gifting Collection')">
                         <div class="occasion-card-image">
                             <img src="https://images.unsplash.com/photo-1549439602-43ebca2327af?auto=format&fit=crop&w=300&q=80" alt="Gift jewellery" loading="lazy" width="300" height="300">
                         </div>
                         <span class="occasion-card-name">Gifting</span>
                     </div>
-                    <div class="occasion-card" onclick="navigateTo('shop'); setTimeout(()=>handleOccasionFilter('Special Occasions'),50)">
+                    <div class="occasion-card" onclick="navigateToShopWithFilter('occasion', 'Special Occasions', 'featured', 'Special Occasions Jewellery')">
                         <div class="occasion-card-image">
                             <img src="https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?auto=format&fit=crop&w=300&q=80" alt="Special occasion jewellery" loading="lazy" width="300" height="300">
                         </div>
@@ -399,7 +399,7 @@
                     </button>
                 </div>
                 <div class="shop-toolbar-right shop-sort">
-                    <select onchange="handleSort(this.value)" aria-label="Sort products">
+                    <select id="shop-sort-select" onchange="handleSort(this.value)" aria-label="Sort products">
                         <option value="featured">Sort: Featured</option>
                         <option value="newest">Sort: Newest</option>
                         <option value="price-low">Price: Low to High</option>
@@ -709,12 +709,12 @@
             </div>
             <div class="footer-column">
                 <h4>Shop</h4>
-                <a onclick="navigateTo('shop')">All Jewellery</a>
-                <a onclick="navigateTo('shop'); setTimeout(()=>handleCategoryFilter('Rings'),50)">Rings</a>
-                <a onclick="navigateTo('shop'); setTimeout(()=>handleCategoryFilter('Earrings'),50)">Earrings</a>
-                <a onclick="navigateTo('shop'); setTimeout(()=>handleCategoryFilter('Necklaces'),50)">Necklaces</a>
-                <a onclick="navigateTo('shop'); setTimeout(()=>handleCategoryFilter('Bracelets'),50)">Bracelets</a>
-                <a onclick="navigateTo('shop'); setTimeout(()=>handleCategoryFilter('Anklets'),50)">Anklets</a>
+                <a onclick="navigateToShopWithFilter('category', 'All', 'featured', 'All Jewellery')">All Jewellery</a>
+                <a onclick="navigateToShopWithFilter('category', 'Rings', 'featured', 'Rings')">Rings</a>
+                <a onclick="navigateToShopWithFilter('category', 'Earrings', 'featured', 'Earrings')">Earrings</a>
+                <a onclick="navigateToShopWithFilter('category', 'Necklaces', 'featured', 'Necklaces')">Necklaces</a>
+                <a onclick="navigateToShopWithFilter('category', 'Bracelets', 'featured', 'Bracelets')">Bracelets</a>
+                <a onclick="navigateToShopWithFilter('category', 'Anklets', 'featured', 'Anklets')">Anklets</a>
             </div>
             <div class="footer-column">
                 <h4>Company</h4>

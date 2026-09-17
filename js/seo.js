@@ -43,7 +43,10 @@ function updateSEO(config) {
     }
 
     // Remove old structured data
-    document.querySelectorAll('script[data-wr-schema]').forEach(s => s.remove());
+    document.querySelectorAll('script[data-wr-schema]').forEach(s => {
+        if (typeof s.remove === 'function') s.remove();
+        else if (s.parentNode) s.parentNode.removeChild(s);
+    });
 
     // Add structured data
     if (config.schema) {
@@ -140,6 +143,10 @@ function setProductSEO(product) {
     document.head.appendChild(bcScript);
 }
 
+function getSiteOrigin() {
+    return (typeof window !== 'undefined' && window.location && window.location.origin) ? window.location.origin : 'https://www.wishrite.in';
+}
+
 function setShopSEO(category) {
     const title = category && category !== 'All'
         ? `${category} | 925 Sterling Silver | WishRite`
@@ -149,7 +156,7 @@ function setShopSEO(category) {
         title: title,
         description: `Browse our collection of ${category && category !== 'All' ? category.toLowerCase() : 'premium jewellery'} in 925 sterling silver. Thoughtfully designed for everyday elegance.`,
         keywords: ['925 sterling silver', 'silver jewellery', category || ''].filter(Boolean),
-        canonical: window.location.origin + '/shop'
+        canonical: getSiteOrigin() + '/shop'
     });
 }
 
@@ -158,7 +165,7 @@ function setAboutSEO() {
         title: 'About WishRite | Our Story | Premium Silver Jewellery',
         description: 'Discover WishRite — a premium jewellery brand specialising in thoughtfully designed 925 sterling silver pieces for everyday elegance and meaningful moments.',
         keywords: ['about WishRite', 'silver jewellery brand', '925 sterling silver', 'premium Indian jewellery'],
-        canonical: window.location.origin + '/about'
+        canonical: getSiteOrigin() + '/about'
     });
 }
 
@@ -167,7 +174,7 @@ function setCollectionsSEO() {
         title: 'Curated Silver Collections | WishRite 925 Sterling Silver',
         description: 'Explore WishRite curated silver jewellery collections: 925 Silver Signature Collection, Daily Elegance, The Occasion & Evening Edit, and Modern Solitaires.',
         keywords: ['silver collections', '925 sterling silver collections', 'curated silver jewellery', 'WishRite collections'],
-        canonical: window.location.origin + '/collections'
+        canonical: getSiteOrigin() + '/collections'
     });
 }
 
