@@ -41,14 +41,17 @@ function renderSearchResults(query) {
 
     const lowerQuery = query.toLowerCase();
 
-    // Search across multiple fields
+    // Search across live Supabase fields safely
     const productResults = productsDB.filter(p =>
-        p.name.toLowerCase().includes(lowerQuery) ||
-        p.category.toLowerCase().includes(lowerQuery) ||
-        p.jewelleryType.toLowerCase().includes(lowerQuery) ||
-        (p.collection && p.collection.toLowerCase().includes(lowerQuery)) ||
+        (p.name && p.name.toLowerCase().includes(lowerQuery)) ||
+        (p.category && p.category.toLowerCase().includes(lowerQuery)) ||
+        (p.rawCategory && p.rawCategory.toLowerCase().includes(lowerQuery)) ||
         (p.sku && p.sku.toLowerCase().includes(lowerQuery)) ||
-        (p.seoKeywords && p.seoKeywords.some(k => k.toLowerCase().includes(lowerQuery)))
+        (p.code && p.code.toLowerCase().includes(lowerQuery)) ||
+        (p.material && p.material.toLowerCase().includes(lowerQuery)) ||
+        (p.description && p.description.toLowerCase().includes(lowerQuery)) ||
+        (p.shortDescription && p.shortDescription.toLowerCase().includes(lowerQuery)) ||
+        (p.collection && p.collection.toLowerCase().includes(lowerQuery))
     );
 
     // Category matches
@@ -97,7 +100,7 @@ function renderSearchResults(query) {
                 <h3 class="search-results-title">Products</h3>
                 ${productResults.map(p => `
                     <div class="search-result-item" onclick="closeSearch(); navigateTo('product', '${p.slug}')">
-                        <img class="search-result-image" src="${p.image}" alt="${p.name}" loading="lazy" width="56" height="56">
+                        <img class="search-result-image" src="${p.images?.[0]?.url || p.image || ''}" alt="${p.name}" loading="lazy" width="56" height="56">
                         <div class="search-result-info">
                             <h4>${p.name}</h4>
                             <span>${formatPrice(p.sellingPrice)} · ${p.material}</span>

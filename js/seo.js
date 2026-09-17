@@ -111,9 +111,12 @@ function setProductSEO(product) {
         };
     }
 
+    const pageTitle = product.seoTitle || `${product.name} | 925 Sterling Silver | WishRite`;
+    const pageDescription = product.seoDescription || `Buy ${product.name} at WishRite. 925 Sterling Silver, ${product.silverPurity || '92.5%'} purity, hallmarked jewellery. Price: ₹${product.sellingPrice}. Complimentary insured express delivery.`;
+
     updateSEO({
-        title: `${product.name} | 925 Sterling Silver | WishRite`,
-        description: `Buy ${product.name} at WishRite. 925 Sterling Silver, ${product.silverPurity || '92.5%'} purity, hallmarked jewellery. Price: ₹${product.sellingPrice}. Complimentary insured express delivery.`,
+        title: pageTitle,
+        description: pageDescription,
         keywords: [product.category, '925 sterling silver', product.name, 'WishRite silver'],
         canonical: canonicalUrl,
         schema: schema

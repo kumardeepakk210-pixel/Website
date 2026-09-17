@@ -1,0 +1,168 @@
+/* ============================================
+   WISHRITE — PRODUCT IMAGES LAYER
+   Read-only customer-facing image resolution from Supabase.
+   Handles primary images, gallery, sort order, and luxury placeholders.
+   Strictly display-only: no upload or edit functionality.
+   ============================================ */
+
+/**
+ * Registry cache for image lookups by product ID or SKU
+ */
+let productImagesMap = new Map();
+
+/**
+ * Set image records fetched from Supabase product_images table
+ */
+function setSupabaseProductImages(records) {
+    productImagesMap.clear();
+    if (!Array.isArray(records)) return;
+
+    records.forEach(rec => {
+        const key = rec.product_id || rec.sku || rec.product_code;
+        if (!key) return;
+        if (!productImagesMap.has(key)) {
+            productImagesMap.set(key, []);
+        }
+        productImagesMap.get(key).push({
+            url: rec.image_url || rec.url,
+            alt: rec.alt_text || rec.alt || 'WishRite 925 Sterling Silver Jewellery',
+            type: rec.image_type || (rec.is_primary ? 'main' : 'gallery'),
+            isPrimary: Boolean(rec.is_primary),
+            sortOrder: Number(rec.sort_order) || 0
+        });
+    });
+
+    // Sort images for each product: primary first, then by sort_order
+    productImagesMap.forEach((imgs) => {
+        imgs.sort((a, b) => {
+            if (a.isPrimary && !b.isPrimary) return -1;
+            if (!a.isPrimary && b.isPrimary) return 1;
+            return a.sortOrder - b.sortOrder;
+        });
+    });
+}
+
+/**
+ * Get display images for a product
+ * Priority:
+ * 1. Supabase product_images table records (ordered by primary / sort_order)
+ * 2. Product's direct image_url property
+ * 3. Product's product_media_urls array
+ * 4. Supabase Storage public URL: product-images/${sku}/...
+ * 5. Cached custom image registry (from previous sessions)
+ * 6. Luxury SVG vector placeholder tailored to jewellery category
+ */
+function getProductImages(product) {
+    if (!product) return [];
+
+    const sku = (product.sku || product.code || product.product_code || '').trim();
+    const id = product.id;
+
+    // 1. Check Supabase product_images map
+    if (id && productImagesMap.has(id) && productImagesMap.get(id).length > 0) {
+        return productImagesMap.get(id);
+    }
+    if (sku && productImagesMap.has(sku) && productImagesMap.get(sku).length > 0) {
+        return productImagesMap.get(sku);
+    }
+
+    // 2. Check product's own images array if already populated
+    if (Array.isArray(product.images) && product.images.length > 0 && !product.images[0].isPlaceholder) {
+        return product.images;
+    }
+
+    // 3. Check direct image_url on product record
+    if (product.image_url) {
+        return [{
+            url: product.image_url,
+            alt: product.name || 'WishRite 925 Sterling Silver',
+            type: 'main',
+            isPrimary: true
+        }];
+    }
+
+    // 4. Check product_media_urls array on product record
+    if (Array.isArray(product.product_media_urls) && product.product_media_urls.length > 0) {
+        return product.product_media_urls.map((url, idx) => ({
+            url: typeof url === 'string' ? url : url.url,
+            alt: `${product.name} — view ${idx + 1}`,
+            type: idx === 0 ? 'main' : 'gallery',
+            isPrimary: idx === 0
+        }));
+    }
+
+    // 5. Check localStorage registry (read-only for immediate consistency)
+    try {
+        const raw = localStorage.getItem('wishrite_custom_product_images');
+        if (raw) {
+            const reg = JSON.parse(raw);
+            if (sku && reg[sku] && reg[sku].length > 0) {
+                return reg[sku];
+            }
+            if (id && reg[id] && reg[id].length > 0) {
+                return reg[id];
+            }
+        }
+    } catch (e) {
+        // Storage disabled or inaccessible
+    }
+
+    // 6. Check single image property
+    if (product.image && typeof product.image === 'string' && !product.image.includes('unsplash') && !product.image.startsWith('data:image/svg')) {
+        return [{
+            url: product.image,
+            alt: product.name,
+            type: 'main',
+            isPrimary: true
+        }];
+    }
+
+    // 7. Fallback to luxury SVG vector placeholder
+    return [generateProductPlaceholder(product)];
+}
+
+/**
+ * Generate luxury vector SVG placeholder for silver jewellery
+ * Elegant minimalist design with fine gold/silver metallic accents
+ */
+function generateProductPlaceholder(product) {
+    const category = String(product?.category || 'Jewellery').toLowerCase();
+    const name = product?.name || '925 Sterling Silver Piece';
+    const sku = product?.sku || product?.code || '';
+
+    let iconSvg = '';
+    if (category.includes('earring') || category.includes('bali')) {
+        iconSvg = `<circle cx="150" cy="130" r="30" fill="none" stroke="#D4AF37" stroke-width="3"/><path d="M150 160 L150 210 M140 210 L160 210" stroke="#8E8E93" stroke-width="3" stroke-linecap="round"/><circle cx="150" cy="225" r="8" fill="#5E3435"/>`;
+    } else if (category.includes('ring')) {
+        iconSvg = `<circle cx="150" cy="180" r="50" fill="none" stroke="#A8A8A8" stroke-width="5"/><polygon points="150,118 165,138 135,138" fill="#D4AF37"/>`;
+    } else if (category.includes('necklace') || category.includes('chain') || category.includes('pendant')) {
+        iconSvg = `<path d="M90 120 Q150 230 210 120" fill="none" stroke="#B0B0B0" stroke-width="4" stroke-dasharray="6,4"/><polygon points="150,225 140,245 160,245" fill="#5E3435"/>`;
+    } else if (category.includes('bracelet') || category.includes('anklet')) {
+        iconSvg = `<ellipse cx="150" cy="180" rx="65" ry="45" fill="none" stroke="#A8A8A8" stroke-width="4"/><circle cx="190" cy="150" r="6" fill="#D4AF37"/>`;
+    } else {
+        iconSvg = `<polygon points="150,130 185,160 170,210 130,210 115,160" fill="none" stroke="#A8A8A8" stroke-width="3"/><circle cx="150" cy="175" r="10" fill="#5E3435"/>`;
+    }
+
+    const svg = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 360" width="100%" height="100%">
+        <defs>
+            <linearGradient id="wr-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#FDFBF9"/>
+                <stop offset="100%" stop-color="#F4ECE6"/>
+            </linearGradient>
+        </defs>
+        <rect width="100%" height="100%" fill="url(%23wr-bg)"/>
+        <rect x="15" y="15" width="270" height="330" fill="none" stroke="#E6DFD9" stroke-width="1"/>
+        <g opacity="0.9">${iconSvg}</g>
+        <text x="150" y="275" font-family="Playfair Display, Georgia, serif" font-size="14" fill="#5E3435" font-weight="600" text-anchor="middle" letter-spacing="1.5">WISHRITE</text>
+        <text x="150" y="295" font-family="Inter, sans-serif" font-size="10" fill="#8E8E93" text-anchor="middle" letter-spacing="2">925 STERLING SILVER</text>
+        ${sku ? `<text x="150" y="313" font-family="monospace" font-size="9" fill="#B0A69F" text-anchor="middle">${sku}</text>` : ''}
+    </svg>`;
+
+    return {
+        url: svg,
+        alt: `${name} — 925 Sterling Silver WishRite Jewellery`,
+        type: 'main',
+        isPrimary: true,
+        isPlaceholder: true
+    };
+}

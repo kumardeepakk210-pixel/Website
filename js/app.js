@@ -1,10 +1,12 @@
 /* ============================================
    WISHRITE — APP
-   Router, state management, dynamic inventory sync, admin view
+   Customer Storefront Router, State Management,
+   Dynamic Supabase Inventory Sync & Realtime Subscription
+   Strictly customer-facing: no admin routes or controls.
    ============================================ */
 
-// All available views
-const views = ['home', 'shop', 'about', 'login', 'register', 'profile', 'cart', 'wishlist', 'product', 'admin'];
+// All customer-facing storefront views
+const views = ['home', 'shop', 'about', 'login', 'register', 'profile', 'cart', 'wishlist', 'product'];
 
 function getCurrentView() {
     for (const v of views) {
@@ -41,7 +43,7 @@ function navigateTo(viewId, param, pushHistory = true) {
     }
 
     // Set active nav
-    const navMap = { home: 'nav-home', shop: 'nav-shop', about: 'nav-about', admin: 'nav-admin' };
+    const navMap = { home: 'nav-home', shop: 'nav-shop', about: 'nav-about' };
     const activeNav = document.getElementById(navMap[viewId]);
     if (activeNav) activeNav.classList.add('active');
 
@@ -87,9 +89,10 @@ function navigateTo(viewId, param, pushHistory = true) {
             resetRegistration();
             if (pushHistory) { try { history.pushState({ view: 'register' }, '', '/register'); } catch(e){} }
             break;
-        case 'admin':
-            renderAdminProductManagement();
-            if (pushHistory) { try { history.pushState({ view: 'admin' }, '', '/admin'); } catch(e){} }
+        default:
+            renderHomeSections();
+            setHomeSEO();
+            if (pushHistory) { try { history.pushState({ view: 'home' }, '', '/'); } catch(e){} }
             break;
     }
 
@@ -190,7 +193,7 @@ function renderStickyCTA(product) {
         return;
     }
 
-    const isOutOfStock = (product.stockQuantity <= 0);
+    const isOutOfStock = (product.stockQuantity <= 0 || product.status === 'Out of Stock');
     const priceFormatted = (typeof formatPrice === 'function')
         ? formatPrice(product.sellingPrice)
         : `₹${Number(product.sellingPrice).toLocaleString('en-IN')}`;
@@ -219,9 +222,17 @@ function updateStickyCTA(product) {
     }
 }
 
-// Render home page sections
+// Render home page sections with live Supabase products or skeletons
 function renderHomeSections() {
-    const inStock = productsDB.filter(p => p.stockQuantity > 0);
+    if (!productsDB || productsDB.length === 0) {
+        if (typeof renderProductSkeletons === 'function') {
+            renderProductSkeletons('bestsellers-container', 4);
+            renderProductSkeletons('new-arrivals-container', 4);
+        }
+        return;
+    }
+
+    const inStock = productsDB.filter(p => p.stockQuantity > 0 && p.status !== 'Out of Stock');
     const pool = inStock.length > 0 ? inStock : productsDB;
 
     // Bestsellers: prefer marked bestsellers or top stock
@@ -232,136 +243,8 @@ function renderHomeSections() {
     // New Arrivals: recent or newly added
     let newArrivals = pool.filter(p => p.isNew);
     if (newArrivals.length < 4) newArrivals = pool.slice(8, 16);
+    if (newArrivals.length === 0) newArrivals = pool.slice(0, 8);
     renderProductsToContainer(newArrivals.slice(0, 8), 'new-arrivals-container');
-}
-
-/**
- * Admin Product & Image Management View
- */
-function renderAdminProductManagement(filterText = '') {
-    const container = document.getElementById('admin-view');
-    if (!container) return;
-
-    const term = filterText.toLowerCase();
-    const filtered = productsDB.filter(p => 
-        (p.name && p.name.toLowerCase().includes(term)) ||
-        (p.sku && p.sku.toLowerCase().includes(term)) ||
-        (p.category && p.category.toLowerCase().includes(term))
-    );
-
-    container.innerHTML = `
-        <div class="container" style="padding:40px 0 80px;">
-            <div class="admin-view-header">
-                <div>
-                    <span class="admin-badge">ADMIN CONTROL</span>
-                    <h1 style="font-family:var(--wr-font-heading);font-size:2rem;margin:6px 0 4px;color:var(--wr-primary);">Product & Inventory Management</h1>
-                    <p style="color:var(--wr-text-muted);font-size:0.9rem;margin:0;">Source of Truth: Supabase <code>inventory</code> table (${productsDB.length} active items loaded)</p>
-                </div>
-                <div class="admin-view-actions">
-                    <button class="btn btn-outline btn-sm" onclick="openBulkImageUploadModal()">
-                        <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" fill="none" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                        Bulk SKU Upload
-                    </button>
-                    <button class="btn btn-primary btn-sm" onclick="refreshInventoryData()">
-                        ⟳ Sync Database
-                    </button>
-                </div>
-            </div>
-
-            <!-- Search & Filter Bar -->
-            <div class="admin-filter-bar" style="margin:24px 0 16px;display:flex;gap:12px;align-items:center;">
-                <div style="flex:1;position:relative;">
-                    <input 
-                        type="text" 
-                        class="admin-search-input" 
-                        placeholder="Search products by SKU, name, or category..." 
-                        value="${filterText}" 
-                        oninput="renderAdminProductManagement(this.value)"
-                    />
-                </div>
-                <span style="font-size:0.85rem;color:var(--wr-text-muted);white-space:nowrap;">Showing ${filtered.length} products</span>
-            </div>
-
-            <!-- Product Table -->
-            <div class="admin-table-wrapper">
-                <table class="admin-table">
-                    <thead>
-                        <tr>
-                            <th style="width:70px;">Preview</th>
-                            <th style="width:110px;">SKU / Code</th>
-                            <th>Product Name</th>
-                            <th>Category</th>
-                            <th>Weight</th>
-                            <th>Selling Price</th>
-                            <th>Stock</th>
-                            <th>Status</th>
-                            <th style="text-align:right;">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${filtered.map(p => {
-                            const isOut = p.stockQuantity <= 0;
-                            const customImgs = (typeof getProductImages === 'function') ? getProductImages(p) : [];
-                            const hasCustom = customImgs.length > 0 && !customImgs[0].isPlaceholder;
-                            const previewUrl = customImgs[0]?.url || p.image;
-
-                            return `
-                                <tr>
-                                    <td>
-                                        <div class="admin-thumb-wrap" onclick="navigateTo('product', '${p.slug}')" title="View PDP">
-                                            <img src="${previewUrl}" alt="${p.name}" loading="lazy">
-                                        </div>
-                                    </td>
-                                    <td><strong style="font-family:monospace;color:var(--wr-primary);">${p.sku || p.code}</strong></td>
-                                    <td>
-                                        <div style="font-weight:500;">${p.name}</div>
-                                        <div style="font-size:0.75rem;color:var(--wr-text-muted);">${p.slug}</div>
-                                    </td>
-                                    <td><span class="admin-cat-pill">${p.category}</span></td>
-                                    <td>${p.weight || '—'}</td>
-                                    <td><strong>${formatPrice(p.sellingPrice)}</strong></td>
-                                    <td>
-                                        <span class="admin-stock-val ${isOut ? 'out' : ''}">${p.stockQuantity}</span>
-                                    </td>
-                                    <td>
-                                        ${!isOut 
-                                            ? '<span class="status-pill active">In Stock</span>' 
-                                            : '<span class="status-pill out">Out of Stock</span>'}
-                                        ${hasCustom ? '<span class="img-status-pill custom" title="Has custom images">Custom Img</span>' : '<span class="img-status-pill placeholder" title="Using hallmark placeholder">Default</span>'}
-                                    </td>
-                                    <td style="text-align:right;">
-                                        <div style="display:inline-flex;gap:6px;">
-                                            <button class="btn btn-outline btn-xs" onclick="openImageManagerForProduct('${p.id}')">
-                                                📷 Manage Images
-                                            </button>
-                                            <button class="btn btn-outline btn-xs" onclick="navigateTo('product', '${p.slug}')">
-                                                View
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            `;
-                        }).join('')}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    `;
-}
-
-function openBulkImageUploadModal() {
-    if (productsDB.length > 0) {
-        openImageManagerForProduct(productsDB[0]);
-        setTimeout(() => switchAdminImageTab('bulk'), 50);
-    }
-}
-
-async function refreshInventoryData() {
-    showToast('Syncing products with Supabase inventory...', 'info');
-    await loadProductsFromInventory();
-    renderAdminProductManagement();
-    renderHomeSections();
-    showToast('Inventory synchronization complete!', 'success');
 }
 
 // ── Browser URL Navigation & History Handling ──
@@ -408,7 +291,11 @@ function handleInitialURLRoute(pushHistory = false) {
         navigateTo('register', null, pushHistory);
         return;
     } else if (path === '/admin') {
-        navigateTo('admin', null, pushHistory);
+        // Direct administrative users to the separate Inventory Application
+        navigateTo('home', null, false);
+        if (window.history.replaceState) {
+            window.history.replaceState({}, '', '/');
+        }
         return;
     }
 
@@ -424,12 +311,12 @@ window.addEventListener('popstate', (e) => {
     }
 });
 
-// ── Initialization ──
+// ── Storefront Initialization ──
 document.addEventListener('DOMContentLoaded', async () => {
     // 0. Ensure sticky CTA is completely unmounted initially
     unmountStickyCTA();
 
-    // 1. Initial local render for zero perceived latency
+    // 1. Initial local render (with shimmer skeletons if data pending)
     renderHomeSections();
     updateAuthDropdown();
     updateCartCount();
@@ -447,16 +334,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     // 4. Asynchronously sync live inventory from Supabase database
     try {
         await loadProductsFromInventory();
-        // Re-render home sections and current views with live inventory
+
+        // 5. Initialize Supabase Realtime channel for instant price/stock synchronization
+        initRealtimeInventorySync();
+
+        // Re-render home sections and active views with live Supabase inventory
         renderHomeSections();
         if (getCurrentView() === 'shop') {
             buildSidebarFilters();
             buildMobileFilters();
             applyFiltersAndSort();
-        } else if (getCurrentView() === 'admin') {
-            renderAdminProductManagement();
         }
     } catch (err) {
-        console.warn('Initial inventory load completed with fallback:', err);
+        console.warn('Initial inventory load notice:', err);
     }
 });

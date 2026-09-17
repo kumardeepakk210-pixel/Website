@@ -1,51 +1,26 @@
 /* ============================================
    WISHRITE — PRODUCTS & INVENTORY DATA LAYER
-   Dynamic Inventory Sync from Supabase, Customer-Safe Mapping,
-   Product Catalog Rendering, PDP with Pincode Validation
+   Dynamic Product Sync from Supabase, Customer-Safe Mapping,
+   Product Catalog Rendering, PDP with Pincode Validation,
+   Real-Time Updates, Skeletons & Resilient Error Handling
    ============================================ */
 
-// Configuration for out-of-stock visibility
+// Configuration for out-of-stock visibility & threshold
 const WISHRITE_CONFIG_STORE = {
-    showOutOfStockInCatalog: true, // Show with 'Out of Stock' badge vs hide
+    showOutOfStockInCatalog: true, // Show with 'Out of Stock' badge
     lowStockThreshold: 3
 };
 
-// Initial fallback catalogue (ensures instant rendering before network sync)
-let productsDB = [
-    {
-        id: "wrd-ed-001",
-        name: "Petal Drop Earrings",
-        slug: "petal-drop-earrings",
-        code: "WR-ED-001",
-        sku: "WRED001",
-        category: "Earrings",
-        subcategory: "Drop Earrings",
-        collection: "Floral Edit",
-        shortDescription: "Delicate petal-inspired drop earrings crafted in 925 sterling silver with a soft polished finish.",
-        description: "These Petal Drop Earrings capture the grace of nature in 925 sterling silver. The design draws inspiration from softly unfurling petals, creating a refined silhouette that moves beautifully. Lightweight and comfortable for all-day wear.",
-        mrp: 2999,
-        sellingPrice: 2499,
-        discount: 17,
-        material: "925 Sterling Silver",
-        silverPurity: "92.5%",
-        jewelleryType: "Earrings",
-        finish: "Polished Rhodium",
-        stockQuantity: 15,
-        availability: "In Stock",
-        care: "Store in a dry place. Avoid perfumes and direct chemicals. Wipe gently with a soft microfibre cloth.",
-        shippingInfo: "Standard express delivery within 2-5 business days.",
-        returnInfo: "Easy returns within 7 days of delivery.",
-        images: [
-            { url: "https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?auto=format&fit=crop&w=800&q=85", alt: "WishRite petal drop earrings in 925 sterling silver", type: "main" }
-        ],
-        isBestseller: true,
-        isNew: false
-    }
-];
+// Initial catalog is empty — populated dynamically from Supabase
+let productsDB = [];
 
 // Inverted index for rapid slug / SKU lookups
 let productSlugMap = new Map();
 let productSkuMap = new Map();
+
+// Track data sync status
+let isInventoryLoading = false;
+let inventorySyncError = null;
 
 /**
  * Generate SEO-friendly and unique slug from product name and code
@@ -70,7 +45,7 @@ function generateProductSlug(name, code, existingSlugs = new Set()) {
  */
 function normalizeCategory(raw) {
     if (!raw) return 'Jewellery';
-    const clean = raw.trim();
+    const clean = String(raw).trim();
     const map = {
         'Chain': 'Chains',
         'Ring': 'Rings',
@@ -85,6 +60,11 @@ function normalizeCategory(raw) {
         'Nose Pin': 'Nose Pins',
         'Bali': 'Balis & Hoops',
         'Set': 'Jewellery Sets',
+        'Silver Jewellery': 'Silver Jewellery',
+        'Fashion Jewellery': 'Fashion Jewellery',
+        'Toys': 'Toys',
+        'Household': 'Household',
+        'Customized Gifts': 'Customized Gifts',
         'Other': 'Accessories'
     };
     return map[clean] || (clean.endsWith('s') ? clean : clean + 's');
@@ -93,17 +73,28 @@ function normalizeCategory(raw) {
 /**
  * Customer-Safe Mapping Layer
  * Translates Supabase `public.inventory` row into the storefront product model.
- * Strictly excludes: purchase_price, purchase_date, shop_name, shop_address.
+ * Strictly excludes wholesale details: purchase_price, purchase_date, shop_name, shop_address.
  */
 function mapInventoryToProduct(item, existingSlugs) {
-    const sku = item.product_code || 'WR-' + (item.id || '').substring(0, 6).toUpperCase();
+    if (!item) return null;
+
+    // Check status if available: Draft and Archived products are not visible to customers
+    const rawStatus = (item.status || '').trim();
+    if (rawStatus === 'Draft' || rawStatus === 'Archived') {
+        return null;
+    }
+
+    const sku = item.product_code || 'WR-' + String(item.id || '').substring(0, 6).toUpperCase();
     const name = item.product_name || 'WishRite 925 Sterling Silver Piece';
     const category = normalizeCategory(item.category);
     const stock = typeof item.stock_quantity === 'number' ? item.stock_quantity : (parseInt(item.stock_quantity, 10) || 0);
     const sellingPrice = Number(item.selling_price) || 0;
-    
-    // MRP anchor
-    const mrp = sellingPrice > 0 ? Math.round((sellingPrice * 1.25) / 50) * 50 : sellingPrice;
+
+    // Compare-at price / MRP
+    const comparePrice = Number(item.compare_at_price) || 0;
+    const mrp = comparePrice > sellingPrice 
+        ? comparePrice 
+        : (sellingPrice > 0 ? Math.round((sellingPrice * 1.25) / 50) * 50 : sellingPrice);
     const discount = mrp > sellingPrice ? Math.round(((mrp - sellingPrice) / mrp) * 100) : 0;
 
     // Weight formatted if exists
@@ -116,17 +107,25 @@ function mapInventoryToProduct(item, existingSlugs) {
         ? String(item.size).trim()
         : null;
 
-    const slug = generateProductSlug(name, sku, existingSlugs);
+    // Slug: use database slug if present, otherwise generate deterministically
+    const slug = (item.slug && item.slug.trim()) 
+        ? item.slug.trim() 
+        : generateProductSlug(name, sku, existingSlugs);
 
-    // Stock availability
+    // Stock availability & badge logic
     let availability = 'Out of Stock';
     let lowStock = false;
-    if (stock > WISHRITE_CONFIG_STORE.lowStockThreshold) {
+    if (rawStatus === 'Out of Stock' || stock <= 0) {
+        availability = 'Out of Stock';
+    } else if (stock > WISHRITE_CONFIG_STORE.lowStockThreshold) {
         availability = 'In Stock';
     } else if (stock > 0) {
         availability = `Only ${stock} left`;
         lowStock = true;
     }
+
+    const material = item.material || "925 Sterling Silver";
+    const purity = item.purity || "92.5%";
 
     const product = {
         id: item.id,
@@ -136,8 +135,8 @@ function mapInventoryToProduct(item, existingSlugs) {
         code: sku,
         category: category,
         rawCategory: item.category,
-        description: item.product_description || `${name} crafted in pure 925 sterling silver with a refined high-polish finish.`,
-        shortDescription: item.product_description || `Pure 925 sterling silver ${category.toLowerCase().slice(0, -1)} crafted for everyday elegance.`,
+        description: item.product_description || `${name} crafted in pure ${material} with a refined high-polish finish.`,
+        shortDescription: item.short_description || item.product_description || `Pure ${material} ${category.toLowerCase().slice(0, -1)} crafted for everyday elegance.`,
         sellingPrice: sellingPrice,
         mrp: mrp,
         discount: discount,
@@ -146,27 +145,30 @@ function mapInventoryToProduct(item, existingSlugs) {
         stockQuantity: stock,
         availability: availability,
         lowStock: lowStock,
-        material: "925 Sterling Silver",
-        silverPurity: "92.5%",
+        material: material,
+        silverPurity: purity,
         finish: "High-Polish Rhodium",
+        status: (stock <= 0 || rawStatus === 'Out of Stock') ? 'Out of Stock' : 'Active',
+        seoTitle: item.seo_title || null,
+        seoDescription: item.seo_description || null,
         care: "Store in a cool, dry place inside an airtight zip pouch. Keep away from water, perfumes, and harsh chemicals. Polish gently with a soft microfibre cloth.",
-        shippingInfo: "Complimentary insured shipping on all orders. Dispatched within 24-48 hours.",
+        shippingInfo: "Complimentary insured express delivery on all qualifying orders. Dispatched within 24-48 hours.",
         returnInfo: "Hassle-free 7-day return and exchange policy.",
         whatsIncluded: "1 piece in signature WishRite luxury jewellery box with 925 Authenticity Certificate.",
-        isNew: stock > 0 && Math.random() < 0.25, // highlight dynamic selection
-        isBestseller: stock > 0 && Math.random() < 0.35,
-        tag: stock === 0 ? 'SOLD OUT' : (discount >= 20 ? 'SALE' : (stock <= 3 ? 'FEW LEFT' : ''))
+        isNew: stock > 0 && String(sku).endsWith('1'),
+        isBestseller: stock > 0 && stock <= 5,
+        tag: stock <= 0 ? 'SOLD OUT' : (discount >= 20 ? 'SALE' : (stock <= 3 ? 'FEW LEFT' : ''))
     };
 
-    // Attach images via image-manager registry or placeholder
+    // Attach direct image properties if present in row
+    if (item.image_url) product.image_url = item.image_url;
+    if (item.product_media_urls) product.product_media_urls = item.product_media_urls;
+
+    // Attach images via customer-safe image layer
     if (typeof getProductImages === 'function') {
         product.images = getProductImages(product);
     } else {
-        product.images = [{
-            url: `https://images.unsplash.com/photo-1599643478514-4a4e0f6c2dc1?auto=format&fit=crop&w=800&q=80`,
-            alt: product.name,
-            type: 'main'
-        }];
+        product.images = [generateProductPlaceholder(product)];
     }
     product.image = product.images[0]?.url;
 
@@ -174,29 +176,60 @@ function mapInventoryToProduct(item, existingSlugs) {
 }
 
 /**
- * Fetch products from Supabase `inventory` table
- * Queries ONLY customer-safe fields.
+ * Fetch products and images dynamically from Supabase
+ * Queries only customer-safe fields.
  */
 async function loadProductsFromInventory() {
+    if (isInventoryLoading) return productsDB;
+    isInventoryLoading = true;
+    inventorySyncError = null;
+
     try {
-        const url = `${SUPABASE_URL}/rest/v1/inventory?select=id,product_code,product_name,product_description,category,stock_quantity,selling_price,weight,size,created_at,updated_at&order=created_at.desc`;
         const headers = {
             'apikey': SUPABASE_ANON_KEY,
             'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
             'Accept': 'application/json'
         };
 
-        const response = await fetch(url, { headers });
-        if (!response.ok) {
-            throw new Error(`Inventory fetch failed with status ${response.status}`);
+        // 1. Attempt to fetch product_images table if present
+        try {
+            const imagesUrl = `${SUPABASE_URL}/rest/v1/product_images?select=id,product_id,image_url,storage_path,image_type,sort_order,alt_text,is_primary&order=sort_order.asc,created_at.asc`;
+            const imgRes = await fetch(imagesUrl, { headers });
+            if (imgRes.ok) {
+                const imgData = await imgRes.json();
+                if (Array.isArray(imgData) && typeof setSupabaseProductImages === 'function') {
+                    setSupabaseProductImages(imgData);
+                }
+            }
+        } catch (e) {
+            // product_images table is optional until setup sql is run
         }
 
-        const rawData = await response.json();
-        if (Array.isArray(rawData) && rawData.length > 0) {
-            const existingSlugs = new Set();
-            const mapped = rawData.map(item => mapInventoryToProduct(item, existingSlugs));
+        // 2. Fetch products from inventory table
+        // Attempt full extended column set first, fallback to core set if extended columns don't exist yet
+        let rawData = null;
+        const extendedUrl = `${SUPABASE_URL}/rest/v1/inventory?select=id,product_code,product_name,product_description,category,stock_quantity,selling_price,weight,size,created_at,updated_at,status,compare_at_price,image_url,product_media_urls,short_description,material,purity,slug,seo_title,seo_description&order=created_at.desc`;
+        const coreUrl = `${SUPABASE_URL}/rest/v1/inventory?select=id,product_code,product_name,product_description,category,stock_quantity,selling_price,weight,size,created_at,updated_at&order=created_at.desc`;
 
-            // Set global productsDB
+        let res = await fetch(extendedUrl, { headers });
+        if (res.ok) {
+            rawData = await res.json();
+        } else {
+            // Fallback to core columns
+            res = await fetch(coreUrl, { headers });
+            if (res.ok) {
+                rawData = await res.json();
+            } else {
+                throw new Error(`HTTP ${res.status}`);
+            }
+        }
+
+        if (Array.isArray(rawData)) {
+            const existingSlugs = new Set();
+            const mapped = rawData
+                .map(item => mapInventoryToProduct(item, existingSlugs))
+                .filter(Boolean); // Filter out Draft and Archived
+
             productsDB = mapped;
 
             // Rebuild index maps
@@ -210,15 +243,19 @@ async function loadProductsFromInventory() {
             // Cache in local storage for offline resilience
             try {
                 localStorage.setItem('wishrite_inventory_cache', JSON.stringify(mapped));
+                localStorage.setItem('wishrite_inventory_last_sync', String(Date.now()));
             } catch (e) {
-                // Ignore storage quota warnings
+                // Ignore quota errors
             }
 
-            console.info(`✓ Loaded ${mapped.length} products dynamically from WishRite inventory database.`);
+            console.info(`✓ Loaded ${mapped.length} products dynamically from WishRite Supabase database.`);
             return mapped;
         }
     } catch (err) {
-        console.warn('Could not sync with remote inventory table, checking local cache:', err.message);
+        console.warn('Live database sync notice: checking offline cache.', err.message);
+        inventorySyncError = err;
+
+        // Offline cache fallback
         try {
             const cached = localStorage.getItem('wishrite_inventory_cache');
             if (cached) {
@@ -238,8 +275,126 @@ async function loadProductsFromInventory() {
         } catch (cacheErr) {
             console.warn('Cache restoration error:', cacheErr);
         }
+    } finally {
+        isInventoryLoading = false;
     }
+
     return productsDB;
+}
+
+/**
+ * Realtime Supabase Subscription
+ * Automatically updates prices, stock, and status without manual reload.
+ */
+let realtimeChannel = null;
+
+function initRealtimeInventorySync() {
+    if (typeof window.supabaseClient === 'undefined' || !window.supabaseClient) {
+        if (window.supabase && window.SUPABASE_URL && window.SUPABASE_ANON_KEY) {
+            try {
+                window.supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+            } catch (e) {
+                return;
+            }
+        } else {
+            return;
+        }
+    }
+
+    if (realtimeChannel) return;
+
+    try {
+        realtimeChannel = window.supabaseClient
+            .channel('customer-inventory-sync')
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'inventory' },
+                (payload) => {
+                    handleRealtimeInventoryChange(payload);
+                }
+            )
+            .subscribe((status) => {
+                if (status === 'SUBSCRIBED') {
+                    console.info('✓ Supabase Realtime active: listening for product updates.');
+                }
+            });
+    } catch (e) {
+        console.warn('Supabase Realtime subscription not initialized:', e.message);
+    }
+}
+
+/**
+ * Handle live change payload from Supabase Realtime
+ */
+function handleRealtimeInventoryChange(payload) {
+    if (!payload || !payload.eventType) return;
+
+    const { eventType, new: newRecord, old: oldRecord } = payload;
+    console.info(`Supabase Realtime event [${eventType}]:`, newRecord?.product_code || oldRecord?.id);
+
+    if (eventType === 'DELETE') {
+        const delId = oldRecord?.id;
+        productsDB = productsDB.filter(p => p.id !== delId);
+    } else if (eventType === 'INSERT') {
+        const existingSlugs = new Set(productsDB.map(p => p.slug));
+        const mapped = mapInventoryToProduct(newRecord, existingSlugs);
+        if (mapped) {
+            productsDB.unshift(mapped);
+            productSlugMap.set(mapped.slug, mapped);
+            productSkuMap.set((mapped.sku || mapped.code || '').toUpperCase(), mapped);
+        }
+    } else if (eventType === 'UPDATE') {
+        const existingSlugs = new Set(productsDB.filter(p => p.id !== newRecord.id).map(p => p.slug));
+        const mapped = mapInventoryToProduct(newRecord, existingSlugs);
+        const idx = productsDB.findIndex(p => p.id === newRecord.id);
+
+        if (mapped) {
+            if (idx >= 0) {
+                productsDB[idx] = mapped;
+            } else {
+                productsDB.unshift(mapped);
+            }
+            productSlugMap.set(mapped.slug, mapped);
+            productSkuMap.set((mapped.sku || mapped.code || '').toUpperCase(), mapped);
+        } else if (idx >= 0) {
+            // Status changed to Draft or Archived -> remove from public view
+            productsDB.splice(idx, 1);
+            if (newRecord.slug) productSlugMap.delete(newRecord.slug);
+        }
+    }
+
+    // Refresh active view to reflect updated price, stock, or status
+    const currentView = (typeof getCurrentView === 'function') ? getCurrentView() : 'home';
+    if (currentView === 'shop' && typeof applyFiltersAndSort === 'function') {
+        applyFiltersAndSort();
+    } else if (currentView === 'home' && typeof renderHomeSections === 'function') {
+        renderHomeSections();
+    } else if (currentView === 'product') {
+        const currentSlug = window.location.pathname.replace('/product/', '');
+        const currentProd = getProductBySlug(currentSlug);
+        if (currentProd) {
+            const targetView = document.getElementById('product-view');
+            if (targetView) {
+                targetView.innerHTML = renderProductDetail(currentProd);
+                if (typeof renderStickyCTA === 'function') renderStickyCTA(currentProd);
+            }
+        }
+    }
+
+    // If cart contains updated item, update price and stock limits
+    if (typeof cart !== 'undefined' && Array.isArray(cart)) {
+        cart.forEach(cartItem => {
+            const updated = productsDB.find(p => p.id === cartItem.id);
+            if (updated) {
+                cartItem.sellingPrice = updated.sellingPrice;
+                cartItem.stockQuantity = updated.stockQuantity;
+                if (cartItem.qty > updated.stockQuantity) {
+                    cartItem.qty = Math.max(1, updated.stockQuantity);
+                }
+            }
+        });
+        if (typeof renderCart === 'function') renderCart();
+    }
 }
 
 // Icons
@@ -254,8 +409,7 @@ const ICONS = {
     diamond: `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M6 3h12l4 6-10 13L2 9z" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 9h20" stroke-linecap="round"/><path d="M10 3l-4 6 6 13 6-13-4-6" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
     sparkle: `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8L12 2z" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
     lock: `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`,
-    rotate: `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>`,
-    camera: `<svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" fill="none" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>`
+    rotate: `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>`
 };
 
 // Format price to INR
@@ -264,11 +418,34 @@ function formatPrice(price) {
 }
 
 /**
+ * Render luxury product shimmer skeleton cards while fetching from Supabase
+ */
+function renderProductSkeletons(containerId, count = 8) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    let skeletonHTML = '';
+    for (let i = 0; i < count; i++) {
+        skeletonHTML += `
+            <div class="product-card skeleton-card">
+                <div class="product-card-image skeleton-box" style="aspect-ratio:4/5;background:linear-gradient(90deg, #F5F1EE 25%, #EBE5E1 50%, #F5F1EE 75%);background-size:200% 100%;animation:skeletonShimmer 1.5s infinite;"></div>
+                <div class="product-card-info" style="padding:16px 0;">
+                    <div style="height:12px;width:35%;background:#EBE5E1;border-radius:2px;margin-bottom:8px;"></div>
+                    <div style="height:18px;width:75%;background:#EBE5E1;border-radius:2px;margin-bottom:8px;"></div>
+                    <div style="height:16px;width:45%;background:#EBE5E1;border-radius:2px;"></div>
+                </div>
+            </div>
+        `;
+    }
+    container.innerHTML = skeletonHTML;
+}
+
+/**
  * Create a product card HTML
  */
 function createProductCardHTML(product) {
     const isWishlisted = typeof wishlist !== 'undefined' && wishlist.has(product.id);
-    const isOutOfStock = product.stockQuantity <= 0;
+    const isOutOfStock = product.stockQuantity <= 0 || product.status === 'Out of Stock';
     
     let badgeHTML = '';
     if (isOutOfStock) {
@@ -312,14 +489,27 @@ function createProductCardHTML(product) {
     `;
 }
 
-// Render products to a container
+// Render products to a container with appropriate empty and error states
 function renderProductsToContainer(products, containerId) {
     const container = document.getElementById(containerId);
     if (!container) return;
-    if (!products || !products.length) {
-        container.innerHTML = '<p class="cart-empty" style="grid-column:1/-1;">No products found in this category.</p>';
+
+    if (inventorySyncError && (!products || !products.length)) {
+        container.innerHTML = `
+            <div class="cart-empty" style="grid-column:1/-1;padding:60px 20px;">
+                <p style="font-size:1.1rem;color:var(--wr-primary);font-family:var(--wr-font-heading);">Products are temporarily unavailable.</p>
+                <p style="color:var(--wr-text-muted);font-size:0.9rem;margin:8px 0 16px;">Please check back shortly or refresh to reload available pieces.</p>
+                <button class="btn btn-outline btn-sm" onclick="loadProductsFromInventory().then(() => { if (typeof renderHomeSections==='function') renderHomeSections(); if (typeof applyFiltersAndSort==='function') applyFiltersAndSort(); })">Reload Products</button>
+            </div>
+        `;
         return;
     }
+
+    if (!products || !products.length) {
+        container.innerHTML = '<p class="cart-empty" style="grid-column:1/-1;">No products found matching your criteria.</p>';
+        return;
+    }
+
     container.innerHTML = products.map(createProductCardHTML).join('');
 }
 
@@ -349,10 +539,18 @@ function getCollections() {
 
 /**
  * Render Product Detail Page (PDP)
- * Dynamically renders only available attributes without empty dashes.
+ * Completely customer-facing: no Manage Image or Admin controls.
  */
 function renderProductDetail(product) {
-    if (!product) return '<div class="container" style="padding:80px 0;text-align:center;"><h2>Product not found.</h2><button class="btn btn-primary" onclick="navigateTo(\'shop\')">Return to Shop</button></div>';
+    if (!product) {
+        return `
+            <div class="container" style="padding:80px 0;text-align:center;">
+                <h2 style="font-family:var(--wr-font-heading);color:var(--wr-primary);">Product currently unavailable.</h2>
+                <p style="color:var(--wr-text-muted);margin:12px 0 24px;">The piece you are looking for may have been updated or moved.</p>
+                <button class="btn btn-primary" onclick="navigateTo('shop')">Return to Shop</button>
+            </div>
+        `;
+    }
 
     // Ensure images are resolved
     const images = (typeof getProductImages === 'function') ? getProductImages(product) : (product.images || []);
@@ -365,7 +563,7 @@ function renderProductDetail(product) {
     ).join('');
 
     const isWishlisted = typeof wishlist !== 'undefined' && wishlist.has(product.id);
-    const isOutOfStock = product.stockQuantity <= 0;
+    const isOutOfStock = product.stockQuantity <= 0 || product.status === 'Out of Stock';
     const mrpHTML = product.mrp > product.sellingPrice ? `<span class="pdp-price-original">${formatPrice(product.mrp)}</span>` : '';
     const discountHTML = (!isOutOfStock && product.discount > 0) ? `<span class="pdp-price-discount">${product.discount}% OFF</span>` : '';
 
@@ -390,7 +588,6 @@ function renderProductDetail(product) {
     if (product.finish) specsArr.push(`<tr><td>Finish</td><td>${product.finish}</td></tr>`);
     if (product.weight) specsArr.push(`<tr><td>Jewellery Weight</td><td>${product.weight}</td></tr>`);
     if (product.size) specsArr.push(`<tr><td>Size</td><td>${product.size}</td></tr>`);
-    if (product.stoneType) specsArr.push(`<tr><td>Stone</td><td>${product.stoneType}</td></tr>`);
 
     // Dynamic Accordions
     const accordionSections = [];
@@ -462,13 +659,10 @@ function renderProductDetail(product) {
             <div class="pdp-info">
                 <div class="pdp-header-meta">
                     <span class="pdp-sku-badge">SKU: ${product.sku || product.code}</span>
-                    <button class="btn-manage-images-link" onclick="openImageManagerForProduct('${product.id}')" title="Upload custom images for this product">
-                        ${ICONS.camera} <span>Manage Images</span>
-                    </button>
                 </div>
 
                 <h1 class="pdp-name">${product.name}</h1>
-                <p class="pdp-material">Hallmarked 925 Sterling Silver</p>
+                <p class="pdp-material">Hallmarked ${product.material || '925 Sterling Silver'}</p>
 
                 <div class="pdp-price-block">
                     <span class="pdp-price">${formatPrice(product.sellingPrice)}</span>
@@ -516,7 +710,7 @@ function renderProductDetail(product) {
                             ${ICONS.heart}
                         </button>
                     </div>
-                    <p style="font-size:0.85rem;color:var(--wr-text-muted);margin-top:8px;">Add to your wishlist to get notified when restocked.</p>
+                    <p style="font-size:0.85rem;color:var(--wr-text-muted);margin-top:8px;">Save to your wishlist to get notified when restocked.</p>
                 `}
 
                 <!-- Trust signals -->
