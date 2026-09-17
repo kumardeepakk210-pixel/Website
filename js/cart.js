@@ -21,12 +21,12 @@ function addToCart(id, event, qtyToAdd = 1) {
 
     if (!product) return;
 
-    // Out of stock guard
+    // Out of stock guard: Requirement 19 & 28
     if (product.stockQuantity <= 0) {
-        if (typeof showToast === 'function') {
-            showToast(`Sorry, "${product.name}" is currently out of stock.`, 'error');
-        } else {
-            alert(`Sorry, "${product.name}" is currently out of stock.`);
+        if (typeof openNotifyMeModal === 'function') {
+            openNotifyMeModal(product.id);
+        } else if (typeof showToast === 'function') {
+            showToast(`"${product.name}" is currently unavailable.`, 'info');
         }
         return;
     }

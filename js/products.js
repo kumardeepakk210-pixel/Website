@@ -7,8 +7,8 @@
    ============================================ */
 
 // Configuration
-const SUPABASE_URL = window.SUPABASE_URL || 'https://ptpuepejciqiktmcpuon.supabase.co';
-const SUPABASE_ANON_KEY = window.SUPABASE_ANON_KEY || 'sb_publishable_ZHwzEtRBkW9u4T2d_0R2Ag_BX1EeJRX';
+var WR_SUPABASE_URL = window.SUPABASE_URL || (typeof SUPABASE_URL !== 'undefined' ? SUPABASE_URL : 'https://ptpuepejciqiktmcpuon.supabase.co');
+var WR_SUPABASE_ANON_KEY = window.SUPABASE_ANON_KEY || (typeof SUPABASE_ANON_KEY !== 'undefined' ? SUPABASE_ANON_KEY : 'sb_publishable_ZHwzEtRBkW9u4T2d_0R2Ag_BX1EeJRX');
 
 // Global stores & indices
 let productsDB = [];
@@ -261,14 +261,14 @@ const productsService = {
         this.loadPromise = (async () => {
             try {
                 const headers = {
-                    'apikey': SUPABASE_ANON_KEY,
-                    'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                    'apikey': WR_SUPABASE_ANON_KEY,
+                    'Authorization': `Bearer ${WR_SUPABASE_ANON_KEY}`,
                     'Accept': 'application/json'
                 };
 
                 // 1. Fetch sales aggregation in parallel (best-effort)
                 try {
-                    const salesRes = await fetch(`${SUPABASE_URL}/rest/v1/sales?select=product_code,quantity`, { headers });
+                    const salesRes = await fetch(`${WR_SUPABASE_URL}/rest/v1/sales?select=product_code,quantity`, { headers });
                     if (salesRes.ok) {
                         const salesRows = await salesRes.json();
                         productSalesMap.clear();
@@ -287,7 +287,7 @@ const productsService = {
                 }
 
                 // 2. Fetch inventory records directly from public.inventory
-                const inventoryUrl = `${SUPABASE_URL}/rest/v1/inventory?select=id,product_code,product_name,product_description,category,stock_quantity,selling_price,weight,size,created_at,updated_at,storage_folder&order=created_at.desc`;
+                const inventoryUrl = `${WR_SUPABASE_URL}/rest/v1/inventory?select=id,product_code,product_name,product_description,category,stock_quantity,selling_price,weight,size,created_at,updated_at,storage_folder&order=created_at.desc`;
                 const invRes = await fetch(inventoryUrl, { headers });
 
                 if (!invRes.ok) {
@@ -932,11 +932,11 @@ async function handleNotifyMeSubmit(event) {
             created_at: new Date().toISOString()
         };
 
-        const res = await fetch(`${SUPABASE_URL}/rest/v1/product_stock_notifications`, {
+        const res = await fetch(`${WR_SUPABASE_URL}/rest/v1/product_stock_notifications`, {
             method: 'POST',
             headers: {
-                'apikey': SUPABASE_ANON_KEY,
-                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                'apikey': WR_SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${WR_SUPABASE_ANON_KEY}`,
                 'Content-Type': 'application/json',
                 'Prefer': 'return=minimal'
             },

@@ -10,14 +10,15 @@ let resendCooldownTimer = null;
 let resendCooldownSeconds = 0;
 
 // Initialize Supabase Client with Session Persistence
-const supabaseClient = (window.supabase && window.SUPABASE_URL && window.SUPABASE_ANON_KEY) ?
-    window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+window.supabaseClient = (window.supabase && (window.SUPABASE_URL || typeof SUPABASE_URL !== 'undefined') && (window.SUPABASE_ANON_KEY || typeof SUPABASE_ANON_KEY !== 'undefined')) ?
+    window.supabase.createClient(window.SUPABASE_URL || (typeof SUPABASE_URL !== 'undefined' ? SUPABASE_URL : 'https://ptpuepejciqiktmcpuon.supabase.co'), window.SUPABASE_ANON_KEY || (typeof SUPABASE_ANON_KEY !== 'undefined' ? SUPABASE_ANON_KEY : 'sb_publishable_ZHwzEtRBkW9u4T2d_0R2Ag_BX1EeJRX'), {
         auth: {
             persistSession: true,
             autoRefreshToken: true,
             detectSessionInUrl: true
         }
     }) : null;
+const supabaseClient = window.supabaseClient;
 
 // ── Customer-friendly Error Mapping ──
 function getFriendlyAuthErrorMessage(rawMessage) {

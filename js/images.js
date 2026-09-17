@@ -45,7 +45,7 @@ function getSupabaseStoragePublicUrl(storagePath) {
         // Fallback to standard Supabase Storage public URL format
     }
 
-    const baseUrl = window.SUPABASE_URL || 'https://ptpuepejciqiktmcpuon.supabase.co';
+    const baseUrl = window.SUPABASE_URL || (typeof SUPABASE_URL !== 'undefined' ? SUPABASE_URL : 'https://ptpuepejciqiktmcpuon.supabase.co');
     return `${baseUrl}/storage/v1/object/public/${STORAGE_BUCKET}/${cleanPath}`;
 }
 
