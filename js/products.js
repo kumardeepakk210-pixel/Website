@@ -543,6 +543,16 @@ function renderProductDetail(product) {
             <div class="product-grid">${relatedAlt.map(createProductCardHTML).join('')}</div>
         </section>
         ` : ''}
+
+        <!-- Sticky Product Action Bar — Scoped directly inside product-view -->
+        <div class="sticky-cta active" id="sticky-cta" aria-hidden="false">
+            ${!isOutOfStock ? `
+                <button class="btn btn-primary" onclick="addToCart('${product.id}', event)">ADD TO CART — ${formatPrice(product.sellingPrice)}</button>
+                <button class="btn btn-secondary" onclick="buyNowFromPDP('${product.id}')">BUY NOW</button>
+            ` : `
+                <button class="btn btn-primary btn-disabled" disabled style="width:100%;">OUT OF STOCK</button>
+            `}
+        </div>
     `;
 }
 

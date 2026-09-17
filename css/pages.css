@@ -1151,7 +1151,7 @@
    MOBILE STICKY CTA
    ═══════════════════════════════════════════ */
 .sticky-cta {
-    display: none;
+    display: none !important;
     position: fixed;
     bottom: 0;
     left: 0;
@@ -1163,12 +1163,16 @@
     gap: var(--space-2);
 }
 
-.sticky-cta:empty {
-    display: none !important;
+body.view-product #product-view .sticky-cta.active,
+body.view-product .sticky-cta.active {
+    display: flex !important;
 }
 
-.sticky-cta.active {
-    display: flex;
+body:not(.view-product) .sticky-cta,
+#product-view[style*="display: none"] .sticky-cta,
+#product-view[style*="display:none"] .sticky-cta,
+.sticky-cta:empty {
+    display: none !important;
 }
 
 .sticky-cta .btn {

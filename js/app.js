@@ -14,10 +14,16 @@ function getCurrentView() {
     return 'home';
 }
 
-function navigateTo(viewId, param) {
+function navigateTo(viewId, param, pushHistory = true) {
     // 1. Immediately reset product state and completely unmount sticky product action bar
     currentPdpProduct = null;
     unmountStickyCTA();
+
+    if (viewId === 'product') {
+        document.body.classList.add('view-product');
+    } else {
+        document.body.classList.remove('view-product');
+    }
 
     // Hide all views
     views.forEach(v => {
@@ -44,46 +50,46 @@ function navigateTo(viewId, param) {
         case 'home':
             renderHomeSections();
             setHomeSEO();
-            try { history.pushState({ view: 'home' }, '', '/'); } catch(e){}
+            if (pushHistory) { try { history.pushState({ view: 'home' }, '', '/'); } catch(e){} }
             break;
         case 'shop':
             buildSidebarFilters();
             buildMobileFilters();
             applyFiltersAndSort();
             setShopSEO(currentFilters.category);
-            try { history.pushState({ view: 'shop' }, '', '/shop'); } catch(e){}
+            if (pushHistory) { try { history.pushState({ view: 'shop' }, '', '/shop'); } catch(e){} }
             break;
         case 'product':
-            handleProductViewNavigation(param, targetView);
+            handleProductViewNavigation(param, targetView, pushHistory);
             break;
         case 'about':
             setAboutSEO();
-            try { history.pushState({ view: 'about' }, '', '/about'); } catch(e){}
+            if (pushHistory) { try { history.pushState({ view: 'about' }, '', '/about'); } catch(e){} }
             break;
         case 'wishlist':
             renderWishlist();
-            try { history.pushState({ view: 'wishlist' }, '', '/wishlist'); } catch(e){}
+            if (pushHistory) { try { history.pushState({ view: 'wishlist' }, '', '/wishlist'); } catch(e){} }
             break;
         case 'cart':
             renderCart();
-            try { history.pushState({ view: 'cart' }, '', '/cart'); } catch(e){}
+            if (pushHistory) { try { history.pushState({ view: 'cart' }, '', '/cart'); } catch(e){} }
             break;
         case 'profile':
             if (typeof renderProfileAccountDetails === 'function') {
                 renderProfileAccountDetails();
             }
-            try { history.pushState({ view: 'profile' }, '', '/account'); } catch(e){}
+            if (pushHistory) { try { history.pushState({ view: 'profile' }, '', '/account'); } catch(e){} }
             break;
         case 'login':
-            try { history.pushState({ view: 'login' }, '', '/login'); } catch(e){}
+            if (pushHistory) { try { history.pushState({ view: 'login' }, '', '/login'); } catch(e){} }
             break;
         case 'register':
             resetRegistration();
-            try { history.pushState({ view: 'register' }, '', '/register'); } catch(e){}
+            if (pushHistory) { try { history.pushState({ view: 'register' }, '', '/register'); } catch(e){} }
             break;
         case 'admin':
             renderAdminProductManagement();
-            try { history.pushState({ view: 'admin' }, '', '/admin'); } catch(e){}
+            if (pushHistory) { try { history.pushState({ view: 'admin' }, '', '/admin'); } catch(e){} }
             break;
     }
 
@@ -99,9 +105,10 @@ function navigateTo(viewId, param) {
     setTimeout(initScrollReveal, 100);
 }
 
-async function handleProductViewNavigation(param, targetView) {
+async function handleProductViewNavigation(param, targetView, pushHistory = true) {
     if (!param || !targetView) {
         unmountStickyCTA();
+        document.body.classList.remove('view-product');
         return;
     }
 
@@ -126,10 +133,12 @@ async function handleProductViewNavigation(param, targetView) {
     // Guard: Ensure user is STILL on the product route after async wait
     if (getCurrentView() !== 'product') {
         unmountStickyCTA();
+        document.body.classList.remove('view-product');
         return;
     }
 
     if (product && product.id) {
+        document.body.classList.add('view-product');
         currentPdpProduct = product;
         currentPdpImageIndex = 0;
         pdpQty = 1;
@@ -140,11 +149,14 @@ async function handleProductViewNavigation(param, targetView) {
             if (typeof initPdpSwipe === 'function') initPdpSwipe();
         }, 100);
 
-        try {
-            history.pushState({ view: 'product', param: product.slug }, '', `/product/${product.slug}`);
-        } catch (e) {}
+        if (pushHistory) {
+            try {
+                history.pushState({ view: 'product', param: product.slug }, '', `/product/${product.slug}`);
+            } catch (e) {}
+        }
     } else {
         unmountStickyCTA();
+        document.body.classList.remove('view-product');
         targetView.innerHTML = `
             <div class="container" style="padding:100px 0;text-align:center;">
                 <h2 style="font-family:var(--wr-font-heading);color:var(--wr-primary);">Jewellery Piece Not Found</h2>
@@ -155,23 +167,24 @@ async function handleProductViewNavigation(param, targetView) {
     }
 }
 
-// Completely unmount and clear sticky product action bar
+// Completely unmount and clear sticky product action bar across DOM
 function unmountStickyCTA() {
-    const cta = document.getElementById('sticky-cta');
-    if (!cta) return;
-    cta.innerHTML = '';
-    cta.classList.remove('active');
-    cta.style.display = 'none';
-    cta.setAttribute('aria-hidden', 'true');
+    const ctas = document.querySelectorAll('.sticky-cta, #sticky-cta');
+    ctas.forEach(cta => {
+        cta.innerHTML = '';
+        cta.classList.remove('active');
+        cta.style.display = 'none';
+        cta.setAttribute('aria-hidden', 'true');
+    });
 }
 
 // Render sticky product action bar ONLY when on valid PDP with loaded product
 function renderStickyCTA(product) {
-    const cta = document.getElementById('sticky-cta');
-    if (!cta) return;
+    const ctas = document.querySelectorAll('.sticky-cta, #sticky-cta');
+    if (!ctas.length) return;
 
     // Strict guard: Must be currently viewing a product page, with valid product & ID
-    const isProductPage = getCurrentView() === 'product';
+    const isProductPage = getCurrentView() === 'product' && document.body.classList.contains('view-product');
     if (!isProductPage || !product || !product.id || product.sellingPrice === undefined) {
         unmountStickyCTA();
         return;
@@ -182,25 +195,24 @@ function renderStickyCTA(product) {
         ? formatPrice(product.sellingPrice)
         : `₹${Number(product.sellingPrice).toLocaleString('en-IN')}`;
 
-    if (!isOutOfStock) {
-        cta.innerHTML = `
-            <button class="btn btn-primary" onclick="addToCart('${product.id}')">ADD TO CART — ${priceFormatted}</button>
-            <button class="btn btn-secondary" onclick="buyNowFromPDP('${product.id}')">BUY NOW</button>
-        `;
-    } else {
-        cta.innerHTML = `
-            <button class="btn btn-primary btn-disabled" disabled style="width:100%;">OUT OF STOCK</button>
-        `;
-    }
+    const innerContent = !isOutOfStock ? `
+        <button class="btn btn-primary" onclick="addToCart('${product.id}', event)">ADD TO CART — ${priceFormatted}</button>
+        <button class="btn btn-secondary" onclick="buyNowFromPDP('${product.id}')">BUY NOW</button>
+    ` : `
+        <button class="btn btn-primary btn-disabled" disabled style="width:100%;">OUT OF STOCK</button>
+    `;
 
-    cta.classList.add('active');
-    cta.style.display = 'flex';
-    cta.setAttribute('aria-hidden', 'false');
+    ctas.forEach(cta => {
+        cta.innerHTML = innerContent;
+        cta.classList.add('active');
+        cta.style.display = 'flex';
+        cta.setAttribute('aria-hidden', 'false');
+    });
 }
 
 // Backward compatibility helper
 function updateStickyCTA(product) {
-    if (getCurrentView() === 'product' && product && product.id) {
+    if (getCurrentView() === 'product' && document.body.classList.contains('view-product') && product && product.id) {
         renderStickyCTA(product);
     } else {
         unmountStickyCTA();
@@ -353,10 +365,10 @@ async function refreshInventoryData() {
 }
 
 // ── Browser URL Navigation & History Handling ──
-function handleInitialURLRoute() {
+function handleInitialURLRoute(pushHistory = false) {
     const path = window.location.pathname;
-    const hash = window.location.hash;
-    const search = window.location.search;
+    const hash = window.location.hash || '';
+    const search = window.location.search || '';
 
     // Detect Supabase Auth Callback (path /auth/callback, or token hashes / search params)
     if (path === '/auth/callback' || path.startsWith('/auth/callback') ||
@@ -371,44 +383,44 @@ function handleInitialURLRoute() {
     if (path.startsWith('/product/')) {
         const slug = path.replace('/product/', '').replace(/\/$/, '');
         if (slug) {
-            navigateTo('product', slug);
+            navigateTo('product', slug, pushHistory);
             return;
         }
     } else if (path === '/shop') {
-        navigateTo('shop');
+        navigateTo('shop', null, pushHistory);
         return;
     } else if (path === '/about') {
-        navigateTo('about');
+        navigateTo('about', null, pushHistory);
         return;
     } else if (path === '/cart') {
-        navigateTo('cart');
+        navigateTo('cart', null, pushHistory);
         return;
     } else if (path === '/wishlist') {
-        navigateTo('wishlist');
+        navigateTo('wishlist', null, pushHistory);
         return;
     } else if (path === '/account' || path === '/profile') {
-        navigateTo('profile');
+        navigateTo('profile', null, pushHistory);
         return;
     } else if (path === '/login') {
-        navigateTo('login');
+        navigateTo('login', null, pushHistory);
         return;
     } else if (path === '/register') {
-        navigateTo('register');
+        navigateTo('register', null, pushHistory);
         return;
     } else if (path === '/admin') {
-        navigateTo('admin');
+        navigateTo('admin', null, pushHistory);
         return;
     }
 
     // Default home view
-    navigateTo('home');
+    navigateTo('home', null, pushHistory);
 }
 
 window.addEventListener('popstate', (e) => {
     if (e.state && e.state.view) {
-        navigateTo(e.state.view, e.state.param);
+        navigateTo(e.state.view, e.state.param, false);
     } else {
-        handleInitialURLRoute();
+        handleInitialURLRoute(false);
     }
 });
 

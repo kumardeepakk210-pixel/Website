@@ -199,13 +199,18 @@
         flex-direction: column;
     }
 
-    /* Sticky CTA on mobile (only when active on PDP) */
+    /* Sticky CTA on mobile (strictly only when active on PDP) */
     .sticky-cta {
-        display: none;
+        display: none !important;
     }
 
-    .sticky-cta.active {
-        display: flex;
+    body.view-product #product-view .sticky-cta.active,
+    body.view-product .sticky-cta.active {
+        display: flex !important;
+    }
+
+    body:not(.view-product) .sticky-cta {
+        display: none !important;
     }
 
     /* About */
