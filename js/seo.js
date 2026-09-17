@@ -161,3 +161,13 @@ function setAboutSEO() {
         canonical: window.location.origin + '/about'
     });
 }
+
+function setCollectionsSEO() {
+    updateSEO({
+        title: 'Curated Silver Collections | WishRite 925 Sterling Silver',
+        description: 'Explore WishRite curated silver jewellery collections: 925 Silver Signature Collection, Daily Elegance, The Occasion & Evening Edit, and Modern Solitaires.',
+        keywords: ['silver collections', '925 sterling silver collections', 'curated silver jewellery', 'WishRite collections'],
+        canonical: window.location.origin + '/collections'
+    });
+}
+

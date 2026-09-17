@@ -53,7 +53,7 @@
         <!-- Desktop Navigation -->
         <nav class="header-nav" aria-label="Main navigation">
             <a onclick="navigateTo('shop'); handleCategoryFilter('All')" id="nav-shop">Jewellery</a>
-            <a onclick="navigateTo('shop')" id="nav-collections">Collections</a>
+            <a onclick="navigateTo('collections')" id="nav-collections">Collections</a>
             <a onclick="navigateTo('shop'); currentFilters.category='All'; currentSort='newest'; applyFiltersAndSort();">New Arrivals</a>
             <a onclick="navigateTo('shop'); currentFilters.category='All'; currentSort='featured'; applyFiltersAndSort();">Best Sellers</a>
             <a onclick="navigateTo('about')" id="nav-about">About</a>
@@ -98,7 +98,7 @@
         </div>
         <nav class="mobile-menu-nav" aria-label="Mobile navigation">
             <a onclick="closeMobileMenu(); navigateTo('shop')">Jewellery</a>
-            <a onclick="closeMobileMenu(); navigateTo('shop')">Collections</a>
+            <a onclick="closeMobileMenu(); navigateTo('collections')">Collections</a>
             <a onclick="closeMobileMenu(); navigateTo('shop'); setTimeout(()=>{currentSort='newest';applyFiltersAndSort();},50)">New Arrivals</a>
             <a onclick="closeMobileMenu(); navigateTo('shop'); setTimeout(()=>{currentSort='featured';applyFiltersAndSort();},50)">Best Sellers</a>
             <a onclick="closeMobileMenu(); navigateTo('about')">About WishRite</a>
@@ -174,29 +174,29 @@
                 </div>
             </section>
 
-            <!-- Trust Badges -->
-            <section class="trust-section" aria-label="Why shop with us">
+            <!-- Trust Bar -->
+            <section class="trust-bar" aria-label="Benefits">
                 <div class="trust-badge">
                     <div class="trust-badge-icon">
-                        <svg viewBox="0 0 24 24"><path d="M6 3h12l4 6-10 13L2 9z" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 9h20" stroke-linecap="round"/></svg>
+                        <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke-linecap="round" stroke-linejoin="round"/></svg>
                     </div>
-                    <div class="trust-badge-text">925 Sterling Silver<span>Hallmarked Quality</span></div>
+                    <div class="trust-badge-text">925 Sterling Silver<span>Certified Hallmarked</span></div>
                 </div>
                 <div class="trust-badge">
                     <div class="trust-badge-icon">
-                        <svg viewBox="0 0 24 24"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+                        <svg viewBox="0 0 24 24"><rect x="1" y="3" width="15" height="13" rx="2"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
                     </div>
-                    <div class="trust-badge-text">Free Shipping<span>Above ₹2,999</span></div>
+                    <div class="trust-badge-text">Insured Express Shipping<span>Pan-India Delivery</span></div>
                 </div>
                 <div class="trust-badge">
                     <div class="trust-badge-icon">
-                        <svg viewBox="0 0 24 24"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>
+                        <svg viewBox="0 0 24 24"><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
                     </div>
-                    <div class="trust-badge-text">Gift Ready<span>Premium Packaging</span></div>
+                    <div class="trust-badge-text">7-Day Easy Returns<span>Hassle-Free Exchange</span></div>
                 </div>
                 <div class="trust-badge">
                     <div class="trust-badge-icon">
-                        <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                        <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
                     </div>
                     <div class="trust-badge-text">Secure Payments<span>100% Safe Checkout</span></div>
                 </div>
@@ -210,7 +210,7 @@
                 </div>
                 <div class="categories-grid">
                     <div class="category-card" onclick="navigateTo('shop'); setTimeout(()=>handleCategoryFilter('Rings'),50)">
-                        <img src="https://images.unsplash.com/photo-1605100804763-247f67b2548e?auto=format&fit=crop&w=500&q=80" alt="Silver rings collection" loading="lazy" width="500" height="667">
+                        <img src="https://images.unsplash.com/photo-1603561591411-07134e71a2a9?auto=format&fit=crop&w=500&q=80" alt="Silver rings collection" loading="lazy" width="500" height="667">
                         <div class="category-card-overlay"><span class="category-card-name">Rings</span></div>
                     </div>
                     <div class="category-card" onclick="navigateTo('shop'); setTimeout(()=>handleCategoryFilter('Earrings'),50)">
@@ -218,7 +218,7 @@
                         <div class="category-card-overlay"><span class="category-card-name">Earrings</span></div>
                     </div>
                     <div class="category-card" onclick="navigateTo('shop'); setTimeout(()=>handleCategoryFilter('Necklaces'),50)">
-                        <img src="https://images.unsplash.com/photo-1599643478514-4a4e0f6c2dc1?auto=format&fit=crop&w=500&q=80" alt="Silver necklaces collection" loading="lazy" width="500" height="667">
+                        <img src="https://images.unsplash.com/photo-1599643477877-530eb83abc8e?auto=format&fit=crop&w=500&q=80" alt="Silver necklaces collection" loading="lazy" width="500" height="667">
                         <div class="category-card-overlay"><span class="category-card-name">Necklaces</span></div>
                     </div>
                     <div class="category-card" onclick="navigateTo('shop'); setTimeout(()=>handleCategoryFilter('Bracelets'),50)">
@@ -278,13 +278,13 @@
                     </div>
                     <div class="occasion-card" onclick="navigateTo('shop'); setTimeout(()=>handleOccasionFilter('Office'),50)">
                         <div class="occasion-card-image">
-                            <img src="https://images.unsplash.com/photo-1605100804763-247f67b2548e?auto=format&fit=crop&w=300&q=80" alt="Office jewellery" loading="lazy" width="300" height="300">
+                            <img src="https://images.unsplash.com/photo-1573408301185-9146fe634ad0?auto=format&fit=crop&w=300&q=80" alt="Office jewellery" loading="lazy" width="300" height="300">
                         </div>
                         <span class="occasion-card-name">Office</span>
                     </div>
                     <div class="occasion-card" onclick="navigateTo('shop'); setTimeout(()=>handleOccasionFilter('Date Night'),50)">
                         <div class="occasion-card-image">
-                            <img src="https://images.unsplash.com/photo-1599643478514-4a4e0f6c2dc1?auto=format&fit=crop&w=300&q=80" alt="Date night jewellery" loading="lazy" width="300" height="300">
+                            <img src="https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?auto=format&fit=crop&w=300&q=80" alt="Date night jewellery" loading="lazy" width="300" height="300">
                         </div>
                         <span class="occasion-card-name">Date Night</span>
                     </div>
@@ -380,6 +380,9 @@
 
         </div>
 
+        <!-- ═══ COLLECTIONS VIEW ═══ -->
+        <div id="collections-view" style="display: none;"></div>
+
         <!-- ═══ SHOP VIEW ═══ -->
         <div id="shop-view" style="display: none;">
             <div class="shop-hero">
@@ -389,7 +392,7 @@
 
             <div class="shop-toolbar">
                 <div class="shop-toolbar-left">
-                    <span class="shop-toolbar-count" id="shop-product-count">8 products</span>
+                    <span class="shop-toolbar-count" id="shop-product-count">Loading products...</span>
                     <button class="shop-filter-btn" onclick="openFilterSheet(); buildMobileFilters();">
                         <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
                         Filter
@@ -401,6 +404,7 @@
                         <option value="newest">Sort: Newest</option>
                         <option value="price-low">Price: Low to High</option>
                         <option value="price-high">Price: High to Low</option>
+                        <option value="name-asc">Name: A-Z</option>
                     </select>
                 </div>
             </div>
@@ -653,6 +657,35 @@
 
     </main>
 
+    <!-- ═══ NOTIFY ME MODAL ═══ -->
+    <div class="notify-modal" id="notify-me-modal" role="dialog" aria-modal="true" aria-labelledby="notify-modal-title" style="display:none;position:fixed;inset:0;z-index:9999;align-items:center;justify-content:center;">
+        <div class="notify-modal-backdrop" onclick="closeNotifyMeModal()" style="position:absolute;inset:0;background:rgba(0,0,0,0.6);backdrop-filter:blur(3px);"></div>
+        <div class="notify-modal-content" style="position:relative;background:#fff;border-radius:8px;max-width:440px;width:90%;padding:32px 28px;box-shadow:0 12px 36px rgba(0,0,0,0.2);z-index:2;">
+            <button class="notify-modal-close" onclick="closeNotifyMeModal()" aria-label="Close modal" style="position:absolute;top:16px;right:16px;background:none;border:none;font-size:24px;cursor:pointer;color:var(--wr-text-muted);">&times;</button>
+            <div class="notify-modal-header" style="margin-bottom:20px;">
+                <span class="sub-label" style="font-size:0.75rem;letter-spacing:1.5px;color:var(--wr-primary);text-transform:uppercase;font-weight:600;">BACK IN STOCK ALERT</span>
+                <h3 id="notify-modal-title" style="font-family:var(--wr-font-heading);font-size:1.35rem;color:var(--wr-primary);margin-top:6px;">Notify Me When Available</h3>
+                <p id="notify-modal-subtitle" class="notify-modal-desc" style="font-size:0.9rem;color:var(--wr-text-muted);margin-top:6px;line-height:1.5;">
+                    Enter your email to receive an alert the moment this piece returns to stock.
+                </p>
+            </div>
+            <form id="notify-me-form" onsubmit="handleNotifyMeSubmit(event)">
+                <input type="hidden" id="notify-product-id">
+                <input type="hidden" id="notify-product-code">
+                <input type="hidden" id="notify-product-name">
+                <div class="form-group" style="margin-bottom:16px;">
+                    <label for="notify-email" class="form-label" style="display:block;font-size:0.85rem;font-weight:500;margin-bottom:6px;color:var(--wr-text);">Email Address</label>
+                    <input type="email" id="notify-email" class="form-input" placeholder="name@example.com" required autocomplete="email" style="width:100%;padding:10px 14px;border:1px solid var(--wr-border);border-radius:4px;font-size:0.95rem;">
+                </div>
+                <div id="notify-error-msg" class="notify-msg error" style="display:none;color:#d32f2f;font-size:0.85rem;margin-bottom:12px;"></div>
+                <div id="notify-success-msg" class="notify-msg success" style="display:none;background:#f4fbf7;border:1px solid #c8e6c9;color:#2e7d32;padding:12px;border-radius:4px;font-size:0.9rem;margin-bottom:12px;">
+                    <p style="margin:0;">✓ You're on the list. We'll email you when this piece is available again.</p>
+                </div>
+                <button type="submit" id="notify-submit-btn" class="btn btn-primary" style="width:100%;padding:12px;font-weight:600;letter-spacing:1px;">NOTIFY ME</button>
+            </form>
+        </div>
+    </div>
+
     <!-- ═══ MOBILE FILTER SHEET ═══ -->
     <div class="filter-backdrop" id="filter-backdrop" onclick="closeFilterSheet()"></div>
     <div class="filter-sheet" id="filter-sheet">
@@ -686,7 +719,7 @@
             <div class="footer-column">
                 <h4>Company</h4>
                 <a onclick="navigateTo('about')">About WishRite</a>
-                <a onclick="navigateTo('shop')">Collections</a>
+                <a onclick="navigateTo('collections')">Collections</a>
                 <a href="#">Contact Us</a>
             </div>
             <div class="footer-column">

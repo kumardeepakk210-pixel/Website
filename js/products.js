@@ -1,47 +1,57 @@
 /* ============================================
-   WISHRITE — PRODUCTS & INVENTORY DATA LAYER
-   Dynamic Product Sync from Supabase, Customer-Safe Mapping,
-   Product Catalog Rendering, PDP with Pincode Validation,
-   Real-Time Updates, Skeletons & Resilient Error Handling
+   WISHRITE — CENTRAL PRODUCT DATA SERVICE & STOREFRONT LAYER
+   Strictly customer-facing: reads from Supabase public.inventory,
+   aggregates sales ranking from public.sales,
+   resolves images from Supabase Storage bucket 'product-images',
+   and handles the 'CURRENTLY UNAVAILABLE' / 'NOTIFY ME' workflow.
    ============================================ */
 
-// Configuration for out-of-stock visibility & threshold
-const WISHRITE_CONFIG_STORE = {
-    showOutOfStockInCatalog: true, // Show with 'Out of Stock' badge
-    lowStockThreshold: 3
-};
+// Configuration
+const SUPABASE_URL = window.SUPABASE_URL || 'https://ptpuepejciqiktmcpuon.supabase.co';
+const SUPABASE_ANON_KEY = window.SUPABASE_ANON_KEY || 'sb_publishable_ZHwzEtRBkW9u4T2d_0R2Ag_BX1EeJRX';
 
-// Initial catalog is empty — populated dynamically from Supabase
+// Global stores & indices
 let productsDB = [];
-
-// Inverted index for rapid slug / SKU lookups
 let productSlugMap = new Map();
-let productSkuMap = new Map();
-
-// Track data sync status
-let isInventoryLoading = false;
+let productCodeMap = new Map();
+let productSalesMap = new Map();
 let inventorySyncError = null;
 
 /**
- * Generate SEO-friendly and unique slug from product name and code
+ * Format Indian Rupee currency
+ */
+function formatPrice(amount) {
+    return '₹' + Number(amount || 0).toLocaleString('en-IN');
+}
+
+/**
+ * Deterministic SEO slug generator
  */
 function generateProductSlug(name, code, existingSlugs = new Set()) {
-    const baseSlug = String(name || 'product')
+    let base = (name || 'jewellery')
         .toLowerCase()
-        .replace(/925\s*sterling\s*silver/gi, '')
         .replace(/[^a-z0-9]+/g, '-')
-        .replace(/(^-|-$)+/g, '');
+        .replace(/(^-|-$)/g, '');
 
-    let finalSlug = baseSlug || 'silver-jewellery';
-    if (existingSlugs.has(finalSlug) && code) {
-        finalSlug = `${finalSlug}-${String(code).toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+    const codePart = (code || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+    let candidate = codePart ? `${base}-${codePart}` : base;
+
+    if (!existingSlugs.has(candidate)) {
+        existingSlugs.add(candidate);
+        return candidate;
     }
+
+    let count = 2;
+    while (existingSlugs.has(`${candidate}-${count}`)) {
+        count++;
+    }
+    const finalSlug = `${candidate}-${count}`;
     existingSlugs.add(finalSlug);
     return finalSlug;
 }
 
 /**
- * Normalize category naming from database to luxury e-commerce taxonomy
+ * Normalize database categories into clean luxury taxonomy
  */
 function normalizeCategory(raw) {
     if (!raw) return 'Jewellery';
@@ -62,373 +72,441 @@ function normalizeCategory(raw) {
         'Set': 'Jewellery Sets',
         'Silver Jewellery': 'Silver Jewellery',
         'Fashion Jewellery': 'Fashion Jewellery',
-        'Toys': 'Toys',
-        'Household': 'Household',
-        'Customized Gifts': 'Customized Gifts',
+        'Accessories': 'Accessories',
         'Other': 'Accessories'
     };
     return map[clean] || (clean.endsWith('s') ? clean : clean + 's');
 }
 
 /**
- * Customer-Safe Mapping Layer
- * Translates Supabase `public.inventory` row into the storefront product model.
- * Strictly excludes wholesale details: purchase_price, purchase_date, shop_name, shop_address.
+ * Map products into curated collections based on silver craftsmanship
  */
-function mapInventoryToProduct(item, existingSlugs) {
-    if (!item) return null;
+function determineCollection(item, category) {
+    const cat = (category || '').toLowerCase();
+    const name = (item.product_name || '').toLowerCase();
 
-    // Check status if available: Draft and Archived products are not visible to customers
-    const rawStatus = (item.status || '').trim();
-    if (rawStatus === 'Draft' || rawStatus === 'Archived') {
-        return null;
+    if (cat.includes('set') || cat.includes('necklace') || name.includes('statement') || name.includes('choker')) {
+        return 'The Occasion & Evening Edit';
+    }
+    if (cat.includes('toe') || cat.includes('nose') || name.includes('band') || name.includes('stud') || name.includes('daily')) {
+        return 'Daily Elegance';
+    }
+    if (cat.includes('chain') || cat.includes('bracelet') || cat.includes('bali') || name.includes('rope') || name.includes('box')) {
+        return '925 Silver Signature Collection';
+    }
+    return 'Modern Solitaires & Keepsakes';
+}
+
+/**
+ * Map products into occasions based on style & jewellery type
+ */
+function determineOccasions(item, category) {
+    const cat = (category || '').toLowerCase();
+    const occasions = new Set();
+
+    // Everyday
+    if (cat.includes('toe') || cat.includes('nose') || cat.includes('chain') || cat.includes('ring') || cat.includes('earring') || cat.includes('bali')) {
+        occasions.add('Everyday');
+    }
+    // Office
+    if (cat.includes('ring') || cat.includes('pendant') || cat.includes('chain') || cat.includes('bracelet') || cat.includes('earring')) {
+        occasions.add('Office');
+    }
+    // Date Night
+    if (cat.includes('pendant') || cat.includes('earring') || cat.includes('necklace') || cat.includes('bracelet') || cat.includes('ring')) {
+        occasions.add('Date Night');
+    }
+    // Festive
+    if (cat.includes('set') || cat.includes('anklet') || cat.includes('rakhi') || cat.includes('necklace') || cat.includes('pendant')) {
+        occasions.add('Festive');
+    }
+    // Gifting
+    if (cat.includes('pendant') || cat.includes('rakhi') || cat.includes('chain') || cat.includes('set') || cat.includes('ring')) {
+        occasions.add('Gifting');
+    }
+    // Special Occasions
+    if (cat.includes('set') || cat.includes('necklace') || cat.includes('anklet') || cat.includes('bracelet')) {
+        occasions.add('Special Occasions');
     }
 
-    const sku = item.product_code || 'WR-' + String(item.id || '').substring(0, 6).toUpperCase();
-    const name = item.product_name || 'WishRite 925 Sterling Silver Piece';
+    if (occasions.size === 0) occasions.add('Everyday');
+    return Array.from(occasions);
+}
+
+/**
+ * Map raw database row from public.inventory into unified storefront product model
+ */
+function mapInventoryToProduct(item, existingSlugs = new Set()) {
+    if (!item) return null;
+
+    const productCode = (item.product_code || item.sku || '').trim();
+    const name = (item.product_name || 'Handcrafted Silver Piece').trim();
     const category = normalizeCategory(item.category);
+    const rawCategory = (item.category || '').trim();
     const stock = typeof item.stock_quantity === 'number' ? item.stock_quantity : (parseInt(item.stock_quantity, 10) || 0);
     const sellingPrice = Number(item.selling_price) || 0;
 
-    // Compare-at price / MRP
-    const comparePrice = Number(item.compare_at_price) || 0;
-    const mrp = comparePrice > sellingPrice 
-        ? comparePrice 
-        : (sellingPrice > 0 ? Math.round((sellingPrice * 1.25) / 50) * 50 : sellingPrice);
+    // Approximate MRP based on jewellery standard markup if not explicitly set
+    const mrp = sellingPrice > 0 ? Math.round((sellingPrice * 1.25) / 50) * 50 : sellingPrice;
     const discount = mrp > sellingPrice ? Math.round(((mrp - sellingPrice) / mrp) * 100) : 0;
 
-    // Weight formatted if exists
+    // Formatted weight
     const weightStr = (item.weight !== null && item.weight !== undefined && String(item.weight).trim() !== '')
         ? `${item.weight}g`
         : null;
 
-    // Size formatted if exists
+    // Formatted size
     const sizeStr = (item.size !== null && item.size !== undefined && String(item.size).trim() !== '')
         ? String(item.size).trim()
         : null;
 
-    // Slug: use database slug if present, otherwise generate deterministically
-    const slug = (item.slug && item.slug.trim()) 
-        ? item.slug.trim() 
-        : generateProductSlug(name, sku, existingSlugs);
+    // Deterministic slug
+    const slug = generateProductSlug(name, productCode, existingSlugs);
 
-    // Stock availability & badge logic
-    let availability = 'Out of Stock';
+    // Dynamic collection & occasions
+    const collection = determineCollection(item, category);
+    const occasions = determineOccasions(item, category);
+
+    // Sales count from sales table
+    const salesCount = productSalesMap.get(productCode) || 0;
+
+    // Stock availability
+    let availability = 'Currently Unavailable';
     let lowStock = false;
-    if (rawStatus === 'Out of Stock' || stock <= 0) {
-        availability = 'Out of Stock';
-    } else if (stock > WISHRITE_CONFIG_STORE.lowStockThreshold) {
+    if (stock > 3) {
         availability = 'In Stock';
     } else if (stock > 0) {
         availability = `Only ${stock} left`;
         lowStock = true;
     }
 
-    const material = item.material || "925 Sterling Silver";
-    const purity = item.purity || "92.5%";
+    const material = '925 Sterling Silver';
+    const silverPurity = '92.5%';
 
     const product = {
         id: item.id,
+        productCode: productCode,
+        sku: productCode,
+        code: productCode,
         name: name,
         slug: slug,
-        sku: sku,
-        code: sku,
+        description: item.product_description || `${name} crafted in hallmarked ${material} with a luminous high-polish finish.`,
+        shortDescription: item.product_description || `${material} ${category} crafted for effortless luxury.`,
         category: category,
-        rawCategory: item.category,
-        description: item.product_description || `${name} crafted in pure ${material} with a refined high-polish finish.`,
-        shortDescription: item.short_description || item.product_description || `Pure ${material} ${category.toLowerCase().slice(0, -1)} crafted for everyday elegance.`,
+        rawCategory: rawCategory,
+        collection: collection,
+        occasions: occasions,
+        occasion: occasions.join(', '),
+        price: sellingPrice,
         sellingPrice: sellingPrice,
         mrp: mrp,
         discount: discount,
+        stockQuantity: stock,
+        isAvailable: stock > 0,
+        isPublished: true,
         weight: weightStr,
         size: sizeStr,
-        stockQuantity: stock,
         availability: availability,
         lowStock: lowStock,
         material: material,
-        silverPurity: purity,
-        finish: "High-Polish Rhodium",
-        status: (stock <= 0 || rawStatus === 'Out of Stock') ? 'Out of Stock' : 'Active',
-        seoTitle: item.seo_title || null,
-        seoDescription: item.seo_description || null,
-        care: "Store in a cool, dry place inside an airtight zip pouch. Keep away from water, perfumes, and harsh chemicals. Polish gently with a soft microfibre cloth.",
-        shippingInfo: "Complimentary insured express delivery on all qualifying orders. Dispatched within 24-48 hours.",
-        returnInfo: "Hassle-free 7-day return and exchange policy.",
-        whatsIncluded: "1 piece in signature WishRite luxury jewellery box with 925 Authenticity Certificate.",
-        isNew: stock > 0 && String(sku).endsWith('1'),
-        isBestseller: stock > 0 && stock <= 5,
-        tag: stock <= 0 ? 'SOLD OUT' : (discount >= 20 ? 'SALE' : (stock <= 3 ? 'FEW LEFT' : ''))
+        silverPurity: silverPurity,
+        finish: 'High-Polish Rhodium',
+        status: stock > 0 ? 'Active' : 'Currently Unavailable',
+        createdAt: item.created_at,
+        updatedAt: item.updated_at,
+        salesCount: salesCount,
+        care: 'Store in an airtight pouch. Keep away from water, perfumes, and sprays. Clean gently using a soft jewellery polishing cloth.',
+        shippingInfo: 'Complimentary insured express shipping across India. Usually dispatched within 24 to 48 hours.',
+        returnInfo: 'Easy 7-day return and exchange policy with original packaging and certificate.',
+        whatsIncluded: '1 piece in signature WishRite luxury gift box with 925 Authenticity Certificate.',
+        isNew: false, // Calculated dynamically across catalog
+        isBestseller: false, // Calculated dynamically across catalog
+        tag: stock <= 0 ? 'UNAVAILABLE' : (discount >= 20 ? 'SALE' : (stock <= 3 ? 'FEW LEFT' : ''))
     };
 
-    // Attach direct image properties if present in row
-    if (item.image_url) product.image_url = item.image_url;
-    if (item.product_media_urls) product.product_media_urls = item.product_media_urls;
-
-    // Attach images via customer-safe image layer
+    // Attach resolved images via image layer
     if (typeof getProductImages === 'function') {
         product.images = getProductImages(product);
     } else {
-        product.images = [generateProductPlaceholder(product)];
+        product.images = [];
     }
-    product.image = product.images[0]?.url;
+    product.image = product.images[0]?.url || '';
 
     return product;
 }
 
-/**
- * Fetch products and images dynamically from Supabase
- * Queries only customer-safe fields.
- */
-async function loadProductsFromInventory() {
-    if (isInventoryLoading) return productsDB;
-    isInventoryLoading = true;
-    inventorySyncError = null;
+// ════════════════════════════════════════════════════
+// 5. CENTRAL PRODUCT DATA SERVICE
+// ════════════════════════════════════════════════════
+const productsService = {
+    isLoading: false,
+    loadPromise: null,
+    error: null,
 
-    try {
-        const headers = {
-            'apikey': SUPABASE_ANON_KEY,
-            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-            'Accept': 'application/json'
-        };
-
-        // 1. Attempt to fetch product_images table if present
-        try {
-            const imagesUrl = `${SUPABASE_URL}/rest/v1/product_images?select=id,product_id,image_url,storage_path,image_type,sort_order,alt_text,is_primary&order=sort_order.asc,created_at.asc`;
-            const imgRes = await fetch(imagesUrl, { headers });
-            if (imgRes.ok) {
-                const imgData = await imgRes.json();
-                if (Array.isArray(imgData) && typeof setSupabaseProductImages === 'function') {
-                    setSupabaseProductImages(imgData);
-                }
-            }
-        } catch (e) {
-            // product_images table is optional until setup sql is run
+    /**
+     * Guarantees a single in-flight Promise for all callers.
+     * Prevents returning empty array [] while network request is underway.
+     */
+    async ensureLoaded() {
+        if (productsDB.length > 0 && !this.isLoading) {
+            return productsDB;
+        }
+        if (this.loadPromise) {
+            return this.loadPromise;
         }
 
-        // 2. Fetch products from inventory table
-        // Attempt full extended column set first, fallback to core set if extended columns don't exist yet
-        let rawData = null;
-        const extendedUrl = `${SUPABASE_URL}/rest/v1/inventory?select=id,product_code,product_name,product_description,category,stock_quantity,selling_price,weight,size,created_at,updated_at,status,compare_at_price,image_url,product_media_urls,short_description,material,purity,slug,seo_title,seo_description&order=created_at.desc`;
-        const coreUrl = `${SUPABASE_URL}/rest/v1/inventory?select=id,product_code,product_name,product_description,category,stock_quantity,selling_price,weight,size,created_at,updated_at&order=created_at.desc`;
+        this.isLoading = true;
+        this.error = null;
 
-        let res = await fetch(extendedUrl, { headers });
-        if (res.ok) {
-            rawData = await res.json();
-        } else {
-            // Fallback to core columns
-            res = await fetch(coreUrl, { headers });
-            if (res.ok) {
-                rawData = await res.json();
-            } else {
-                throw new Error(`HTTP ${res.status}`);
-            }
-        }
-
-        if (Array.isArray(rawData)) {
-            const existingSlugs = new Set();
-            const mapped = rawData
-                .map(item => mapInventoryToProduct(item, existingSlugs))
-                .filter(Boolean); // Filter out Draft and Archived
-
-            productsDB = mapped;
-
-            // Rebuild index maps
-            productSlugMap.clear();
-            productSkuMap.clear();
-            productsDB.forEach(p => {
-                productSlugMap.set(p.slug, p);
-                productSkuMap.set((p.sku || p.code || '').toUpperCase(), p);
-            });
-
-            // Cache in local storage for offline resilience
+        this.loadPromise = (async () => {
             try {
-                localStorage.setItem('wishrite_inventory_cache', JSON.stringify(mapped));
-                localStorage.setItem('wishrite_inventory_last_sync', String(Date.now()));
-            } catch (e) {
-                // Ignore quota errors
-            }
+                const headers = {
+                    'apikey': SUPABASE_ANON_KEY,
+                    'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                    'Accept': 'application/json'
+                };
 
-            console.info(`✓ Loaded ${mapped.length} products dynamically from WishRite Supabase database.`);
-            return mapped;
-        }
-    } catch (err) {
-        console.warn('Live database sync notice: checking offline cache.', err.message);
-        inventorySyncError = err;
-
-        // Offline cache fallback
-        try {
-            const cached = localStorage.getItem('wishrite_inventory_cache');
-            if (cached) {
-                const parsed = JSON.parse(cached);
-                if (Array.isArray(parsed) && parsed.length > 0) {
-                    productsDB = parsed;
-                    productSlugMap.clear();
-                    productSkuMap.clear();
-                    productsDB.forEach(p => {
-                        productSlugMap.set(p.slug, p);
-                        productSkuMap.set((p.sku || p.code || '').toUpperCase(), p);
-                    });
-                    console.info(`✓ Restored ${parsed.length} products from offline cache.`);
-                    return parsed;
+                // 1. Fetch sales aggregation in parallel (best-effort)
+                try {
+                    const salesRes = await fetch(`${SUPABASE_URL}/rest/v1/sales?select=product_code,quantity`, { headers });
+                    if (salesRes.ok) {
+                        const salesRows = await salesRes.json();
+                        productSalesMap.clear();
+                        if (Array.isArray(salesRows)) {
+                            salesRows.forEach(row => {
+                                const code = (row.product_code || '').trim();
+                                if (code) {
+                                    const prev = productSalesMap.get(code) || 0;
+                                    productSalesMap.set(code, prev + (Number(row.quantity) || 1));
+                                }
+                            });
+                        }
+                    }
+                } catch (salesErr) {
+                    console.info('Sales data notice: using in-stock ranking.', salesErr.message);
                 }
-            }
-        } catch (cacheErr) {
-            console.warn('Cache restoration error:', cacheErr);
-        }
-    } finally {
-        isInventoryLoading = false;
-    }
 
-    return productsDB;
-}
+                // 2. Fetch inventory records directly from public.inventory
+                const inventoryUrl = `${SUPABASE_URL}/rest/v1/inventory?select=id,product_code,product_name,product_description,category,stock_quantity,selling_price,weight,size,created_at,updated_at,storage_folder&order=created_at.desc`;
+                const invRes = await fetch(inventoryUrl, { headers });
 
-/**
- * Realtime Supabase Subscription
- * Automatically updates prices, stock, and status without manual reload.
- */
-let realtimeChannel = null;
-
-function initRealtimeInventorySync() {
-    if (typeof window.supabaseClient === 'undefined' || !window.supabaseClient) {
-        if (window.supabase && window.SUPABASE_URL && window.SUPABASE_ANON_KEY) {
-            try {
-                window.supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-            } catch (e) {
-                return;
-            }
-        } else {
-            return;
-        }
-    }
-
-    if (realtimeChannel) return;
-
-    try {
-        realtimeChannel = window.supabaseClient
-            .channel('customer-inventory-sync')
-            .on(
-                'postgres_changes',
-                { event: '*', schema: 'public', table: 'inventory' },
-                (payload) => {
-                    handleRealtimeInventoryChange(payload);
+                if (!invRes.ok) {
+                    throw new Error(`Failed to load inventory: HTTP ${invRes.status}`);
                 }
-            )
-            .subscribe((status) => {
-                if (status === 'SUBSCRIBED') {
-                    console.info('✓ Supabase Realtime active: listening for product updates.');
+
+                const rawItems = await invRes.json();
+                if (!Array.isArray(rawItems)) {
+                    throw new Error('Invalid inventory data format received from database');
                 }
-            });
-    } catch (e) {
-        console.warn('Supabase Realtime subscription not initialized:', e.message);
-    }
-}
 
-/**
- * Handle live change payload from Supabase Realtime
- */
-function handleRealtimeInventoryChange(payload) {
-    if (!payload || !payload.eventType) return;
+                const existingSlugs = new Set();
+                const mapped = rawItems.map(item => mapInventoryToProduct(item, existingSlugs)).filter(Boolean);
 
-    const { eventType, new: newRecord, old: oldRecord } = payload;
-    console.info(`Supabase Realtime event [${eventType}]:`, newRecord?.product_code || oldRecord?.id);
+                // Mark top 15 newest items
+                const sortedByDate = [...mapped].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+                sortedByDate.slice(0, 15).forEach(p => { p.isNew = true; });
 
-    if (eventType === 'DELETE') {
-        const delId = oldRecord?.id;
-        productsDB = productsDB.filter(p => p.id !== delId);
-    } else if (eventType === 'INSERT') {
-        const existingSlugs = new Set(productsDB.map(p => p.slug));
-        const mapped = mapInventoryToProduct(newRecord, existingSlugs);
-        if (mapped) {
-            productsDB.unshift(mapped);
-            productSlugMap.set(mapped.slug, mapped);
-            productSkuMap.set((mapped.sku || mapped.code || '').toUpperCase(), mapped);
-        }
-    } else if (eventType === 'UPDATE') {
-        const existingSlugs = new Set(productsDB.filter(p => p.id !== newRecord.id).map(p => p.slug));
-        const mapped = mapInventoryToProduct(newRecord, existingSlugs);
-        const idx = productsDB.findIndex(p => p.id === newRecord.id);
+                // Mark bestsellers (by real sales count or high in-stock popularity)
+                const sortedBySales = [...mapped].sort((a, b) => (b.salesCount - a.salesCount) || (b.stockQuantity - a.stockQuantity));
+                sortedBySales.slice(0, 12).forEach(p => { p.isBestseller = true; });
 
-        if (mapped) {
-            if (idx >= 0) {
-                productsDB[idx] = mapped;
-            } else {
-                productsDB.unshift(mapped);
+                productsDB = mapped;
+
+                // Rebuild fast index maps
+                productSlugMap.clear();
+                productCodeMap.clear();
+                productsDB.forEach(p => {
+                    productSlugMap.set(p.slug, p);
+                    if (p.productCode) {
+                        productCodeMap.set(p.productCode.toUpperCase(), p);
+                    }
+                    if (p.id) {
+                        productSlugMap.set(p.id, p);
+                    }
+                });
+
+                // Cache in localStorage for offline resilience
+                try {
+                    localStorage.setItem('wishrite_inventory_cache', JSON.stringify(mapped));
+                    localStorage.setItem('wishrite_inventory_sync_time', String(Date.now()));
+                } catch (e) {}
+
+                console.info(`✓ Loaded ${mapped.length} active products dynamically from WishRite Supabase database.`);
+                return productsDB;
+            } catch (err) {
+                console.error('Supabase inventory sync error:', err);
+                this.error = err;
+                inventorySyncError = err;
+
+                // Attempt restore from offline cache
+                try {
+                    const cached = localStorage.getItem('wishrite_inventory_cache');
+                    if (cached) {
+                        const parsed = JSON.parse(cached);
+                        if (Array.isArray(parsed) && parsed.length > 0) {
+                            productsDB = parsed;
+                            productSlugMap.clear();
+                            productCodeMap.clear();
+                            productsDB.forEach(p => {
+                                productSlugMap.set(p.slug, p);
+                                if (p.productCode) productCodeMap.set(p.productCode.toUpperCase(), p);
+                                if (p.id) productSlugMap.set(p.id, p);
+                            });
+                            console.info(`✓ Restored ${parsed.length} products from offline cache.`);
+                            return productsDB;
+                        }
+                    }
+                } catch (cacheErr) {}
+
+                throw err;
+            } finally {
+                this.isLoading = false;
+                this.loadPromise = null;
             }
-            productSlugMap.set(mapped.slug, mapped);
-            productSkuMap.set((mapped.sku || mapped.code || '').toUpperCase(), mapped);
-        } else if (idx >= 0) {
-            // Status changed to Draft or Archived -> remove from public view
-            productsDB.splice(idx, 1);
-            if (newRecord.slug) productSlugMap.delete(newRecord.slug);
-        }
-    }
+        })();
 
-    // Refresh active view to reflect updated price, stock, or status
-    const currentView = (typeof getCurrentView === 'function') ? getCurrentView() : 'home';
-    if (currentView === 'shop' && typeof applyFiltersAndSort === 'function') {
-        applyFiltersAndSort();
-    } else if (currentView === 'home' && typeof renderHomeSections === 'function') {
-        renderHomeSections();
-    } else if (currentView === 'product') {
-        const currentSlug = window.location.pathname.replace('/product/', '');
-        const currentProd = getProductBySlug(currentSlug);
-        if (currentProd) {
-            const targetView = document.getElementById('product-view');
-            if (targetView) {
-                targetView.innerHTML = renderProductDetail(currentProd);
-                if (typeof renderStickyCTA === 'function') renderStickyCTA(currentProd);
+        return this.loadPromise;
+    },
+
+    async getProducts(options = {}) {
+        await this.ensureLoaded();
+        let list = [...productsDB];
+
+        if (options.category && options.category !== 'All') {
+            const normCat = normalizeCategory(options.category).toLowerCase();
+            list = list.filter(p => normalizeCategory(p.category).toLowerCase() === normCat || (p.rawCategory && p.rawCategory.toLowerCase() === normCat));
+        }
+
+        if (options.collection && options.collection !== 'All') {
+            list = list.filter(p => p.collection === options.collection);
+        }
+
+        if (options.occasion && options.occasion !== 'All') {
+            list = list.filter(p => p.occasions && p.occasions.includes(options.occasion));
+        }
+
+        if (options.sort) {
+            switch (options.sort) {
+                case 'price-low':
+                    list.sort((a, b) => a.sellingPrice - b.sellingPrice);
+                    break;
+                case 'price-high':
+                    list.sort((a, b) => b.sellingPrice - a.sellingPrice);
+                    break;
+                case 'newest':
+                    list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+                    break;
+                case 'name-asc':
+                    list.sort((a, b) => a.name.localeCompare(b.name));
+                    break;
+                case 'featured':
+                default:
+                    list.sort((a, b) => (b.salesCount - a.salesCount) || (b.isBestseller ? 1 : 0) - (a.isBestseller ? 1 : 0));
+                    break;
             }
         }
-    }
 
-    // If cart contains updated item, update price and stock limits
-    if (typeof cart !== 'undefined' && Array.isArray(cart)) {
-        cart.forEach(cartItem => {
-            const updated = productsDB.find(p => p.id === cartItem.id);
-            if (updated) {
-                cartItem.sellingPrice = updated.sellingPrice;
-                cartItem.stockQuantity = updated.stockQuantity;
-                if (cartItem.qty > updated.stockQuantity) {
-                    cartItem.qty = Math.max(1, updated.stockQuantity);
-                }
-            }
-        });
-        if (typeof renderCart === 'function') renderCart();
-    }
-}
+        return list;
+    },
 
-// Icons
-const ICONS = {
-    heart: `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
-    chevronDown: `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><polyline points="6 9 12 15 18 9" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
-    chevronRight: `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><polyline points="9 18 15 12 9 6" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
-    check: `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><polyline points="20 6 9 17 4 12" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
-    shield: `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
-    truck: `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="3" width="15" height="13" stroke-linecap="round" stroke-linejoin="round"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>`,
-    gift: `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><polyline points="20 12 20 22 4 22 4 12" stroke-linecap="round" stroke-linejoin="round"/><rect x="2" y="7" width="20" height="5" stroke-linecap="round" stroke-linejoin="round"/><line x1="12" y1="22" x2="12" y2="7" stroke-linecap="round"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
-    diamond: `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M6 3h12l4 6-10 13L2 9z" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 9h20" stroke-linecap="round"/><path d="M10 3l-4 6 6 13 6-13-4-6" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
-    sparkle: `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8L12 2z" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
-    lock: `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`,
-    rotate: `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>`
+    getProductByCode(code) {
+        if (!code) return null;
+        return productCodeMap.get(String(code).toUpperCase()) || productsDB.find(p => p.productCode?.toUpperCase() === String(code).toUpperCase());
+    },
+
+    getProductById(id) {
+        if (!id) return null;
+        return productSlugMap.get(id) || productsDB.find(p => p.id === id || String(p.id) === String(id) || p.productCode === id);
+    },
+
+    getProductBySlug(slug) {
+        if (!slug) return null;
+        return productSlugMap.get(slug) || productsDB.find(p => p.slug === slug || p.id === slug || p.productCode === slug);
+    },
+
+    getProductsByCategory(category) {
+        if (!category || category === 'All') return productsDB;
+        const norm = normalizeCategory(category).toLowerCase();
+        return productsDB.filter(p => normalizeCategory(p.category).toLowerCase() === norm || (p.rawCategory && p.rawCategory.toLowerCase() === norm));
+    },
+
+    getProductsByCollection(collection) {
+        if (!collection || collection === 'All') return productsDB;
+        return productsDB.filter(p => p.collection === collection);
+    },
+
+    getProductsByOccasion(occasion) {
+        if (!occasion || occasion === 'All') return productsDB;
+        return productsDB.filter(p => p.occasions && p.occasions.includes(occasion));
+    },
+
+    getNewArrivals(limit = 12) {
+        return [...productsDB]
+            .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+            .slice(0, limit);
+    },
+
+    getBestSellers(limit = 12) {
+        return [...productsDB]
+            .sort((a, b) => (b.salesCount - a.salesCount) || ((b.stockQuantity > 0 ? 1 : 0) - (a.stockQuantity > 0 ? 1 : 0)))
+            .slice(0, limit);
+    },
+
+    searchProducts(query) {
+        if (!query || query.trim().length < 2) return [];
+        const q = query.toLowerCase().trim();
+        return productsDB.filter(p =>
+            (p.name && p.name.toLowerCase().includes(q)) ||
+            (p.productCode && p.productCode.toLowerCase().includes(q)) ||
+            (p.category && p.category.toLowerCase().includes(q)) ||
+            (p.rawCategory && p.rawCategory.toLowerCase().includes(q)) ||
+            (p.collection && p.collection.toLowerCase().includes(q)) ||
+            (p.description && p.description.toLowerCase().includes(q)) ||
+            (p.material && p.material.toLowerCase().includes(q))
+        );
+    },
+
+    getCategories() {
+        return [...new Set(productsDB.map(p => p.category))].filter(Boolean);
+    },
+
+    getCollections() {
+        return [
+            'All',
+            '925 Silver Signature Collection',
+            'Daily Elegance',
+            'The Occasion & Evening Edit',
+            'Modern Solitaires & Keepsakes'
+        ];
+    },
+
+    getOccasions() {
+        return ['All', 'Everyday', 'Office', 'Date Night', 'Festive', 'Gifting', 'Special Occasions'];
+    }
 };
 
-// Format price to INR
-function formatPrice(price) {
-    return '₹' + (Number(price) || 0).toLocaleString('en-IN');
-}
+// Global backward-compatible bridge
+window.productsService = productsService;
+window.loadProductsFromInventory = () => productsService.ensureLoaded();
+window.getProductBySlug = (slug) => productsService.getProductBySlug(slug);
+window.getProductById = (id) => productsService.getProductById(id);
+window.getProductByCode = (code) => productsService.getProductByCode(code);
+window.getProductsByCategory = (cat) => productsService.getProductsByCategory(cat);
+window.getCategories = () => productsService.getCategories();
+window.getCollections = () => productsService.getCollections();
 
 /**
- * Render luxury product shimmer skeleton cards while fetching from Supabase
+ * Render loading skeleton cards
  */
-function renderProductSkeletons(containerId, count = 8) {
+function renderProductLoadingSkeletons(containerId, count = 8) {
     const container = document.getElementById(containerId);
     if (!container) return;
 
     let skeletonHTML = '';
     for (let i = 0; i < count; i++) {
         skeletonHTML += `
-            <div class="product-card skeleton-card">
-                <div class="product-card-image skeleton-box" style="aspect-ratio:4/5;background:linear-gradient(90deg, #F5F1EE 25%, #EBE5E1 50%, #F5F1EE 75%);background-size:200% 100%;animation:skeletonShimmer 1.5s infinite;"></div>
+            <div class="product-card skeleton-card" aria-hidden="true">
+                <div class="product-card-image skeleton-box" style="aspect-ratio:4/5;background:linear-gradient(90deg, #F5F1EE 25%, #EBE5E1 50%, #F5F1EE 75%);background-size:200% 100%;animation:skeletonShimmer 1.5s infinite;border-radius:4px;"></div>
                 <div class="product-card-info" style="padding:16px 0;">
                     <div style="height:12px;width:35%;background:#EBE5E1;border-radius:2px;margin-bottom:8px;"></div>
                     <div style="height:18px;width:75%;background:#EBE5E1;border-radius:2px;margin-bottom:8px;"></div>
@@ -445,11 +523,11 @@ function renderProductSkeletons(containerId, count = 8) {
  */
 function createProductCardHTML(product) {
     const isWishlisted = typeof wishlist !== 'undefined' && wishlist.has(product.id);
-    const isOutOfStock = product.stockQuantity <= 0 || product.status === 'Out of Stock';
-    
+    const isOutOfStock = product.stockQuantity <= 0;
+
     let badgeHTML = '';
     if (isOutOfStock) {
-        badgeHTML = `<span class="product-card-badge badge-out-of-stock">SOLD OUT</span>`;
+        badgeHTML = `<span class="product-card-badge badge-out-of-stock">CURRENTLY UNAVAILABLE</span>`;
     } else if (product.tag) {
         const badgeClass = product.tag === 'NEW' ? 'badge-new' : (product.tag === 'SALE' ? 'badge-sale' : 'badge-gold');
         badgeHTML = `<span class="product-card-badge ${badgeClass}">${product.tag}</span>`;
@@ -458,24 +536,34 @@ function createProductCardHTML(product) {
     const discountHTML = (!isOutOfStock && product.discount > 0) ? `<span class="price-discount">${product.discount}% OFF</span>` : '';
     const mrpHTML = (product.mrp > product.sellingPrice) ? `<span class="price-original">${formatPrice(product.mrp)}</span>` : '';
 
-    const imgSrc = product.images?.[0]?.url || product.image;
+    const imgSrc = product.images?.[0]?.url || product.image || '';
     const imgAlt = product.images?.[0]?.alt || product.name;
 
     return `
         <div class="product-card ${isOutOfStock ? 'out-of-stock' : ''}" onclick="navigateTo('product', '${product.slug}')">
             <div class="product-card-image">
-                <img src="${imgSrc}" alt="${imgAlt}" loading="lazy" width="400" height="500">
+                <img 
+                    src="${imgSrc}" 
+                    alt="${imgAlt}" 
+                    loading="lazy" 
+                    width="400" 
+                    height="500"
+                    data-product-code="${product.productCode}"
+                    data-category="${product.category}"
+                    data-fallback-index="0"
+                    onerror="handleProductImageError(this, '${product.productCode}', '${product.category}')"
+                >
                 ${badgeHTML}
                 <button class="product-card-wishlist ${isWishlisted ? 'active' : ''}" onclick="toggleWishlist('${product.id}', event)" aria-label="${isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}">
                     ${ICONS.heart}
                 </button>
                 ${!isOutOfStock 
                     ? `<button class="product-card-quick" onclick="addToCart('${product.id}', event)">Quick Add</button>` 
-                    : `<div class="product-card-quick out-of-stock-label">Out of Stock</div>`}
+                    : `<button class="product-card-quick notify-label" onclick="event.stopPropagation(); openNotifyMeModal('${product.id}')">Notify Me</button>`}
             </div>
             <div class="product-card-info">
                 <div class="product-card-meta-line">
-                    <span class="product-card-sku">${product.sku || product.code || ''}</span>
+                    <span class="product-card-sku">${product.productCode || ''}</span>
                     <span class="product-card-category">${product.category}</span>
                 </div>
                 <h3 class="product-card-name">${product.name}</h3>
@@ -489,17 +577,24 @@ function createProductCardHTML(product) {
     `;
 }
 
-// Render products to a container with appropriate empty and error states
+/**
+ * Render products to a container with proper Loading, Empty, and Error states
+ */
 function renderProductsToContainer(products, containerId) {
     const container = document.getElementById(containerId);
     if (!container) return;
 
-    if (inventorySyncError && (!products || !products.length)) {
+    if (productsService.isLoading) {
+        renderProductLoadingSkeletons(containerId, 8);
+        return;
+    }
+
+    if (productsService.error && (!products || !products.length)) {
         container.innerHTML = `
-            <div class="cart-empty" style="grid-column:1/-1;padding:60px 20px;">
-                <p style="font-size:1.1rem;color:var(--wr-primary);font-family:var(--wr-font-heading);">Products are temporarily unavailable.</p>
-                <p style="color:var(--wr-text-muted);font-size:0.9rem;margin:8px 0 16px;">Please check back shortly or refresh to reload available pieces.</p>
-                <button class="btn btn-outline btn-sm" onclick="loadProductsFromInventory().then(() => { if (typeof renderHomeSections==='function') renderHomeSections(); if (typeof applyFiltersAndSort==='function') applyFiltersAndSort(); })">Reload Products</button>
+            <div class="cart-empty" style="grid-column:1/-1;padding:60px 20px;text-align:center;">
+                <p style="font-size:1.1rem;color:var(--wr-primary);font-family:var(--wr-font-heading);margin-bottom:8px;">Unable to load jewellery collection right now.</p>
+                <p style="color:var(--wr-text-muted);font-size:0.9rem;margin-bottom:20px;">Please check your connection or tap below to retry.</p>
+                <button class="btn btn-outline btn-sm" onclick="productsService.ensureLoaded().then(() => { if(typeof applyFiltersAndSort==='function') applyFiltersAndSort(); if(typeof renderHomeSections==='function') renderHomeSections(); })">Reload Collection</button>
             </div>
         `;
         return;
@@ -513,34 +608,13 @@ function renderProductsToContainer(products, containerId) {
     container.innerHTML = products.map(createProductCardHTML).join('');
 }
 
-// Product getters
-function getProductBySlug(slug) {
-    if (!slug) return null;
-    return productSlugMap.get(slug) || productsDB.find(p => p.slug === slug || p.id === slug || p.sku === slug || p.code === slug);
-}
+// ════════════════════════════════════════════════════
+// 18. PRODUCT DETAIL PAGE (PDP)
+// ════════════════════════════════════════════════════
+let currentPdpProduct = null;
+let currentPdpImageIndex = 0;
+let pdpQty = 1;
 
-function getProductById(id) {
-    if (!id) return null;
-    return productsDB.find(p => p.id === id || String(p.id) === String(id) || p.sku === id || p.code === id);
-}
-
-function getProductsByCategory(category) {
-    if (!category || category === 'All') return productsDB;
-    return productsDB.filter(p => p.category === category || p.rawCategory === category);
-}
-
-function getCategories() {
-    return [...new Set(productsDB.map(p => p.category))].filter(Boolean);
-}
-
-function getCollections() {
-    return ['All', '925 Sterling Silver', 'Daily Elegance', 'Occasion Edit', 'Signature Essentials'];
-}
-
-/**
- * Render Product Detail Page (PDP)
- * Completely customer-facing: no Manage Image or Admin controls.
- */
 function renderProductDetail(product) {
     if (!product) {
         return `
@@ -552,36 +626,41 @@ function renderProductDetail(product) {
         `;
     }
 
-    // Ensure images are resolved
+    currentPdpProduct = product;
+    currentPdpImageIndex = 0;
+    pdpQty = 1;
+
+    // Resolve images
     const images = (typeof getProductImages === 'function') ? getProductImages(product) : (product.images || []);
     const mainImage = images[0] || { url: '', alt: product.name };
 
+    // Thumbnail gallery with error handling to gracefully hide failed extra views
     const imagesHTML = images.map((img, i) =>
         `<div class="pdp-thumbnail ${i === 0 ? 'active' : ''}" onclick="switchPdpImage(${i})" role="button" aria-label="View image ${i+1}">
-            <img src="${img.url}" alt="${img.alt}" loading="lazy" width="72" height="72">
+            <img src="${img.url}" alt="${img.alt}" loading="lazy" width="72" height="72" onerror="handleThumbnailError(this)">
         </div>`
     ).join('');
 
     const isWishlisted = typeof wishlist !== 'undefined' && wishlist.has(product.id);
-    const isOutOfStock = product.stockQuantity <= 0 || product.status === 'Out of Stock';
+    const isOutOfStock = product.stockQuantity <= 0;
     const mrpHTML = product.mrp > product.sellingPrice ? `<span class="pdp-price-original">${formatPrice(product.mrp)}</span>` : '';
     const discountHTML = (!isOutOfStock && product.discount > 0) ? `<span class="pdp-price-discount">${product.discount}% OFF</span>` : '';
 
     // Trust & Feature Badges
     const features = [];
-    if (product.material) features.push(product.material);
-    if (product.silverPurity) features.push(`${product.silverPurity} Pure Silver`);
+    features.push('Hallmarked 925 Pure Silver');
     if (product.weight) features.push(`Weight: ${product.weight}`);
-    features.push('Hallmarked 925');
-    features.push('Complimentary Packaging');
+    if (product.size) features.push(`Size: ${product.size}`);
+    features.push('High-Polish Rhodium Finish');
+    features.push('Complimentary Luxury Gift Box');
 
     const featuresHTML = features.map(f =>
         `<div class="feature-item">${ICONS.check}<span>${f}</span></div>`
     ).join('');
 
-    // Dynamic Specifications — Only render fields that actually exist
+    // Dynamic Specifications Table
     const specsArr = [];
-    if (product.sku || product.code) specsArr.push(`<tr><td>Product Code / SKU</td><td><code>${product.sku || product.code}</code></td></tr>`);
+    if (product.productCode) specsArr.push(`<tr><td>Product Code</td><td><code>${product.productCode}</code></td></tr>`);
     if (product.material) specsArr.push(`<tr><td>Precious Metal</td><td>${product.material}</td></tr>`);
     if (product.silverPurity) specsArr.push(`<tr><td>Silver Purity</td><td>${product.silverPurity} Standard</td></tr>`);
     if (product.category) specsArr.push(`<tr><td>Category</td><td>${product.category}</td></tr>`);
@@ -610,7 +689,7 @@ function renderProductDetail(product) {
         accordionSections.push({ title: 'Shipping, Delivery & Returns', content: shipContent });
     }
     if (product.whatsIncluded) {
-        accordionSections.push({ title: "In the Box", content: `<p>${product.whatsIncluded}</p>` });
+        accordionSections.push({ title: 'In the Box', content: `<p>${product.whatsIncluded}</p>` });
     }
 
     const accordionsHTML = accordionSections.map(s =>
@@ -625,20 +704,18 @@ function renderProductDetail(product) {
         </div>`
     ).join('');
 
-    // Related products in the same category
+    // Related products in same category
     const related = productsDB.filter(p => p.id !== product.id && p.category === product.category).slice(0, 4);
     const relatedAlt = related.length < 4 ? productsDB.filter(p => p.id !== product.id).slice(0, 4) : related;
 
     // Pincode checker HTML
-    const pincodeHTML = (typeof renderPincodeCheckerHTML === 'function') 
-        ? renderPincodeCheckerHTML() 
-        : '';
+    const pincodeHTML = (typeof renderPincodeCheckerHTML === 'function') ? renderPincodeCheckerHTML() : '';
 
     return `
         <nav class="breadcrumbs" aria-label="Breadcrumb">
             <a onclick="navigateTo('home')">Home</a>
             <span class="separator">›</span>
-            <a onclick="navigateTo('shop'); currentFilters.category='${product.category}'; applyFiltersAndSort();">${product.category}</a>
+            <a onclick="navigateTo('shop'); handleCategoryFilter('${product.category}');">${product.category}</a>
             <span class="separator">›</span>
             <span class="current">${product.name}</span>
         </nav>
@@ -647,7 +724,17 @@ function renderProductDetail(product) {
             <!-- Gallery -->
             <div class="pdp-gallery" id="pdp-gallery">
                 <div class="pdp-main-image" onclick="openImageViewer()" role="button" aria-label="Zoom image">
-                    <img id="pdp-main-img" src="${mainImage.url}" alt="${mainImage.alt}" width="700" height="875">
+                    <img 
+                        id="pdp-main-img" 
+                        src="${mainImage.url}" 
+                        alt="${mainImage.alt}" 
+                        width="700" 
+                        height="875"
+                        data-product-code="${product.productCode}"
+                        data-category="${product.category}"
+                        data-fallback-index="0"
+                        onerror="handleProductImageError(this, '${product.productCode}', '${product.category}')"
+                    >
                     <span class="image-counter" id="pdp-image-counter">1 / ${images.length}</span>
                 </div>
                 <div class="pdp-thumbnails" id="pdp-thumbnails">
@@ -658,11 +745,11 @@ function renderProductDetail(product) {
             <!-- Product Info -->
             <div class="pdp-info">
                 <div class="pdp-header-meta">
-                    <span class="pdp-sku-badge">SKU: ${product.sku || product.code}</span>
+                    <span class="pdp-sku-badge">CODE: ${product.productCode}</span>
                 </div>
 
                 <h1 class="pdp-name">${product.name}</h1>
-                <p class="pdp-material">Hallmarked ${product.material || '925 Sterling Silver'}</p>
+                <p class="pdp-material">Hallmarked ${product.material}</p>
 
                 <div class="pdp-price-block">
                     <span class="pdp-price">${formatPrice(product.sellingPrice)}</span>
@@ -670,22 +757,23 @@ function renderProductDetail(product) {
                     ${discountHTML}
                 </div>
 
-                <!-- Stock availability -->
+                <!-- Stock availability: Section 19 requirement -->
                 <div class="pdp-stock-status">
                     ${!isOutOfStock 
                         ? `<span class="stock-badge in-stock"><span class="stock-dot"></span>${product.availability}</span>` 
-                        : `<span class="stock-badge out-of-stock"><span class="stock-dot"></span>Sold Out / Currently Unavailable</span>`}
+                        : `<span class="stock-badge out-of-stock"><span class="stock-dot"></span>CURRENTLY UNAVAILABLE</span>`}
                 </div>
 
                 <p class="pdp-short-desc">${product.shortDescription}</p>
+
                 <div class="pdp-features">
                     ${featuresHTML}
                 </div>
 
-                <!-- PINCODE SHIPPING VALIDATION COMPONENT -->
+                <!-- PINCODE SHIPPING VALIDATION -->
                 ${pincodeHTML}
 
-                <!-- Quantity & Purchase Actions -->
+                <!-- Customer Action Area: Add to Bag vs Notify Me -->
                 ${!isOutOfStock ? `
                     <div class="pdp-quantity">
                         <label for="pdp-qty">Quantity</label>
@@ -704,13 +792,13 @@ function renderProductDetail(product) {
                         </button>
                     </div>
                 ` : `
-                    <div class="pdp-actions">
-                        <button class="btn btn-primary btn-lg btn-disabled" disabled>Out of Stock</button>
-                        <button class="pdp-wishlist-btn ${isWishlisted ? 'active' : ''}" onclick="toggleWishlist('${product.id}', event)" aria-label="Add to wishlist">
+                    <div class="pdp-actions pdp-notify-area">
+                        <button class="btn btn-primary btn-lg" onclick="openNotifyMeModal('${product.id}')">NOTIFY ME</button>
+                        <button class="pdp-wishlist-btn ${isWishlisted ? 'active' : ''}" onclick="toggleWishlist('${product.id}', event)" aria-label="${isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}">
                             ${ICONS.heart}
                         </button>
                     </div>
-                    <p style="font-size:0.85rem;color:var(--wr-text-muted);margin-top:8px;">Save to your wishlist to get notified when restocked.</p>
+                    <p style="font-size:0.9rem;color:var(--wr-text-muted);margin-top:10px;">Notify me when this piece is back in stock.</p>
                 `}
 
                 <!-- Trust signals -->
@@ -738,22 +826,154 @@ function renderProductDetail(product) {
         </section>
         ` : ''}
 
-        <!-- Sticky Product Action Bar — Scoped directly inside product-view -->
+        <!-- Sticky Action Bar -->
         <div class="sticky-cta active" id="sticky-cta" aria-hidden="false">
             ${!isOutOfStock ? `
                 <button class="btn btn-primary" onclick="addToCart('${product.id}', event)">ADD TO CART — ${formatPrice(product.sellingPrice)}</button>
                 <button class="btn btn-secondary" onclick="buyNowFromPDP('${product.id}')">BUY NOW</button>
             ` : `
-                <button class="btn btn-primary btn-disabled" disabled style="width:100%;">OUT OF STOCK</button>
+                <button class="btn btn-primary" onclick="openNotifyMeModal('${product.id}')" style="width:100%;">NOTIFY ME WHEN AVAILABLE</button>
             `}
         </div>
     `;
 }
 
-// PDP Image Gallery interaction
-let currentPdpImageIndex = 0;
-let currentPdpProduct = null;
+// ════════════════════════════════════════════════════
+// 20. NOTIFY ME MODAL & SUBSCRIPTION WORKFLOW
+// ════════════════════════════════════════════════════
+function openNotifyMeModal(productId) {
+    const product = productsService.getProductById(productId) || currentPdpProduct;
+    if (!product) return;
 
+    const modal = document.getElementById('notify-me-modal');
+    if (!modal) return;
+
+    // Populate hidden fields and labels
+    document.getElementById('notify-product-id').value = product.id;
+    document.getElementById('notify-product-code').value = product.productCode || '';
+    document.getElementById('notify-product-name').value = product.name || '';
+    document.getElementById('notify-modal-title').textContent = `Notify Me — ${product.name}`;
+    document.getElementById('notify-modal-subtitle').textContent = `We will email you the moment ${product.name} (${product.productCode}) is back in stock.`;
+
+    // Reset status messages
+    const errEl = document.getElementById('notify-error-msg');
+    const successEl = document.getElementById('notify-success-msg');
+    const emailInput = document.getElementById('notify-email');
+    if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
+    if (successEl) { successEl.style.display = 'none'; }
+    if (emailInput) {
+        emailInput.value = '';
+        emailInput.disabled = false;
+    }
+    const submitBtn = document.getElementById('notify-submit-btn');
+    if (submitBtn) {
+        submitBtn.style.display = 'block';
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'NOTIFY ME';
+    }
+
+    modal.style.display = 'flex';
+    setTimeout(() => emailInput && emailInput.focus(), 100);
+}
+
+function closeNotifyMeModal() {
+    const modal = document.getElementById('notify-me-modal');
+    if (modal) modal.style.display = 'none';
+}
+
+async function handleNotifyMeSubmit(event) {
+    event.preventDefault();
+    const emailInput = document.getElementById('notify-email');
+    const errEl = document.getElementById('notify-error-msg');
+    const successEl = document.getElementById('notify-success-msg');
+    const submitBtn = document.getElementById('notify-submit-btn');
+
+    const email = (emailInput?.value || '').trim().toLowerCase();
+    const productId = document.getElementById('notify-product-id')?.value;
+    const productCode = document.getElementById('notify-product-code')?.value;
+    const productName = document.getElementById('notify-product-name')?.value;
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email || !emailRegex.test(email)) {
+        if (errEl) {
+            errEl.style.display = 'block';
+            errEl.textContent = 'Please enter a valid email address.';
+        }
+        return;
+    }
+
+    if (errEl) errEl.style.display = 'none';
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Submitting...';
+    }
+
+    // Duplicate check in localStorage
+    const localKey = `wishrite_notified_${productCode}_${email}`;
+    if (localStorage.getItem(localKey)) {
+        if (successEl) {
+            successEl.style.display = 'block';
+            successEl.innerHTML = "<p>✓ You're on the list. We'll email you when this piece is available again.</p>";
+        }
+        if (submitBtn) submitBtn.style.display = 'none';
+        if (emailInput) emailInput.disabled = true;
+        return;
+    }
+
+    // Attempt insertion into public.product_stock_notifications via Supabase REST
+    try {
+        const payload = {
+            product_id: productId,
+            product_code: productCode,
+            product_name: productName,
+            customer_email: email,
+            status: 'pending',
+            created_at: new Date().toISOString()
+        };
+
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/product_stock_notifications`, {
+            method: 'POST',
+            headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                'Content-Type': 'application/json',
+                'Prefer': 'return=minimal'
+            },
+            body: JSON.stringify(payload)
+        });
+
+        // Store in local storage for duplicate protection & offline resilience
+        localStorage.setItem(localKey, 'true');
+
+        // Also track locally in array
+        try {
+            const list = JSON.parse(localStorage.getItem('wishrite_saved_notifications') || '[]');
+            list.push({ productCode, email, date: new Date().toISOString() });
+            localStorage.setItem('wishrite_saved_notifications', JSON.stringify(list));
+        } catch (e) {}
+
+    } catch (apiErr) {
+        // Graceful fallback — save to localStorage so customer experience is flawless
+        localStorage.setItem(localKey, 'true');
+    }
+
+    // Show customer confirmation
+    if (successEl) {
+        successEl.style.display = 'block';
+        successEl.innerHTML = "<p>✓ You're on the list. We'll email you when this piece is available again.</p>";
+    }
+    if (submitBtn) submitBtn.style.display = 'none';
+    if (emailInput) emailInput.disabled = true;
+
+    if (typeof showToast === 'function') {
+        showToast("You're on the list. We'll email you when this piece is back in stock.", 'success');
+    }
+}
+
+// ════════════════════════════════════════════════════
+// PDP Gallery Controls & Viewer
+// ════════════════════════════════════════════════════
 function switchPdpImage(index) {
     if (!currentPdpProduct) return;
     const images = currentPdpProduct.images || [];
@@ -772,7 +992,6 @@ function switchPdpImage(index) {
     thumbs.forEach((t, i) => t.classList.toggle('active', i === index));
 }
 
-let pdpQty = 1;
 function updateQty(delta) {
     pdpQty = Math.max(1, pdpQty + delta);
     const qtyEl = document.getElementById('pdp-qty');

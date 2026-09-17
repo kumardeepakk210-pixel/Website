@@ -88,12 +88,39 @@ let currentFilters = {
 
 let currentSort = 'featured';
 
-function applyFiltersAndSort() {
+async function applyFiltersAndSort() {
+    const countEl = document.getElementById('shop-product-count');
+    
+    // Show loading skeleton if products are currently being fetched
+    if (typeof productsService !== 'undefined' && (productsService.isLoading || productsDB.length === 0)) {
+        if (countEl) countEl.textContent = 'Loading products...';
+        if (typeof renderProductLoadingSkeletons === 'function') {
+            renderProductLoadingSkeletons('shop-grid-container', 8);
+        }
+    }
+
+    try {
+        if (typeof productsService !== 'undefined') {
+            await productsService.ensureLoaded();
+        }
+    } catch (err) {
+        if (countEl) countEl.textContent = 'Unable to load products';
+        if (typeof renderProductsToContainer === 'function') {
+            renderProductsToContainer([], 'shop-grid-container');
+        }
+        return;
+    }
+
     let filtered = [...productsDB];
 
-    // Apply category filter
+    // Apply category filter (normalized matching)
     if (currentFilters.category && currentFilters.category !== 'All') {
-        filtered = filtered.filter(p => p.category === currentFilters.category);
+        const targetCat = (typeof normalizeCategory === 'function' ? normalizeCategory(currentFilters.category) : currentFilters.category).toLowerCase();
+        filtered = filtered.filter(p => {
+            const pCat = (p.category || '').toLowerCase();
+            const pRaw = (p.rawCategory || '').trim().toLowerCase();
+            return pCat === targetCat || pRaw === targetCat || (typeof normalizeCategory === 'function' && normalizeCategory(p.rawCategory).toLowerCase() === targetCat);
+        });
     }
 
     // Apply collection filter
@@ -103,7 +130,7 @@ function applyFiltersAndSort() {
 
     // Apply occasion filter
     if (currentFilters.occasion && currentFilters.occasion !== 'All') {
-        filtered = filtered.filter(p => p.occasion && p.occasion.includes(currentFilters.occasion));
+        filtered = filtered.filter(p => p.occasions && p.occasions.includes(currentFilters.occasion));
     }
 
     // Apply price range filter
@@ -115,7 +142,7 @@ function applyFiltersAndSort() {
         });
     }
 
-    // Apply sort
+    // Apply sort: Featured, Newest, Price Low to High, Price High to Low, Name A-Z
     switch (currentSort) {
         case 'price-low':
             filtered.sort((a, b) => a.sellingPrice - b.sellingPrice);
@@ -124,19 +151,25 @@ function applyFiltersAndSort() {
             filtered.sort((a, b) => b.sellingPrice - a.sellingPrice);
             break;
         case 'newest':
-            filtered.sort((a, b) => (b.isNew ? 1 : 0) - (a.isNew ? 1 : 0));
+            filtered.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+            break;
+        case 'name-asc':
+            filtered.sort((a, b) => a.name.localeCompare(b.name));
             break;
         case 'featured':
         default:
-            filtered.sort((a, b) => (b.isBestseller ? 1 : 0) - (a.isBestseller ? 1 : 0));
+            filtered.sort((a, b) => (b.salesCount - a.salesCount) || (b.isBestseller ? 1 : 0) - (a.isBestseller ? 1 : 0));
             break;
     }
 
-    renderProductsToContainer(filtered, 'shop-grid-container');
+    if (typeof renderProductsToContainer === 'function') {
+        renderProductsToContainer(filtered, 'shop-grid-container');
+    }
 
-    // Update count
-    const countEl = document.getElementById('shop-product-count');
-    if (countEl) countEl.textContent = `${filtered.length} product${filtered.length !== 1 ? 's' : ''}`;
+    // Update count accurately — never show 0 while loading
+    if (countEl) {
+        countEl.textContent = `${filtered.length} product${filtered.length !== 1 ? 's' : ''}`;
+    }
 }
 
 function handleCategoryFilter(category) {

@@ -1,9 +1,30 @@
 /* ============================================
    WISHRITE — WISHLIST
-   Wishlist state management + rendering
+   Wishlist state management, rendering & localStorage persistence
    ============================================ */
 
-let wishlist = new Set();
+const WISHLIST_STORAGE_KEY = 'wishrite_wishlist_items';
+
+function loadSavedWishlist() {
+    try {
+        const raw = localStorage.getItem(WISHLIST_STORAGE_KEY);
+        if (raw) {
+            const arr = JSON.parse(raw);
+            if (Array.isArray(arr)) {
+                return new Set(arr);
+            }
+        }
+    } catch (e) {}
+    return new Set();
+}
+
+function saveWishlist() {
+    try {
+        localStorage.setItem(WISHLIST_STORAGE_KEY, JSON.stringify(Array.from(wishlist)));
+    } catch (e) {}
+}
+
+let wishlist = loadSavedWishlist();
 
 function toggleWishlist(id, event) {
     if (event) {
@@ -17,6 +38,7 @@ function toggleWishlist(id, event) {
         wishlist.add(id);
     }
 
+    saveWishlist();
     updateWishlistCount();
     refreshProductCards();
 
@@ -54,14 +76,17 @@ function renderWishlist() {
 }
 
 function refreshProductCards() {
-    // Re-render all visible product cards to reflect wishlist state
-    const currentView = getCurrentView();
+    const currentView = typeof getCurrentView === 'function' ? getCurrentView() : 'home';
     if (currentView === 'home') {
-        renderProductsToContainer(productsDB.filter(p => p.isBestseller), 'bestsellers-container');
-        renderProductsToContainer(productsDB.filter(p => p.isNew), 'new-arrivals-container');
+        if (typeof renderHomeSections === 'function') renderHomeSections();
     } else if (currentView === 'shop') {
-        applyFiltersAndSort();
+        if (typeof applyFiltersAndSort === 'function') applyFiltersAndSort();
     } else if (currentView === 'wishlist') {
         renderWishlist();
     }
 }
+
+// Initial badge update
+document.addEventListener('DOMContentLoaded', () => {
+    updateWishlistCount();
+});

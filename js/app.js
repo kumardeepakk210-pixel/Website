@@ -6,7 +6,7 @@
    ============================================ */
 
 // All customer-facing storefront views
-const views = ['home', 'shop', 'about', 'login', 'register', 'profile', 'cart', 'wishlist', 'product'];
+const views = ['home', 'shop', 'collections', 'about', 'login', 'register', 'profile', 'cart', 'wishlist', 'product'];
 
 function getCurrentView() {
     for (const v of views) {
@@ -43,7 +43,7 @@ function navigateTo(viewId, param, pushHistory = true) {
     }
 
     // Set active nav
-    const navMap = { home: 'nav-home', shop: 'nav-shop', about: 'nav-about' };
+    const navMap = { home: 'nav-home', shop: 'nav-shop', collections: 'nav-collections', about: 'nav-about' };
     const activeNav = document.getElementById(navMap[viewId]);
     if (activeNav) activeNav.classList.add('active');
 
@@ -60,6 +60,11 @@ function navigateTo(viewId, param, pushHistory = true) {
             applyFiltersAndSort();
             setShopSEO(currentFilters.category);
             if (pushHistory) { try { history.pushState({ view: 'shop' }, '', '/shop'); } catch(e){} }
+            break;
+        case 'collections':
+            renderCollectionsPage();
+            if (typeof setCollectionsSEO === 'function') setCollectionsSEO();
+            if (pushHistory) { try { history.pushState({ view: 'collections' }, '', '/collections'); } catch(e){} }
             break;
         case 'product':
             handleProductViewNavigation(param, targetView, pushHistory);
@@ -223,28 +228,112 @@ function updateStickyCTA(product) {
 }
 
 // Render home page sections with live Supabase products or skeletons
-function renderHomeSections() {
+async function renderHomeSections() {
     if (!productsDB || productsDB.length === 0) {
-        if (typeof renderProductSkeletons === 'function') {
-            renderProductSkeletons('bestsellers-container', 4);
-            renderProductSkeletons('new-arrivals-container', 4);
+        if (typeof renderProductLoadingSkeletons === 'function') {
+            renderProductLoadingSkeletons('bestsellers-container', 4);
+            renderProductLoadingSkeletons('new-arrivals-container', 4);
         }
-        return;
+        try {
+            if (typeof productsService !== 'undefined') {
+                await productsService.ensureLoaded();
+            }
+        } catch (e) {
+            return;
+        }
     }
 
-    const inStock = productsDB.filter(p => p.stockQuantity > 0 && p.status !== 'Out of Stock');
-    const pool = inStock.length > 0 ? inStock : productsDB;
+    const bestsellers = (typeof productsService !== 'undefined') 
+        ? productsService.getBestSellers(8) 
+        : productsDB.slice(0, 8);
+    const newArrivals = (typeof productsService !== 'undefined') 
+        ? productsService.getNewArrivals(8) 
+        : productsDB.slice(0, 8);
 
-    // Bestsellers: prefer marked bestsellers or top stock
-    let bestsellers = pool.filter(p => p.isBestseller);
-    if (bestsellers.length < 4) bestsellers = pool.slice(0, 8);
-    renderProductsToContainer(bestsellers.slice(0, 8), 'bestsellers-container');
+    if (typeof renderProductsToContainer === 'function') {
+        renderProductsToContainer(bestsellers, 'bestsellers-container');
+        renderProductsToContainer(newArrivals, 'new-arrivals-container');
+    }
+}
 
-    // New Arrivals: recent or newly added
-    let newArrivals = pool.filter(p => p.isNew);
-    if (newArrivals.length < 4) newArrivals = pool.slice(8, 16);
-    if (newArrivals.length === 0) newArrivals = pool.slice(0, 8);
-    renderProductsToContainer(newArrivals.slice(0, 8), 'new-arrivals-container');
+/**
+ * Render dedicated Collections Page connected to real product data
+ */
+function renderCollectionsPage() {
+    const container = document.getElementById('collections-view');
+    if (!container) return;
+
+    const collections = [
+        {
+            name: '925 Silver Signature Collection',
+            tagline: 'Timeless Hallmarked Essentials',
+            description: 'The foundation of true silver luxury. Classic chains, rope designs, minimalist balis, and timeless bracelets crafted in pure 925 sterling silver.',
+            image: 'https://images.unsplash.com/photo-1599643477877-530eb83abc8e?auto=format&fit=crop&w=800&q=80',
+            queryCol: '925 Silver Signature Collection'
+        },
+        {
+            name: 'Daily Elegance',
+            tagline: 'Workday Minimalism & Daily Grace',
+            description: 'Understated brilliance designed for everyday wear. Lightweight toe rings, sleek silver bands, refined studs, and delicate nose pins for effortless daily style.',
+            image: 'https://images.unsplash.com/photo-1603561591411-07134e71a2a9?auto=format&fit=crop&w=800&q=80',
+            queryCol: 'Daily Elegance'
+        },
+        {
+            name: 'The Occasion & Evening Edit',
+            tagline: 'Luminous Statements for Celebrated Moments',
+            description: 'Crafted to captivate. Intricate jewellery sets, sparkling drop earrings, and statement chokers designed to elevate festive celebrations and special occasions.',
+            image: 'https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?auto=format&fit=crop&w=800&q=80',
+            queryCol: 'The Occasion & Evening Edit'
+        },
+        {
+            name: 'Modern Solitaires & Keepsakes',
+            tagline: 'Auspicious Silver & Meaningful Gifting',
+            description: 'Timeless tokens of love, auspicious pure silver rakhis, radiant solitaire motifs, and keepsake pendants designed to celebrate life’s most cherished moments.',
+            image: 'https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?auto=format&fit=crop&w=800&q=80',
+            queryCol: 'Modern Solitaires & Keepsakes'
+        }
+    ];
+
+    const cardsHTML = collections.map(col => {
+        const count = typeof productsService !== 'undefined' 
+            ? productsService.getProductsByCollection(col.queryCol).length 
+            : 0;
+        return `
+            <div class="collection-feature-card" style="background:#fff;border:1px solid var(--wr-border);border-radius:6px;overflow:hidden;transition:transform 0.3s ease, box-shadow 0.3s ease;display:flex;flex-direction:column;">
+                <div class="collection-feature-image" style="position:relative;aspect-ratio:16/10;overflow:hidden;">
+                    <img src="${col.image}" alt="${col.name}" loading="lazy" width="600" height="400" style="width:100%;height:100%;object-fit:cover;">
+                    <span class="collection-badge" style="position:absolute;bottom:12px;right:12px;background:rgba(94,52,53,0.92);color:#fff;font-size:0.75rem;padding:4px 10px;border-radius:2px;letter-spacing:0.5px;font-weight:500;">
+                        ${count} Pieces Available
+                    </span>
+                </div>
+                <div class="collection-feature-body" style="padding:24px;display:flex;flex-direction:column;flex:1;">
+                    <span class="sub-label" style="font-size:0.75rem;letter-spacing:2px;color:var(--wr-primary);text-transform:uppercase;font-weight:600;margin-bottom:6px;">${col.tagline}</span>
+                    <h3 class="collection-feature-title" style="font-family:var(--wr-font-heading);font-size:1.4rem;color:var(--wr-primary);margin-bottom:10px;">${col.name}</h3>
+                    <p class="collection-feature-desc" style="font-size:0.9rem;color:var(--wr-text-muted);line-height:1.6;margin-bottom:20px;flex:1;">${col.description}</p>
+                    <button class="btn btn-primary" onclick="navigateTo('shop'); currentFilters.collection='${col.queryCol}'; currentFilters.category='All'; applyFiltersAndSort(); document.getElementById('shop-title').textContent='${col.name}';">
+                        Explore Collection
+                    </button>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    container.innerHTML = `
+        <div class="page-header" style="text-align:center;padding:60px 20px 40px;background:var(--wr-cream);">
+            <div class="container">
+                <span class="sub-label">WishRite Curations</span>
+                <h1 style="font-family:var(--wr-font-heading);font-size:2.4rem;color:var(--wr-primary);margin-top:8px;">Curated Collections</h1>
+                <p style="color:var(--wr-text-muted);max-width:600px;margin:12px auto 0;font-size:1.05rem;">
+                    Every collection embodies thoughtful design, hallmarked 925 purity, and effortless silver luxury.
+                </p>
+            </div>
+        </div>
+        <div class="container" style="padding:40px 20px 80px;">
+            <div class="collections-grid-layout" style="display:grid;grid-template-columns:repeat(auto-fit, minmax(320px, 1fr));gap:32px;">
+                ${cardsHTML}
+            </div>
+        </div>
+    `;
 }
 
 // ── Browser URL Navigation & History Handling ──
@@ -271,6 +360,9 @@ function handleInitialURLRoute(pushHistory = false) {
         }
     } else if (path === '/shop') {
         navigateTo('shop', null, pushHistory);
+        return;
+    } else if (path === '/collections') {
+        navigateTo('collections', null, pushHistory);
         return;
     } else if (path === '/about') {
         navigateTo('about', null, pushHistory);
