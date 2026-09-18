@@ -111,13 +111,194 @@ function setSupabaseProductImages(records) {
     });
 }
 
+// In-flight Promise tracker to deduplicate concurrent Storage list requests
+const inFlightResolutions = new Map();
+
 /**
- * Get display images for a product
+ * CENTRAL PRODUCT IMAGE RESOLVER
+ * Discovers and resolves images from Supabase Storage for any product.
+ * Maps: product_code -> product-images/{product_code}/
+ * 
+ * Follows exact specifications:
+ * 1. Uses supabase.storage.from('product-images').list(productCode)
+ * 2. Filters for valid image files: webp, jpg, jpeg, png
+ * 3. Ignores: .folder, txt, metadata files, and non-image files
+ * 4. Generates public URLs dynamically via supabase.storage.from('product-images').getPublicUrl(path)
+ * 5. Orders images deterministically (first image is main, remaining are gallery thumbnails)
+ * 6. Graceful fallback cascade: never throws or breaks the product page
+ * 
+ * @param {string|object} productOrCode - Product code string or product object
+ * @returns {Promise<Array<{path: string, url: string, filename: string, name: string, type: string, isPrimary: boolean, alt: string}>>}
+ */
+async function resolveProductImages(productOrCode) {
+    if (!productOrCode) return [];
+
+    let cleanCode = '';
+    let productObj = null;
+
+    if (typeof productOrCode === 'string') {
+        cleanCode = productOrCode.trim();
+    } else if (typeof productOrCode === 'object') {
+        productObj = productOrCode;
+        cleanCode = (productOrCode.productCode || productOrCode.product_code || productOrCode.sku || productOrCode.code || '').trim();
+    }
+
+    if (!cleanCode) return [];
+
+    // Return cached result if already resolved
+    if (resolvedImageCache.has(cleanCode)) {
+        const cached = resolvedImageCache.get(cleanCode);
+        if (Array.isArray(cached) && cached.length > 0) {
+            return cached;
+        }
+    }
+
+    // Return in-flight promise if a request is already pending
+    if (inFlightResolutions.has(cleanCode)) {
+        return inFlightResolutions.get(cleanCode);
+    }
+
+    const resolutionPromise = (async () => {
+        try {
+            const client = window.supabaseClient || (typeof supabaseClient !== 'undefined' ? supabaseClient : null);
+            let files = [];
+
+            if (client && client.storage) {
+                const { data, error } = await client.storage
+                    .from(STORAGE_BUCKET)
+                    .list(cleanCode, {
+                        limit: 100,
+                        offset: 0,
+                        sortBy: { column: 'name', order: 'asc' }
+                    });
+
+                if (!error && Array.isArray(data)) {
+                    files = data;
+                }
+            }
+
+            // Filter only valid image files: webp, jpg, jpeg, png
+            // Ignore .folder, txt, metadata files, dotfiles, and non-image files
+            const validImageFiles = files.filter(f => {
+                if (!f || !f.name) return false;
+                const name = f.name.trim().toLowerCase();
+                if (name.startsWith('.')) return false;
+                if (name.endsWith('.folder') || name.endsWith('.txt') || name.endsWith('.json') || name.endsWith('.metadata')) return false;
+                return (
+                    name.endsWith('.webp') ||
+                    name.endsWith('.jpg') ||
+                    name.endsWith('.jpeg') ||
+                    name.endsWith('.png')
+                );
+            });
+
+            // Deterministic sort: upload/created order if available, else alphabetical by filename
+            validImageFiles.sort((a, b) => {
+                if (a.created_at && b.created_at) {
+                    const diff = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+                    if (diff !== 0) return diff;
+                }
+                return a.name.localeCompare(b.name);
+            });
+
+            const prodName = productObj?.name || productObj?.product_name || cleanCode;
+
+            if (validImageFiles.length > 0) {
+                // Dynamically generate public URLs for all discovered images
+                const resolvedList = validImageFiles.map((f, idx) => {
+                    const storagePath = `${cleanCode}/${f.name}`;
+                    const publicUrl = getSupabaseStoragePublicUrl(storagePath);
+                    return {
+                        path: storagePath,
+                        url: publicUrl,
+                        filename: f.name,
+                        name: f.name,
+                        type: idx === 0 ? 'main' : 'gallery',
+                        isPrimary: idx === 0,
+                        productCode: cleanCode,
+                        alt: `${prodName} — View ${idx + 1}`
+                    };
+                });
+
+                resolvedImageCache.set(cleanCode, resolvedList);
+
+                // Update in-memory productsDB if available
+                if (typeof productsDB !== 'undefined' && Array.isArray(productsDB)) {
+                    const match = productsDB.find(p => p.productCode === cleanCode);
+                    if (match) {
+                        match.images = resolvedList;
+                        match.image = resolvedList[0].url;
+                    }
+                }
+
+                // Update rendered product cards on screen
+                updateRenderedProductCards(cleanCode, resolvedList[0].url);
+
+                return resolvedList;
+            }
+
+            // Fallback: Check local storage registry (from inventory app sync if available)
+            try {
+                const raw = localStorage.getItem('wishrite_custom_product_images');
+                if (raw) {
+                    const reg = JSON.parse(raw);
+                    if (reg && reg[cleanCode] && Array.isArray(reg[cleanCode]) && reg[cleanCode].length > 0) {
+                        const localImgs = reg[cleanCode].map((item, idx) => ({
+                            path: `${cleanCode}/${idx + 1}`,
+                            url: item.url,
+                            filename: `${idx + 1}.webp`,
+                            name: `${idx + 1}.webp`,
+                            type: idx === 0 ? 'main' : 'gallery',
+                            isPrimary: idx === 0,
+                            productCode: cleanCode,
+                            alt: item.alt || `${prodName} — View ${idx + 1}`
+                        }));
+                        resolvedImageCache.set(cleanCode, localImgs);
+                        return localImgs;
+                    }
+                }
+            } catch (e) {}
+
+            // Fallback: Return luxury category placeholder
+            const placeholder = generateProductPlaceholder(productObj || { productCode: cleanCode, product_code: cleanCode });
+            return [placeholder];
+        } catch (err) {
+            console.warn(`[WishRite Storage] resolveProductImages error for ${cleanCode}:`, err);
+            const placeholder = generateProductPlaceholder(productObj || { productCode: cleanCode, product_code: cleanCode });
+            return [placeholder];
+        } finally {
+            inFlightResolutions.delete(cleanCode);
+        }
+    })();
+
+    inFlightResolutions.set(cleanCode, resolutionPromise);
+    return resolutionPromise;
+}
+window.resolveProductImages = resolveProductImages;
+
+/**
+ * Update rendered product cards across all pages when images resolve
+ */
+function updateRenderedProductCards(productCode, mainImageUrl) {
+    if (!productCode || !mainImageUrl) return;
+    const imgs = document.querySelectorAll(`img[data-product-code="${productCode}"]`);
+    imgs.forEach(img => {
+        if (img.id === 'pdp-main-img') return; // Handled by PDP gallery updater
+        if (img.src !== mainImageUrl) {
+            img.src = mainImageUrl;
+            img.classList.remove('is-placeholder-img');
+        }
+    });
+}
+window.updateRenderedProductCards = updateRenderedProductCards;
+
+/**
+ * Get display images for a product (synchronous accessor with async background discovery)
  * Priority:
- * 1. Supabase product_images table records (ordered by primary / sort_order)
- * 2. Product's direct image_url property
- * 3. Product's product_media_urls array
- * 4. Supabase Storage public URL: product-images/${product_code}/main.webp
+ * 1. Supabase Storage resolved cache (from resolveProductImages)
+ * 2. Supabase product_images table records (if present)
+ * 3. Product's direct image_url property
+ * 4. Product's product_media_urls array
  * 5. Luxury SVG vector placeholder tailored to category
  */
 function getProductImages(product) {
@@ -126,9 +307,16 @@ function getProductImages(product) {
     const productCode = (product.productCode || product.sku || product.code || product.product_code || '').trim();
     const id = product.id;
     const name = product.name || product.product_name || 'WishRite Silver Jewellery';
-    const category = product.category || 'Jewellery';
 
-    // 1. Check Supabase product_images map
+    // 1. Check resolved image cache from Supabase Storage
+    if (productCode && resolvedImageCache.has(productCode)) {
+        const cached = resolvedImageCache.get(productCode);
+        if (Array.isArray(cached) && cached.length > 0 && !cached[0].isPlaceholder) {
+            return cached;
+        }
+    }
+
+    // 2. Check Supabase product_images map (if populated from db table)
     if (id && productImagesMap.has(id) && productImagesMap.get(id).length > 0) {
         return productImagesMap.get(id);
     }
@@ -136,7 +324,7 @@ function getProductImages(product) {
         return productImagesMap.get(productCode);
     }
 
-    // 2. Check product's direct image_url property (if it exists in DB)
+    // 3. Check product's direct image_url property (if exists in DB)
     if (product.image_url && typeof product.image_url === 'string') {
         const fullUrl = product.image_url.startsWith('http') 
             ? product.image_url 
@@ -149,7 +337,7 @@ function getProductImages(product) {
         }];
     }
 
-    // 3. Check product_media_urls array
+    // 4. Check product_media_urls array
     if (Array.isArray(product.product_media_urls) && product.product_media_urls.length > 0) {
         return product.product_media_urls.map((url, idx) => {
             const rawUrl = typeof url === 'string' ? url : url.url;
@@ -163,43 +351,12 @@ function getProductImages(product) {
         });
     }
 
-    // 4. Primary storage path: product-images/${productCode}/main.webp
-    if (productCode) {
-        const primaryUrl = getSupabaseStoragePublicUrl(`${productCode}/main.webp`);
-        const gallery = [
-            {
-                url: primaryUrl,
-                alt: `${name} — 925 Sterling Silver`,
-                type: 'main',
-                isPrimary: true,
-                productCode: productCode
-            },
-            {
-                url: getSupabaseStoragePublicUrl(`${productCode}/image-2.webp`),
-                alt: `${name} — Detailed View`,
-                type: 'gallery',
-                isPrimary: false,
-                productCode: productCode
-            },
-            {
-                url: getSupabaseStoragePublicUrl(`${productCode}/image-3.webp`),
-                alt: `${name} — Lifestyle View`,
-                type: 'gallery',
-                isPrimary: false,
-                productCode: productCode
-            },
-            {
-                url: getSupabaseStoragePublicUrl(`${productCode}/image-4.webp`),
-                alt: `${name} — Hallmarking & Box`,
-                type: 'gallery',
-                isPrimary: false,
-                productCode: productCode
-            }
-        ];
-        return gallery;
+    // 5. Trigger asynchronous Storage discovery in background for this productCode
+    if (productCode && !resolvedImageCache.has(productCode) && !inFlightResolutions.has(productCode)) {
+        resolveProductImages(product);
     }
 
-    // 5. Fallback placeholder
+    // 6. Return luxury SVG placeholder until Storage discovery resolves
     return [generateProductPlaceholder(product)];
 }
 

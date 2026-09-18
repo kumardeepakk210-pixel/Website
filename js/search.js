@@ -40,12 +40,14 @@ function renderSearchResults(query) {
     }
 
     const lowerQuery = query.toLowerCase();
+    const cleanQuery = lowerQuery.replace(/[^a-z0-9]/g, '');
 
     // Search across live Supabase fields safely
     const productResults = productsDB.filter(p =>
         (p.name && p.name.toLowerCase().includes(lowerQuery)) ||
         (p.category && p.category.toLowerCase().includes(lowerQuery)) ||
         (p.rawCategory && p.rawCategory.toLowerCase().includes(lowerQuery)) ||
+        (p.productCode && (p.productCode.toLowerCase().includes(lowerQuery) || p.productCode.toLowerCase().replace(/[^a-z0-9]/g, '').includes(cleanQuery))) ||
         (p.sku && p.sku.toLowerCase().includes(lowerQuery)) ||
         (p.code && p.code.toLowerCase().includes(lowerQuery)) ||
         (p.material && p.material.toLowerCase().includes(lowerQuery)) ||
@@ -100,7 +102,18 @@ function renderSearchResults(query) {
                 <h3 class="search-results-title">Products</h3>
                 ${productResults.map(p => `
                     <div class="search-result-item" onclick="closeSearch(); navigateTo('product', '${p.slug}')">
-                        <img class="search-result-image" src="${p.images?.[0]?.url || p.image || ''}" alt="${p.name}" loading="lazy" width="56" height="56">
+                        <img 
+                            class="search-result-image" 
+                            src="${p.images?.[0]?.url || p.image || ''}" 
+                            alt="${p.name}" 
+                            loading="lazy" 
+                            width="56" 
+                            height="56"
+                            data-product-code="${p.productCode || ''}"
+                            data-category="${p.category || 'Jewellery'}"
+                            data-fallback-index="0"
+                            onerror="handleProductImageError(this, '${p.productCode || ''}', '${p.category || 'Jewellery'}')"
+                        >
                         <div class="search-result-info">
                             <h4>${p.name}</h4>
                             <span>${formatPrice(p.sellingPrice)} · ${p.material}</span>

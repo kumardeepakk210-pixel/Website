@@ -358,6 +358,15 @@ const productsService = {
 
                 console.info(`✓ Loaded ${mapped.length} active products dynamically from WishRite Supabase database.`);
 
+                // Automatically resolve images from Supabase Storage for all products in catalog
+                if (typeof resolveProductImages === 'function') {
+                    mapped.forEach(p => {
+                        if (p.productCode) {
+                            resolveProductImages(p).catch(() => {});
+                        }
+                    });
+                }
+
                 // Automatically update waiting UI sections across pages
                 try {
                     window.dispatchEvent(new CustomEvent('wishrite:productsLoaded', { detail: { products: mapped } }));
@@ -451,17 +460,24 @@ const productsService = {
 
     getProductByCode(code) {
         if (!code) return null;
-        return productCodeMap.get(String(code).toUpperCase()) || productsDB.find(p => p.productCode?.toUpperCase() === String(code).toUpperCase());
+        const clean = String(code).trim().toUpperCase();
+        return productCodeMap.get(clean) || productsDB.find(p => p.productCode?.toUpperCase() === clean);
     },
 
     getProductById(id) {
         if (!id) return null;
-        return productSlugMap.get(id) || productsDB.find(p => p.id === id || String(p.id) === String(id) || p.productCode === id);
+        return productSlugMap.get(id) || productsDB.find(p => p.id === id || String(p.id) === String(id) || p.productCode?.toUpperCase() === String(id).toUpperCase());
     },
 
     getProductBySlug(slug) {
         if (!slug) return null;
-        return productSlugMap.get(slug) || productsDB.find(p => p.slug === slug || p.id === slug || p.productCode === slug);
+        const s = String(slug).trim().toLowerCase();
+        return productSlugMap.get(slug) || 
+               productSlugMap.get(s) || 
+               productsDB.find(p => (p.slug && p.slug.toLowerCase() === s) || 
+                                    (p.productCode && p.productCode.toLowerCase() === s) || 
+                                    p.id === slug || 
+                                    (p.productCode && p.productCode.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() === s.replace(/[^a-zA-Z0-9]/g, '').toLowerCase()));
     },
 
     getProductsByCategory(category) {
@@ -695,6 +711,19 @@ function renderProductDetail(product) {
     currentPdpProduct = product;
     currentPdpImageIndex = 0;
     pdpQty = 1;
+
+    // Asynchronously resolve real Storage images dynamically for PDP
+    if (typeof resolveProductImages === 'function' && product.productCode) {
+        resolveProductImages(product).then(resolvedImgs => {
+            if (resolvedImgs && resolvedImgs.length > 0 && !resolvedImgs[0].isPlaceholder) {
+                product.images = resolvedImgs;
+                product.image = resolvedImgs[0].url;
+                if (currentPdpProduct && currentPdpProduct.productCode === product.productCode) {
+                    updatePdpGallery(resolvedImgs, product);
+                }
+            }
+        }).catch(() => {});
+    }
 
     // Resolve images
     const images = (typeof getProductImages === 'function') ? getProductImages(product) : (product.images || []);
@@ -1040,6 +1069,46 @@ async function handleNotifyMeSubmit(event) {
 // ════════════════════════════════════════════════════
 // PDP Gallery Controls & Viewer
 // ════════════════════════════════════════════════════
+function updatePdpGallery(images, product) {
+    if (!Array.isArray(images) || images.length === 0) return;
+    const p = product || currentPdpProduct;
+    if (currentPdpProduct) {
+        currentPdpProduct.images = images;
+        currentPdpProduct.image = images[0].url;
+    }
+    currentPdpImageIndex = 0;
+
+    const mainImg = document.getElementById('pdp-main-img');
+    if (mainImg) {
+        mainImg.src = images[0].url;
+        mainImg.alt = images[0].alt || (p?.name || 'WishRite Silver Jewellery');
+        mainImg.classList.remove('is-placeholder-img');
+        mainImg.dataset.fallbackIndex = '0';
+    }
+
+    const thumbsContainer = document.getElementById('pdp-thumbnails');
+    const counter = document.getElementById('pdp-image-counter');
+
+    if (thumbsContainer) {
+        if (images.length > 1) {
+            thumbsContainer.style.display = 'flex';
+            thumbsContainer.innerHTML = images.map((img, i) =>
+                `<div class="pdp-thumbnail ${i === 0 ? 'active' : ''}" onclick="switchPdpImage(${i})" role="button" aria-label="View image ${i+1}">
+                    <img src="${img.url}" alt="${img.alt || (p?.name || '')}" loading="lazy" width="72" height="72" onerror="handleThumbnailError(this)">
+                </div>`
+            ).join('');
+            if (counter) {
+                counter.style.display = 'block';
+                counter.textContent = `1 / ${images.length}`;
+            }
+        } else {
+            thumbsContainer.style.display = 'none';
+            if (counter) counter.style.display = 'none';
+        }
+    }
+}
+window.updatePdpGallery = updatePdpGallery;
+
 function switchPdpImage(index) {
     if (!currentPdpProduct) return;
     const images = currentPdpProduct.images || [];
