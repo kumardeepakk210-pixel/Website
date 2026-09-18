@@ -626,6 +626,8 @@
             img.src =
                 addCacheBuster(imageUrl);
 
+            img.setAttribute('data-original-src', img.src);
+
             img.dataset.imageResolved = 'true';
 
             img.classList.remove(

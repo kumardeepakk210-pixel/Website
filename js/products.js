@@ -636,20 +636,22 @@ function createProductCardHTML(product) {
 
     const imgSrc = product.images?.[0]?.url || product.image || '';
     const imgAlt = product.images?.[0]?.alt || product.name;
+    const prodCode = product.productCode || product.sku || product.code || '';
 
     return `
-        <div class="product-card ${isOutOfStock ? 'out-of-stock' : ''}" onclick="navigateTo('product', '${product.slug}')">
-            <div class="product-card-image">
+        <div class="product-card ${isOutOfStock ? 'out-of-stock' : ''}" data-product-code="${prodCode}" onclick="navigateTo('product', '${product.slug}')">
+            <div class="product-card-image" data-product-code="${prodCode}">
                 <img 
                     src="${imgSrc}" 
                     alt="${imgAlt}" 
                     loading="lazy" 
                     width="400" 
                     height="500"
-                    data-product-code="${product.productCode}"
-                    data-category="${product.category}"
+                    data-product-code="${prodCode}"
+                    data-original-src="${imgSrc}"
+                    data-category="${product.category || 'Jewellery'}"
                     data-fallback-index="0"
-                    onerror="handleProductImageError(this, '${product.productCode}', '${product.category}')"
+                    onerror="handleProductImageError(this, '${prodCode}', '${product.category || 'Jewellery'}')"
                 >
                 ${badgeHTML}
                 <button class="product-card-wishlist ${isWishlisted ? 'active' : ''}" onclick="toggleWishlist('${product.id}', event)" aria-label="${isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}">
@@ -661,7 +663,7 @@ function createProductCardHTML(product) {
             </div>
             <div class="product-card-info">
                 <div class="product-card-meta-line">
-                    <span class="product-card-sku">${product.productCode || ''}</span>
+                    <span class="product-card-sku">${prodCode}</span>
                     <span class="product-card-category">${product.category}</span>
                 </div>
                 <h3 class="product-card-name">${product.name}</h3>
@@ -704,6 +706,16 @@ function renderProductsToContainer(products, containerId) {
     }
 
     container.innerHTML = products.map(createProductCardHTML).join('');
+
+    // Pre-attach resolved images if already present in product model
+    products.forEach(p => {
+        if (p && p.productCode && Array.isArray(p.images) && p.images.length > 0) {
+            const cardImages = container.querySelectorAll(`.product-card-image[data-product-code="${p.productCode}"]`);
+            cardImages.forEach(el => {
+                el._productImages = p.images;
+            });
+        }
+    });
 }
 
 // ════════════════════════════════════════════════════
@@ -1220,3 +1232,331 @@ function closeImageViewer() {
         document.body.style.overflow = '';
     }
 }
+
+/* ============================================================
+   19. PRODUCT CARD HOVER IMAGE SLIDESHOW
+   ------------------------------------------------------------
+   Automatic slideshow cycling through product.images on hover.
+   - Starts when mouse enters .product-card-image
+   - Only cycles if product has >= 2 images
+   - Cycles every 1000ms with a 280ms smooth fade transition
+   - Preloads upcoming images in background
+   - Immediately stops and restores Image 1 on mouseleave
+   - Always restarts from Image 1 on re-hover
+   - Disabled on touch / mobile devices
+   - Purely visual: preserves card navigation, cart & wishlist
+   ============================================================ */
+
+(function initProductCardHoverSlideshow() {
+    'use strict';
+
+    const SLIDESHOW_INTERVAL = 1000;
+    const FADE_DURATION = 280;
+
+    const cardSlideshowMap = new WeakMap();
+    let activeCardImageEl = null;
+    const preloadedUrls = new Set();
+
+    function canHover() {
+        return Boolean(
+            window.matchMedia &&
+            window.matchMedia('(hover: hover) and (pointer: fine)').matches
+        );
+    }
+
+    function preloadImage(url) {
+        if (!url || typeof url !== 'string' || preloadedUrls.has(url)) return;
+        if (url.startsWith('data:image/svg')) return;
+        preloadedUrls.add(url);
+        const img = new Image();
+        img.src = url;
+    }
+
+    function getCardImageUrls(cardImageEl) {
+        const imgEl = cardImageEl.querySelector('img');
+        if (!imgEl) return [];
+
+        const productCode = (
+            cardImageEl.dataset.productCode ||
+            imgEl.dataset.productCode ||
+            cardImageEl.closest('.product-card')?.dataset.productCode ||
+            ''
+        ).trim();
+
+        let rawList = [];
+
+        // 1. Direct property on element (set by resolver or renderer)
+        if (Array.isArray(cardImageEl._productImages) && cardImageEl._productImages.length > 0) {
+            rawList = cardImageEl._productImages;
+        }
+        // 2. Global storage cache in images.js
+        else if (productCode && window.wishriteImageDebug && typeof window.wishriteImageDebug.getCache === 'function') {
+            const cached = window.wishriteImageDebug.getCache(productCode);
+            if (Array.isArray(cached) && cached.length > 0) {
+                rawList = cached;
+            }
+        }
+
+        // 3. Products database / service lookup
+        if ((!rawList || rawList.length === 0) && productCode) {
+            let prod = null;
+            if (typeof productsService !== 'undefined' && typeof productsService.getProductByCode === 'function') {
+                prod = productsService.getProductByCode(productCode);
+            } else if (Array.isArray(window.productsDB)) {
+                prod = window.productsDB.find(p =>
+                    (p.productCode && p.productCode.toUpperCase() === productCode.toUpperCase()) ||
+                    (p.slug && p.slug.toLowerCase() === productCode.toLowerCase()) ||
+                    p.id === productCode
+                );
+            }
+
+            if (prod) {
+                if (typeof window.getProductImages === 'function') {
+                    rawList = window.getProductImages(prod);
+                } else if (Array.isArray(prod.images) && prod.images.length > 0) {
+                    rawList = prod.images;
+                }
+            }
+        }
+
+        if (!Array.isArray(rawList)) return [];
+
+        const urls = [];
+        rawList.forEach(item => {
+            let u = '';
+            if (typeof item === 'string') {
+                u = item.trim();
+            } else if (item && typeof item === 'object') {
+                if (item.isPlaceholder) return;
+                u = (item.url || item.src || '').trim();
+            }
+
+            if (u && !u.startsWith('data:image/svg') && !urls.includes(u)) {
+                urls.push(u);
+            }
+        });
+
+        // Ensure current primary image on card is at index 0 if not already present
+        const currentSrc = (imgEl.getAttribute('data-original-src') || imgEl.src || '').trim();
+        if (currentSrc && !currentSrc.startsWith('data:image/svg') && !urls.includes(currentSrc)) {
+            urls.unshift(currentSrc);
+        }
+
+        return urls;
+    }
+
+    function startSlideshow(cardImageEl) {
+        if (!canHover()) return;
+        if (!cardImageEl) return;
+
+        const imgEl = cardImageEl.querySelector('img');
+        if (!imgEl) return;
+
+        // Stop any other active slideshow
+        if (activeCardImageEl && activeCardImageEl !== cardImageEl) {
+            stopSlideshow(activeCardImageEl);
+        }
+
+        // Clear existing timer on this card
+        stopSlideshow(cardImageEl);
+
+        const urls = getCardImageUrls(cardImageEl);
+        if (urls.length < 2) {
+            // Only 1 image — do nothing
+            return;
+        }
+
+        // Record primary image URL to always restore it reliably
+        const primaryUrl = imgEl.getAttribute('data-original-src') || urls[0] || imgEl.src;
+        if (!imgEl.getAttribute('data-original-src')) {
+            imgEl.setAttribute('data-original-src', primaryUrl);
+        }
+
+        const state = {
+            isActive: true,
+            timer: null,
+            fadeTimer: null,
+            currentIndex: 0,
+            primaryUrl: primaryUrl,
+            imageUrls: urls,
+            failedUrls: new Set(),
+            imgEl: imgEl,
+            cardEl: cardImageEl
+        };
+
+        cardSlideshowMap.set(cardImageEl, state);
+        activeCardImageEl = cardImageEl;
+
+        // Preload next image immediately
+        preloadImage(urls[1]);
+
+        // Schedule first transition after 1000ms
+        scheduleNextSlide(cardImageEl);
+    }
+
+    function scheduleNextSlide(cardImageEl) {
+        const state = cardSlideshowMap.get(cardImageEl);
+        if (!state || !state.isActive) return;
+
+        clearTimeout(state.timer);
+        state.timer = setTimeout(() => {
+            if (!state.isActive) return;
+            cycleNextImage(cardImageEl);
+        }, SLIDESHOW_INTERVAL);
+    }
+
+    function cycleNextImage(cardImageEl) {
+        const state = cardSlideshowMap.get(cardImageEl);
+        if (!state || !state.isActive) return;
+
+        const available = state.imageUrls.filter(u => !state.failedUrls.has(u));
+        if (available.length < 2) {
+            stopSlideshow(cardImageEl);
+            return;
+        }
+
+        const nextIndex = (state.currentIndex + 1) % available.length;
+        const nextUrl = available[nextIndex];
+
+        // Preload upcoming image for subsequent cycle
+        const upcomingIndex = (nextIndex + 1) % available.length;
+        preloadImage(available[upcomingIndex]);
+
+        // Validate image via preloader before initiating DOM change
+        const tester = new Image();
+        tester.onload = () => {
+            if (!state.isActive) return;
+
+            // Fade out current image
+            state.imgEl.classList.add('slideshow-fading');
+
+            clearTimeout(state.fadeTimer);
+            state.fadeTimer = setTimeout(() => {
+                if (!state.isActive) return;
+
+                // Swap src while faded out
+                state.imgEl.src = nextUrl;
+                state.currentIndex = nextIndex;
+
+                // Smoothly fade back in
+                requestAnimationFrame(() => {
+                    if (state.isActive) {
+                        state.imgEl.classList.remove('slideshow-fading');
+                    }
+                });
+
+                // Schedule next slide after transition completes
+                scheduleNextSlide(cardImageEl);
+            }, FADE_DURATION);
+        };
+
+        tester.onerror = () => {
+            if (!state.isActive) return;
+            // Record failed URL and skip to next valid image
+            state.failedUrls.add(nextUrl);
+            const remaining = state.imageUrls.filter(u => !state.failedUrls.has(u));
+            if (remaining.length < 2) {
+                stopSlideshow(cardImageEl);
+            } else {
+                cycleNextImage(cardImageEl);
+            }
+        };
+
+        tester.src = nextUrl;
+    }
+
+    function stopSlideshow(cardImageEl) {
+        if (!cardImageEl) return;
+        const state = cardSlideshowMap.get(cardImageEl);
+        if (!state) return;
+
+        state.isActive = false;
+
+        if (state.timer) {
+            clearTimeout(state.timer);
+            state.timer = null;
+        }
+        if (state.fadeTimer) {
+            clearTimeout(state.fadeTimer);
+            state.fadeTimer = null;
+        }
+
+        if (state.imgEl) {
+            state.imgEl.classList.remove('slideshow-fading');
+            state.imgEl.style.opacity = '';
+
+            // Restore primary image immediately
+            if (state.primaryUrl && state.imgEl.src !== state.primaryUrl) {
+                state.imgEl.src = state.primaryUrl;
+            }
+        }
+
+        // Reset index to 0 so next hover starts from image 1 again
+        state.currentIndex = 0;
+
+        if (activeCardImageEl === cardImageEl) {
+            activeCardImageEl = null;
+        }
+    }
+
+    function stopAllSlideshows() {
+        if (activeCardImageEl) {
+            stopSlideshow(activeCardImageEl);
+        }
+    }
+
+    // Delegated mouse event listeners on document
+    document.addEventListener('mouseover', (e) => {
+        if (!canHover()) return;
+        const cardImageEl = e.target.closest('.product-card-image');
+        if (!cardImageEl) return;
+
+        const fromEl = e.relatedTarget ? e.relatedTarget.closest('.product-card-image') : null;
+        if (fromEl === cardImageEl) return;
+
+        startSlideshow(cardImageEl);
+    }, { passive: true });
+
+    document.addEventListener('mouseout', (e) => {
+        if (!canHover()) return;
+        const cardImageEl = e.target.closest('.product-card-image');
+        if (!cardImageEl) return;
+
+        const toEl = e.relatedTarget ? e.relatedTarget.closest('.product-card-image') : null;
+        if (toEl === cardImageEl) return;
+
+        stopSlideshow(cardImageEl);
+    }, { passive: true });
+
+    // Stop slideshow on window blur, navigation, or popstate
+    window.addEventListener('blur', stopAllSlideshows);
+    window.addEventListener('popstate', stopAllSlideshows);
+
+    // Reactive update when Supabase Storage finishes dynamic image resolution
+    window.addEventListener('wishrite:productImagesResolved', (e) => {
+        const detail = e.detail;
+        if (!detail || !detail.productCode || !Array.isArray(detail.images)) return;
+        const cleanCode = String(detail.productCode).toUpperCase();
+
+        const cardImages = document.querySelectorAll(
+            `.product-card-image[data-product-code="${cleanCode}"], .product-card-image[data-product-code="${detail.productCode}"]`
+        );
+        cardImages.forEach(cardImageEl => {
+            cardImageEl._productImages = detail.images;
+            const img = cardImageEl.querySelector('img');
+            if (img && detail.images[0]?.url) {
+                img.setAttribute('data-original-src', detail.images[0].url);
+            }
+        });
+
+        if (canHover() && detail.images.length > 1 && detail.images[1]?.url) {
+            preloadImage(detail.images[1].url);
+        }
+    });
+
+    window.stopAllProductCardSlideshows = stopAllSlideshows;
+    window.startProductCardSlideshow = startSlideshow;
+    window.stopProductCardSlideshow = stopSlideshow;
+
+})();
+
