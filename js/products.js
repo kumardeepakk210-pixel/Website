@@ -354,19 +354,35 @@ const productsService = {
                 try {
                     localStorage.setItem('wishrite_inventory_cache', JSON.stringify(mapped));
                     localStorage.setItem('wishrite_inventory_sync_time', String(Date.now()));
-                } catch (e) {}
+                } catch (e) { }
 
                 console.info(`✓ Loaded ${mapped.length} active products dynamically from WishRite Supabase database.`);
 
-                // Automatically resolve images from Supabase Storage for all products in catalog
+                // Automatically resolve images from Supabase Storage
+                // for every product using its product code.
                 if (typeof resolveProductImages === 'function') {
                     mapped.forEach(p => {
-                        if (p.productCode) {
-                            resolveProductImages(p).catch(() => {});
-                        }
+                        if (!p.productCode) return;
+
+                        resolveProductImages(p)
+                            .then(images => {
+                                if (
+                                    Array.isArray(images) &&
+                                    images.length > 0
+                                ) {
+                                    p.images = images;
+                                    p.image = images[0]?.url || '';
+                                    p.image_url = images[0]?.url || '';
+                                }
+                            })
+                            .catch(error => {
+                                console.error(
+                                    `[WishRite] Image resolution failed for ${p.productCode}:`,
+                                    error
+                                );
+                            });
                     });
                 }
-
                 // Automatically update waiting UI sections across pages
                 try {
                     window.dispatchEvent(new CustomEvent('wishrite:productsLoaded', { detail: { products: mapped } }));
@@ -379,7 +395,7 @@ const productsService = {
                     if (typeof renderCollectionsPage === 'function' && typeof getCurrentView === 'function' && getCurrentView() === 'collections') {
                         renderCollectionsPage();
                     }
-                } catch (uiErr) {}
+                } catch (uiErr) { }
 
                 return productsDB;
             } catch (err) {
@@ -405,7 +421,7 @@ const productsService = {
                             return productsDB;
                         }
                     }
-                } catch (cacheErr) {}
+                } catch (cacheErr) { }
 
                 throw err;
             } finally {
@@ -472,12 +488,12 @@ const productsService = {
     getProductBySlug(slug) {
         if (!slug) return null;
         const s = String(slug).trim().toLowerCase();
-        return productSlugMap.get(slug) || 
-               productSlugMap.get(s) || 
-               productsDB.find(p => (p.slug && p.slug.toLowerCase() === s) || 
-                                    (p.productCode && p.productCode.toLowerCase() === s) || 
-                                    p.id === slug || 
-                                    (p.productCode && p.productCode.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() === s.replace(/[^a-zA-Z0-9]/g, '').toLowerCase()));
+        return productSlugMap.get(slug) ||
+            productSlugMap.get(s) ||
+            productsDB.find(p => (p.slug && p.slug.toLowerCase() === s) ||
+                (p.productCode && p.productCode.toLowerCase() === s) ||
+                p.id === slug ||
+                (p.productCode && p.productCode.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() === s.replace(/[^a-zA-Z0-9]/g, '').toLowerCase()));
     },
 
     getProductsByCategory(category) {
@@ -639,9 +655,9 @@ function createProductCardHTML(product) {
                 <button class="product-card-wishlist ${isWishlisted ? 'active' : ''}" onclick="toggleWishlist('${product.id}', event)" aria-label="${isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}">
                     ${ICONS.heart}
                 </button>
-                ${!isOutOfStock 
-                    ? `<button class="product-card-quick" onclick="addToCart('${product.id}', event)">Quick Add</button>` 
-                    : `<button class="product-card-quick notify-label" onclick="event.stopPropagation(); openNotifyMeModal('${product.id}')">Notify Me</button>`}
+                ${!isOutOfStock
+            ? `<button class="product-card-quick" onclick="addToCart('${product.id}', event)">Quick Add</button>`
+            : `<button class="product-card-quick notify-label" onclick="event.stopPropagation(); openNotifyMeModal('${product.id}')">Notify Me</button>`}
             </div>
             <div class="product-card-info">
                 <div class="product-card-meta-line">
@@ -713,17 +729,34 @@ function renderProductDetail(product) {
     pdpQty = 1;
 
     // Asynchronously resolve real Storage images dynamically for PDP
-    if (typeof resolveProductImages === 'function' && product.productCode) {
-        resolveProductImages(product).then(resolvedImgs => {
-            if (resolvedImgs && resolvedImgs.length > 0 && !resolvedImgs[0].isPlaceholder) {
+    resolveProductImages(product)
+        .then(resolvedImgs => {
+            if (
+                Array.isArray(resolvedImgs) &&
+                resolvedImgs.length > 0 &&
+                !resolvedImgs[0].isPlaceholder
+            ) {
                 product.images = resolvedImgs;
                 product.image = resolvedImgs[0].url;
-                if (currentPdpProduct && currentPdpProduct.productCode === product.productCode) {
-                    updatePdpGallery(resolvedImgs, product);
+
+                if (
+                    currentPdpProduct &&
+                    currentPdpProduct.productCode ===
+                    product.productCode
+                ) {
+                    updatePdpGallery(
+                        resolvedImgs,
+                        product
+                    );
                 }
             }
-        }).catch(() => {});
-    }
+        })
+        .catch(error => {
+            console.error(
+                `[WishRite] PDP image resolution failed for ${product.productCode}:`,
+                error
+            );
+        });
 
     // Resolve images
     const images = (typeof getProductImages === 'function') ? getProductImages(product) : (product.images || []);
@@ -731,7 +764,7 @@ function renderProductDetail(product) {
 
     // Thumbnail gallery with error handling to gracefully hide failed extra views
     const imagesHTML = images.map((img, i) =>
-        `<div class="pdp-thumbnail ${i === 0 ? 'active' : ''}" onclick="switchPdpImage(${i})" role="button" aria-label="View image ${i+1}">
+        `<div class="pdp-thumbnail ${i === 0 ? 'active' : ''}" onclick="switchPdpImage(${i})" role="button" aria-label="View image ${i + 1}">
             <img src="${img.url}" alt="${img.alt}" loading="lazy" width="72" height="72" onerror="handleThumbnailError(this)">
         </div>`
     ).join('');
@@ -854,9 +887,9 @@ function renderProductDetail(product) {
 
                 <!-- Stock availability: Section 19 requirement -->
                 <div class="pdp-stock-status">
-                    ${!isOutOfStock 
-                        ? `<span class="stock-badge in-stock"><span class="stock-dot"></span>${product.availability}</span>` 
-                        : `<span class="stock-badge out-of-stock"><span class="stock-dot"></span>CURRENTLY UNAVAILABLE</span>`}
+                    ${!isOutOfStock
+            ? `<span class="stock-badge in-stock"><span class="stock-dot"></span>${product.availability}</span>`
+            : `<span class="stock-badge out-of-stock"><span class="stock-dot"></span>CURRENTLY UNAVAILABLE</span>`}
                 </div>
 
                 <p class="pdp-short-desc">${product.shortDescription}</p>
@@ -1046,7 +1079,7 @@ async function handleNotifyMeSubmit(event) {
             const list = JSON.parse(localStorage.getItem('wishrite_saved_notifications') || '[]');
             list.push({ productCode, email, date: new Date().toISOString() });
             localStorage.setItem('wishrite_saved_notifications', JSON.stringify(list));
-        } catch (e) {}
+        } catch (e) { }
 
     } catch (apiErr) {
         // Graceful fallback — save to localStorage so customer experience is flawless
@@ -1080,7 +1113,9 @@ function updatePdpGallery(images, product) {
 
     const mainImg = document.getElementById('pdp-main-img');
     if (mainImg) {
-        mainImg.src = images[0].url;
+        mainImg.src =
+            `${images[0].url}${images[0].url.includes('?') ? '&' : '?'
+            }wrimg=${Date.now()}`;
         mainImg.alt = images[0].alt || (p?.name || 'WishRite Silver Jewellery');
         mainImg.classList.remove('is-placeholder-img');
         mainImg.dataset.fallbackIndex = '0';
@@ -1093,7 +1128,7 @@ function updatePdpGallery(images, product) {
         if (images.length > 1) {
             thumbsContainer.style.display = 'flex';
             thumbsContainer.innerHTML = images.map((img, i) =>
-                `<div class="pdp-thumbnail ${i === 0 ? 'active' : ''}" onclick="switchPdpImage(${i})" role="button" aria-label="View image ${i+1}">
+                `<div class="pdp-thumbnail ${i === 0 ? 'active' : ''}" onclick="switchPdpImage(${i})" role="button" aria-label="View image ${i + 1}">
                     <img src="${img.url}" alt="${img.alt || (p?.name || '')}" loading="lazy" width="72" height="72" onerror="handleThumbnailError(this)">
                 </div>`
             ).join('');
