@@ -40,44 +40,115 @@ function initScrollReveal() {
     document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
 }
 
-// ── Header Scroll Effect ──
-function initHeaderScroll() {
+// ── Header Scroll & Hero Transition Effect ──
+function updateHeaderState() {
     const header = document.querySelector('.header');
     if (!header) return;
 
-    let lastScroll = 0;
-    window.addEventListener('scroll', () => {
-        const currentScroll = window.scrollY;
-        header.classList.toggle('scrolled', currentScroll > 20);
-        lastScroll = currentScroll;
-    }, { passive: true });
+    const isHome = (typeof getCurrentView === 'function' ? getCurrentView() === 'home' : true);
+    const scrollY = window.scrollY;
+
+    if (isHome) {
+        if (scrollY > 50) {
+            header.classList.remove('header-over-hero');
+            header.classList.add('header-fixed');
+            header.classList.add('scrolled');
+        } else {
+            header.classList.add('header-over-hero');
+            header.classList.remove('header-fixed');
+            header.classList.remove('scrolled');
+        }
+    } else {
+        header.classList.remove('header-over-hero');
+        header.classList.remove('header-fixed');
+        header.classList.toggle('scrolled', scrollY > 20);
+    }
 }
 
-// ── Hero Carousel ──
-function initHeroCarousel() {
+function initHeaderScroll() {
+    updateHeaderState();
+    window.addEventListener('scroll', updateHeaderState, { passive: true });
+}
+
+// ── Hero Carousel & Slider Controls ──
+let heroSliderTimer = null;
+let currentHeroSlide = 0;
+const HERO_SLIDE_DURATION = 6000; // 6 seconds per slide
+
+function goToHeroSlide(index) {
     const slides = document.querySelectorAll('.hero-slide');
-    const dots = document.querySelectorAll('.hero-dot');
+    const navItems = document.querySelectorAll('.hero-slide-nav');
     if (!slides.length) return;
 
-    let current = 0;
-    const interval = setInterval(() => {
-        slides[current].classList.remove('active');
-        dots[current]?.classList.remove('active');
-        current = (current + 1) % slides.length;
-        slides[current].classList.add('active');
-        dots[current]?.classList.add('active');
-    }, 5000);
+    currentHeroSlide = (index + slides.length) % slides.length;
 
-    dots.forEach((dot, i) => {
-        dot.addEventListener('click', () => {
-            slides[current].classList.remove('active');
-            dots[current]?.classList.remove('active');
-            current = i;
-            slides[current].classList.add('active');
-            dots[current]?.classList.add('active');
-        });
+    slides.forEach((slide, idx) => {
+        slide.classList.toggle('active', idx === currentHeroSlide);
     });
+
+    navItems.forEach((nav, idx) => {
+        nav.classList.toggle('active', idx === currentHeroSlide);
+        const progressBar = nav.querySelector('.hero-progress-bar');
+        if (progressBar) {
+            progressBar.style.animation = 'none';
+            void progressBar.offsetWidth; // trigger reflow
+            if (idx === currentHeroSlide) {
+                progressBar.style.animation = 'heroProgressFill 6s linear forwards';
+            }
+        }
+    });
+
+    resetHeroSliderTimer();
 }
+
+function nextHeroSlide() {
+    goToHeroSlide(currentHeroSlide + 1);
+}
+
+function prevHeroSlide() {
+    goToHeroSlide(currentHeroSlide - 1);
+}
+
+function resetHeroSliderTimer() {
+    if (heroSliderTimer) clearInterval(heroSliderTimer);
+    heroSliderTimer = setInterval(() => {
+        const slides = document.querySelectorAll('.hero-slide');
+        if (slides.length > 1) {
+            nextHeroSlide();
+        }
+    }, HERO_SLIDE_DURATION);
+}
+
+function initHeroCarousel() {
+    const slides = document.querySelectorAll('.hero-slide');
+    if (!slides.length) return;
+
+    goToHeroSlide(0);
+}
+
+function scrollPastHero() {
+    const hero = document.querySelector('.hero');
+    if (hero) {
+        const rect = hero.getBoundingClientRect();
+        const targetScroll = window.scrollY + rect.height;
+        window.scrollTo({
+            top: targetScroll,
+            behavior: 'smooth'
+        });
+    } else {
+        window.scrollTo({
+            top: window.innerHeight,
+            behavior: 'smooth'
+        });
+    }
+}
+
+// Global exposure for inline events
+window.goToHeroSlide = goToHeroSlide;
+window.nextHeroSlide = nextHeroSlide;
+window.prevHeroSlide = prevHeroSlide;
+window.scrollPastHero = scrollPastHero;
+window.updateHeaderState = updateHeaderState;
 
 // ── Shop Filters & Sort ──
 let currentFilters = {

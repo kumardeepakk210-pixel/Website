@@ -84,11 +84,26 @@
 
     /* Hero */
     .hero {
-        min-height: 70vh;
+        height: 100svh;
+        min-height: 640px;
     }
 
-    .hero-content h1 {
-        font-size: clamp(2rem, 7vw, 2.8rem);
+    .hero-container {
+        padding: 0 var(--container-padding);
+        padding-top: 60px;
+    }
+
+    .hero-title {
+        font-size: clamp(2.4rem, 6vw, 3.8rem);
+    }
+
+    .hero-description {
+        font-size: var(--text-sm);
+        margin-bottom: 28px;
+    }
+
+    .hero-arrow {
+        display: none;
     }
 
     /* Category Grid */
@@ -344,22 +359,81 @@
         display: none;
     }
 
-    /* Hero */
+    /* Hero — Dedicated Mobile Composition */
     .hero {
-        min-height: 60vh;
+        height: 100svh;
+        min-height: 580px;
+        align-items: flex-end;
+        padding-bottom: 78px;
     }
 
-    .hero-content h1 {
-        font-size: 2rem;
+    .hero-slide img {
+        object-position: center 22%;
     }
 
-    .hero-content p {
-        font-size: var(--text-sm);
+    .hero-container {
+        padding: 0 20px;
     }
 
-    .hero-buttons .btn {
-        padding: 12px 24px;
-        font-size: var(--text-xs);
+    .hero-content {
+        max-width: 100%;
+    }
+
+    .hero-subtitle {
+        font-size: 10px;
+        letter-spacing: 0.22em;
+        margin-bottom: 12px;
+    }
+
+    .hero-subtitle::before {
+        width: 18px;
+    }
+
+    .hero-title {
+        font-size: clamp(2.1rem, 7.5vw, 2.9rem);
+        line-height: 1.12;
+        margin-bottom: 14px;
+    }
+
+    .hero-description {
+        font-size: 13px;
+        line-height: 1.6;
+        margin-bottom: 22px;
+    }
+
+    .hero-buttons {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+        width: 100%;
+    }
+
+    .btn-hero-primary,
+    .btn-hero-secondary {
+        width: 100%;
+        padding: 14px 20px;
+        font-size: 10.5px;
+        text-align: center;
+        justify-content: center;
+    }
+
+    .hero-bottom-bar {
+        bottom: 14px;
+        padding: 0 20px;
+    }
+
+    .hero-editorial-tag,
+    .hero-editorial-badge,
+    .hero-scroll-indicator {
+        display: none;
+    }
+
+    .hero-pagination {
+        gap: 12px;
+    }
+
+    .hero-progress-line {
+        width: 28px;
     }
 
     /* Product Cards */
@@ -414,39 +488,45 @@
         font-size: 10px;
     }
 
-    /* Trust Bar (Mobile: 2x2 grid with compact luxury spacing) */
+    /* Trust Bar (Mobile: 1 column clean luxury strip) */
     .trust-bar {
-        padding: var(--space-6) 0;
+        padding: 24px 0;
     }
 
     .trust-bar-container {
-        grid-template-columns: repeat(2, 1fr);
-        row-gap: var(--space-5);
-        column-gap: var(--space-2);
-        padding: 0 var(--space-3);
+        grid-template-columns: 1fr;
+        row-gap: 16px;
+        padding: 0 20px;
     }
 
     .trust-badge {
-        padding: var(--space-1);
+        padding: 6px 0;
+        justify-content: flex-start;
+    }
+
+    .trust-badge:not(:last-child)::after,
+    .trust-badge:nth-child(odd)::after {
+        display: none;
     }
 
     .trust-badge-icon {
-        width: 36px;
-        height: 36px;
-        margin-bottom: var(--space-2);
+        width: 38px;
+        height: 38px;
+        flex: 0 0 38px;
+        margin-bottom: 0;
     }
 
     .trust-badge-icon svg {
-        width: 22px;
-        height: 22px;
+        width: 20px;
+        height: 20px;
     }
 
     .trust-badge-title {
-        font-size: 0.75rem;
+        font-size: 11px;
     }
 
     .trust-badge-sub {
-        font-size: 0.6875rem;
+        font-size: 11.5px;
     }
 
     /* Legacy trust section if present */

@@ -37,12 +37,8 @@
     <div class="announcement-bar" role="banner">
         <div class="announcement-marquee" aria-label="Store announcements">
             <div class="announcement-track">
-                <span class="announcement-text">FREE SHIPPING ON ALL ORDERS ABOVE ₹2,999 <span class="dot"></span> 925
-                    HALLMARKED STERLING SILVER <span class="dot"></span> COMPLIMENTARY GIFT PACKAGING <span
-                        class="dot"></span></span>
-                <span class="announcement-text" aria-hidden="true">FREE SHIPPING ON ALL ORDERS ABOVE ₹2,999 <span
-                        class="dot"></span> 925 HALLMARKED STERLING SILVER <span class="dot"></span> COMPLIMENTARY GIFT
-                    PACKAGING <span class="dot"></span></span>
+                <span class="announcement-text">HALLMARKED 925 STERLING SILVER <span class="dot"></span> FREE SHIPPING ON ALL ORDERS ABOVE ₹2,999 <span class="dot"></span> COMPLIMENTARY GIFT PACKAGING <span class="dot"></span></span>
+                <span class="announcement-text" aria-hidden="true">HALLMARKED 925 STERLING SILVER <span class="dot"></span> FREE SHIPPING ON ALL ORDERS ABOVE ₹2,999 <span class="dot"></span> COMPLIMENTARY GIFT PACKAGING <span class="dot"></span></span>
             </div>
         </div>
     </div>
@@ -62,11 +58,11 @@
 
         <!-- Desktop Navigation -->
         <nav class="header-nav" aria-label="Main navigation">
-            <a onclick="navigateTo('shop')" id="nav-shop">All Jewellery</a>
-            <a onclick="navigateTo('collections')" id="nav-collections">Collections</a>
-            <a onclick="navigateTo('new-arrivals')" id="nav-new-arrivals">New Arrivals</a>
-            <a onclick="navigateTo('best-sellers')" id="nav-bestsellers">Best Sellers</a>
-            <a onclick="navigateTo('about')" id="nav-about">About</a>
+            <a onclick="navigateToShopWithFilter('category', 'All', 'featured', 'All Jewellery')" id="nav-shop">ALL JEWELLERY</a>
+            <a onclick="navigateTo('collections')" id="nav-collections">COLLECTIONS</a>
+            <a onclick="navigateTo('new-arrivals')" id="nav-new-arrivals">NEW ARRIVALS</a>
+            <a onclick="navigateTo('best-sellers')" id="nav-bestsellers">BEST SELLERS</a>
+            <a onclick="navigateTo('about')" id="nav-about">ABOUT</a>
         </nav>
 
         <!-- Header Actions -->
@@ -193,40 +189,95 @@
 
             <!-- Hero Section -->
             <section class="hero" aria-label="Featured jewellery">
+                <!-- Background Slides -->
                 <div class="hero-bg">
                     <div class="hero-slide active">
-                        <img src="https://images.unsplash.com/photo-1617038220319-276d3cfab638?auto=format&fit=crop&w=1600&q=85"
-                            alt="Premium sterling silver jewellery by WishRite" width="1600" height="900"
-                            fetchpriority="high">
+                        <img src="https://images.unsplash.com/photo-1617038220319-276d3cfab638?auto=format&fit=crop&w=1920&q=85"
+                            alt="Premium sterling silver jewellery by WishRite" width="1920" height="1080"
+                            fetchpriority="high" loading="eager">
                     </div>
                     <div class="hero-slide">
-                        <img src="https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?auto=format&fit=crop&w=1600&q=85"
-                            alt="Elegant silver necklace and earrings collection" loading="lazy" width="1600"
-                            height="900">
+                        <img src="https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?auto=format&fit=crop&w=1920&q=85"
+                            alt="Elegant silver necklace and earrings collection" loading="lazy" width="1920"
+                            height="1080">
                     </div>
                     <div class="hero-slide">
-                        <img src="https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?auto=format&fit=crop&w=1600&q=85"
-                            alt="Silver drop earrings styled on display" loading="lazy" width="1600" height="900">
+                        <img src="https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?auto=format&fit=crop&w=1920&q=85"
+                            alt="Silver drop earrings styled on display" loading="lazy" width="1920" height="1080">
                     </div>
                 </div>
+
+                <!-- Gradient Overlay -->
                 <div class="hero-overlay"></div>
-                <div class="hero-content">
-                    <p class="hero-subtitle">TIMELESS · VERSATILE · YOURS</p>
-                    <h1>Timeless Silver.<br>Modern Elegance.</h1>
-                    <p>Thoughtfully crafted 925 sterling silver jewellery for everyday moments, meaningful occasions,
-                        and unforgettable gifts.</p>
-                    <div class="hero-buttons">
-                        <a class="btn btn-primary btn-lg"
-                            onclick="navigateToShopWithFilter('category', 'All', 'featured', 'All Jewellery')">Shop
-                            Jewellery</a>
-                        <a class="btn btn-ghost btn-lg" style="border-color:rgba(255,255,255,0.5);color:#fff;"
-                            onclick="navigateTo('collections')">Explore Collections</a>
+
+                <!-- Navigation Arrows -->
+                <button class="hero-arrow hero-arrow-prev" onclick="prevHeroSlide()" aria-label="Previous slide">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <polyline points="15 18 9 12 15 6"></polyline>
+                    </svg>
+                </button>
+                <button class="hero-arrow hero-arrow-next" onclick="nextHeroSlide()" aria-label="Next slide">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <polyline points="9 18 15 12 9 6"></polyline>
+                    </svg>
+                </button>
+
+                <!-- Hero Content Container (Left-aligned) -->
+                <div class="hero-container">
+                    <div class="hero-content">
+                        <p class="hero-subtitle">TIMELESS · VERSATILE · YOURS</p>
+                        <h1 class="hero-title">Timeless Silver.<br><span class="hero-title-italic">Modern Elegance.</span></h1>
+                        <p class="hero-description">Thoughtfully crafted 925 sterling silver jewellery for everyday moments, meaningful occasions, and unforgettable gifts.</p>
+                        <div class="hero-buttons">
+                            <a class="btn btn-hero-primary"
+                                onclick="navigateToShopWithFilter('category', 'All', 'featured', 'All Jewellery')">
+                                <span>Shop Jewellery</span>
+                                <svg class="hero-btn-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
+                                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                                    <polyline points="12 5 19 12 12 19"></polyline>
+                                </svg>
+                            </a>
+                            <a class="btn btn-hero-secondary" onclick="navigateTo('collections')">
+                                Explore Collections
+                            </a>
+                        </div>
                     </div>
                 </div>
-                <div class="hero-dots">
-                    <button class="hero-dot active" aria-label="Slide 1"></button>
-                    <button class="hero-dot" aria-label="Slide 2"></button>
-                    <button class="hero-dot" aria-label="Slide 3"></button>
+
+                <!-- Bottom Bar: Indicators, Scroll Prompt, Editorial Badges -->
+                <div class="hero-bottom-bar">
+                    <div class="hero-bottom-left">
+                        <div class="hero-pagination" aria-label="Slide indicators">
+                            <button class="hero-slide-nav active" onclick="goToHeroSlide(0)" aria-label="Slide 1">
+                                <span class="hero-slide-num">01</span>
+                                <span class="hero-progress-line"><span class="hero-progress-bar"></span></span>
+                            </button>
+                            <button class="hero-slide-nav" onclick="goToHeroSlide(1)" aria-label="Slide 2">
+                                <span class="hero-slide-num">02</span>
+                                <span class="hero-progress-line"><span class="hero-progress-bar"></span></span>
+                            </button>
+                            <button class="hero-slide-nav" onclick="goToHeroSlide(2)" aria-label="Slide 3">
+                                <span class="hero-slide-num">03</span>
+                                <span class="hero-progress-line"><span class="hero-progress-bar"></span></span>
+                            </button>
+                        </div>
+                        <div class="hero-editorial-tag">
+                            <span>MODERN HEIRLOOMS</span>
+                            <span class="hero-editorial-sub">FOR A BRIGHTER TOMORROW</span>
+                        </div>
+                    </div>
+
+                    <div class="hero-scroll-indicator" onclick="scrollPastHero()" role="button" aria-label="Scroll to explore collection">
+                        <span class="hero-scroll-text">SCROLL TO EXPLORE</span>
+                        <div class="hero-scroll-line" aria-hidden="true"></div>
+                    </div>
+
+                    <div class="hero-bottom-right">
+                        <div class="hero-editorial-badge">
+                            <span>HALLMARKED 925 STERLING SILVER</span>
+                            <span class="hero-editorial-sub">AUTHENTIC CRAFTSMANSHIP</span>
+                        </div>
+                    </div>
                 </div>
             </section>
 
@@ -242,8 +293,22 @@
                             </svg>
                         </div>
                         <div class="trust-badge-content">
-                            <div class="trust-badge-title">925 Sterling Silver</div>
-                            <div class="trust-badge-sub">Certified Hallmarked</div>
+                            <div class="trust-badge-title">925 STERLING SILVER</div>
+                            <div class="trust-badge-sub">Hallmarked & Authentic</div>
+                        </div>
+                    </div>
+                    <div class="trust-badge">
+                        <div class="trust-badge-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24">
+                                <rect x="3" y="8" width="18" height="13" rx="1" stroke-linecap="round" stroke-linejoin="round"/>
+                                <path d="M12 8v13" stroke-linecap="round"/>
+                                <path d="M3 12h18" stroke-linecap="round"/>
+                                <path d="M12 8c-2-3-5-2-5 0s5 2 5 2c0 0 5-1 5-2s-3-3-5 0z" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </div>
+                        <div class="trust-badge-content">
+                            <div class="trust-badge-title">PREMIUM GIFT PACKAGING</div>
+                            <div class="trust-badge-sub">For Every Order</div>
                         </div>
                     </div>
                     <div class="trust-badge">
@@ -258,35 +323,19 @@
                             </svg>
                         </div>
                         <div class="trust-badge-content">
-                            <div class="trust-badge-title">Insured Express Shipping</div>
-                            <div class="trust-badge-sub">Pan-India Delivery</div>
+                            <div class="trust-badge-title">FREE SHIPPING</div>
+                            <div class="trust-badge-sub">On Orders Above ₹2,999</div>
                         </div>
                     </div>
                     <div class="trust-badge">
                         <div class="trust-badge-icon" aria-hidden="true">
                             <svg viewBox="0 0 24 24">
-                                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" stroke-linecap="round"
-                                    stroke-linejoin="round" />
-                                <path d="M3 3v5h5" stroke-linecap="round" stroke-linejoin="round" />
+                                <path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8z" stroke-linecap="round" stroke-linejoin="round"/>
                             </svg>
                         </div>
                         <div class="trust-badge-content">
-                            <div class="trust-badge-title">7-Day Easy Returns</div>
-                            <div class="trust-badge-sub">Hassle-Free Exchange</div>
-                        </div>
-                    </div>
-                    <div class="trust-badge">
-                        <div class="trust-badge-icon" aria-hidden="true">
-                            <svg viewBox="0 0 24 24">
-                                <rect x="3" y="11" width="18" height="11" rx="2" stroke-linecap="round"
-                                    stroke-linejoin="round" />
-                                <path d="M7 11V7a5 5 0 0 1 10 0v4" stroke-linecap="round" stroke-linejoin="round" />
-                                <circle cx="12" cy="16" r="1" />
-                            </svg>
-                        </div>
-                        <div class="trust-badge-content">
-                            <div class="trust-badge-title">Secure Payments</div>
-                            <div class="trust-badge-sub">100% Safe Checkout</div>
+                            <div class="trust-badge-title">JEWELLERY THAT</div>
+                            <div class="trust-badge-sub">Celebrates You</div>
                         </div>
                     </div>
                 </div>

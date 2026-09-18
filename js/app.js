@@ -163,6 +163,11 @@ function navigateTo(viewId, param, pushHistory = true) {
     // Scroll to top
     window.scrollTo({ top: 0, behavior: 'smooth' });
 
+    // Update header appearance (transparent over hero on homepage vs sticky solid on other views)
+    if (typeof updateHeaderState === 'function') {
+        updateHeaderState();
+    }
+
     // Close any open panels
     closeMobileMenu();
     closeSearch();
