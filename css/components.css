@@ -94,14 +94,16 @@
 .btn .btn-spinner {
     width: 16px;
     height: 16px;
-    border: 2px solid rgba(255,255,255,0.3);
+    border: 2px solid rgba(255, 255, 255, 0.3);
     border-top-color: #fff;
     border-radius: 50%;
     animation: spin 0.6s linear infinite;
 }
 
 @keyframes spin {
-    to { transform: rotate(360deg); }
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 /* ── Product Card ── */
@@ -176,7 +178,7 @@
     width: 36px;
     height: 36px;
     border-radius: 50%;
-    background: rgba(255,255,255,0.92);
+    background: rgba(255, 255, 255, 0.92);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -516,7 +518,7 @@ select.form-input {
 .category-card-overlay {
     position: absolute;
     inset: 0;
-    background: linear-gradient(to top, rgba(26,26,26,0.55) 0%, transparent 60%);
+    background: linear-gradient(to top, rgba(26, 26, 26, 0.55) 0%, transparent 60%);
     display: flex;
     align-items: flex-end;
     padding: var(--space-6);
@@ -652,7 +654,7 @@ select.form-input {
     position: absolute;
     bottom: var(--space-4);
     right: var(--space-4);
-    background: rgba(0,0,0,0.55);
+    background: rgba(0, 0, 0, 0.55);
     color: var(--wr-white);
     font-size: var(--text-xs);
     padding: 4px 10px;
@@ -849,7 +851,7 @@ select.form-input {
 }
 
 .out-of-stock-label {
-    background: rgba(0,0,0,0.75) !important;
+    background: rgba(0, 0, 0, 0.75) !important;
     color: #FFF !important;
     cursor: not-allowed !important;
 }
@@ -929,6 +931,7 @@ select.form-input {
     0% {
         background-position: 200% 0;
     }
+
     100% {
         background-position: -200% 0;
     }
@@ -1004,4 +1007,272 @@ select.form-input {
 }
 
 
+/* =========================================================
+   WISHRITE — LUXURY CHECKOUT MODAL
+   ========================================================= */
 
+#wishrite-checkout-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 99999;
+}
+
+.wishrite-checkout-overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: rgba(25, 18, 18, 0.72);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    overflow-y: auto;
+}
+
+.wishrite-checkout-modal {
+    width: min(720px, 100%);
+    max-height: calc(100vh - 48px);
+    overflow-y: auto;
+    background: #fff;
+    border: 1px solid rgba(94, 52, 53, 0.18);
+    border-radius: 4px;
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.28);
+    animation: wishriteCheckoutAppear 0.25s ease-out;
+}
+
+@keyframes wishriteCheckoutAppear {
+    from {
+        opacity: 0;
+        transform: translateY(15px) scale(0.985);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.wishrite-checkout-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 24px;
+    padding: 30px 32px 24px;
+    border-bottom: 1px solid #eee6e1;
+}
+
+.wishrite-checkout-eyebrow {
+    display: block;
+    margin-bottom: 7px;
+    color: #9a7778;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 3px;
+}
+
+.wishrite-checkout-header h2 {
+    margin: 0;
+    color: #5e3435;
+    font-family: var(--wr-font-heading);
+    font-size: 1.8rem;
+    font-weight: 500;
+}
+
+.wishrite-checkout-header p {
+    margin: 7px 0 0;
+    color: var(--wr-text-muted);
+    font-size: 0.88rem;
+}
+
+.wishrite-checkout-close {
+    flex: 0 0 auto;
+    width: 38px;
+    height: 38px;
+    border: 1px solid #e5d9d2;
+    border-radius: 50%;
+    background: transparent;
+    color: #5e3435;
+    font-size: 1.5rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.wishrite-checkout-close:hover {
+    background: #5e3435;
+    color: #fff;
+}
+
+.wishrite-checkout-body {
+    padding: 28px 32px 32px;
+}
+
+.wishrite-checkout-order-summary {
+    margin-bottom: 28px;
+    padding: 18px 20px;
+    background: #faf7f5;
+    border: 1px solid #eee6e1;
+    border-radius: 3px;
+}
+
+.wishrite-checkout-order-summary>div {
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 5px 0;
+    color: var(--wr-text-muted);
+    font-size: 0.88rem;
+}
+
+.wishrite-checkout-order-summary strong {
+    color: var(--wr-text);
+}
+
+.wishrite-checkout-order-summary .wishrite-checkout-total {
+    margin-top: 10px;
+    padding-top: 13px;
+    border-top: 1px solid #e5d9d2;
+    color: #5e3435;
+    font-size: 1.05rem;
+}
+
+.wishrite-checkout-order-summary .wishrite-checkout-total strong {
+    color: #5e3435;
+    font-size: 1.15rem;
+}
+
+.wishrite-form-section-title {
+    margin: 24px 0 14px;
+    color: #5e3435;
+    font-family: var(--wr-font-heading);
+    font-size: 1.05rem;
+    font-weight: 500;
+}
+
+.wishrite-form-section-title:first-child {
+    margin-top: 0;
+}
+
+.wishrite-form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+.wishrite-form-field {
+    margin-bottom: 16px;
+}
+
+.wishrite-form-field label {
+    display: block;
+    margin-bottom: 7px;
+    color: #4a3b3b;
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+
+.wishrite-form-field label span {
+    color: #a44848;
+}
+
+.wishrite-form-field input,
+.wishrite-form-field textarea {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid #dcd0ca;
+    border-radius: 2px;
+    background: #fff;
+    color: #302626;
+    font-family: inherit;
+    font-size: 0.9rem;
+    outline: none;
+    transition:
+        border-color 0.2s ease,
+        box-shadow 0.2s ease;
+}
+
+.wishrite-form-field input {
+    height: 46px;
+    padding: 0 13px;
+}
+
+.wishrite-form-field textarea {
+    min-height: 90px;
+    padding: 12px 13px;
+    resize: vertical;
+}
+
+.wishrite-form-field input:focus,
+.wishrite-form-field textarea:focus {
+    border-color: #8d6263;
+    box-shadow: 0 0 0 3px rgba(94, 52, 53, 0.08);
+}
+
+.wishrite-form-field input::placeholder,
+.wishrite-form-field textarea::placeholder {
+    color: #a89a94;
+}
+
+.wishrite-checkout-form-error {
+    margin: 5px 0 14px;
+    padding: 11px 13px;
+    border: 1px solid;
+    border-radius: 3px;
+    font-size: 0.82rem;
+    line-height: 1.45;
+}
+
+.wishrite-create-order-btn {
+    width: 100%;
+    margin-top: 4px;
+}
+
+.wishrite-create-order-btn:disabled {
+    cursor: wait;
+    opacity: 0.7;
+}
+
+.wishrite-checkout-security {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 14px;
+    color: #91827b;
+    font-size: 0.7rem;
+    letter-spacing: 0.2px;
+}
+
+@media (max-width: 600px) {
+
+    .wishrite-checkout-overlay {
+        align-items: flex-start;
+        padding: 10px;
+    }
+
+    .wishrite-checkout-modal {
+        max-height: calc(100vh - 20px);
+    }
+
+    .wishrite-checkout-header {
+        padding: 22px 20px 18px;
+    }
+
+    .wishrite-checkout-header h2 {
+        font-size: 1.45rem;
+    }
+
+    .wishrite-checkout-body {
+        padding: 20px;
+    }
+
+    .wishrite-form-grid {
+        grid-template-columns: 1fr;
+        gap: 0;
+    }
+
+    .wishrite-checkout-security {
+        font-size: 0.65rem;
+    }
+}
