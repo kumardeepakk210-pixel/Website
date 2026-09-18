@@ -1,438 +1,1590 @@
-/* ============================================
-   WISHRITE — PRODUCT IMAGES LAYER
-   Read-only customer-facing image resolution from Supabase Storage.
-   Product code is the folder key: product-images/{product_code}/
-   Fallback cascade:
-     1. Database image path (if exists)
-     2. {product_code}/main.webp
-     3. {product_code}/main.png
-     4. {product_code}/main.jpg
-     5. {product_code}/image-1.webp
-     6. {product_code}/image-1.png
-     7. {product_code}/image-1.jpg
-     8. Luxury WishRite SVG vector placeholder
-   Strictly display-only: no upload or edit functionality.
-   ============================================ */
+/* ============================================================
+   WISHRITE — DYNAMIC PRODUCT IMAGE SERVICE
+   ------------------------------------------------------------
+   Customer-facing website only.
 
-const STORAGE_BUCKET = 'product-images';
-const FALLBACK_CANDIDATES = [
-    'main.webp',
-    'main.png',
-    'main.jpg',
-    'image-1.webp',
-    'image-1.png',
-    'image-1.jpg'
-];
+   SOURCE OF TRUTH:
+   Supabase Storage bucket:
+       product-images
 
-// In-memory cache for resolved working image URLs per product code
-const resolvedImageCache = new Map();
-let productImagesMap = new Map();
+   FOLDER STRUCTURE:
+       product-images/
+          {PRODUCT_CODE}/
+              image-1.webp
+              image-2.webp
+              image-3.webp
+              ...
 
-/**
- * Generate public URL from Supabase Storage bucket 'product-images'
- * Uses supabase.storage.from('product-images').getPublicUrl(storagePath)
- */
-function getSupabaseStoragePublicUrl(storagePath) {
-    if (!storagePath) return '';
-    const cleanPath = String(storagePath).replace(/^\/+/, '').trim();
+   EXAMPLE:
+       inventory.product_code = ERN-0021
 
-    try {
-        if (window.supabaseClient && window.supabaseClient.storage) {
-            const { data } = window.supabaseClient.storage.from(STORAGE_BUCKET).getPublicUrl(cleanPath);
-            if (data && data.publicUrl) return data.publicUrl;
+       Storage:
+       product-images/ERN-0021/
+
+   IMPORTANT:
+   - No product code is hardcoded.
+   - All images inside the product folder are discovered dynamically.
+   - Supports unlimited images.
+   - Inventory/Admin remains responsible for uploading images.
+   - Website only reads images.
+   ============================================================ */
+
+(function () {
+    'use strict';
+
+    /* ============================================================
+       1. CONFIGURATION
+       ============================================================ */
+
+    const STORAGE_BUCKET = 'product-images';
+
+    const SUPABASE_URL =
+        window.SUPABASE_URL ||
+        (typeof window.WR_SUPABASE_URL !== 'undefined'
+            ? window.WR_SUPABASE_URL
+            : 'https://ptpuepejciqiktmcpuon.supabase.co');
+
+    const SUPABASE_ANON_KEY =
+        window.SUPABASE_ANON_KEY ||
+        (typeof window.WR_SUPABASE_ANON_KEY !== 'undefined'
+            ? window.WR_SUPABASE_ANON_KEY
+            : '');
+
+    /*
+       Fallback names are used only when Storage listing is unavailable.
+
+       They are NOT required when .list() works.
+    */
+    const FALLBACK_CANDIDATES = [
+        'main.webp',
+        'main.png',
+        'main.jpg',
+        'image-1.webp',
+        'image-1.png',
+        'image-1.jpg',
+        'image1.webp',
+        'image1.png',
+        'image1.jpg'
+    ];
+
+    const VALID_IMAGE_EXTENSIONS = [
+        'webp',
+        'jpg',
+        'jpeg',
+        'png'
+    ];
+
+    /* ============================================================
+       2. INTERNAL CACHE
+       ============================================================ */
+
+    const resolvedImageCache = new Map();
+    const inFlightResolutions = new Map();
+
+    /*
+       Product-code → images
+
+       Example:
+
+       ERN-0021 => [
+           {
+               url: "...",
+               path: "ERN-0021/image1.webp",
+               name: "image1.webp"
+           },
+           ...
+       ]
+    */
+
+    /* ============================================================
+       3. SUPABASE CLIENT
+       ============================================================ */
+
+    function getSupabaseClient() {
+        if (window.supabaseClient) {
+            return window.supabaseClient;
         }
-    } catch (err) {
-        // Fallback to standard Supabase Storage public URL format
-    }
 
-    const baseUrl = window.SUPABASE_URL || (typeof SUPABASE_URL !== 'undefined' ? SUPABASE_URL : 'https://ptpuepejciqiktmcpuon.supabase.co');
-    return `${baseUrl}/storage/v1/object/public/${STORAGE_BUCKET}/${cleanPath}`;
-}
-
-/**
- * Handle image load errors gracefully with progressive fallback cascade.
- * Never displays broken browser image icons or blank areas.
- */
-function handleProductImageError(imgEl, productCode, category) {
-    if (!imgEl) return;
-
-    const code = (productCode || imgEl.dataset.productCode || '').trim();
-    const cat = category || imgEl.dataset.category || 'Jewellery';
-    let currentIndex = parseInt(imgEl.dataset.fallbackIndex || '0', 10);
-
-    // Increment index to try next candidate in sequence
-    currentIndex += 1;
-    imgEl.dataset.fallbackIndex = String(currentIndex);
-
-    if (code && currentIndex < FALLBACK_CANDIDATES.length) {
-        const nextFilename = FALLBACK_CANDIDATES[currentIndex];
-        const nextUrl = getSupabaseStoragePublicUrl(`${code}/${nextFilename}`);
-        imgEl.src = nextUrl;
-    } else {
-        // All storage candidates exhausted — display luxury SVG vector placeholder
-        imgEl.onerror = null; // Prevent infinite loop
-        const placeholder = generateProductPlaceholder({ code, product_code: code, category: cat });
-        imgEl.src = placeholder.url;
-        imgEl.alt = placeholder.alt;
-        imgEl.classList.add('is-placeholder-img');
-        if (code) resolvedImageCache.set(code, placeholder.url);
-    }
-}
-
-/**
- * Set image records fetched from Supabase product_images table (if present)
- */
-function setSupabaseProductImages(records) {
-    productImagesMap.clear();
-    if (!Array.isArray(records)) return;
-
-    records.forEach(rec => {
-        const key = rec.product_id || rec.sku || rec.product_code;
-        if (!key) return;
-        if (!productImagesMap.has(key)) {
-            productImagesMap.set(key, []);
+        /*
+           Some versions of the website may expose the client
+           under another global name.
+        */
+        if (window.supabase) {
+            return window.supabase;
         }
-        productImagesMap.get(key).push({
-            url: rec.image_url || (rec.storage_path ? getSupabaseStoragePublicUrl(rec.storage_path) : rec.url),
-            alt: rec.alt_text || rec.alt || 'WishRite 925 Sterling Silver Jewellery',
-            type: rec.image_type || (rec.is_primary ? 'main' : 'gallery'),
-            isPrimary: Boolean(rec.is_primary),
-            sortOrder: Number(rec.sort_order) || 0
-        });
-    });
 
-    // Sort images: primary first, then by sort_order
-    productImagesMap.forEach((imgs) => {
-        imgs.sort((a, b) => {
-            if (a.isPrimary && !b.isPrimary) return -1;
-            if (!a.isPrimary && b.isPrimary) return 1;
-            return a.sortOrder - b.sortOrder;
-        });
-    });
-}
-
-// In-flight Promise tracker to deduplicate concurrent Storage list requests
-const inFlightResolutions = new Map();
-
-/**
- * CENTRAL PRODUCT IMAGE RESOLVER
- * Discovers and resolves images from Supabase Storage for any product.
- * Maps: product_code -> product-images/{product_code}/
- * 
- * Follows exact specifications:
- * 1. Uses supabase.storage.from('product-images').list(productCode)
- * 2. Filters for valid image files: webp, jpg, jpeg, png
- * 3. Ignores: .folder, txt, metadata files, and non-image files
- * 4. Generates public URLs dynamically via supabase.storage.from('product-images').getPublicUrl(path)
- * 5. Orders images deterministically (first image is main, remaining are gallery thumbnails)
- * 6. Graceful fallback cascade: never throws or breaks the product page
- * 
- * @param {string|object} productOrCode - Product code string or product object
- * @returns {Promise<Array<{path: string, url: string, filename: string, name: string, type: string, isPrimary: boolean, alt: string}>>}
- */
-async function resolveProductImages(productOrCode) {
-    if (!productOrCode) return [];
-
-    let cleanCode = '';
-    let productObj = null;
-
-    if (typeof productOrCode === 'string') {
-        cleanCode = productOrCode.trim();
-    } else if (typeof productOrCode === 'object') {
-        productObj = productOrCode;
-        cleanCode = (productOrCode.productCode || productOrCode.product_code || productOrCode.sku || productOrCode.code || '').trim();
+        return null;
     }
 
-    if (!cleanCode) return [];
+    /* ============================================================
+       4. NORMALIZE PRODUCT CODE
+       ============================================================ */
 
-    // Return cached result if already resolved
-    if (resolvedImageCache.has(cleanCode)) {
-        const cached = resolvedImageCache.get(cleanCode);
-        if (Array.isArray(cached) && cached.length > 0) {
-            return cached;
+    function normalizeProductCode(value) {
+        if (value === null || value === undefined) {
+            return '';
         }
+
+        return String(value)
+            .trim()
+            .replace(/^\/+|\/+$/g, '');
     }
 
-    // Return in-flight promise if a request is already pending
-    if (inFlightResolutions.has(cleanCode)) {
-        return inFlightResolutions.get(cleanCode);
+    /* ============================================================
+       5. EXTRACT PRODUCT CODE
+       ============================================================ */
+
+    function extractProductCode(productOrCode) {
+        if (!productOrCode) {
+            return '';
+        }
+
+        if (typeof productOrCode === 'string') {
+            return normalizeProductCode(productOrCode);
+        }
+
+        if (typeof productOrCode === 'object') {
+            return normalizeProductCode(
+                productOrCode.productCode ||
+                productOrCode.product_code ||
+                productOrCode.sku ||
+                productOrCode.code
+            );
+        }
+
+        return '';
     }
 
-    const resolutionPromise = (async () => {
-        try {
-            const client = window.supabaseClient || (typeof supabaseClient !== 'undefined' ? supabaseClient : null);
-            let files = [];
+    /* ============================================================
+       6. CHECK IMAGE EXTENSION
+       ============================================================ */
 
-            if (client && client.storage) {
-                const { data, error } = await client.storage
+    function isValidImageFile(filename) {
+        if (!filename) {
+            return false;
+        }
+
+        const cleanName = String(filename)
+            .split('?')[0]
+            .split('#')[0]
+            .toLowerCase();
+
+        /*
+           Ignore hidden/system files.
+        */
+        if (
+            cleanName.startsWith('.') ||
+            cleanName.endsWith('.folder') ||
+            cleanName.endsWith('.txt') ||
+            cleanName.endsWith('.json') ||
+            cleanName.endsWith('.metadata')
+        ) {
+            return false;
+        }
+
+        const extension = cleanName.includes('.')
+            ? cleanName.split('.').pop()
+            : '';
+
+        return VALID_IMAGE_EXTENSIONS.includes(extension);
+    }
+
+    /* ============================================================
+       7. PUBLIC STORAGE URL
+       ============================================================ */
+
+    function getSupabaseStoragePublicUrl(storagePath) {
+        const cleanPath = String(storagePath || '')
+            .replace(/^\/+/, '');
+
+        if (!cleanPath) {
+            return '';
+        }
+
+        /*
+           Preferred method:
+           use the existing Supabase JS client.
+        */
+        const client = getSupabaseClient();
+
+        if (
+            client &&
+            client.storage &&
+            typeof client.storage.from === 'function'
+        ) {
+            try {
+                const result = client
+                    .storage
                     .from(STORAGE_BUCKET)
-                    .list(cleanCode, {
-                        limit: 100,
-                        offset: 0,
-                        sortBy: { column: 'name', order: 'asc' }
-                    });
+                    .getPublicUrl(cleanPath);
 
-                if (!error && Array.isArray(data)) {
-                    files = data;
+                if (
+                    result &&
+                    result.data &&
+                    result.data.publicUrl
+                ) {
+                    return result.data.publicUrl;
+                }
+            } catch (error) {
+                console.warn(
+                    '[WishRite Images] getPublicUrl client error:',
+                    error
+                );
+            }
+        }
+
+        /*
+           Reliable direct public URL fallback.
+        */
+        return (
+            `${SUPABASE_URL}/storage/v1/object/public/` +
+            `${encodeURIComponent(STORAGE_BUCKET)}/` +
+            cleanPath
+                .split('/')
+                .map(part => encodeURIComponent(part))
+                .join('/')
+        );
+    }
+
+    /* ============================================================
+       8. WAIT FOR SUPABASE CLIENT
+       ============================================================ */
+
+    async function waitForSupabaseClient(timeoutMs = 8000) {
+        const start = Date.now();
+
+        while (Date.now() - start < timeoutMs) {
+            const client = getSupabaseClient();
+
+            if (
+                client &&
+                client.storage &&
+                typeof client.storage.from === 'function'
+            ) {
+                return client;
+            }
+
+            await new Promise(resolve => setTimeout(resolve, 200));
+        }
+
+        return null;
+    }
+
+    /* ============================================================
+       9. SORT STORAGE FILES
+       ============================================================ */
+
+    function sortStorageFiles(files) {
+        return [...files].sort((a, b) => {
+            /*
+               Primary/main image first.
+            */
+            const aName = String(a.name || '').toLowerCase();
+            const bName = String(b.name || '').toLowerCase();
+
+            const aMain =
+                aName === 'main.webp' ||
+                aName === 'main.png' ||
+                aName === 'main.jpg';
+
+            const bMain =
+                bName === 'main.webp' ||
+                bName === 'main.png' ||
+                bName === 'main.jpg';
+
+            if (aMain && !bMain) return -1;
+            if (!aMain && bMain) return 1;
+
+            /*
+               If Storage provides timestamps, use them.
+            */
+            if (a.created_at && b.created_at) {
+                const dateDiff =
+                    new Date(a.created_at) -
+                    new Date(b.created_at);
+
+                if (dateDiff !== 0) {
+                    return dateDiff;
                 }
             }
 
-            // Filter only valid image files: webp, jpg, jpeg, png
-            // Ignore .folder, txt, metadata files, dotfiles, and non-image files
-            const validImageFiles = files.filter(f => {
-                if (!f || !f.name) return false;
-                const name = f.name.trim().toLowerCase();
-                if (name.startsWith('.')) return false;
-                if (name.endsWith('.folder') || name.endsWith('.txt') || name.endsWith('.json') || name.endsWith('.metadata')) return false;
-                return (
-                    name.endsWith('.webp') ||
-                    name.endsWith('.jpg') ||
-                    name.endsWith('.jpeg') ||
-                    name.endsWith('.png')
-                );
+            /*
+               Finally sort alphabetically.
+            */
+            return aName.localeCompare(bName, undefined, {
+                numeric: true,
+                sensitivity: 'base'
             });
+        });
+    }
 
-            // Deterministic sort: upload/created order if available, else alphabetical by filename
-            validImageFiles.sort((a, b) => {
-                if (a.created_at && b.created_at) {
-                    const diff = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-                    if (diff !== 0) return diff;
-                }
-                return a.name.localeCompare(b.name);
-            });
+    /* ============================================================
+       10. BUILD IMAGE RECORD
+       ============================================================ */
 
-            const prodName = productObj?.name || productObj?.product_name || cleanCode;
+    function buildImageRecord(file, productCode, index) {
+        const fileName = String(file.name || '').trim();
 
-            if (validImageFiles.length > 0) {
-                // Dynamically generate public URLs for all discovered images
-                const resolvedList = validImageFiles.map((f, idx) => {
-                    const storagePath = `${cleanCode}/${f.name}`;
-                    const publicUrl = getSupabaseStoragePublicUrl(storagePath);
-                    return {
-                        path: storagePath,
-                        url: publicUrl,
-                        filename: f.name,
-                        name: f.name,
-                        type: idx === 0 ? 'main' : 'gallery',
-                        isPrimary: idx === 0,
-                        productCode: cleanCode,
-                        alt: `${prodName} — View ${idx + 1}`
-                    };
+        const storagePath =
+            `${productCode}/${fileName}`;
+
+        const url =
+            getSupabaseStoragePublicUrl(storagePath);
+
+        return {
+            id: `${productCode}-${index}`,
+            productCode: productCode,
+            product_code: productCode,
+            name: fileName,
+            path: storagePath,
+            storagePath: storagePath,
+            url: url,
+            alt: `${productCode} — WishRite 925 Sterling Silver Jewellery`,
+            type: 'product',
+            isPrimary: index === 0,
+            sortOrder: index,
+            createdAt: file.created_at || null,
+            updatedAt: file.updated_at || null,
+            isPlaceholder: false
+        };
+    }
+
+    /* ============================================================
+       11. LIST IMAGES FROM SUPABASE STORAGE
+       ============================================================ */
+
+    async function listProductImagesFromStorage(productCode) {
+        const cleanCode = normalizeProductCode(productCode);
+
+        if (!cleanCode) {
+            return {
+                images: [],
+                error: new Error('Missing product code')
+            };
+        }
+
+        const client = await waitForSupabaseClient();
+
+        if (!client) {
+            const error = new Error(
+                'Supabase client is not ready'
+            );
+
+            console.warn(
+                `[WishRite Images] Supabase client unavailable for ${cleanCode}`
+            );
+
+            return {
+                images: [],
+                error
+            };
+        }
+
+        try {
+            console.info(
+                `[WishRite Images] Checking Storage folder: product-images/${cleanCode}/`
+            );
+
+            const {
+                data,
+                error
+            } = await client
+                .storage
+                .from(STORAGE_BUCKET)
+                .list(cleanCode, {
+                    limit: 100,
+                    offset: 0,
+                    sortBy: {
+                        column: 'name',
+                        order: 'asc'
+                    }
                 });
 
-                resolvedImageCache.set(cleanCode, resolvedList);
+            if (error) {
+                console.error(
+                    `[WishRite Images] Storage listing failed for ${cleanCode}:`,
+                    error
+                );
 
-                // Update in-memory productsDB if available
-                if (typeof productsDB !== 'undefined' && Array.isArray(productsDB)) {
-                    const match = productsDB.find(p => p.productCode === cleanCode);
-                    if (match) {
-                        match.images = resolvedList;
-                        match.image = resolvedList[0].url;
-                    }
-                }
-
-                // Update rendered product cards on screen
-                updateRenderedProductCards(cleanCode, resolvedList[0].url);
-
-                return resolvedList;
+                return {
+                    images: [],
+                    error
+                };
             }
 
-            // Fallback: Check local storage registry (from inventory app sync if available)
-            try {
-                const raw = localStorage.getItem('wishrite_custom_product_images');
-                if (raw) {
-                    const reg = JSON.parse(raw);
-                    if (reg && reg[cleanCode] && Array.isArray(reg[cleanCode]) && reg[cleanCode].length > 0) {
-                        const localImgs = reg[cleanCode].map((item, idx) => ({
-                            path: `${cleanCode}/${idx + 1}`,
-                            url: item.url,
-                            filename: `${idx + 1}.webp`,
-                            name: `${idx + 1}.webp`,
-                            type: idx === 0 ? 'main' : 'gallery',
-                            isPrimary: idx === 0,
-                            productCode: cleanCode,
-                            alt: item.alt || `${prodName} — View ${idx + 1}`
-                        }));
-                        resolvedImageCache.set(cleanCode, localImgs);
-                        return localImgs;
-                    }
-                }
-            } catch (e) {}
+            if (!Array.isArray(data)) {
+                return {
+                    images: [],
+                    error: new Error(
+                        'Supabase Storage returned invalid file list'
+                    )
+                };
+            }
 
-            // Fallback: Return luxury category placeholder
-            const placeholder = generateProductPlaceholder(productObj || { productCode: cleanCode, product_code: cleanCode });
-            return [placeholder];
-        } catch (err) {
-            console.warn(`[WishRite Storage] resolveProductImages error for ${cleanCode}:`, err);
-            const placeholder = generateProductPlaceholder(productObj || { productCode: cleanCode, product_code: cleanCode });
-            return [placeholder];
-        } finally {
-            inFlightResolutions.delete(cleanCode);
-        }
-    })();
+            const validFiles = data.filter(file =>
+                file &&
+                file.name &&
+                isValidImageFile(file.name)
+            );
 
-    inFlightResolutions.set(cleanCode, resolutionPromise);
-    return resolutionPromise;
-}
-window.resolveProductImages = resolveProductImages;
+            const sortedFiles =
+                sortStorageFiles(validFiles);
 
-/**
- * Update rendered product cards across all pages when images resolve
- */
-function updateRenderedProductCards(productCode, mainImageUrl) {
-    if (!productCode || !mainImageUrl) return;
-    const imgs = document.querySelectorAll(`img[data-product-code="${productCode}"]`);
-    imgs.forEach(img => {
-        if (img.id === 'pdp-main-img') return; // Handled by PDP gallery updater
-        if (img.src !== mainImageUrl) {
-            img.src = mainImageUrl;
-            img.classList.remove('is-placeholder-img');
-        }
-    });
-}
-window.updateRenderedProductCards = updateRenderedProductCards;
+            const images =
+                sortedFiles.map((file, index) =>
+                    buildImageRecord(
+                        file,
+                        cleanCode,
+                        index
+                    )
+                );
 
-/**
- * Get display images for a product (synchronous accessor with async background discovery)
- * Priority:
- * 1. Supabase Storage resolved cache (from resolveProductImages)
- * 2. Supabase product_images table records (if present)
- * 3. Product's direct image_url property
- * 4. Product's product_media_urls array
- * 5. Luxury SVG vector placeholder tailored to category
- */
-function getProductImages(product) {
-    if (!product) return [];
+            console.info(
+                `[WishRite Images] ${cleanCode}: found ${images.length} image(s).`
+            );
 
-    const productCode = (product.productCode || product.sku || product.code || product.product_code || '').trim();
-    const id = product.id;
-    const name = product.name || product.product_name || 'WishRite Silver Jewellery';
+            if (images.length === 0) {
+                console.warn(
+                    `[WishRite Images] No image files found in product-images/${cleanCode}/`
+                );
+            }
 
-    // 1. Check resolved image cache from Supabase Storage
-    if (productCode && resolvedImageCache.has(productCode)) {
-        const cached = resolvedImageCache.get(productCode);
-        if (Array.isArray(cached) && cached.length > 0 && !cached[0].isPlaceholder) {
-            return cached;
-        }
-    }
-
-    // 2. Check Supabase product_images map (if populated from db table)
-    if (id && productImagesMap.has(id) && productImagesMap.get(id).length > 0) {
-        return productImagesMap.get(id);
-    }
-    if (productCode && productImagesMap.has(productCode) && productImagesMap.get(productCode).length > 0) {
-        return productImagesMap.get(productCode);
-    }
-
-    // 3. Check product's direct image_url property (if exists in DB)
-    if (product.image_url && typeof product.image_url === 'string') {
-        const fullUrl = product.image_url.startsWith('http') 
-            ? product.image_url 
-            : getSupabaseStoragePublicUrl(product.image_url);
-        return [{
-            url: fullUrl,
-            alt: name,
-            type: 'main',
-            isPrimary: true
-        }];
-    }
-
-    // 4. Check product_media_urls array
-    if (Array.isArray(product.product_media_urls) && product.product_media_urls.length > 0) {
-        return product.product_media_urls.map((url, idx) => {
-            const rawUrl = typeof url === 'string' ? url : url.url;
-            const fullUrl = rawUrl.startsWith('http') ? rawUrl : getSupabaseStoragePublicUrl(rawUrl);
             return {
-                url: fullUrl,
-                alt: `${name} — view ${idx + 1}`,
-                type: idx === 0 ? 'main' : 'gallery',
-                isPrimary: idx === 0
+                images,
+                error: null
             };
+
+        } catch (error) {
+            console.error(
+                `[WishRite Images] Unexpected Storage error for ${cleanCode}:`,
+                error
+            );
+
+            return {
+                images: [],
+                error
+            };
+        }
+    }
+
+    /* ============================================================
+       12. FALLBACK PUBLIC URL CHECK
+       ============================================================ */
+
+    async function checkFallbackImageUrls(productCode) {
+        const cleanCode =
+            normalizeProductCode(productCode);
+
+        if (!cleanCode) {
+            return [];
+        }
+
+        const results = [];
+
+        /*
+           This fallback is intentionally limited to common names.
+           Normally Storage .list() discovers all files.
+        */
+
+        for (
+            let index = 0;
+            index < FALLBACK_CANDIDATES.length;
+            index++
+        ) {
+            const fileName =
+                FALLBACK_CANDIDATES[index];
+
+            const path =
+                `${cleanCode}/${fileName}`;
+
+            const url =
+                getSupabaseStoragePublicUrl(path);
+
+            try {
+                const response =
+                    await fetch(url, {
+                        method: 'HEAD',
+                        cache: 'no-store'
+                    });
+
+                if (response.ok) {
+                    results.push({
+                        id: `${cleanCode}-fallback-${results.length}`,
+                        productCode: cleanCode,
+                        product_code: cleanCode,
+                        name: fileName,
+                        path: path,
+                        storagePath: path,
+                        url: url,
+                        alt: `${cleanCode} — WishRite 925 Sterling Silver Jewellery`,
+                        type: 'product',
+                        isPrimary: results.length === 0,
+                        sortOrder: results.length,
+                        isPlaceholder: false
+                    });
+                }
+
+            } catch (error) {
+                /*
+                   Ignore individual fallback failures.
+                */
+            }
+        }
+
+        return results;
+    }
+
+    /* ============================================================
+       13. UPDATE PRODUCTS DATABASE
+       ============================================================ */
+
+    function updateProductsDatabase(
+        productCode,
+        images
+    ) {
+        const cleanCode =
+            normalizeProductCode(productCode);
+
+        if (!cleanCode) {
+            return;
+        }
+
+        if (
+            !Array.isArray(window.productsDB)
+        ) {
+            return;
+        }
+
+        window.productsDB.forEach(product => {
+            const code =
+                normalizeProductCode(
+                    product?.productCode ||
+                    product?.product_code ||
+                    product?.sku ||
+                    product?.code
+                );
+
+            if (
+                code.toUpperCase() ===
+                cleanCode.toUpperCase()
+            ) {
+                product.images = images;
+
+                product.image =
+                    images[0]?.url || '';
+
+                product.image_url =
+                    images[0]?.url || '';
+            }
         });
     }
 
-    // 5. Trigger asynchronous Storage discovery in background for this productCode
-    if (productCode && !resolvedImageCache.has(productCode) && !inFlightResolutions.has(productCode)) {
-        resolveProductImages(product);
+    /* ============================================================
+       14. UPDATE PRODUCT CARDS
+       ============================================================ */
+
+    function updateRenderedProductCards(
+        productCode,
+        imageUrl
+    ) {
+        const cleanCode =
+            normalizeProductCode(productCode);
+
+        if (!cleanCode || !imageUrl) {
+            return;
+        }
+
+        const images =
+            document.querySelectorAll(
+                'img[data-product-code]'
+            );
+
+        images.forEach(img => {
+            const imgCode =
+                normalizeProductCode(
+                    img.dataset.productCode
+                );
+
+            if (
+                imgCode.toUpperCase() !==
+                cleanCode.toUpperCase()
+            ) {
+                return;
+            }
+
+            /*
+               Do not overwrite the PDP main image here.
+               updatePdpGallery() handles that.
+            */
+            if (img.id === 'pdp-main-img') {
+                return;
+            }
+
+            /*
+               Cache busting.
+            */
+            img.src =
+                addCacheBuster(imageUrl);
+
+            img.dataset.imageResolved = 'true';
+
+            img.classList.remove(
+                'is-placeholder-img'
+            );
+
+            img.removeAttribute(
+                'data-fallback-index'
+            );
+        });
     }
 
-    // 6. Return luxury SVG placeholder until Storage discovery resolves
-    return [generateProductPlaceholder(product)];
-}
+    /* ============================================================
+       15. CACHE BUSTER
+       ============================================================ */
 
-/**
- * Generate luxury vector SVG placeholder for silver jewellery
- * Elegant minimalist design with fine gold/silver metallic accents
- */
-function generateProductPlaceholder(product) {
-    const category = String(product?.category || 'Jewellery').toLowerCase();
-    const name = product?.name || product?.product_name || '925 Sterling Silver Piece';
-    const code = product?.productCode || product?.sku || product?.code || product?.product_code || '';
+    function addCacheBuster(url) {
+        if (!url) {
+            return '';
+        }
 
-    let iconSvg = '';
-    if (category.includes('earring') || category.includes('bali')) {
-        iconSvg = `<circle cx="150" cy="130" r="30" fill="none" stroke="#D4AF37" stroke-width="3"/><path d="M150 160 L150 210 M140 210 L160 210" stroke="#8E8E93" stroke-width="3" stroke-linecap="round"/><circle cx="150" cy="225" r="8" fill="#5E3435"/>`;
-    } else if (category.includes('ring')) {
-        iconSvg = `<circle cx="150" cy="180" r="50" fill="none" stroke="#A8A8A8" stroke-width="5"/><polygon points="150,118 165,138 135,138" fill="#D4AF37"/>`;
-    } else if (category.includes('necklace') || category.includes('chain') || category.includes('pendant')) {
-        iconSvg = `<path d="M90 120 Q150 230 210 120" fill="none" stroke="#B0B0B0" stroke-width="4" stroke-dasharray="6,4"/><polygon points="150,225 140,245 160,245" fill="#5E3435"/>`;
-    } else if (category.includes('bracelet') || category.includes('anklet')) {
-        iconSvg = `<ellipse cx="150" cy="180" rx="65" ry="45" fill="none" stroke="#A8A8A8" stroke-width="4"/><circle cx="190" cy="150" r="6" fill="#D4AF37"/>`;
-    } else if (category.includes('rakhi')) {
-        iconSvg = `<circle cx="150" cy="170" r="28" fill="none" stroke="#D4AF37" stroke-width="4"/><path d="M80 170 L122 170 M178 170 L220 170" stroke="#8E8E93" stroke-width="3"/><circle cx="150" cy="170" r="10" fill="#5E3435"/>`;
-    } else {
-        iconSvg = `<polygon points="150,130 185,160 170,210 130,210 115,160" fill="none" stroke="#A8A8A8" stroke-width="3"/><circle cx="150" cy="175" r="10" fill="#5E3435"/>`;
+        /*
+           Do not constantly change URLs if the URL already
+           has a cache-busting version supplied by the app.
+        */
+        const separator =
+            url.includes('?') ? '&' : '?';
+
+        return `${url}${separator}wrimg=${Date.now()}`;
     }
 
-    const svg = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 360" width="100%" height="100%">
-        <defs>
-            <linearGradient id="wr-bg" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stop-color="#FDFBF9"/>
-                <stop offset="100%" stop-color="#F4ECE6"/>
-            </linearGradient>
-        </defs>
-        <rect width="100%" height="100%" fill="url(%23wr-bg)"/>
-        <rect x="15" y="15" width="270" height="330" fill="none" stroke="#E6DFD9" stroke-width="1"/>
-        <g opacity="0.9">${iconSvg}</g>
-        <text x="150" y="275" font-family="Playfair Display, Georgia, serif" font-size="14" fill="#5E3435" font-weight="600" text-anchor="middle" letter-spacing="1.5">WISHRITE</text>
-        <text x="150" y="295" font-family="Inter, sans-serif" font-size="10" fill="#8E8E93" text-anchor="middle" letter-spacing="2">925 STERLING SILVER</text>
-        ${code ? `<text x="150" y="313" font-family="monospace" font-size="9" fill="#B0A69F" text-anchor="middle">${code}</text>` : ''}
-    </svg>`;
+    /* ============================================================
+       16. UPDATE PDP IF OPEN
+       ============================================================ */
 
-    return {
-        url: svg,
-        alt: `${name} — 925 Sterling Silver WishRite Jewellery`,
-        type: 'main',
-        isPrimary: true,
-        isPlaceholder: true
-    };
-}
+    function updateCurrentPdp(
+        productCode,
+        images
+    ) {
+        const cleanCode =
+            normalizeProductCode(productCode);
 
-/**
- * Helper to remove broken thumbnail in PDP gallery and adjust counter
- */
-function handleThumbnailError(thumbEl) {
-    if (!thumbEl) return;
-    const parent = thumbEl.closest('.pdp-thumbnail');
-    if (parent) {
-        parent.remove();
-        checkPdpThumbnailCount();
-    }
-}
+        if (
+            !cleanCode ||
+            !Array.isArray(images) ||
+            images.length === 0
+        ) {
+            return;
+        }
 
-function checkPdpThumbnailCount() {
-    const thumbsContainer = document.getElementById('pdp-thumbnails');
-    if (!thumbsContainer) return;
-    const remainingThumbs = thumbsContainer.querySelectorAll('.pdp-thumbnail');
-    const counterEl = document.getElementById('pdp-image-counter');
-    if (remainingThumbs.length <= 1) {
-        thumbsContainer.style.display = 'none';
-        if (counterEl) counterEl.style.display = 'none';
-    } else {
-        thumbsContainer.style.display = 'flex';
-        if (counterEl) {
-            counterEl.style.display = 'block';
-            counterEl.textContent = `1 / ${remainingThumbs.length}`;
+        const current =
+            window.currentPdpProduct ||
+            null;
+
+        /*
+           currentPdpProduct may be maintained privately by
+           products.js, so also inspect the DOM.
+        */
+        const mainImg =
+            document.getElementById(
+                'pdp-main-img'
+            );
+
+        const domCode =
+            normalizeProductCode(
+                mainImg?.dataset?.productCode
+            );
+
+        if (
+            domCode &&
+            domCode.toUpperCase() !==
+            cleanCode.toUpperCase()
+        ) {
+            return;
+        }
+
+        if (
+            typeof window.updatePdpGallery ===
+            'function'
+        ) {
+            try {
+                window.updatePdpGallery(
+                    images,
+                    current || {
+                        productCode: cleanCode,
+                        images: images
+                    }
+                );
+
+                return;
+            } catch (error) {
+                console.warn(
+                    '[WishRite Images] PDP update failed:',
+                    error
+                );
+            }
+        }
+
+        /*
+           Direct fallback if updatePdpGallery is not
+           available yet.
+        */
+        if (mainImg) {
+            mainImg.src =
+                addCacheBuster(images[0].url);
+
+            mainImg.alt =
+                images[0].alt ||
+                'WishRite Silver Jewellery';
         }
     }
-}
+
+    /* ============================================================
+       17. MAIN IMAGE RESOLVER
+       ============================================================ */
+
+    async function resolveProductImages(
+        productOrCode,
+        options = {}
+    ) {
+        const cleanCode =
+            extractProductCode(productOrCode);
+
+        if (!cleanCode) {
+            console.warn(
+                '[WishRite Images] Cannot resolve images: missing product code.'
+            );
+
+            return [
+                generateProductPlaceholder(
+                    'Product Image'
+                )
+            ];
+        }
+
+        const forceRefresh =
+            options.forceRefresh === true;
+
+        /*
+           Return cached images unless explicitly
+           requesting a refresh.
+        */
+        if (
+            !forceRefresh &&
+            resolvedImageCache.has(cleanCode)
+        ) {
+            const cached =
+                resolvedImageCache.get(cleanCode);
+
+            /*
+               Update DOM again because a new page/view
+               may have been rendered after the cache was created.
+            */
+            if (cached.length > 0) {
+                updateRenderedProductCards(
+                    cleanCode,
+                    cached[0].url
+                );
+            }
+
+            return cached;
+        }
+
+        /*
+           Prevent duplicate Storage requests for the
+           same product.
+        */
+        if (
+            !forceRefresh &&
+            inFlightResolutions.has(cleanCode)
+        ) {
+            return inFlightResolutions.get(cleanCode);
+        }
+
+        const resolutionPromise =
+            (async () => {
+                try {
+                    const storageResult =
+                        await listProductImagesFromStorage(
+                            cleanCode
+                        );
+
+                    let images =
+                        storageResult.images;
+
+                    /*
+                       If Storage listing works and returns
+                       images, this is the authoritative result.
+                    */
+                    if (
+                        Array.isArray(images) &&
+                        images.length > 0
+                    ) {
+                        resolvedImageCache.set(
+                            cleanCode,
+                            images
+                        );
+
+                        updateProductsDatabase(
+                            cleanCode,
+                            images
+                        );
+
+                        updateRenderedProductCards(
+                            cleanCode,
+                            images[0].url
+                        );
+
+                        updateCurrentPdp(
+                            cleanCode,
+                            images
+                        );
+
+                        window.dispatchEvent(
+                            new CustomEvent(
+                                'wishrite:productImagesResolved',
+                                {
+                                    detail: {
+                                        productCode:
+                                            cleanCode,
+                                        images:
+                                            images
+                                    }
+                                }
+                            )
+                        );
+
+                        return images;
+                    }
+
+                    /*
+                       Storage listing failed or folder
+                       returned no images.
+
+                       Try known public filenames.
+                    */
+                    if (
+                        storageResult.error ||
+                        images.length === 0
+                    ) {
+                        console.warn(
+                            `[WishRite Images] Trying public URL fallback for ${cleanCode}`
+                        );
+
+                        const fallbackImages =
+                            await checkFallbackImageUrls(
+                                cleanCode
+                            );
+
+                        if (
+                            fallbackImages.length > 0
+                        ) {
+                            resolvedImageCache.set(
+                                cleanCode,
+                                fallbackImages
+                            );
+
+                            updateProductsDatabase(
+                                cleanCode,
+                                fallbackImages
+                            );
+
+                            updateRenderedProductCards(
+                                cleanCode,
+                                fallbackImages[0].url
+                            );
+
+                            updateCurrentPdp(
+                                cleanCode,
+                                fallbackImages
+                            );
+
+                            window.dispatchEvent(
+                                new CustomEvent(
+                                    'wishrite:productImagesResolved',
+                                    {
+                                        detail: {
+                                            productCode:
+                                                cleanCode,
+                                            images:
+                                                fallbackImages
+                                        }
+                                    }
+                                )
+                            );
+
+                            return fallbackImages;
+                        }
+                    }
+
+                    /*
+                       Existing custom-image localStorage
+                       compatibility.
+                    */
+                    try {
+                        const custom =
+                            JSON.parse(
+                                localStorage.getItem(
+                                    'wishrite_custom_product_images'
+                                ) || '{}'
+                            );
+
+                        const localImages =
+                            custom[cleanCode] ||
+                            custom[
+                            cleanCode.toUpperCase()
+                            ] ||
+                            [];
+
+                        if (
+                            Array.isArray(localImages) &&
+                            localImages.length > 0
+                        ) {
+                            const normalized =
+                                localImages.map(
+                                    (item, index) => {
+                                        if (
+                                            typeof item ===
+                                            'string'
+                                        ) {
+                                            return {
+                                                id: `${cleanCode}-local-${index}`,
+                                                productCode: cleanCode,
+                                                product_code: cleanCode,
+                                                name: `local-${index}`,
+                                                path: '',
+                                                storagePath: '',
+                                                url: item,
+                                                alt: `${cleanCode} — WishRite Silver Jewellery`,
+                                                type: 'product',
+                                                isPrimary:
+                                                    index === 0,
+                                                sortOrder:
+                                                    index,
+                                                isPlaceholder:
+                                                    false
+                                            };
+                                        }
+
+                                        return {
+                                            ...item,
+                                            productCode:
+                                                cleanCode,
+                                            isPrimary:
+                                                index === 0,
+                                            sortOrder:
+                                                index,
+                                            isPlaceholder:
+                                                false
+                                        };
+                                    }
+                                );
+
+                            resolvedImageCache.set(
+                                cleanCode,
+                                normalized
+                            );
+
+                            updateProductsDatabase(
+                                cleanCode,
+                                normalized
+                            );
+
+                            updateRenderedProductCards(
+                                cleanCode,
+                                normalized[0].url
+                            );
+
+                            updateCurrentPdp(
+                                cleanCode,
+                                normalized
+                            );
+
+                            return normalized;
+                        }
+
+                    } catch (localError) {
+                        console.warn(
+                            '[WishRite Images] Local image fallback failed:',
+                            localError
+                        );
+                    }
+
+                    /*
+                       Nothing found.
+                    */
+                    console.warn(
+                        `[WishRite Images] No images available for ${cleanCode}`
+                    );
+
+                    return [
+                        generateProductPlaceholder(
+                            cleanCode
+                        )
+                    ];
+
+                } catch (error) {
+                    console.error(
+                        `[WishRite Images] Failed resolving ${cleanCode}:`,
+                        error
+                    );
+
+                    return [
+                        generateProductPlaceholder(
+                            cleanCode
+                        )
+                    ];
+
+                } finally {
+                    inFlightResolutions.delete(
+                        cleanCode
+                    );
+                }
+            })();
+
+        inFlightResolutions.set(
+            cleanCode,
+            resolutionPromise
+        );
+
+        return resolutionPromise;
+    }
+
+    /* ============================================================
+       18. FORCE REFRESH ONE PRODUCT
+       ============================================================ */
+
+    async function refreshProductImages(
+        productOrCode
+    ) {
+        const cleanCode =
+            extractProductCode(productOrCode);
+
+        if (!cleanCode) {
+            return [];
+        }
+
+        resolvedImageCache.delete(
+            cleanCode
+        );
+
+        return resolveProductImages(
+            cleanCode,
+            {
+                forceRefresh: true
+            }
+        );
+    }
+
+    /* ============================================================
+       19. CLEAR ALL IMAGE CACHE
+       ============================================================ */
+
+    function clearProductImageCache() {
+        resolvedImageCache.clear();
+        inFlightResolutions.clear();
+
+        console.info(
+            '[WishRite Images] Product image cache cleared.'
+        );
+    }
+
+    /* ============================================================
+       20. GET PRODUCT IMAGES
+       ============================================================ */
+
+    function getProductImages(product) {
+        if (!product) {
+            return [
+                generateProductPlaceholder(
+                    'Product'
+                )
+            ];
+        }
+
+        const productCode =
+            extractProductCode(product);
+
+        /*
+           1. Dynamic Storage cache
+        */
+        if (
+            productCode &&
+            resolvedImageCache.has(productCode)
+        ) {
+            return resolvedImageCache.get(
+                productCode
+            );
+        }
+
+        /*
+           2. Existing product images
+        */
+        if (
+            Array.isArray(product.images) &&
+            product.images.length > 0
+        ) {
+            return product.images;
+        }
+
+        /*
+           3. Existing image_url
+        */
+        if (product.image_url) {
+            return [
+                {
+                    id: `${productCode}-image-url`,
+                    productCode: productCode,
+                    product_code: productCode,
+                    name: 'image_url',
+                    path: '',
+                    storagePath: '',
+                    url: product.image_url,
+                    alt:
+                        product.name ||
+                        `${productCode} — WishRite Silver Jewellery`,
+                    type: 'product',
+                    isPrimary: true,
+                    sortOrder: 0,
+                    isPlaceholder: false
+                }
+            ];
+        }
+
+        /*
+           4. Existing product_media_urls
+        */
+        if (
+            Array.isArray(
+                product.product_media_urls
+            ) &&
+            product.product_media_urls.length > 0
+        ) {
+            return product.product_media_urls
+                .map((url, index) => ({
+                    id:
+                        `${productCode}-media-${index}`,
+                    productCode:
+                        productCode,
+                    product_code:
+                        productCode,
+                    name:
+                        `media-${index}`,
+                    path: '',
+                    storagePath: '',
+                    url:
+                        typeof url === 'string'
+                            ? url
+                            : url.url,
+                    alt:
+                        product.name ||
+                        `${productCode} — WishRite Silver Jewellery`,
+                    type:
+                        'product',
+                    isPrimary:
+                        index === 0,
+                    sortOrder:
+                        index,
+                    isPlaceholder:
+                        false
+                }))
+                .filter(item => item.url);
+        }
+
+        /*
+           5. Start dynamic Storage resolution.
+           Do not block initial product rendering.
+        */
+        if (productCode) {
+            resolveProductImages(
+                product
+            ).catch(error => {
+                console.error(
+                    '[WishRite Images] Background resolution failed:',
+                    error
+                );
+            });
+        }
+
+        /*
+           6. Temporary placeholder.
+           It will be replaced automatically once
+           Storage resolution completes.
+        */
+        return [
+            generateProductPlaceholder(
+                product.name ||
+                productCode ||
+                'Product'
+            )
+        ];
+    }
+
+    /* ============================================================
+       21. PRODUCT IMAGE ERROR HANDLER
+       ============================================================ */
+
+    function handleProductImageError(
+        img,
+        productCode,
+        category
+    ) {
+        if (!img) {
+            return;
+        }
+
+        const cleanCode =
+            normalizeProductCode(
+                productCode ||
+                img.dataset.productCode
+            );
+
+        /*
+           Do not repeatedly retry the same URL.
+        */
+        const currentIndex =
+            parseInt(
+                img.dataset.fallbackIndex ||
+                '0',
+                10
+            );
+
+        const nextIndex =
+            currentIndex + 1;
+
+        if (
+            nextIndex <
+            FALLBACK_CANDIDATES.length
+        ) {
+            const fileName =
+                FALLBACK_CANDIDATES[nextIndex];
+
+            const fallbackPath =
+                `${cleanCode}/${fileName}`;
+
+            const fallbackUrl =
+                getSupabaseStoragePublicUrl(
+                    fallbackPath
+                );
+
+            img.dataset.fallbackIndex =
+                String(nextIndex);
+
+            img.src =
+                addCacheBuster(
+                    fallbackUrl
+                );
+
+            return;
+        }
+
+        /*
+           Final placeholder.
+        */
+        img.onerror = null;
+
+        img.src =
+            generatePlaceholderDataUri(
+                category ||
+                cleanCode ||
+                'Jewellery'
+            );
+
+        img.classList.add(
+            'is-placeholder-img'
+        );
+    }
+
+    /* ============================================================
+       22. THUMBNAIL ERROR HANDLER
+       ============================================================ */
+
+    function handleThumbnailError(img) {
+        if (!img) {
+            return;
+        }
+
+        img.onerror = null;
+
+        img.src =
+            generatePlaceholderDataUri(
+                'WishRite'
+            );
+    }
+
+    /* ============================================================
+       23. SVG PLACEHOLDER
+       ============================================================ */
+
+    function generatePlaceholderDataUri(
+        label = 'WishRite'
+    ) {
+        const safeLabel =
+            String(label)
+                .replace(
+                    /[<>&'"]/g,
+                    ''
+                )
+                .substring(0, 40);
+
+        const svg = `
+            <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="700"
+                height="875"
+                viewBox="0 0 700 875"
+            >
+                <rect
+                    width="700"
+                    height="875"
+                    fill="#f7f4f1"
+                />
+
+                <text
+                    x="350"
+                    y="410"
+                    text-anchor="middle"
+                    font-family="Arial, sans-serif"
+                    font-size="26"
+                    fill="#5e3435"
+                >
+                    WishRite
+                </text>
+
+                <text
+                    x="350"
+                    y="450"
+                    text-anchor="middle"
+                    font-family="Arial, sans-serif"
+                    font-size="16"
+                    fill="#8a7775"
+                >
+                    ${safeLabel}
+                </text>
+            </svg>
+        `;
+
+        return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+    }
+
+    function generateProductPlaceholder(
+        label = 'WishRite'
+    ) {
+        return {
+            id: `placeholder-${Date.now()}`,
+            productCode:
+                extractProductCode(label),
+            product_code:
+                extractProductCode(label),
+            name: 'placeholder',
+            path: '',
+            storagePath: '',
+            url:
+                generatePlaceholderDataUri(
+                    label
+                ),
+            alt:
+                `${label} — Image coming soon`,
+            type: 'placeholder',
+            isPrimary: true,
+            sortOrder: 0,
+            isPlaceholder: true
+        };
+    }
+
+    /* ============================================================
+       24. PRODUCT IMAGE MAP COMPATIBILITY
+       ============================================================ */
+
+    const productImagesMap = new Map();
+
+    function setSupabaseProductImages(records) {
+        productImagesMap.clear();
+
+        if (!Array.isArray(records)) {
+            return;
+        }
+
+        records.forEach(record => {
+            const code =
+                extractProductCode(record);
+
+            if (!code) {
+                return;
+            }
+
+            const image = {
+                id:
+                    record.id ||
+                    `${code}-${productImagesMap.size}`,
+                productCode:
+                    code,
+                product_code:
+                    code,
+                url:
+                    record.url ||
+                    record.image_url ||
+                    record.public_url ||
+                    '',
+                alt:
+                    record.alt ||
+                    record.image_alt ||
+                    `${code} — WishRite Silver Jewellery`,
+                type:
+                    record.type ||
+                    'product',
+                isPrimary:
+                    record.isPrimary ??
+                    record.is_primary ??
+                    false,
+                sortOrder:
+                    Number(
+                        record.sortOrder ??
+                        record.sort_order ??
+                        0
+                    ),
+                isPlaceholder:
+                    false
+            };
+
+            if (!image.url) {
+                return;
+            }
+
+            const existing =
+                productImagesMap.get(code) ||
+                [];
+
+            existing.push(image);
+
+            productImagesMap.set(
+                code,
+                existing
+            );
+        });
+
+        /*
+           Sort each product's images.
+        */
+        productImagesMap.forEach(
+            (images, code) => {
+                images.sort((a, b) => {
+                    if (
+                        a.isPrimary &&
+                        !b.isPrimary
+                    ) {
+                        return -1;
+                    }
+
+                    if (
+                        !a.isPrimary &&
+                        b.isPrimary
+                    ) {
+                        return 1;
+                    }
+
+                    return (
+                        a.sortOrder -
+                        b.sortOrder
+                    );
+                });
+
+                productImagesMap.set(
+                    code,
+                    images
+                );
+            }
+        );
+    }
+
+    /* ============================================================
+       25. OPTIONAL DB IMAGE MAP FALLBACK
+       ============================================================ */
+
+    function getMappedProductImages(
+        product
+    ) {
+        const code =
+            extractProductCode(product);
+
+        if (!code) {
+            return [];
+        }
+
+        return (
+            productImagesMap.get(code) ||
+            productImagesMap.get(
+                code.toUpperCase()
+            ) ||
+            []
+        );
+    }
+
+    /* ============================================================
+       26. EXPOSE PUBLIC API
+       ============================================================ */
+
+    window.resolveProductImages =
+        resolveProductImages;
+
+    window.refreshProductImages =
+        refreshProductImages;
+
+    window.clearProductImageCache =
+        clearProductImageCache;
+
+    window.getProductImages =
+        getProductImages;
+
+    window.getSupabaseStoragePublicUrl =
+        getSupabaseStoragePublicUrl;
+
+    window.setSupabaseProductImages =
+        setSupabaseProductImages;
+
+    window.updateRenderedProductCards =
+        updateRenderedProductCards;
+
+    window.handleProductImageError =
+        handleProductImageError;
+
+    window.handleThumbnailError =
+        handleThumbnailError;
+
+    window.generateProductPlaceholder =
+        generateProductPlaceholder;
+
+    /* ============================================================
+       27. DEBUG HELPERS
+       ============================================================ */
+
+    window.wishriteImageDebug = {
+        bucket:
+            STORAGE_BUCKET,
+
+        resolve:
+            resolveProductImages,
+
+        refresh:
+            refreshProductImages,
+
+        clearCache:
+            clearProductImageCache,
+
+        getCache:
+            function (productCode) {
+                return resolvedImageCache.get(
+                    normalizeProductCode(
+                        productCode
+                    )
+                ) || [];
+            },
+
+        getClient:
+            getSupabaseClient
+    };
+
+    console.info(
+        '✓ WishRite dynamic image service initialized.'
+    );
+
+})();
