@@ -186,6 +186,151 @@ async function checkPincodeServiceability(pincode) {
     };
 }
 
+// Session cache to prevent repeated lookups for the same PIN in a checkout session
+const pincodeLocationCache = new Map();
+
+/**
+ * Look up City & State from an Indian 6-digit PIN code
+ * Primary source: Indian Postal API (api.postalpincode.in)
+ * Secondary fallback: Zippopotam API
+ * Offline fallback: Local Postal Matrix (CLIENT_POSTAL_ZONES)
+ * 
+ * Reuses existing isValidIndianPincode() and CLIENT_POSTAL_ZONES from shipping.js
+ */
+async function lookupPincodeLocation(pincode) {
+    const raw = String(pincode || '').replace(/\s+/g, '').trim();
+
+    if (!isValidIndianPincode(raw)) {
+        return {
+            success: false,
+            valid: false,
+            invalid: true,
+            error: 'Please enter a valid PIN code.'
+        };
+    }
+
+    if (pincodeLocationCache.has(raw)) {
+        return pincodeLocationCache.get(raw);
+    }
+
+    let primaryFailed = false;
+
+    // 1. Primary Lookup via official Indian Postal data
+    try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 4000);
+        const res = await fetch(`https://api.postalpincode.in/pincode/${raw}`, {
+            signal: controller.signal
+        });
+        clearTimeout(timer);
+
+        if (res.ok) {
+            const data = await res.json();
+            if (Array.isArray(data) && data.length > 0) {
+                const entry = data[0];
+                if (entry.Status === 'Success' && Array.isArray(entry.PostOffice) && entry.PostOffice.length > 0) {
+                    const po = entry.PostOffice[0];
+                    const rawDistrict = (po.District || po.Division || po.Block || '').trim();
+                    const rawState = (po.State || '').trim();
+                    if (rawDistrict || rawState) {
+                        const result = {
+                            success: true,
+                            valid: true,
+                            city: rawDistrict,
+                            state: rawState,
+                            source: 'postal-api'
+                        };
+                        pincodeLocationCache.set(raw, result);
+                        return result;
+                    }
+                } else if (entry.Status === 'Error' || (entry.Message && /no records found/i.test(entry.Message))) {
+                    const result = {
+                        success: false,
+                        valid: false,
+                        invalid: true,
+                        error: 'Please enter a valid PIN code.'
+                    };
+                    pincodeLocationCache.set(raw, result);
+                    return result;
+                }
+            }
+        }
+        primaryFailed = true;
+    } catch (e) {
+        primaryFailed = true;
+    }
+
+    // 2. Secondary Lookup via Zippopotam fallback
+    if (primaryFailed) {
+        try {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), 3000);
+            const res = await fetch(`https://api.zippopotam.us/in/${raw}`, {
+                signal: controller.signal
+            });
+            clearTimeout(timer);
+
+            if (res.ok) {
+                const zipData = await res.json();
+                if (zipData && Array.isArray(zipData.places) && zipData.places.length > 0) {
+                    const place = zipData.places[0];
+                    const placeCity = (place['place name'] || '').trim();
+                    const placeState = (place['state'] || '').trim();
+                    if (placeCity || placeState) {
+                        const result = {
+                            success: true,
+                            valid: true,
+                            city: placeCity,
+                            state: placeState,
+                            source: 'zippopotam'
+                        };
+                        pincodeLocationCache.set(raw, result);
+                        return result;
+                    }
+                }
+            } else if (res.status === 404) {
+                const result = {
+                    success: false,
+                    valid: false,
+                    invalid: true,
+                    error: 'Please enter a valid PIN code.'
+                };
+                pincodeLocationCache.set(raw, result);
+                return result;
+            }
+        } catch (e) {
+            // Secondary network lookup failed
+        }
+    }
+
+    // 3. Offline matrix fallback using CLIENT_POSTAL_ZONES
+    const prefix = raw.substring(0, 2);
+    const zone = CLIENT_POSTAL_ZONES[prefix];
+    if (zone && zone.state) {
+        const cleanState = zone.state.replace(/\s*\([^)]*\)/, '').trim();
+        return {
+            success: true,
+            valid: true,
+            city: '',
+            state: cleanState,
+            source: 'offline-zone',
+            partial: true
+        };
+    }
+
+    // 4. Non-blocking error when service is completely unreachable
+    return {
+        success: false,
+        serviceUnavailable: true,
+        error: "We couldn't verify this PIN code. Please check your City and State."
+    };
+}
+
+if (typeof window !== 'undefined') {
+    window.lookupPincodeLocation = lookupPincodeLocation;
+}
+
+
 /**
  * Generate PDP Pincode Checker Component HTML
  */
