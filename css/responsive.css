@@ -125,6 +125,32 @@
         padding: var(--space-10) var(--container-padding);
     }
 
+    /* Trust Bar (Tablet: 2x2 grid) */
+    .trust-bar {
+        padding: var(--space-7) 0;
+    }
+
+    .trust-bar-container {
+        grid-template-columns: repeat(2, 1fr);
+        row-gap: var(--space-6);
+        column-gap: var(--space-4);
+    }
+
+    .trust-badge:not(:last-child)::after {
+        display: none;
+    }
+
+    .trust-badge:nth-child(odd)::after {
+        display: block;
+        content: '';
+        position: absolute;
+        right: 0;
+        top: 15%;
+        height: 70%;
+        width: 1px;
+        background: var(--wr-border-light);
+    }
+
     /* Trust */
     .trust-section {
         justify-content: center;
@@ -388,21 +414,46 @@
         font-size: 10px;
     }
 
-    /* Trust */
+    /* Trust Bar (Mobile: 2x2 grid with compact luxury spacing) */
+    .trust-bar {
+        padding: var(--space-6) 0;
+    }
+
+    .trust-bar-container {
+        grid-template-columns: repeat(2, 1fr);
+        row-gap: var(--space-5);
+        column-gap: var(--space-2);
+        padding: 0 var(--space-3);
+    }
+
+    .trust-badge {
+        padding: var(--space-1);
+    }
+
+    .trust-badge-icon {
+        width: 36px;
+        height: 36px;
+        margin-bottom: var(--space-2);
+    }
+
+    .trust-badge-icon svg {
+        width: 22px;
+        height: 22px;
+    }
+
+    .trust-badge-title {
+        font-size: 0.75rem;
+    }
+
+    .trust-badge-sub {
+        font-size: 0.6875rem;
+    }
+
+    /* Legacy trust section if present */
     .trust-section {
         flex-direction: column;
         align-items: flex-start;
         gap: var(--space-4);
-    }
-
-    .trust-badge-icon {
-        width: 32px;
-        height: 32px;
-    }
-
-    .trust-badge-icon svg {
-        width: 20px;
-        height: 20px;
     }
 
     /* Why */

@@ -294,35 +294,99 @@
     transform: translateY(0);
 }
 
-/* ── Trust Badge ── */
+/* ── Trust & Service Benefits Strip ── */
+.trust-bar {
+    width: 100%;
+    background: var(--wr-white);
+    border-top: 1px solid var(--wr-border-light);
+    border-bottom: 1px solid var(--wr-border-light);
+    padding: var(--space-8) 0;
+}
+
+.trust-bar-container {
+    max-width: var(--container-max);
+    margin: 0 auto;
+    padding: 0 var(--container-padding);
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    align-items: center;
+}
+
 .trust-badge {
     display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: var(--space-3);
+    text-align: center;
+    padding: var(--space-2) var(--space-4);
+    position: relative;
+}
+
+/* Subtle luxury vertical divider between columns on desktop */
+.trust-badge:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 15%;
+    height: 70%;
+    width: 1px;
+    background: var(--wr-border-light);
 }
 
 .trust-badge-icon {
-    width: 40px;
-    height: 40px;
+    width: 44px;
+    height: 44px;
     display: flex;
     align-items: center;
     justify-content: center;
+    margin-bottom: var(--space-3);
+    color: var(--wr-primary);
     flex-shrink: 0;
 }
 
 .trust-badge-icon svg {
-    width: 24px;
-    height: 24px;
+    width: 26px;
+    height: 26px;
     stroke: var(--wr-primary);
     stroke-width: 1.5;
     fill: none;
+    stroke-linecap: round;
+    stroke-linejoin: round;
 }
 
-.trust-badge-text {
+.trust-badge-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.trust-badge-title {
+    font-family: var(--font-body);
     font-size: var(--text-sm);
     font-weight: 500;
-    color: var(--wr-text);
+    color: var(--wr-charcoal);
+    letter-spacing: 0.02em;
     line-height: var(--leading-snug);
+    margin: 0 0 var(--space-1) 0;
+}
+
+.trust-badge-sub {
+    font-family: var(--font-body);
+    font-size: var(--text-xs);
+    font-weight: 300;
+    color: var(--wr-text-muted);
+    letter-spacing: 0.03em;
+    margin: 0;
+    line-height: var(--leading-normal);
+}
+
+/* Backward compatibility for text element */
+.trust-badge-text {
+    font-family: var(--font-body);
+    font-size: var(--text-sm);
+    font-weight: 500;
+    color: var(--wr-charcoal);
+    line-height: var(--leading-snug);
+    text-align: center;
 }
 
 .trust-badge-text span {
@@ -330,7 +394,7 @@
     font-weight: 300;
     font-size: var(--text-xs);
     color: var(--wr-text-muted);
-    margin-top: 2px;
+    margin-top: var(--space-1);
 }
 
 /* ── Accordion ── */
