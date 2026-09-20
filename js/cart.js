@@ -5,12 +5,30 @@ pincode validation before order placement, dynamic shipping charges
 ============================================ */
 
 let cart = [];
-const FREE_SHIPPING_THRESHOLD = 1999;
+const FREE_SHIPPING_THRESHOLD = 2999;
 const STANDARD_SHIPPING_FEE = 99;
+const COD_CHARGE = 50;
 
 function getShippingFee(subtotal) {
     if (subtotal <= 0) return 0;
     return subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : STANDARD_SHIPPING_FEE;
+}
+
+function getCodCharge(paymentMethod, subtotal = getCartSubtotal()) {
+    if (String(paymentMethod || '').toLowerCase() !== 'cod' || subtotal <= 0) return 0;
+    return COD_CHARGE;
+}
+
+function getCheckoutTotals(paymentMethod = 'prepaid') {
+    const subtotal = getCartSubtotal();
+    const shipping = getShippingFee(subtotal);
+    const codCharge = getCodCharge(paymentMethod, subtotal);
+    return {
+        subtotal,
+        shipping,
+        codCharge,
+        total: subtotal + shipping + codCharge
+    };
 }
 
 function addToCart(id, event, qtyToAdd = 1) {
@@ -236,6 +254,7 @@ function renderCart() {
 }
 
 let checkoutPincodeVerified = false;
+let checkoutPincodeServiceability = null;
 
 async function validateCheckoutPincode() {
     const input = document.getElementById('checkout-pincode-input');
@@ -255,6 +274,8 @@ async function validateCheckoutPincode() {
         const res = (typeof checkPincodeServiceability === 'function')
             ? await checkPincodeServiceability(pin)
             : { serviceable: true };
+
+        checkoutPincodeServiceability = res;
 
         if (res.serviceable) {
             msg.innerHTML = `<span style="color:#2E7D32;">✓ Delivery available to ${pin} (${res.estimatedDeliveryDate || '3-5 business days'}).</span>`;
@@ -343,9 +364,10 @@ function openWishriteCheckoutModal(pin) {
         existingModal.remove();
     }
 
-    const subtotal = getCartSubtotal();
-    const shipping = getShippingFee(subtotal);
-    const total = subtotal + shipping;
+    const initialTotals = getCheckoutTotals('prepaid');
+    const subtotal = initialTotals.subtotal;
+    const shipping = initialTotals.shipping;
+    const total = initialTotals.total;
 
     const modal = document.createElement('div');
 
@@ -388,28 +410,51 @@ function openWishriteCheckoutModal(pin) {
 
                 <div class="wishrite-checkout-body">
 
-                    <div class="wishrite-checkout-order-summary">
+                    <div class="wishrite-checkout-order-summary" id="wishrite-checkout-summary">
 
                         <div>
                             <span>Subtotal</span>
-                            <strong>${formatPrice(subtotal)}</strong>
+                            <strong id="wishrite-checkout-subtotal">${formatPrice(subtotal)}</strong>
                         </div>
 
                         <div>
                             <span>Shipping</span>
-                            <strong>
-                                ${shipping === 0
-            ? 'FREE'
-            : formatPrice(shipping)
-        }
+                            <strong id="wishrite-checkout-shipping">
+                                ${shipping === 0 ? 'FREE' : formatPrice(shipping)}
                             </strong>
+                        </div>
+
+                        <div id="wishrite-checkout-cod-row" style="display:none;">
+                            <span>COD Charges</span>
+                            <strong id="wishrite-checkout-cod-charge">${formatPrice(COD_CHARGE)}</strong>
                         </div>
 
                         <div class="wishrite-checkout-total">
                             <span>Total</span>
-                            <strong>${formatPrice(total)}</strong>
+                            <strong id="wishrite-checkout-total">${formatPrice(total)}</strong>
                         </div>
 
+                    </div>
+
+                    <div class="wishrite-payment-section" style="margin:20px 0 24px;">
+                        <div class="wishrite-form-section-title" style="margin-bottom:12px;">Payment Method</div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                            <label id="wishrite-prepaid-option" style="display:flex;align-items:center;gap:10px;border:1px solid var(--wr-primary);border-radius:10px;padding:14px;cursor:pointer;background:#faf6f3;">
+                                <input type="radio" name="wishrite-payment-method" value="prepaid" checked onchange="updateWishriteCheckoutTotals('prepaid')">
+                                <span>
+                                    <strong style="display:block;">Online Payment</strong>
+                                    <small style="color:var(--wr-text-muted);">UPI, Cards & Net Banking</small>
+                                </span>
+                            </label>
+                            <label id="wishrite-cod-option" style="display:flex;align-items:center;gap:10px;border:1px solid var(--wr-border);border-radius:10px;padding:14px;cursor:pointer;background:#fff;">
+                                <input type="radio" name="wishrite-payment-method" value="cod" onchange="updateWishriteCheckoutTotals('cod')">
+                                <span>
+                                    <strong style="display:block;">Cash on Delivery</strong>
+                                    <small style="color:var(--wr-text-muted);">+ ₹50 COD charges</small>
+                                </span>
+                            </label>
+                        </div>
+                        <div id="wishrite-payment-note" style="margin-top:10px;font-size:0.78rem;color:var(--wr-text-muted);">Secure online payment powered by Razorpay.</div>
                     </div>
 
                     <form
@@ -608,6 +653,7 @@ function openWishriteCheckoutModal(pin) {
 
     // Initialize auto City & State lookup on PIN entry
     initCheckoutPinLookup(pin);
+    updateWishriteCheckoutTotals('prepaid');
 
     setTimeout(() => {
         const nameInput = document.getElementById(
@@ -620,6 +666,58 @@ function openWishriteCheckoutModal(pin) {
     }, 100);
 }
 
+
+function updateWishriteCheckoutTotals(paymentMethod) {
+    const method = String(paymentMethod || 'prepaid').toLowerCase() === 'cod' ? 'cod' : 'prepaid';
+    const totals = getCheckoutTotals(method);
+
+    const shippingEl = document.getElementById('wishrite-checkout-shipping');
+    const codRow = document.getElementById('wishrite-checkout-cod-row');
+    const codChargeEl = document.getElementById('wishrite-checkout-cod-charge');
+    const totalEl = document.getElementById('wishrite-checkout-total');
+    const prepaidOption = document.getElementById('wishrite-prepaid-option');
+    const codOption = document.getElementById('wishrite-cod-option');
+    const noteEl = document.getElementById('wishrite-payment-note');
+
+    if (shippingEl) {
+        shippingEl.innerHTML = totals.shipping === 0
+            ? '<strong style="color:#2E7D32;">FREE</strong>'
+            : formatPrice(totals.shipping);
+    }
+    if (codRow) codRow.style.display = method === 'cod' ? 'flex' : 'none';
+    if (codChargeEl) codChargeEl.textContent = formatPrice(totals.codCharge);
+    if (totalEl) totalEl.textContent = formatPrice(totals.total);
+
+    if (prepaidOption) {
+        prepaidOption.style.borderColor = method === 'prepaid' ? 'var(--wr-primary)' : 'var(--wr-border)';
+        prepaidOption.style.background = method === 'prepaid' ? '#faf6f3' : '#fff';
+    }
+    const codAvailable = checkoutPincodeServiceability?.codAvailable !== false;
+    const codRadio = codOption?.querySelector('input[value="cod"]');
+    if (codOption) {
+        codOption.style.borderColor = method === 'cod' ? 'var(--wr-primary)' : 'var(--wr-border)';
+        codOption.style.background = method === 'cod' ? '#faf6f3' : '#fff';
+        codOption.style.opacity = codAvailable ? '1' : '0.5';
+        codOption.style.cursor = codAvailable ? 'pointer' : 'not-allowed';
+    }
+    if (codRadio) {
+        codRadio.disabled = !codAvailable;
+        if (!codAvailable && codRadio.checked) {
+            const prepaidRadio = document.querySelector('input[name="wishrite-payment-method"][value="prepaid"]');
+            if (prepaidRadio) {
+                prepaidRadio.checked = true;
+                return updateWishriteCheckoutTotals('prepaid');
+            }
+        }
+    }
+    if (noteEl) {
+        noteEl.textContent = method === 'cod'
+            ? 'Cash on Delivery includes a ₹50 COD handling charge.'
+            : 'Secure online payment powered by Razorpay.';
+    }
+
+    return totals;
+}
 
 function closeWishriteCheckoutModal(event) {
     if (
@@ -1169,9 +1267,34 @@ async function submitWishriteCustomerCheckout(event) {
         return;
     }
 
-    const subtotal = getCartSubtotal();
-    const shipping = getShippingFee(subtotal);
-    const total = subtotal + shipping;
+    // Re-check serviceability here because the customer can edit the PIN inside the checkout modal.
+    try {
+        if (typeof checkPincodeServiceability === 'function') {
+            const serviceability = await checkPincodeServiceability(pin);
+            checkoutPincodeServiceability = serviceability;
+            if (!serviceability?.serviceable) {
+                showCheckoutFormError('Delivery is unavailable to this PIN code. Please enter a serviceable delivery PIN.');
+                return;
+            }
+        }
+    } catch (serviceabilityError) {
+        showCheckoutFormError('Unable to verify delivery serviceability right now. Please try again.');
+        return;
+    }
+
+    const paymentMethodInput = document.querySelector('input[name="wishrite-payment-method"]:checked');
+    const paymentMethod = paymentMethodInput?.value === 'cod' ? 'cod' : 'prepaid';
+
+    if (paymentMethod === 'cod' && checkoutPincodeServiceability?.codAvailable === false) {
+        showCheckoutFormError('Cash on Delivery is not available for this PIN code. Please choose online payment.');
+        return;
+    }
+
+    const checkoutTotals = getCheckoutTotals(paymentMethod);
+    const subtotal = checkoutTotals.subtotal;
+    const shipping = checkoutTotals.shipping;
+    const codCharge = checkoutTotals.codCharge;
+    const total = checkoutTotals.total;
 
     if (!Number.isFinite(total) || total <= 0) {
         showCheckoutFormError(
@@ -1216,9 +1339,9 @@ async function submitWishriteCustomerCheckout(event) {
             tax: 0,
             grand_total: Number(total),
             currency: 'INR',
-            payment_method: 'razorpay',
+            payment_method: paymentMethod,
             payment_status: 'pending',
-            order_status: 'pending'
+            order_status: paymentMethod === 'cod' ? 'confirmed' : 'pending'
         };
 
         // 1. Insert order record into public.orders without SELECT/RETURNING
@@ -1304,12 +1427,34 @@ async function submitWishriteCustomerCheckout(event) {
             customer_pin: pin,
             subtotal: Number(subtotal),
             shipping_charge: Number(shipping),
+            cod_charge: Number(codCharge),
             grand_total: Number(total),
+            payment_method: paymentMethod,
             currency: 'INR',
             items: orderItemsWithImages
         };
 
-        // 4. Directly proceed to Razorpay Checkout
+        // 4. Online payment goes through Razorpay. COD is confirmed without opening Razorpay.
+        if (paymentMethod === 'cod') {
+            if (window.wishritePendingCheckout) {
+                window.wishritePendingCheckout.is_completed = true;
+                window.wishritePendingCheckout.payment_status = 'pending';
+                window.wishritePendingCheckout.order_status = 'confirmed';
+            }
+
+            clearCart();
+            renderWishriteOrderConfirmation(window.wishritePendingCheckout, {
+                success: true,
+                verified: false,
+                order_number: orderNumber,
+                payment_status: 'pending',
+                order_status: 'confirmed',
+                grand_total: Number(total),
+                currency: 'INR'
+            });
+            return;
+        }
+
         await proceedToRazorpayPayment(internalOrderId);
 
     } catch (error) {
@@ -1626,6 +1771,16 @@ function ensureWishriteConfirmationStyles() {
 
         .wishrite-pill-paid .wishrite-pill-dot {
             background: #167946;
+        }
+
+        .wishrite-pill-pending {
+            background: #FFF8E1;
+            color: #8A6D1D;
+            border: 1px solid #E8D79A;
+        }
+
+        .wishrite-pill-pending .wishrite-pill-dot {
+            background: #C79A00;
         }
 
         .wishrite-pill-processing {
@@ -2092,6 +2247,9 @@ function renderWishriteOrderConfirmation(pendingCheckout, verifyData) {
     const grandTotal = verifyData?.grand_total !== undefined ? verifyData.grand_total : (pending.grand_total || 0);
     const subtotal = pending.subtotal !== undefined ? pending.subtotal : grandTotal;
     const shipping = pending.shipping_charge !== undefined ? pending.shipping_charge : 0;
+    const codCharge = pending.cod_charge !== undefined ? pending.cod_charge : 0;
+    const paymentMethod = String(pending.payment_method || 'razorpay').toLowerCase();
+    const isCod = paymentMethod === 'cod';
     const items = Array.isArray(pending.items) ? pending.items : [];
 
     const customerName = pending.customer_name || 'Valued Customer';
@@ -2171,7 +2329,9 @@ function renderWishriteOrderConfirmation(pendingCheckout, verifyData) {
                     <h1 class="wishrite-confirm-title">Order Confirmed</h1>
                     <p class="wishrite-confirm-thankyou">Thank you for your order.</p>
                     <p class="wishrite-confirm-subtitle">
-                        Your payment has been verified and your order is now being prepared.
+                        ${isCod
+            ? 'Your Cash on Delivery order has been confirmed. Please keep the payable amount ready at delivery.'
+            : 'Your payment has been verified and your order is now being prepared.'}
                     </p>
                 </div>
 
@@ -2183,14 +2343,14 @@ function renderWishriteOrderConfirmation(pendingCheckout, verifyData) {
                     </div>
                     <div class="wishrite-status-col">
                         <span class="wishrite-status-label">Payment Status</span>
-                        <span class="wishrite-pill wishrite-pill-paid">
-                            <span class="wishrite-pill-dot"></span> Paid
+                        <span class="wishrite-pill ${isCod ? 'wishrite-pill-pending' : 'wishrite-pill-paid'}">
+                            <span class="wishrite-pill-dot"></span> ${escapeWishriteHtml(paymentStatusDisplay)}
                         </span>
                     </div>
                     <div class="wishrite-status-col">
                         <span class="wishrite-status-label">Order Status</span>
                         <span class="wishrite-pill wishrite-pill-processing">
-                            <span class="wishrite-pill-dot"></span> Processing
+                            <span class="wishrite-pill-dot"></span> ${escapeWishriteHtml(orderStatusDisplay)}
                         </span>
                     </div>
                     <div class="wishrite-status-col">
@@ -2262,6 +2422,16 @@ function renderWishriteOrderConfirmation(pendingCheckout, verifyData) {
                                     <span class="wishrite-price-val wishrite-shipping-val">
                                         ${shipping === 0 ? 'FREE' : formatPrice(shipping)}
                                     </span>
+                                </div>
+                                ${isCod ? `
+                                <div class="wishrite-price-row">
+                                    <span class="wishrite-price-label">COD Charges</span>
+                                    <span class="wishrite-price-val">${formatPrice(codCharge)}</span>
+                                </div>
+                                ` : ''}
+                                <div class="wishrite-price-row">
+                                    <span class="wishrite-price-label">Payment Method</span>
+                                    <span class="wishrite-price-val">${isCod ? 'Cash on Delivery' : 'Online Payment'}</span>
                                 </div>
                                 <div class="wishrite-price-divider"></div>
                                 <div class="wishrite-price-row wishrite-grand-total-row">

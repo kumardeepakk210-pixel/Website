@@ -114,9 +114,9 @@ function savePincode(pin) {
 }
 
 /**
- * Check PIN code serviceability via backend API with offline fallback
+ * Check PIN code serviceability via Supabase Edge Function (Shiprocket) with offline fallback
  */
-async function checkPincodeServiceability(pincode) {
+async function checkPincodeServiceability(pincode, options = {}) {
     const raw = String(pincode || '').trim();
 
     if (!isValidIndianPincode(raw)) {
@@ -129,23 +129,98 @@ async function checkPincodeServiceability(pincode) {
     }
 
     const cleaned = raw;
+    const pickupPincode = '700092'; // WishRite base pickup pincode (Kolkata)
+    const orderValue = Number(options.order_value || options.orderValue || options.subtotal) || 
+        (typeof getCartSubtotal === 'function' ? getCartSubtotal() : 2500) || 2500;
+    const paymentMethod = String(options.payment_method || options.paymentMethod || 'PREPAID').toUpperCase();
 
+    // 1. Call Supabase Edge Function: shiprocket-serviceability
     try {
-        // Call backend API (supports live Shiprocket & server-side verification)
-        const response = await fetch(`/api/pincode?pincode=${cleaned}`);
-        if (response.ok) {
-            const data = await response.json();
+        const supabaseUrl = window.SUPABASE_URL || 'https://ptpuepejciqiktmcpuon.supabase.co';
+        const supabaseKey = window.SUPABASE_ANON_KEY || 'sb_publishable_ZHwzEtRBkW9u4T2d_0R2Ag_BX1EeJRX';
+        const requestBody = {
+            delivery_pincode: cleaned,
+            pickup_pincode: pickupPincode,
+            order_value: orderValue,
+            payment_method: paymentMethod
+        };
+
+        let data = null;
+        const client = window.supabaseClient || (typeof supabase !== 'undefined' ? supabase : null);
+        if (client && client.functions && typeof client.functions.invoke === 'function') {
+            const { data: efData, error: efError } = await client.functions.invoke('shiprocket-serviceability', {
+                body: requestBody
+            });
+            if (!efError && efData) {
+                data = efData;
+            }
+        }
+
+        if (!data) {
+            const response = await fetch(`${supabaseUrl}/functions/v1/shiprocket-serviceability`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'apikey': supabaseKey,
+                    'Authorization': `Bearer ${supabaseKey}`
+                },
+                body: JSON.stringify(requestBody)
+            });
+            if (response.ok) {
+                data = await response.json();
+            }
+        }
+
+        if (data && typeof data.serviceable === 'boolean') {
             if (data.serviceable) {
                 savePincode(cleaned);
+                const cheapest = data.shiprocket?.cheapest_courier;
+                const couriers = Array.isArray(data.shiprocket?.couriers) ? data.shiprocket.couriers : [];
+                const hasCod = couriers.some(c => Number(c.cod) === 1);
+                const etd = cheapest?.etd || '';
+                const estDays = couriers[0]?.estimated_delivery_days
+                    ? `${couriers[0].estimated_delivery_days} business days`
+                    : '2–4 business days';
+                const city = couriers[0]?.city || '';
+                const state = couriers[0]?.state || '';
+
+                const shippingCharge = data.wishrite_shipping?.shipping_charge !== undefined
+                    ? data.wishrite_shipping.shipping_charge
+                    : (orderValue >= 2999 ? 0 : 99);
+                const codCharge = data.wishrite_shipping?.cod_charge !== undefined
+                    ? data.wishrite_shipping.cod_charge
+                    : 50;
+
+                return {
+                    success: true,
+                    serviceable: true,
+                    pincode: cleaned,
+                    city: city,
+                    state: state,
+                    estimatedDays: estDays,
+                    estimatedDeliveryDate: etd || estDays,
+                    codAvailable: hasCod,
+                    shippingCharge: shippingCharge,
+                    codCharge: codCharge,
+                    courierName: cheapest?.courier_name || 'Express Courier',
+                    source: 'shiprocket-serviceability',
+                    message: `Delivery available to ${cleaned}`
+                };
+            } else {
+                return {
+                    success: true,
+                    serviceable: false,
+                    pincode: cleaned,
+                    codAvailable: false,
+                    message: `Sorry, delivery is currently unavailable to PIN code ${cleaned}.`
+                };
             }
-            return data;
         }
     } catch (networkErr) {
-        // Fallback to client-side postal circle verification
-        console.info('Pincode service using client verification:', networkErr.message);
+        console.info('Pincode service edge function error, using postal matrix fallback:', networkErr.message);
     }
 
-    // Client fallback verification
+    // 2. Client fallback verification
     const prefix = cleaned.substring(0, 2);
     const zone = CLIENT_POSTAL_ZONES[prefix];
 
@@ -154,6 +229,7 @@ async function checkPincodeServiceability(pincode) {
             success: true,
             serviceable: false,
             pincode: cleaned,
+            codAvailable: false,
             message: `Sorry, delivery is currently unavailable to PIN code ${cleaned}.`
         };
     }
@@ -181,9 +257,15 @@ async function checkPincodeServiceability(pincode) {
         estimatedDays: `${zone.days} business days`,
         estimatedDeliveryDate: dateRangeStr,
         codAvailable: true,
-        shippingCharge: 0,
+        shippingCharge: orderValue >= 2999 ? 0 : 99,
+        codCharge: 50,
+        source: 'postal-matrix-fallback',
         message: `Delivery available to ${cleaned} (${zone.state})`
     };
+}
+
+if (typeof window !== 'undefined') {
+    window.checkPincodeServiceability = checkPincodeServiceability;
 }
 
 // Session cache to prevent repeated lookups for the same PIN in a checkout session
