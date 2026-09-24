@@ -59,11 +59,12 @@
         <!-- Logo -->
         <div class="header-logo" onclick="navigateTo('home')" role="link" aria-label="WishRite Home">
             <div class="header-logo-text">WISHRITE</div>
-            <div class="header-logo-sub">SILVER JEWELLERY</div>
+            <div class="header-logo-sub" id="header-logo-sub">SILVER JEWELLERY</div>
         </div>
 
         <!-- Desktop Navigation -->
         <nav class="header-nav" aria-label="Main navigation">
+            <a onclick="navigateTo('occasion')" id="nav-occasion" class="nav-festive-item" style="display: none;">FESTIVE EDIT</a>
             <a onclick="navigateToShopWithFilter('category', 'All', 'featured', 'All Jewellery')" id="nav-shop">ALL
                 JEWELLERY</a>
             <a onclick="navigateTo('collections')" id="nav-collections">COLLECTIONS</a>
@@ -128,6 +129,7 @@
             </button>
         </div>
         <nav class="mobile-menu-nav" aria-label="Mobile navigation">
+            <a onclick="closeMobileMenu(); navigateTo('occasion')" id="mobile-nav-occasion" class="nav-festive-item" style="display: none;">Festive Edit</a>
             <a
                 onclick="closeMobileMenu(); navigateToShopWithFilter('category', 'All', 'featured', 'All Jewellery')">Jewellery</a>
             <a onclick="closeMobileMenu(); navigateTo('collections')">Collections</a>
@@ -193,6 +195,8 @@
 
         <!-- ═══ HOME VIEW ═══ -->
         <div id="home-view">
+            <!-- Main Homepage Jewellery Line-Art Sketch (Section 5: 0.08–0.12 opacity, responsive) -->
+            <div class="homepage-jewellery-sketch" aria-hidden="true"></div>
 
             <!-- Hero Section -->
             <section class="hero" aria-label="Featured jewellery">
@@ -680,6 +684,9 @@
             </div>
         </div>
 
+        <!-- ═══ FESTIVE OCCASION VIEW ═══ -->
+        <div id="occasion-view" style="display: none;" class="occasion-page"></div>
+
         <!-- ═══ PRODUCT DETAIL VIEW ═══ -->
         <div id="product-view" style="display: none;"></div>
 
@@ -809,6 +816,294 @@
                         </div>
                         <h4>Quality Focus</h4>
                         <p>From material selection to finishing — every step reflects our commitment to quality.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ═══ 1. SHIPPING INFORMATION (Section 30) ═══ -->
+            <section id="shipping" class="about-policy-section">
+                <div class="container">
+                    <div class="about-policy-header">
+                        <span class="sub-label">TRANSPARENT FULFILLMENT</span>
+                        <h2>Shipping Information &amp; Delivery Policies</h2>
+                        <p>We take utmost care in delivering our authentic pieces safely, promptly, and securely across India.</p>
+                    </div>
+
+                    <div class="policy-cards-grid">
+                        <div class="policy-card">
+                            <div class="policy-card-icon">💎</div>
+                            <h3>Silver Jewellery Shipping</h3>
+                            <div class="policy-highlight">FREE Express Delivery above ₹2,999</div>
+                            <p>For orders below ₹2,999, a flat standard insured delivery fee of ₹99 is applied at checkout. Orders are packed in tamper-proof security enclosures.</p>
+                            <div class="policy-subnote">Cash on Delivery (COD): ₹50 nominal verification fee.</div>
+                        </div>
+
+                        <div class="policy-card festive-policy-accent">
+                            <div class="policy-card-icon">🪔</div>
+                            <h3>Festive &amp; Occasion Edit</h3>
+                            <div class="policy-highlight">FREE Delivery above ₹199</div>
+                            <p>Special festive doorstep delivery on our active Occasion Collection (Sarees &amp; Statement Jewellery). Orders below ₹199 incur a minimal ₹49 shipping charge.</p>
+                            <div class="policy-subnote" style="color:#2E7D32;font-weight:600;">Cash on Delivery (COD): 100% FREE.</div>
+                        </div>
+
+                        <div class="policy-card">
+                            <div class="policy-card-icon">🚚</div>
+                            <h3>Dispatch &amp; Courier Partners</h3>
+                            <div class="policy-highlight">Dispatched within 24–48 Hours</div>
+                            <p>All pieces are quality-inspected and dispatched from our primary hub in Kolkata (PIN 700092) through our national courier network via Shiprocket (Blue Dart, Delhivery, DTDC, Xpressbees).</p>
+                            <div class="policy-subnote">Transit Time: 3–5 days (Metros), 4–7 days (Rest of India).</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ═══ 2. RETURN & EXCHANGE (Section 31) ═══ -->
+            <section id="returns" class="about-policy-section about-policy-alt">
+                <div class="container">
+                    <div class="about-policy-header">
+                        <span class="sub-label">PEACE OF MIND GUARANTEE</span>
+                        <h2>Returns &amp; Exchange Policy</h2>
+                        <p>We want you to love your WishRite piece as much as we loved creating it. If something isn't right, we are here to help.</p>
+                    </div>
+
+                    <div class="policy-content-block">
+                        <div class="policy-step-item">
+                            <span class="step-badge">7 Days</span>
+                            <h4>Hassle-Free Return Window</h4>
+                            <p>You can request an exchange or return within <strong>7 days of delivery</strong> for all eligible jewellery and sarees.</p>
+                        </div>
+                        <div class="policy-step-item">
+                            <span class="step-badge">Authenticity</span>
+                            <h4>Condition &amp; Original Packaging</h4>
+                            <p>Items must be unused, unworn, and returned with the original 925 hallmarking certificate, security tag intact, and packaged in the WishRite luxury box.</p>
+                        </div>
+                        <div class="policy-step-item">
+                            <span class="step-badge">Doorstep</span>
+                            <h4>Complimentary Reverse Pickup</h4>
+                            <p>Our courier partner will arrange doorstep pickup from your registered address upon authorization of your return request.</p>
+                        </div>
+                        <div class="policy-step-item">
+                            <span class="step-badge">Refund</span>
+                            <h4>Prompt Refund Processing</h4>
+                            <p>Following inspection at our Kolkata hub, refunds are initiated within 3–5 business days to your original payment method (or verified bank account for COD orders).</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ═══ 3. JEWELLERY CARE (Section 32) ═══ -->
+            <section id="care" class="about-policy-section">
+                <div class="container">
+                    <div class="about-policy-header">
+                        <span class="sub-label">PRESERVE THE LUSTRE</span>
+                        <h2>Jewellery &amp; Fabric Care Guide</h2>
+                        <p>Simple daily habits ensure your precious silver keeps its radiant shine and your ethnic wear remains pristine for generations.</p>
+                    </div>
+
+                    <div class="care-grid">
+                        <div class="care-card">
+                            <h4>✨ 925 Sterling Silver Care</h4>
+                            <ul>
+                                <li><strong>Store Airtight:</strong> Keep your silver in an airtight zip-lock pouch or anti-tarnish box when not in use.</li>
+                                <li><strong>Avoid Chemicals:</strong> Apply perfumes, lotions, and hairspray before putting on your jewellery. Avoid pool chlorine and salt water.</li>
+                                <li><strong>Gentle Polishing:</strong> Buff gently with a soft microfiber silver polishing cloth. Avoid abrasive materials.</li>
+                                <li><strong>Wear Often:</strong> Pure silver benefits from regular wear as natural skin oils help prevent oxidation.</li>
+                            </ul>
+                        </div>
+
+                        <div class="care-card">
+                            <h4>🥻 Festive Sarees &amp; Handloom Drapes</h4>
+                            <ul>
+                                <li><strong>Dry Clean Only:</strong> Handcrafted silks, tussar, and organza sarees should always be professionally dry cleaned.</li>
+                                <li><strong>Breathable Storage:</strong> Fold and store draped sarees wrapped inside a soft muslin or pure cotton bag.</li>
+                                <li><strong>Careful Ironing:</strong> Iron on low-to-medium heat with a protective cotton cloth over delicate zari borders.</li>
+                                <li><strong>Aerate Periodically:</strong> Unfold and air dry your sarees in a shaded, well-ventilated area every few months.</li>
+                            </ul>
+                        </div>
+
+                        <div class="care-card">
+                            <h4>👑 Statement Festive Jewellery</h4>
+                            <ul>
+                                <li><strong>Keep Dry:</strong> Wipe gently with a dry cotton swab after wearing to remove traces of sweat or cosmetics.</li>
+                                <li><strong>Store Separately:</strong> Keep intricate haslis, earrings, and bangles in separate compartments to avoid scratching.</li>
+                                <li><strong>Last On, First Off:</strong> Make statement jewellery the final addition to your outfit and the first thing you remove.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ═══ 4. FAQS (Section 33) ═══ -->
+            <section id="faqs" class="about-policy-section about-policy-alt">
+                <div class="container">
+                    <div class="about-policy-header">
+                        <span class="sub-label">GOT QUESTIONS?</span>
+                        <h2>Frequently Asked Questions</h2>
+                        <p>Find quick answers to common questions about WishRite jewellery, shipping, coupons, and orders.</p>
+                    </div>
+
+                    <div class="faq-accordion-container">
+                        <div class="faq-item" onclick="toggleWishriteFaq(this)">
+                            <div class="faq-question">
+                                <span>What is 925 sterling silver?</span>
+                                <span class="faq-icon">+</span>
+                            </div>
+                            <div class="faq-answer">
+                                <p>925 sterling silver is an authentic precious metal alloy composed of 92.5% pure silver and 7.5% copper or strengthening elements. This optimal ratio ensures your jewellery has radiant lustre, structural durability for everyday wear, and long-lasting beauty. Every WishRite silver piece is stamped with genuine hallmark certification.</p>
+                            </div>
+                        </div>
+
+                        <div class="faq-item" onclick="toggleWishriteFaq(this)">
+                            <div class="faq-question">
+                                <span>How should jewellery be cared for?</span>
+                                <span class="faq-icon">+</span>
+                            </div>
+                            <div class="faq-answer">
+                                <p>Store your pieces in airtight pouches away from humid environments. Always apply perfumes, sprays, and cosmetics before wearing your jewellery, and gently wipe each item with a soft microfiber cloth after use.</p>
+                            </div>
+                        </div>
+
+                        <div class="faq-item" onclick="toggleWishriteFaq(this)">
+                            <div class="faq-question">
+                                <span>How does shipping work?</span>
+                                <span class="faq-icon">+</span>
+                            </div>
+                            <div class="faq-answer">
+                                <p>Orders are dispatched within 24–48 hours from our central fulfillment facility in Kolkata (PIN 700092). We partner with premium courier services via Shiprocket (including Blue Dart, Delhivery, and DTDC). Metros receive shipments within 3–5 business days, and all other Indian locations within 4–7 business days.</p>
+                            </div>
+                        </div>
+
+                        <div class="faq-item" onclick="toggleWishriteFaq(this)">
+                            <div class="faq-question">
+                                <span>Is Cash on Delivery (COD) available?</span>
+                                <span class="faq-icon">+</span>
+                            </div>
+                            <div class="faq-answer">
+                                <p>Yes, Cash on Delivery is available across 26,000+ pin codes in India. For Silver Jewellery, a standard ₹50 COD verification charge is applied. For our active Occasion Collection, COD is 100% FREE!</p>
+                            </div>
+                        </div>
+
+                        <div class="faq-item" onclick="toggleWishriteFaq(this)">
+                            <div class="faq-question">
+                                <span>What is the free shipping threshold?</span>
+                                <span class="faq-icon">+</span>
+                            </div>
+                            <div class="faq-answer">
+                                <p>Silver Jewellery orders qualify for FREE shipping on order subtotals of ₹2,999 and above. For our Festive &amp; Occasion Collection, FREE shipping unlocks on orders starting from just ₹199.</p>
+                            </div>
+                        </div>
+
+                        <div class="faq-item" onclick="toggleWishriteFaq(this)">
+                            <div class="faq-question">
+                                <span>How do coupons work?</span>
+                                <span class="faq-icon">+</span>
+                            </div>
+                            <div class="faq-answer">
+                                <p>You can enter any valid coupon code in the coupon input box in your shopping bag or during checkout, then click APPLY. Eligible discounts (percentage, fixed amount, or free delivery) will automatically deduct from qualifying items in your cart based on coupon scope (Jewellery, Occasion, or Storewide).</p>
+                            </div>
+                        </div>
+
+                        <div class="faq-item" onclick="toggleWishriteFaq(this)">
+                            <div class="faq-question">
+                                <span>How can I track my order?</span>
+                                <span class="faq-icon">+</span>
+                            </div>
+                            <div class="faq-answer">
+                                <p>As soon as your package is dispatched, we send you an automated tracking SMS and email containing your live Shiprocket AWB tracking link. You can track your shipment live at any time until it arrives safely at your doorstep.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ═══ 5. PRIVACY POLICY (Section 34) ═══ -->
+            <section id="privacy" class="about-policy-section">
+                <div class="container">
+                    <div class="about-policy-header">
+                        <span class="sub-label">YOUR TRUST MATTERS</span>
+                        <h2>Privacy Policy</h2>
+                        <p>WishRite is committed to safeguarding your personal data and ensuring a secure, transparent shopping experience.</p>
+                    </div>
+
+                    <div class="policy-text-card">
+                        <h4>1. Information We Collect</h4>
+                        <p>We collect essential customer information — including name, email address, phone number, and shipping destination — solely to process your orders, communicate delivery updates, and provide personalized support.</p>
+
+                        <h4>2. Secure Payment Processing</h4>
+                        <p>WishRite does NOT store or process your credit card numbers, debit card details, UPI PINs, or net banking passwords. All financial transactions are securely processed through Razorpay's RBI-compliant, 256-bit SSL encrypted payment gateway.</p>
+
+                        <h4>3. Data Sharing &amp; Third-Party Logistics</h4>
+                        <p>We only share your shipping details (recipient name, address, phone number, and delivery PIN) with our certified logistics partner Shiprocket and associated courier carriers for the sole purpose of delivering your order.</p>
+
+                        <h4>4. No Selling of Customer Data</h4>
+                        <p>We respect your privacy. WishRite does not sell, rent, or trade your personal data to third-party marketing companies under any circumstances.</p>
+
+                        <h4>5. Your Rights &amp; Inquiries</h4>
+                        <p>You may request an update or deletion of your stored account details at any time by contacting us at support@wishrite.in.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ═══ 6. CONTACT US (Section 35) ═══ -->
+            <section id="contact" class="about-policy-section about-policy-alt">
+                <div class="container">
+                    <div class="about-policy-header">
+                        <span class="sub-label">WE ARE HERE FOR YOU</span>
+                        <h2>Contact Us</h2>
+                        <p>Have a question about a piece, an order, or bespoke styling? Our concierge team is ready to assist you.</p>
+                    </div>
+
+                    <div class="contact-grid">
+                        <div class="contact-info-card">
+                            <h3>WishRite Studio &amp; Concierge</h3>
+                            <p style="color:var(--wr-text-muted);line-height:1.6;margin-bottom:20px;">
+                                Thoughtfully designed 925 sterling silver jewellery and curated festive collections.
+                            </p>
+
+                            <div class="contact-detail-item">
+                                <span class="contact-icon">📍</span>
+                                <div>
+                                    <strong>Fulfillment Hub</strong>
+                                    <p>Kolkata — PIN 700092, West Bengal, India</p>
+                                </div>
+                            </div>
+
+                            <div class="contact-detail-item">
+                                <span class="contact-icon">✉️</span>
+                                <div>
+                                    <strong>Email Support</strong>
+                                    <p><a href="mailto:support@wishrite.in" style="color:var(--wr-primary);text-decoration:underline;">support@wishrite.in</a></p>
+                                </div>
+                            </div>
+
+                            <div class="contact-detail-item">
+                                <span class="contact-icon">💬</span>
+                                <div>
+                                    <strong>Concierge Hours</strong>
+                                    <p>Monday to Saturday: 10:00 AM – 7:00 PM IST</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="contact-form-card">
+                            <h3>Send Us a Message</h3>
+                            <form id="wishrite-contact-form" onsubmit="handleWishriteContactSubmit(event)">
+                                <div class="form-group" style="margin-bottom:14px;">
+                                    <label for="contact-name" style="display:block;font-size:0.85rem;font-weight:600;margin-bottom:6px;">Your Name <span style="color:#C62828;">*</span></label>
+                                    <input type="text" id="contact-name" required placeholder="Enter your full name" style="width:100%;padding:10px 14px;border:1px solid var(--wr-border);border-radius:var(--radius-sm);">
+                                </div>
+                                <div class="form-group" style="margin-bottom:14px;">
+                                    <label for="contact-email" style="display:block;font-size:0.85rem;font-weight:600;margin-bottom:6px;">Email Address <span style="color:#C62828;">*</span></label>
+                                    <input type="email" id="contact-email" required placeholder="name@example.com" style="width:100%;padding:10px 14px;border:1px solid var(--wr-border);border-radius:var(--radius-sm);">
+                                </div>
+                                <div class="form-group" style="margin-bottom:14px;">
+                                    <label for="contact-message" style="display:block;font-size:0.85rem;font-weight:600;margin-bottom:6px;">Message / Inquiry <span style="color:#C62828;">*</span></label>
+                                    <textarea id="contact-message" rows="4" required placeholder="How can we assist you?" style="width:100%;padding:10px 14px;border:1px solid var(--wr-border);border-radius:var(--radius-sm);resize:vertical;"></textarea>
+                                </div>
+                                <button type="submit" class="btn btn-primary" style="width:100%;padding:12px;">Send Message</button>
+                                <div id="contact-form-status" style="margin-top:12px;font-size:0.85rem;display:none;"></div>
+                            </form>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -1150,17 +1445,17 @@
             </div>
             <div class="footer-column">
                 <h4>Company</h4>
-                <a onclick="navigateTo('about')">About WishRite</a>
-                <a onclick="navigateTo('collections')">Collections</a>
-                <a href="#">Contact Us</a>
+                <a href="/about" onclick="event.preventDefault(); navigateTo('about');">About WishRite</a>
+                <a href="/collections" onclick="event.preventDefault(); navigateTo('collections');">Collections</a>
+                <a href="/about#contact" onclick="event.preventDefault(); navigateToAboutSection('contact');">Contact Us</a>
             </div>
             <div class="footer-column">
-                <h4>Help</h4>
-                <a href="#">Shipping Information</a>
-                <a href="#">Returns & Exchanges</a>
-                <a href="#">Jewellery Care</a>
-                <a href="#">FAQs</a>
-                <a href="#">Privacy Policy</a>
+                <h4>Help &amp; Policies</h4>
+                <a href="/about#shipping" onclick="event.preventDefault(); navigateToAboutSection('shipping');">Shipping Information</a>
+                <a href="/about#returns" onclick="event.preventDefault(); navigateToAboutSection('returns');">Returns &amp; Exchanges</a>
+                <a href="/about#care" onclick="event.preventDefault(); navigateToAboutSection('care');">Jewellery Care</a>
+                <a href="/about#faqs" onclick="event.preventDefault(); navigateToAboutSection('faqs');">FAQs</a>
+                <a href="/about#privacy" onclick="event.preventDefault(); navigateToAboutSection('privacy');">Privacy Policy</a>
             </div>
         </div>
         <div class="footer-bottom">
@@ -1193,11 +1488,14 @@
     <script src="js/shipping.js?v=20260919-shiprocket"></script>
     <script src="js/images.js"></script>
     <script src="js/products.js?v=2.0"></script>
-    <script src="js/cart.js?v=20260919-cod"></script>
+    <script src="js/coupons.js?v=20260920-coupons"></script>
+    <script src="js/cart.js?v=20260920-coupon"></script>
     <script src="js/wishlist.js"></script>
     <script src="js/search.js"></script>
     <script src="js/ui.js"></script>
     <script src="js/seo.js"></script>
+    <script src="js/occasion-config.js?v=20260920-festive"></script>
+    <script src="js/occasion.js?v=20260920-festive"></script>
     <script src="js/app.js?v=2.0"></script>
 
 </body>

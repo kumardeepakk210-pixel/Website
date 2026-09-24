@@ -1,0 +1,132 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 1000" width="100%" height="100%" fill="none">
+  <!-- WISHRITE FESTIVE LINE-ART — MAA DURGA PROFILE / FRONTAL SKETCH -->
+  <defs>
+    <linearGradient id="durgaGoldStroke" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8B1E2D" stop-opacity="0.9"/>
+      <stop offset="50%" stop-color="#D4AF37" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#9C2738" stop-opacity="0.6"/>
+    </linearGradient>
+  </defs>
+
+  <g stroke="url(#durgaGoldStroke)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <!-- Mukut (Ornate Crown) Peaks & Arches -->
+    <path d="M400 110 L400 60 M400 60 L385 85 L400 60 L415 85 Z" stroke-width="2"/>
+    <circle cx="400" cy="50" r="5" stroke-width="1.8"/>
+    <path d="M360 140 C380 90, 420 90, 440 140" stroke-width="1.8"/>
+    <path d="M330 170 C360 110, 440 110, 470 170" stroke-width="1.8"/>
+    <path d="M300 205 C350 130, 450 130, 500 205" stroke-width="1.8"/>
+    
+    <!-- Intricate Mukut Filigree & Jewels -->
+    <circle cx="400" cy="115" r="8"/>
+    <circle cx="400" cy="115" r="3" fill="#D4AF37" fill-opacity="0.3"/>
+    <circle cx="365" cy="145" r="5"/>
+    <circle cx="435" cy="145" r="5"/>
+    <circle cx="335" cy="180" r="5"/>
+    <circle cx="465" cy="180" r="5"/>
+    
+    <!-- Mukut Petals / Traditional Bengali 'Kalka' Motifs -->
+    <path d="M400 130 C385 160, 385 180, 400 200 C415 180, 415 160, 400 130 Z"/>
+    <path d="M370 160 C355 180, 355 195, 370 210 C385 195, 385 180, 370 160 Z"/>
+    <path d="M430 160 C415 180, 415 195, 430 210 C445 195, 445 180, 430 160 Z"/>
+    
+    <!-- Lower Crown Band with Pearl Strands -->
+    <path d="M280 230 Q400 255 520 230" stroke-width="2"/>
+    <path d="M285 242 Q400 268 515 242" stroke-dasharray="3,5" stroke-width="1.5"/>
+    <path d="M290 252 Q400 278 510 252"/>
+    
+    <!-- Flowing Hair Waves (Chikon Chul) -->
+    <path d="M285 242 C240 290, 220 380, 225 480 C230 580, 210 680, 180 770" stroke-width="1.4"/>
+    <path d="M270 255 C225 320, 205 410, 210 510 C215 620, 195 720, 160 810" stroke-width="1.2"/>
+    <path d="M515 242 C560 290, 580 380, 575 480 C570 580, 590 680, 620 770" stroke-width="1.4"/>
+    <path d="M530 255 C575 320, 595 410, 590 510 C585 620, 605 720, 640 810" stroke-width="1.2"/>
+
+    <!-- Forehead & Chandan Floral Dots (Chandaner Kalka) -->
+    <!-- Center Vermilion Bindi -->
+    <circle cx="400" cy="350" r="14" stroke-width="2"/>
+    <circle cx="400" cy="350" r="9" fill="#8B1E2D" fill-opacity="0.25"/>
+
+    <!-- Trinetra (Divine Third Eye on Forehead) -->
+    <path d="M400 280 C414 300, 414 316, 400 336 C386 316, 386 300, 400 280 Z" stroke-width="1.8"/>
+    <circle cx="400" cy="308" r="4" fill="#D4AF37" fill-opacity="0.4"/>
+
+    <!-- Subtle Brow Floral Alpona Dots -->
+    <path d="M340 335 Q400 325 460 335" stroke-dasharray="2,8" stroke-width="2"/>
+    <path d="M330 325 Q365 315 390 325"/>
+    <path d="M470 325 Q435 315 410 325"/>
+
+    <!-- Eyebrows (Bow Shaped Elegant Arches) -->
+    <path d="M310 370 C340 350, 375 352, 388 375" stroke-width="2.4"/>
+    <path d="M490 370 C460 350, 425 352, 412 375" stroke-width="2.4"/>
+
+    <!-- Iconic Patal-Chhera Eyes (Elongated Almond Bengali Eyes) -->
+    <!-- Left Eye -->
+    <path d="M305 385 C335 365, 370 375, 390 392 C365 408, 330 405, 305 385 Z" stroke-width="2.2"/>
+    <path d="M305 385 C295 382, 285 386, 275 392" stroke-width="1.5"/> <!-- Extended Kohl line -->
+    <circle cx="350" cy="388" r="11" stroke-width="1.8"/>
+    <circle cx="350" cy="388" r="6" fill="#8B1E2D" fill-opacity="0.4"/>
+    <circle cx="353" cy="386" r="2" fill="#FFFFFF"/>
+    <!-- Upper Eyelid fold -->
+    <path d="M315 376 C340 365, 368 370, 385 382" stroke-width="1.2"/>
+
+    <!-- Right Eye -->
+    <path d="M495 385 C465 365, 430 375, 410 392 C435 408, 470 405, 495 385 Z" stroke-width="2.2"/>
+    <path d="M495 385 C505 382, 515 386, 525 392" stroke-width="1.5"/> <!-- Extended Kohl line -->
+    <circle cx="450" cy="388" r="11" stroke-width="1.8"/>
+    <circle cx="450" cy="388" r="6" fill="#8B1E2D" fill-opacity="0.4"/>
+    <circle cx="447" cy="386" r="2" fill="#FFFFFF"/>
+    <!-- Upper Eyelid fold -->
+    <path d="M485 376 C460 365, 432 370, 415 382" stroke-width="1.2"/>
+
+    <!-- Sculpted Nose & Traditional Bengali Nath (Nose Ring) -->
+    <path d="M400 375 L398 440 C398 458, 408 462, 412 458 C416 454, 412 446, 402 448" stroke-width="1.8"/>
+    <!-- Nose Ring (Nath) on left nostril with delicate pearl chain extending to ear -->
+    <circle cx="380" cy="458" r="18" stroke-width="1.8"/>
+    <circle cx="380" cy="476" r="3" fill="#D4AF37" fill-opacity="0.5"/>
+    <path d="M362 458 C320 450, 270 400, 250 380" stroke-dasharray="3,6" stroke-width="1.2"/>
+
+    <!-- Divine Lips (Subtle Compassionate Smile) -->
+    <path d="M365 505 C382 500, 395 503, 400 508 C405 503, 418 500, 435 505 C420 525, 380 525, 365 505 Z" stroke-width="2"/>
+    <path d="M365 505 C385 514, 415 514, 435 505" stroke-width="1.4"/>
+    <path d="M382 522 C395 528, 405 528, 418 522" stroke-width="1.4"/>
+
+    <!-- Graceful Jawline & Chin -->
+    <path d="M280 340 C280 430, 330 535, 400 565 C470 535, 520 430, 520 340" stroke-width="1.5" stroke-opacity="0.7"/>
+
+    <!-- Ear & Traditional Jhumka / Kaan-Pasha Earrings -->
+    <!-- Left Ear / Jhumka -->
+    <path d="M272 380 C262 395, 262 420, 272 435" stroke-width="1.5"/>
+    <circle cx="260" cy="445" r="8"/>
+    <path d="M252 453 L268 453 L265 475 L255 475 Z"/>
+    <circle cx="260" cy="482" r="3"/>
+    <!-- Right Ear / Jhumka -->
+    <path d="M528 380 C538 395, 538 420, 528 435" stroke-width="1.5"/>
+    <circle cx="540" cy="445" r="8"/>
+    <path d="M532 453 L548 453 L545 475 L535 475 Z"/>
+    <circle cx="540" cy="482" r="3"/>
+
+    <!-- Slender Neck & Regal Choker / Hasli Necklace -->
+    <path d="M350 560 C350 600, 340 640, 320 670" stroke-width="1.4"/>
+    <path d="M450 560 C450 600, 460 640, 480 670" stroke-width="1.4"/>
+    <!-- Hasli / Choker Bands -->
+    <path d="M335 605 Q400 625 465 605" stroke-width="1.8"/>
+    <path d="M330 620 Q400 642 470 620" stroke-dasharray="4,6" stroke-width="1.5"/>
+    <path d="M325 635 Q400 660 475 635" stroke-width="1.6"/>
+    <!-- Center Necklace Pendant -->
+    <path d="M390 645 L410 645 L400 668 Z" stroke-width="1.6"/>
+    <circle cx="400" cy="675" r="4"/>
+
+    <!-- Subtle Trishul (Trident) Line-art in Background -->
+    <g stroke-opacity="0.35" stroke-width="1.2">
+      <line x1="400" y1="180" x2="400" y2="780"/>
+      <path d="M370 210 C370 260, 400 270, 400 270 C400 270, 430 260, 430 210"/>
+      <path d="M360 215 L370 200 L380 215"/>
+      <path d="M420 215 L430 200 L440 215"/>
+    </g>
+
+    <!-- Radiating Delicate Aura Lines Behind Mukut -->
+    <g stroke-dasharray="2,10" stroke-width="1" stroke-opacity="0.4">
+      <circle cx="400" cy="320" r="280"/>
+      <circle cx="400" cy="320" r="330"/>
+    </g>
+  </g>
+</svg>

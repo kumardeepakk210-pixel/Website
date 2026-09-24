@@ -204,8 +204,30 @@ function mapInventoryToProduct(item, existingSlugs = new Set()) {
         lowStock = true;
     }
 
-    const material = '925 Sterling Silver';
-    const silverPurity = '92.5%';
+    // Extended Festive Catalog Support (Backward-compatible with safe defaults)
+    const catalogType = item.catalog_type || 'silver_jewellery';
+    const occasionSlug = item.occasion_slug || '';
+    const color = item.color || '';
+    const fabric = item.fabric || '';
+    const design = item.design || '';
+    const pattern = item.pattern || '';
+    const borderStyle = item.border_style || '';
+    const matchingTags = item.matching_tags || '';
+    const isOccasionFeatured = Boolean(item.is_occasion_featured);
+
+    let material = '925 Sterling Silver';
+    let silverPurity = '92.5%';
+    let finish = 'High-Polish Rhodium';
+
+    if (catalogType === 'saree') {
+        material = fabric || 'Traditional Handloom Silk';
+        silverPurity = null;
+        finish = 'Authentic Handloom Weave';
+    } else if (catalogType === 'artificial_jewellery') {
+        material = item.material || 'Heritage Brass with Micron Gold Polish';
+        silverPurity = null;
+        finish = 'Antique Micron Polish';
+    }
 
     const product = {
         id: item.id,
@@ -214,13 +236,22 @@ function mapInventoryToProduct(item, existingSlugs = new Set()) {
         code: productCode,
         name: name,
         slug: slug,
-        description: item.product_description || `${name} crafted in hallmarked ${material} with a luminous high-polish finish.`,
+        catalog_type: catalogType,
+        occasion_slug: occasionSlug,
+        color: color,
+        fabric: fabric,
+        design: design,
+        pattern: pattern,
+        border_style: borderStyle,
+        matching_tags: matchingTags,
+        is_occasion_featured: isOccasionFeatured,
+        description: item.product_description || `${name} crafted with fine attention to detail and luxury finishing.`,
         shortDescription: item.product_description || `${material} ${category} crafted for effortless luxury.`,
         category: category,
         rawCategory: rawCategory,
         collection: collection,
         occasions: occasions,
-        occasion: occasions.join(', '),
+        occasion: item.occasion || occasions.join(', '),
         price: sellingPrice,
         sellingPrice: sellingPrice,
         mrp: mrp,
@@ -234,15 +265,19 @@ function mapInventoryToProduct(item, existingSlugs = new Set()) {
         lowStock: lowStock,
         material: material,
         silverPurity: silverPurity,
-        finish: 'High-Polish Rhodium',
+        finish: finish,
         status: stock > 0 ? 'Active' : 'Currently Unavailable',
         createdAt: item.created_at,
         updatedAt: item.updated_at,
         salesCount: salesCount,
-        care: 'Store in an airtight pouch. Keep away from water, perfumes, and sprays. Clean gently using a soft jewellery polishing cloth.',
+        care: catalogType === 'saree'
+            ? 'Dry clean only. Store in a breathable muslin or cotton saree bag. Avoid direct perfume or spray on zari motifs.'
+            : 'Store in an airtight pouch. Keep away from water, perfumes, and sprays. Clean gently using a soft jewellery polishing cloth.',
         shippingInfo: 'Complimentary insured express shipping across India. Usually dispatched within 24 to 48 hours.',
         returnInfo: 'Easy 7-day return and exchange policy with original packaging and certificate.',
-        whatsIncluded: '1 piece in signature WishRite luxury gift box with 925 Authenticity Certificate.',
+        whatsIncluded: catalogType === 'saree'
+            ? '1 Saree in WishRite protective luxury packaging with unstitched blouse piece where applicable.'
+            : '1 piece in signature WishRite luxury gift box with 925 Authenticity Certificate.',
         isNew: false, // Calculated dynamically across catalog
         isBestseller: false, // Calculated dynamically across catalog
         tag: stock <= 0 ? 'UNAVAILABLE' : (discount >= 20 ? 'SALE' : (stock <= 3 ? 'FEW LEFT' : ''))
@@ -311,7 +346,8 @@ const productsService = {
                 }
 
                 // 2. Fetch inventory records directly from public.inventory
-                const inventoryUrl = `${WR_SUPABASE_URL}/rest/v1/inventory?select=id,product_code,product_name,product_description,category,stock_quantity,selling_price,weight,size,created_at,updated_at,storage_folder&order=created_at.desc`;
+                // Requirement 6 & 7: Filter at database/query level so stock_quantity > 0
+                const inventoryUrl = `${WR_SUPABASE_URL}/rest/v1/inventory?select=*&stock_quantity=gt.0&order=created_at.desc`;
                 const invRes = await fetch(inventoryUrl, { headers });
 
                 if (!invRes.ok) {
@@ -323,8 +359,16 @@ const productsService = {
                     throw new Error('Invalid inventory data format received from database');
                 }
 
+                // Double safety layer: Filter out any items where stock_quantity <= 0
+                const inStockRawItems = rawItems.filter(item => {
+                    const qty = typeof item.stock_quantity === 'number' ? item.stock_quantity : parseInt(item.stock_quantity, 10);
+                    return !isNaN(qty) && qty > 0;
+                });
+
                 const existingSlugs = new Set();
-                const mapped = rawItems.map(item => mapInventoryToProduct(item, existingSlugs)).filter(Boolean);
+                const mapped = inStockRawItems
+                    .map(item => mapInventoryToProduct(item, existingSlugs))
+                    .filter(p => p && Number(p.stockQuantity || 0) > 0);
 
                 // Mark top 15 newest items
                 const sortedByDate = [...mapped].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
@@ -409,7 +453,9 @@ const productsService = {
                     if (cached) {
                         const parsed = JSON.parse(cached);
                         if (Array.isArray(parsed) && parsed.length > 0) {
-                            productsDB = parsed;
+                            const inStock = parsed.filter(p => p && Number(p.stockQuantity || 0) > 0);
+                            productsDB = inStock;
+                            window.productsDB = inStock;
                             productSlugMap.clear();
                             productCodeMap.clear();
                             productsDB.forEach(p => {
@@ -417,7 +463,7 @@ const productsService = {
                                 if (p.productCode) productCodeMap.set(p.productCode.toUpperCase(), p);
                                 if (p.id) productSlugMap.set(p.id, p);
                             });
-                            console.info(`✓ Restored ${parsed.length} products from offline cache.`);
+                            console.info(`✓ Restored ${inStock.length} in-stock products from offline cache.`);
                             return productsDB;
                         }
                     }
@@ -482,45 +528,62 @@ const productsService = {
 
     getProductById(id) {
         if (!id) return null;
-        return productSlugMap.get(id) || productsDB.find(p => p.id === id || String(p.id) === String(id) || p.productCode?.toUpperCase() === String(id).toUpperCase());
+        const found = productSlugMap.get(id) || productsDB.find(p => p.id === id || String(p.id) === String(id) || p.productCode?.toUpperCase() === String(id).toUpperCase());
+        if (found) return found;
+        if (typeof window.getOccasionShowcaseProducts === 'function') {
+            const showcase = window.getOccasionShowcaseProducts();
+            return showcase.find(p => p.id === id || String(p.id) === String(id) || p.productCode?.toUpperCase() === String(id).toUpperCase()) || null;
+        }
+        return null;
     },
 
     getProductBySlug(slug) {
         if (!slug) return null;
         const s = String(slug).trim().toLowerCase();
-        return productSlugMap.get(slug) ||
+        const found = productSlugMap.get(slug) ||
             productSlugMap.get(s) ||
-            productsDB.find(p => (p.slug && p.slug.toLowerCase() === s) ||
+            productsDB.find(p => p && Number(p.stockQuantity || 0) > 0 && ((p.slug && p.slug.toLowerCase() === s) ||
                 (p.productCode && p.productCode.toLowerCase() === s) ||
                 p.id === slug ||
-                (p.productCode && p.productCode.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() === s.replace(/[^a-zA-Z0-9]/g, '').toLowerCase()));
+                (p.productCode && p.productCode.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() === s.replace(/[^a-zA-Z0-9]/g, '').toLowerCase())));
+        if (found && Number(found.stockQuantity || 0) > 0) return found;
+        if (typeof window.getOccasionShowcaseProducts === 'function') {
+            const showcase = window.getOccasionShowcaseProducts();
+            return showcase.find(p => p && Number(p.stockQuantity || 0) > 0 && ((p.slug && p.slug.toLowerCase() === s) ||
+                (p.productCode && p.productCode.toLowerCase() === s) ||
+                p.id === slug)) || null;
+        }
+        return null;
     },
 
     getProductsByCategory(category) {
-        if (!category || category === 'All') return productsDB;
+        const inStock = productsDB.filter(p => p && Number(p.stockQuantity || 0) > 0);
+        if (!category || category === 'All') return inStock;
         const norm = normalizeCategory(category).toLowerCase();
-        return productsDB.filter(p => normalizeCategory(p.category).toLowerCase() === norm || (p.rawCategory && p.rawCategory.toLowerCase() === norm));
+        return inStock.filter(p => normalizeCategory(p.category).toLowerCase() === norm || (p.rawCategory && p.rawCategory.toLowerCase() === norm));
     },
 
     getProductsByCollection(collection) {
-        if (!collection || collection === 'All') return productsDB;
-        return productsDB.filter(p => p.collection === collection);
+        const inStock = productsDB.filter(p => p && Number(p.stockQuantity || 0) > 0);
+        if (!collection || collection === 'All') return inStock;
+        return inStock.filter(p => p.collection === collection);
     },
 
     getProductsByOccasion(occasion) {
-        if (!occasion || occasion === 'All') return productsDB;
-        return productsDB.filter(p => p.occasions && p.occasions.includes(occasion));
+        const inStock = productsDB.filter(p => p && Number(p.stockQuantity || 0) > 0);
+        if (!occasion || occasion === 'All') return inStock;
+        return inStock.filter(p => p.occasions && p.occasions.includes(occasion));
     },
 
     getNewArrivals(limit = 0) {
-        const sorted = [...productsDB]
+        const sorted = productsDB.filter(p => p && Number(p.stockQuantity || 0) > 0)
             .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
         return (limit && limit > 0) ? sorted.slice(0, limit) : sorted;
     },
 
     getBestSellers(limit = 0) {
-        const sorted = [...productsDB]
-            .sort((a, b) => (b.salesCount - a.salesCount) || ((b.stockQuantity > 0 ? 1 : 0) - (a.stockQuantity > 0 ? 1 : 0)));
+        const sorted = productsDB.filter(p => p && Number(p.stockQuantity || 0) > 0)
+            .sort((a, b) => (b.salesCount - a.salesCount) || (b.stockQuantity - a.stockQuantity));
         return (limit && limit > 0) ? sorted.slice(0, limit) : sorted;
     },
 
@@ -528,13 +591,15 @@ const productsService = {
         if (!query || query.trim().length < 2) return [];
         const q = query.toLowerCase().trim();
         return productsDB.filter(p =>
-            (p.name && p.name.toLowerCase().includes(q)) ||
-            (p.productCode && p.productCode.toLowerCase().includes(q)) ||
-            (p.category && p.category.toLowerCase().includes(q)) ||
-            (p.rawCategory && p.rawCategory.toLowerCase().includes(q)) ||
-            (p.collection && p.collection.toLowerCase().includes(q)) ||
-            (p.description && p.description.toLowerCase().includes(q)) ||
-            (p.material && p.material.toLowerCase().includes(q))
+            p && Number(p.stockQuantity || 0) > 0 && (
+                (p.name && p.name.toLowerCase().includes(q)) ||
+                (p.productCode && p.productCode.toLowerCase().includes(q)) ||
+                (p.category && p.category.toLowerCase().includes(q)) ||
+                (p.rawCategory && p.rawCategory.toLowerCase().includes(q)) ||
+                (p.collection && p.collection.toLowerCase().includes(q)) ||
+                (p.description && p.description.toLowerCase().includes(q)) ||
+                (p.material && p.material.toLowerCase().includes(q))
+            )
         );
     },
 
@@ -590,6 +655,7 @@ window.getCategories = () => productsService.getCategories();
 window.getCollections = () => productsService.getCollections();
 window.createProductCardHTML = createProductCardHTML;
 window.renderProductCard = createProductCardHTML;
+window.renderProductDetail = renderProductDetail;
 window.renderProductsToContainer = renderProductsToContainer;
 window.renderProductLoadingSkeletons = renderProductLoadingSkeletons;
 
@@ -620,18 +686,20 @@ function renderProductLoadingSkeletons(containerId, count = 8) {
  * Create a product card HTML
  */
 function createProductCardHTML(product) {
+    // Requirement 6: Critical - Never show zero stock products anywhere on website
+    if (!product || Number(product.stockQuantity || 0) <= 0) {
+        return '';
+    }
+
     const isWishlisted = typeof wishlist !== 'undefined' && wishlist.has(product.id);
-    const isOutOfStock = product.stockQuantity <= 0;
 
     let badgeHTML = '';
-    if (isOutOfStock) {
-        badgeHTML = `<span class="product-card-badge badge-out-of-stock">CURRENTLY UNAVAILABLE</span>`;
-    } else if (product.tag) {
+    if (product.tag && product.tag !== 'UNAVAILABLE') {
         const badgeClass = product.tag === 'NEW' ? 'badge-new' : (product.tag === 'SALE' ? 'badge-sale' : 'badge-gold');
         badgeHTML = `<span class="product-card-badge ${badgeClass}">${product.tag}</span>`;
     }
 
-    const discountHTML = (!isOutOfStock && product.discount > 0) ? `<span class="price-discount">${product.discount}% OFF</span>` : '';
+    const discountHTML = product.discount > 0 ? `<span class="price-discount">${product.discount}% OFF</span>` : '';
     const mrpHTML = (product.mrp > product.sellingPrice) ? `<span class="price-original">${formatPrice(product.mrp)}</span>` : '';
 
     const imgSrc = product.images?.[0]?.url || product.image || '';
@@ -639,7 +707,7 @@ function createProductCardHTML(product) {
     const prodCode = product.productCode || product.sku || product.code || '';
 
     return `
-        <div class="product-card ${isOutOfStock ? 'out-of-stock' : ''}" data-product-code="${prodCode}" onclick="navigateTo('product', '${product.slug}')">
+        <div class="product-card" data-product-code="${prodCode}" onclick="navigateTo('product', '${product.slug}')">
             <div class="product-card-image" data-product-code="${prodCode}">
                 <img 
                     src="${imgSrc}" 
@@ -657,9 +725,7 @@ function createProductCardHTML(product) {
                 <button class="product-card-wishlist ${isWishlisted ? 'active' : ''}" onclick="toggleWishlist('${product.id}', event)" aria-label="${isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}">
                     ${ICONS.heart}
                 </button>
-                ${!isOutOfStock
-            ? `<button class="product-card-quick" onclick="addToCart('${product.id}', event)">Quick Add</button>`
-            : `<button class="product-card-quick notify-label" onclick="event.stopPropagation(); openNotifyMeModal('${product.id}')">Notify Me</button>`}
+                <button class="product-card-quick" onclick="addToCart('${product.id}', event)">Quick Add</button>
             </div>
             <div class="product-card-info">
                 <div class="product-card-meta-line">
@@ -741,34 +807,36 @@ function renderProductDetail(product) {
     pdpQty = 1;
 
     // Asynchronously resolve real Storage images dynamically for PDP
-    resolveProductImages(product)
-        .then(resolvedImgs => {
-            if (
-                Array.isArray(resolvedImgs) &&
-                resolvedImgs.length > 0 &&
-                !resolvedImgs[0].isPlaceholder
-            ) {
-                product.images = resolvedImgs;
-                product.image = resolvedImgs[0].url;
-
+    if (typeof resolveProductImages === 'function') {
+        resolveProductImages(product)
+            .then(resolvedImgs => {
                 if (
-                    currentPdpProduct &&
-                    currentPdpProduct.productCode ===
-                    product.productCode
+                    Array.isArray(resolvedImgs) &&
+                    resolvedImgs.length > 0 &&
+                    !resolvedImgs[0].isPlaceholder
                 ) {
-                    updatePdpGallery(
-                        resolvedImgs,
-                        product
-                    );
+                    product.images = resolvedImgs;
+                    product.image = resolvedImgs[0].url;
+
+                    if (
+                        currentPdpProduct &&
+                        currentPdpProduct.productCode ===
+                        product.productCode
+                    ) {
+                        updatePdpGallery(
+                            resolvedImgs,
+                            product
+                        );
+                    }
                 }
-            }
-        })
-        .catch(error => {
-            console.error(
-                `[WishRite] PDP image resolution failed for ${product.productCode}:`,
-                error
-            );
-        });
+            })
+            .catch(error => {
+                console.error(
+                    `[WishRite] PDP image resolution failed for ${product.productCode}:`,
+                    error
+                );
+            });
+    }
 
     // Resolve images
     const images = (typeof getProductImages === 'function') ? getProductImages(product) : (product.images || []);
@@ -782,45 +850,86 @@ function renderProductDetail(product) {
     ).join('');
 
     const isWishlisted = typeof wishlist !== 'undefined' && wishlist.has(product.id);
-    const isOutOfStock = product.stockQuantity <= 0;
     const mrpHTML = product.mrp > product.sellingPrice ? `<span class="pdp-price-original">${formatPrice(product.mrp)}</span>` : '';
-    const discountHTML = (!isOutOfStock && product.discount > 0) ? `<span class="pdp-price-discount">${product.discount}% OFF</span>` : '';
+    const discountHTML = product.discount > 0 ? `<span class="pdp-price-discount">${product.discount}% OFF</span>` : '';
 
-    // Trust & Feature Badges
+    // Trust & Feature Badges based on catalog_type
     const features = [];
-    features.push('Hallmarked 925 Pure Silver');
-    if (product.weight) features.push(`Weight: ${product.weight}`);
-    if (product.size) features.push(`Size: ${product.size}`);
-    features.push('High-Polish Rhodium Finish');
-    features.push('Complimentary Luxury Gift Box');
+    if (product.catalog_type === 'saree') {
+        if (product.fabric) features.push(`Fabric: ${product.fabric}`);
+        if (product.design) features.push(`Design: ${product.design}`);
+        if (product.color) features.push(`Color: ${product.color}`);
+        features.push('Authentic Festive Handloom Weave');
+        features.push('Complimentary Luxury Festive Packaging');
+    } else if (product.catalog_type === 'artificial_jewellery') {
+        features.push('Heritage Micron Gold Polish');
+        if (product.design) features.push(`Style: ${product.design}`);
+        if (product.color) features.push(`Color: ${product.color}`);
+        features.push('Handcrafted Festive Adornment');
+        features.push('Complimentary Luxury Gift Box');
+    } else {
+        features.push('Hallmarked 925 Pure Silver');
+        if (product.weight) features.push(`Weight: ${product.weight}`);
+        if (product.size) features.push(`Size: ${product.size}`);
+        features.push('High-Polish Rhodium Finish');
+        features.push('Complimentary Luxury Gift Box');
+    }
 
     const featuresHTML = features.map(f =>
         `<div class="feature-item">${ICONS.check}<span>${f}</span></div>`
     ).join('');
 
-    // Dynamic Specifications Table
+    // Dynamic Specifications Table based on catalog_type (Section 11, 12, 13)
     const specsArr = [];
     if (product.productCode) specsArr.push(`<tr><td>Product Code</td><td><code>${product.productCode}</code></td></tr>`);
-    if (product.material) specsArr.push(`<tr><td>Precious Metal</td><td>${product.material}</td></tr>`);
-    if (product.silverPurity) specsArr.push(`<tr><td>Silver Purity</td><td>${product.silverPurity} Standard</td></tr>`);
-    if (product.category) specsArr.push(`<tr><td>Category</td><td>${product.category}</td></tr>`);
-    if (product.finish) specsArr.push(`<tr><td>Finish</td><td>${product.finish}</td></tr>`);
-    if (product.weight) specsArr.push(`<tr><td>Jewellery Weight</td><td>${product.weight}</td></tr>`);
-    if (product.size) specsArr.push(`<tr><td>Size</td><td>${product.size}</td></tr>`);
+    
+    if (product.catalog_type === 'saree') {
+        if (product.fabric) specsArr.push(`<tr><td>Fabric</td><td>${product.fabric}</td></tr>`);
+        if (product.design) specsArr.push(`<tr><td>Weave & Design</td><td>${product.design}</td></tr>`);
+        if (product.pattern) specsArr.push(`<tr><td>Pattern Motif</td><td>${product.pattern}</td></tr>`);
+        if (product.border_style) specsArr.push(`<tr><td>Border Style</td><td>${product.border_style}</td></tr>`);
+        if (product.color) specsArr.push(`<tr><td>Color Palette</td><td>${product.color}</td></tr>`);
+        if (product.occasion) specsArr.push(`<tr><td>Occasion</td><td>${product.occasion}</td></tr>`);
+        if (product.size) specsArr.push(`<tr><td>Length & Dimensions</td><td>${product.size}</td></tr>`);
+    } else if (product.catalog_type === 'artificial_jewellery') {
+        if (product.material) specsArr.push(`<tr><td>Base Metal & Craft</td><td>${product.material}</td></tr>`);
+        if (product.finish) specsArr.push(`<tr><td>Finish</td><td>${product.finish}</td></tr>`);
+        if (product.design) specsArr.push(`<tr><td>Style & Design</td><td>${product.design}</td></tr>`);
+        if (product.color) specsArr.push(`<tr><td>Color</td><td>${product.color}</td></tr>`);
+        if (product.category) specsArr.push(`<tr><td>Category</td><td>${product.category}</td></tr>`);
+        if (product.occasion) specsArr.push(`<tr><td>Occasion</td><td>${product.occasion}</td></tr>`);
+    } else {
+        if (product.material) specsArr.push(`<tr><td>Precious Metal</td><td>${product.material}</td></tr>`);
+        if (product.silverPurity) specsArr.push(`<tr><td>Silver Purity</td><td>${product.silverPurity} Standard</td></tr>`);
+        if (product.category) specsArr.push(`<tr><td>Category</td><td>${product.category}</td></tr>`);
+        if (product.finish) specsArr.push(`<tr><td>Finish</td><td>${product.finish}</td></tr>`);
+        if (product.weight) specsArr.push(`<tr><td>Jewellery Weight</td><td>${product.weight}</td></tr>`);
+        if (product.size) specsArr.push(`<tr><td>Size</td><td>${product.size}</td></tr>`);
+    }
 
-    // Dynamic Accordions
+    // Dynamic Accordions with tailored titles and content
+    let specsTitle = 'Specifications & Hallmarking';
+    let careTitle = 'Silver Care Guide';
+    if (product.catalog_type === 'saree') {
+        specsTitle = 'Saree Details & Weave Specifications';
+        careTitle = 'Saree Care & Muslin Storage Guide';
+    } else if (product.catalog_type === 'artificial_jewellery') {
+        specsTitle = 'Jewellery Specifications & Finish';
+        careTitle = 'Jewellery Care Guide';
+    }
+
     const accordionSections = [];
     if (product.description) {
         accordionSections.push({ title: 'Product Story & Details', content: `<p>${product.description}</p>` });
     }
     if (specsArr.length > 0) {
         accordionSections.push({
-            title: 'Specifications & Hallmarking',
+            title: specsTitle,
             content: `<table class="pdp-specs-table">${specsArr.join('')}</table>`
         });
     }
     if (product.care) {
-        accordionSections.push({ title: 'Silver Care Guide', content: `<p>${product.care}</p>` });
+        accordionSections.push({ title: careTitle, content: `<p>${product.care}</p>` });
     }
     if (product.shippingInfo || product.returnInfo) {
         let shipContent = '';
@@ -844,18 +953,55 @@ function renderProductDetail(product) {
         </div>`
     ).join('');
 
-    // Related products in same category
-    const related = productsDB.filter(p => p.id !== product.id && p.category === product.category).slice(0, 4);
-    const relatedAlt = related.length < 4 ? productsDB.filter(p => p.id !== product.id).slice(0, 4) : related;
+    // Strictly in-stock related products
+    const related = productsDB.filter(p => p && Number(p.stockQuantity || 0) > 0 && p.id !== product.id && p.category === product.category).slice(0, 4);
+    const relatedAlt = related.length < 4 ? productsDB.filter(p => p && Number(p.stockQuantity || 0) > 0 && p.id !== product.id).slice(0, 4) : related;
 
     // Pincode checker HTML
     const pincodeHTML = (typeof renderPincodeCheckerHTML === 'function') ? renderPincodeCheckerHTML() : '';
+
+    // Dynamic subtitle & trust signals by catalog_type
+    let subtitleMaterial = `Hallmarked ${product.material}`;
+    let trustSignalsHTML = `
+        <div class="pdp-trust">
+            <div class="pdp-trust-item">${ICONS.diamond}<span>925 Certified Silver</span></div>
+            <div class="pdp-trust-item">${ICONS.shield}<span>Quality Inspected</span></div>
+            <div class="pdp-trust-item">${ICONS.lock}<span>Secure Checkout</span></div>
+            <div class="pdp-trust-item">${ICONS.gift}<span>Luxury Gift Box</span></div>
+        </div>
+    `;
+
+    let breadcrumbCategory = `<a onclick="navigateTo('shop'); handleCategoryFilter('${product.category}');">${product.category}</a>`;
+
+    if (product.catalog_type === 'saree') {
+        subtitleMaterial = `${product.fabric || 'Traditional Handloom'} • Festive Edit`;
+        breadcrumbCategory = `<a onclick="navigateTo('occasion')">Festive Sarees</a>`;
+        trustSignalsHTML = `
+            <div class="pdp-trust">
+                <div class="pdp-trust-item">${ICONS.sparkle || ICONS.diamond}<span>Authentic Handloom</span></div>
+                <div class="pdp-trust-item">${ICONS.shield}<span>Quality Inspected</span></div>
+                <div class="pdp-trust-item">${ICONS.lock}<span>Secure Checkout</span></div>
+                <div class="pdp-trust-item">${ICONS.gift}<span>Festive Packaging</span></div>
+            </div>
+        `;
+    } else if (product.catalog_type === 'artificial_jewellery') {
+        subtitleMaterial = `${product.material || 'Festive Adornment'} • Heritage Craft`;
+        breadcrumbCategory = `<a onclick="navigateTo('occasion')">Festive Jewellery</a>`;
+        trustSignalsHTML = `
+            <div class="pdp-trust">
+                <div class="pdp-trust-item">${ICONS.sparkle || ICONS.diamond}<span>Heritage Craft</span></div>
+                <div class="pdp-trust-item">${ICONS.shield}<span>Quality Inspected</span></div>
+                <div class="pdp-trust-item">${ICONS.lock}<span>Secure Checkout</span></div>
+                <div class="pdp-trust-item">${ICONS.gift}<span>Signature Gift Box</span></div>
+            </div>
+        `;
+    }
 
     return `
         <nav class="breadcrumbs" aria-label="Breadcrumb">
             <a onclick="navigateTo('home')">Home</a>
             <span class="separator">›</span>
-            <a onclick="navigateTo('shop'); handleCategoryFilter('${product.category}');">${product.category}</a>
+            ${breadcrumbCategory}
             <span class="separator">›</span>
             <span class="current">${product.name}</span>
         </nav>
@@ -889,7 +1035,7 @@ function renderProductDetail(product) {
                 </div>
 
                 <h1 class="pdp-name">${product.name}</h1>
-                <p class="pdp-material">Hallmarked ${product.material}</p>
+                <p class="pdp-material">${subtitleMaterial}</p>
 
                 <div class="pdp-price-block">
                     <span class="pdp-price">${formatPrice(product.sellingPrice)}</span>
@@ -897,11 +1043,9 @@ function renderProductDetail(product) {
                     ${discountHTML}
                 </div>
 
-                <!-- Stock availability: Section 19 requirement -->
+                <!-- Stock availability -->
                 <div class="pdp-stock-status">
-                    ${!isOutOfStock
-            ? `<span class="stock-badge in-stock"><span class="stock-dot"></span>${product.availability}</span>`
-            : `<span class="stock-badge out-of-stock"><span class="stock-dot"></span>CURRENTLY UNAVAILABLE</span>`}
+                    <span class="stock-badge in-stock"><span class="stock-dot"></span>${product.availability || 'In Stock'}</span>
                 </div>
 
                 <p class="pdp-short-desc">${product.shortDescription}</p>
@@ -913,41 +1057,26 @@ function renderProductDetail(product) {
                 <!-- PINCODE SHIPPING VALIDATION -->
                 ${pincodeHTML}
 
-                <!-- Customer Action Area: Add to Bag vs Notify Me -->
-                ${!isOutOfStock ? `
-                    <div class="pdp-quantity">
-                        <label for="pdp-qty">Quantity</label>
-                        <div class="qty-controls">
-                            <button class="qty-btn" onclick="updateQty(-1)" aria-label="Decrease quantity">−</button>
-                            <span class="qty-value" id="pdp-qty">1</span>
-                            <button class="qty-btn" onclick="updateQty(1)" aria-label="Increase quantity">+</button>
-                        </div>
+                <!-- Customer Action Area -->
+                <div class="pdp-quantity">
+                    <label for="pdp-qty">Quantity</label>
+                    <div class="qty-controls">
+                        <button class="qty-btn" onclick="updateQty(-1)" aria-label="Decrease quantity">−</button>
+                        <span class="qty-value" id="pdp-qty">1</span>
+                        <button class="qty-btn" onclick="updateQty(1)" aria-label="Increase quantity">+</button>
                     </div>
+                </div>
 
-                    <div class="pdp-actions">
-                        <button class="btn btn-primary btn-lg" onclick="addToCartFromPDP('${product.id}')">Add to Bag</button>
-                        <button class="btn btn-outline btn-lg" onclick="buyNowFromPDP('${product.id}')">Buy Now</button>
-                        <button class="pdp-wishlist-btn ${isWishlisted ? 'active' : ''}" onclick="toggleWishlist('${product.id}', event)" aria-label="${isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}">
-                            ${ICONS.heart}
-                        </button>
-                    </div>
-                ` : `
-                    <div class="pdp-actions pdp-notify-area">
-                        <button class="btn btn-primary btn-lg" onclick="openNotifyMeModal('${product.id}')">NOTIFY ME</button>
-                        <button class="pdp-wishlist-btn ${isWishlisted ? 'active' : ''}" onclick="toggleWishlist('${product.id}', event)" aria-label="${isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}">
-                            ${ICONS.heart}
-                        </button>
-                    </div>
-                    <p style="font-size:0.9rem;color:var(--wr-text-muted);margin-top:10px;">Notify me when this piece is back in stock.</p>
-                `}
+                <div class="pdp-actions">
+                    <button class="btn btn-primary btn-lg" onclick="addToCartFromPDP('${product.id}')">Add to Bag</button>
+                    <button class="btn btn-outline btn-lg" onclick="buyNowFromPDP('${product.id}')">Buy Now</button>
+                    <button class="pdp-wishlist-btn ${isWishlisted ? 'active' : ''}" onclick="toggleWishlist('${product.id}', event)" aria-label="${isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}">
+                        ${ICONS.heart}
+                    </button>
+                </div>
 
                 <!-- Trust signals -->
-                <div class="pdp-trust">
-                    <div class="pdp-trust-item">${ICONS.diamond}<span>925 Certified Silver</span></div>
-                    <div class="pdp-trust-item">${ICONS.shield}<span>Quality Inspected</span></div>
-                    <div class="pdp-trust-item">${ICONS.lock}<span>Secure Checkout</span></div>
-                    <div class="pdp-trust-item">${ICONS.gift}<span>Luxury Gift Box</span></div>
-                </div>
+                ${trustSignalsHTML}
 
                 <!-- Accordions -->
                 <div class="pdp-accordions">
@@ -956,7 +1085,9 @@ function renderProductDetail(product) {
             </div>
         </div>
 
-        ${relatedAlt.length ? `
+        ${product.catalog_type === 'saree' && typeof window.renderSareeSilverPairingHTML === 'function' ? `
+            ${window.renderSareeSilverPairingHTML(product)}
+        ` : (relatedAlt.length ? `
         <section class="related-section">
             <div class="section-header">
                 <span class="sub-label">Handcrafted Complementary Pieces</span>
@@ -964,16 +1095,12 @@ function renderProductDetail(product) {
             </div>
             <div class="product-grid">${relatedAlt.map(createProductCardHTML).join('')}</div>
         </section>
-        ` : ''}
+        ` : '')}
 
         <!-- Sticky Action Bar -->
         <div class="sticky-cta active" id="sticky-cta" aria-hidden="false">
-            ${!isOutOfStock ? `
-                <button class="btn btn-primary" onclick="addToCart('${product.id}', event)">ADD TO CART — ${formatPrice(product.sellingPrice)}</button>
-                <button class="btn btn-secondary" onclick="buyNowFromPDP('${product.id}')">BUY NOW</button>
-            ` : `
-                <button class="btn btn-primary" onclick="openNotifyMeModal('${product.id}')" style="width:100%;">NOTIFY ME WHEN AVAILABLE</button>
-            `}
+            <button class="btn btn-primary" onclick="addToCart('${product.id}', event)">ADD TO CART — ${formatPrice(product.sellingPrice)}</button>
+            <button class="btn btn-secondary" onclick="buyNowFromPDP('${product.id}')">BUY NOW</button>
         </div>
     `;
 }

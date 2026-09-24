@@ -42,18 +42,20 @@ function renderSearchResults(query) {
     const lowerQuery = query.toLowerCase();
     const cleanQuery = lowerQuery.replace(/[^a-z0-9]/g, '');
 
-    // Search across live Supabase fields safely
+    // Search across live Supabase fields safely (Requirement 6: In-stock only)
     const productResults = productsDB.filter(p =>
-        (p.name && p.name.toLowerCase().includes(lowerQuery)) ||
-        (p.category && p.category.toLowerCase().includes(lowerQuery)) ||
-        (p.rawCategory && p.rawCategory.toLowerCase().includes(lowerQuery)) ||
-        (p.productCode && (p.productCode.toLowerCase().includes(lowerQuery) || p.productCode.toLowerCase().replace(/[^a-z0-9]/g, '').includes(cleanQuery))) ||
-        (p.sku && p.sku.toLowerCase().includes(lowerQuery)) ||
-        (p.code && p.code.toLowerCase().includes(lowerQuery)) ||
-        (p.material && p.material.toLowerCase().includes(lowerQuery)) ||
-        (p.description && p.description.toLowerCase().includes(lowerQuery)) ||
-        (p.shortDescription && p.shortDescription.toLowerCase().includes(lowerQuery)) ||
-        (p.collection && p.collection.toLowerCase().includes(lowerQuery))
+        p && Number(p.stockQuantity || 0) > 0 && (
+            (p.name && p.name.toLowerCase().includes(lowerQuery)) ||
+            (p.category && p.category.toLowerCase().includes(lowerQuery)) ||
+            (p.rawCategory && p.rawCategory.toLowerCase().includes(lowerQuery)) ||
+            (p.productCode && (p.productCode.toLowerCase().includes(lowerQuery) || p.productCode.toLowerCase().replace(/[^a-z0-9]/g, '').includes(cleanQuery))) ||
+            (p.sku && p.sku.toLowerCase().includes(lowerQuery)) ||
+            (p.code && p.code.toLowerCase().includes(lowerQuery)) ||
+            (p.material && p.material.toLowerCase().includes(lowerQuery)) ||
+            (p.description && p.description.toLowerCase().includes(lowerQuery)) ||
+            (p.shortDescription && p.shortDescription.toLowerCase().includes(lowerQuery)) ||
+            (p.collection && p.collection.toLowerCase().includes(lowerQuery))
+        )
     );
 
     // Category matches

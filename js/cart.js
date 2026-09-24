@@ -5,31 +5,126 @@ pincode validation before order placement, dynamic shipping charges
 ============================================ */
 
 let cart = [];
-const FREE_SHIPPING_THRESHOLD = 2999;
-const STANDARD_SHIPPING_FEE = 99;
-const COD_CHARGE = 50;
 
-function getShippingFee(subtotal) {
-    if (subtotal <= 0) return 0;
-    return subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : STANDARD_SHIPPING_FEE;
+/* ==============================================================================
+   CENTRAL COMMERCE RULES (Section 15, 16, 17, 18, 48)
+   One central source of truth for Silver Jewellery, Occasion Collection,
+   and Mixed Cart business logic.
+   ============================================================================== */
+window.COMMERCE_RULES = {
+    silver: {
+        categoryName: 'Silver Jewellery',
+        freeShippingThreshold: 2999,
+        standardShippingFee: 99,
+        codCharge: 50,
+        codEnabled: true
+    },
+    occasion: {
+        categoryName: 'Occasion Collection',
+        freeShippingThreshold: 199,
+        standardShippingFee: 49,
+        codCharge: 0,
+        codEnabled: true
+    },
+    mixed: {
+        categoryName: 'Mixed Cart (Silver & Occasion)',
+        freeShippingThreshold: 2999,
+        standardShippingFee: 99,
+        codCharge: 50,
+        codEnabled: true
+    }
+};
+
+const FREE_SHIPPING_THRESHOLD = window.COMMERCE_RULES.silver.freeShippingThreshold;
+const STANDARD_SHIPPING_FEE = window.COMMERCE_RULES.silver.standardShippingFee;
+const COD_CHARGE = window.COMMERCE_RULES.silver.codCharge;
+
+/**
+ * Helper to identify if an item belongs to the festive/occasion catalog
+ */
+function isOccasionCartItem(item) {
+    if (!item) return false;
+    const catType = String(item.catalog_type || '').toLowerCase();
+    if (catType === 'saree' || catType === 'artificial_jewellery') return true;
+    if (item.occasion_slug) return true;
+    const cat = String(item.category || '').toLowerCase();
+    if (cat.includes('saree') || cat.includes('artificial') || cat.includes('occasion')) return true;
+    return false;
 }
 
-function getCodCharge(paymentMethod, subtotal = getCartSubtotal()) {
+/**
+ * Determine cart composition: 'silver', 'occasion', or 'mixed'
+ */
+function getCartCommerceType(cartItems = cart) {
+    if (!Array.isArray(cartItems) || cartItems.length === 0) {
+        const isOccasionPage = (typeof isOccasionViewActive === 'function' && isOccasionViewActive()) ||
+            window.location.pathname.includes('/occasion') ||
+            window.location.hash.includes('occasion');
+        return isOccasionPage ? 'occasion' : 'silver';
+    }
+    const hasOccasion = cartItems.some(item => isOccasionCartItem(item));
+    const hasSilver = cartItems.some(item => !isOccasionCartItem(item));
+    if (hasOccasion && hasSilver) return 'mixed';
+    if (hasOccasion) return 'occasion';
+    return 'silver';
+}
+
+/**
+ * Retrieve active commerce shipping & payment rules for current cart
+ */
+function getActiveCommerceRules(cartItems = cart) {
+    const type = getCartCommerceType(cartItems);
+    return window.COMMERCE_RULES[type] || window.COMMERCE_RULES.silver;
+}
+
+function getShippingFee(subtotal, cartItems = cart) {
+    if (subtotal <= 0) return 0;
+    const rules = getActiveCommerceRules(cartItems);
+    return subtotal >= rules.freeShippingThreshold ? 0 : rules.standardShippingFee;
+}
+
+function getCodCharge(paymentMethod, subtotal = getCartSubtotal(), cartItems = cart) {
     if (String(paymentMethod || '').toLowerCase() !== 'cod' || subtotal <= 0) return 0;
-    return COD_CHARGE;
+    const rules = getActiveCommerceRules(cartItems);
+    return rules.codCharge;
 }
 
 function getCheckoutTotals(paymentMethod = 'prepaid') {
     const subtotal = getCartSubtotal();
-    const shipping = getShippingFee(subtotal);
-    const codCharge = getCodCharge(paymentMethod, subtotal);
+    const rules = getActiveCommerceRules(cart);
+    const appliedCoupon = (typeof WishRiteCoupons !== 'undefined' && WishRiteCoupons.getAppliedCoupon)
+        ? WishRiteCoupons.getAppliedCoupon()
+        : null;
+
+    let discount = 0;
+    if (appliedCoupon && appliedCoupon.discountAmount > 0) {
+        discount = Number(appliedCoupon.discountAmount);
+    }
+
+    let shipping = getShippingFee(subtotal, cart);
+    if (appliedCoupon && appliedCoupon.discountType === 'free_shipping') {
+        shipping = 0;
+    }
+
+    const codCharge = getCodCharge(paymentMethod, subtotal, cart);
+    const payableTotal = Math.max(0, subtotal - discount + shipping + codCharge);
+
     return {
         subtotal,
+        discount,
+        coupon: appliedCoupon,
         shipping,
         codCharge,
-        total: subtotal + shipping + codCharge
+        total: payableTotal,
+        cartType: getCartCommerceType(cart),
+        rules: rules
     };
 }
+
+function getCart() {
+    return cart;
+}
+window.getCart = getCart;
 
 function addToCart(id, event, qtyToAdd = 1) {
     if (event) event.stopPropagation();
@@ -39,11 +134,9 @@ function addToCart(id, event, qtyToAdd = 1) {
 
     if (!product) return;
 
-    // Out of stock guard: Requirement 19 & 28
-    if (product.stockQuantity <= 0) {
-        if (typeof openNotifyMeModal === 'function') {
-            openNotifyMeModal(product.id);
-        } else if (typeof showToast === 'function') {
+    // Strict zero-stock guard: Requirements 6 & 49 (never allow 0 stock purchase, no "Out of Stock" or "Notify" UI)
+    if (Number(product.stockQuantity || 0) <= 0) {
+        if (typeof showToast === 'function') {
             showToast(`"${product.name}" is currently unavailable.`, 'info');
         }
         return;
@@ -135,9 +228,299 @@ function getCartSubtotal() {
 }
 
 function getCartTotal() {
+    const totals = getCheckoutTotals('prepaid');
+    return totals.total;
+}
+
+/**
+ * Generates the WishRite luxury coupon component HTML (Sections 18, 19, 20, 54).
+ */
+function renderCouponBoxHTML(context = 'checkout') {
+    const applied = (typeof WishRiteCoupons !== 'undefined' && WishRiteCoupons.getAppliedCoupon)
+        ? WishRiteCoupons.getAppliedCoupon()
+        : null;
+
+    const inputId = `${context}-coupon-input`;
+    const msgId = `${context}-coupon-msg`;
+
+    if (applied && applied.discountAmount > 0) {
+        return `
+            <div class="wishrite-coupon-box" id="${context}-coupon-box">
+                <div class="wishrite-coupon-box-header">
+                    <span>Applied Promotion</span>
+                    <button type="button" class="wishrite-available-offers-link" onclick="openWishriteAvailableCouponsModal()">View all offers</button>
+                </div>
+                <div class="wishrite-coupon-applied-card">
+                    <div class="wishrite-coupon-applied-info">
+                        <span style="font-size:1.1rem;color:#2E7D32;">✓</span>
+                        <div>
+                            <span class="wishrite-coupon-applied-code">${escapeWishriteHtml(applied.code)}</span>
+                            <div class="wishrite-coupon-applied-saved">You saved ${formatPrice(applied.discountAmount)}</div>
+                        </div>
+                    </div>
+                    <button type="button" class="wishrite-coupon-remove-btn" onclick="removeWishriteCoupon('${context}')">Remove</button>
+                </div>
+                <div id="${msgId}" class="wishrite-coupon-msg success" style="margin-top:6px;">${escapeWishriteHtml(applied.message || 'Coupon applied successfully.')}</div>
+            </div>
+        `;
+    }
+
+    return `
+        <div class="wishrite-coupon-box" id="${context}-coupon-box">
+            <div class="wishrite-coupon-box-header">
+                <span>Have a coupon code?</span>
+                <button type="button" class="wishrite-available-offers-link" onclick="openWishriteAvailableCouponsModal()">% View available offers</button>
+            </div>
+            <div class="wishrite-coupon-input-group">
+                <input 
+                    type="text" 
+                    id="${inputId}" 
+                    class="wishrite-coupon-input" 
+                    placeholder="ENTER COUPON CODE" 
+                    maxlength="30"
+                    autocomplete="off"
+                    onkeydown="if(event.key==='Enter'){event.preventDefault();applyWishriteCoupon('${context}');}"
+                />
+                <button type="button" class="btn btn-outline wishrite-coupon-btn" onclick="applyWishriteCoupon('${context}')">APPLY</button>
+            </div>
+            <div id="${msgId}" class="wishrite-coupon-msg" style="display:none;"></div>
+        </div>
+    `;
+}
+
+/**
+ * Validates and applies a coupon entered by the customer.
+ */
+async function applyWishriteCoupon(context = 'checkout') {
+    const input = document.getElementById(`${context}-coupon-input`);
+    const msgEl = document.getElementById(`${context}-coupon-msg`);
+    const rawCode = input ? input.value : '';
+
+    if (!rawCode || !rawCode.trim()) {
+        if (msgEl) {
+            msgEl.textContent = 'Please enter a coupon code.';
+            msgEl.className = 'wishrite-coupon-msg error';
+            msgEl.style.display = 'block';
+        }
+        return;
+    }
+
+    if (typeof WishRiteCoupons === 'undefined') {
+        if (msgEl) {
+            msgEl.textContent = 'Coupon system is initializing. Please try again.';
+            msgEl.className = 'wishrite-coupon-msg error';
+            msgEl.style.display = 'block';
+        }
+        return;
+    }
+
+    // Capture customer context if available
+    const nameInput = document.getElementById('checkout-customer-name');
+    const phoneInput = document.getElementById('checkout-customer-phone');
+    const emailInput = document.getElementById('checkout-customer-email');
+    const customer = {
+        name: nameInput?.value?.trim() || '',
+        phone: phoneInput?.value?.trim() || '',
+        email: emailInput?.value?.trim() || ''
+    };
+
     const subtotal = getCartSubtotal();
     const shipping = getShippingFee(subtotal);
-    return subtotal + shipping;
+
+    const btn = input?.nextElementSibling;
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Applying…';
+    }
+
+    try {
+        const result = await WishRiteCoupons.validateCoupon({
+            code: rawCode,
+            cartItems: cart,
+            customer,
+            occasion: typeof window.getActiveOccasion === 'function' ? window.getActiveOccasion() : null,
+            subtotal,
+            shippingFee: shipping
+        });
+
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = 'APPLY';
+        }
+
+        if (!result.valid) {
+            if (msgEl) {
+                msgEl.textContent = result.message || 'Invalid or expired coupon.';
+                msgEl.className = 'wishrite-coupon-msg error';
+                msgEl.style.display = 'block';
+            }
+            return;
+        }
+
+        // Save applied coupon in session
+        WishRiteCoupons.setAppliedCoupon(result);
+
+        // Update UI dynamically
+        if (context === 'cart') {
+            renderCart();
+        } else {
+            const boxContainer = document.getElementById('checkout-coupon-box');
+            if (boxContainer) {
+                boxContainer.outerHTML = renderCouponBoxHTML('checkout');
+            }
+            const activeMethod = document.querySelector('input[name="wishrite-payment-method"]:checked')?.value || 'prepaid';
+            updateWishriteCheckoutTotals(activeMethod);
+            if (document.getElementById('cart-summary')) {
+                renderCart();
+            }
+        }
+
+        if (typeof showToast === 'function') {
+            showToast(`Coupon ${result.code} applied! Saved ${formatPrice(result.discountAmount)}`, 'success');
+        }
+
+    } catch (err) {
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = 'APPLY';
+        }
+        if (msgEl) {
+            msgEl.textContent = 'Unable to validate coupon. Please try again.';
+            msgEl.className = 'wishrite-coupon-msg error';
+            msgEl.style.display = 'block';
+        }
+    }
+}
+
+/**
+ * Removes the currently applied coupon and restores totals.
+ */
+function removeWishriteCoupon(context = 'checkout') {
+    if (typeof WishRiteCoupons !== 'undefined') {
+        WishRiteCoupons.clearAppliedCoupon();
+    }
+    if (context === 'cart') {
+        renderCart();
+    } else {
+        const boxContainer = document.getElementById('checkout-coupon-box');
+        if (boxContainer) {
+            boxContainer.outerHTML = renderCouponBoxHTML('checkout');
+        }
+        const activeMethod = document.querySelector('input[name="wishrite-payment-method"]:checked')?.value || 'prepaid';
+        updateWishriteCheckoutTotals(activeMethod);
+        if (document.getElementById('cart-summary')) {
+            renderCart();
+        }
+    }
+    if (typeof showToast === 'function') {
+        showToast('Coupon removed.', 'info');
+    }
+}
+
+/**
+ * Opens available offers drawer / modal (Section 20).
+ */
+async function openWishriteAvailableCouponsModal() {
+    const existing = document.getElementById('wishrite-available-offers-modal');
+    if (existing) existing.remove();
+
+    const activeOccasion = typeof window.getActiveOccasion === 'function' ? window.getActiveOccasion() : null;
+    const activeOccasionSlug = activeOccasion?.slug || null;
+
+    const modal = document.createElement('div');
+    modal.id = 'wishrite-available-offers-modal';
+    modal.className = 'wishrite-offers-modal-overlay';
+    modal.onclick = function (e) {
+        if (e.target === modal) modal.remove();
+    };
+
+    modal.innerHTML = `
+        <div class="wishrite-offers-modal">
+            <div class="wishrite-offers-modal-header">
+                <h3 class="wishrite-offers-modal-title">Available Offers</h3>
+                <button type="button" class="wishrite-offers-modal-close" onclick="document.getElementById('wishrite-available-offers-modal').remove()">×</button>
+            </div>
+            <div class="wishrite-offers-modal-body" id="wishrite-available-offers-list">
+                <div style="text-align:center;padding:24px;color:var(--wr-text-muted);">
+                    Loading eligible offers for your cart…
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    let offers = [];
+    if (typeof WishRiteCoupons !== 'undefined') {
+        offers = await WishRiteCoupons.fetchAvailableCoupons(cart, null, activeOccasionSlug);
+    }
+
+    const listEl = document.getElementById('wishrite-available-offers-list');
+    if (!listEl) return;
+
+    if (offers.length === 0) {
+        listEl.innerHTML = `
+            <div style="text-align:center;padding:32px 16px;">
+                <p style="font-size:1.05rem;color:var(--wr-text);margin-bottom:8px;">No offers currently available for your cart.</p>
+                <p style="font-size:0.85rem;color:var(--wr-text-muted);">Add eligible festive collection or silver jewellery items to unlock exclusive promotions.</p>
+            </div>
+        `;
+        return;
+    }
+
+    const applied = (typeof WishRiteCoupons !== 'undefined') ? WishRiteCoupons.getAppliedCoupon() : null;
+
+    listEl.innerHTML = offers.map((offer, idx) => {
+        const isBest = idx === 0 && offers.length > 1;
+        const isCurrentlyApplied = applied && applied.code === offer.code;
+        const discountText = offer.discount_type === 'percentage'
+            ? `${offer.discount_value}% OFF`
+            : (offer.discount_type === 'free_shipping' ? 'FREE SHIPPING' : `₹${Number(offer.discount_value).toLocaleString('en-IN')} OFF`);
+
+        return `
+            <div class="wishrite-offer-card ${isBest ? 'best-offer' : ''}">
+                <div style="flex:1;">
+                    <div class="wishrite-offer-badge-row">
+                        <span class="wishrite-offer-badge ${isBest ? 'best' : ''}">
+                            ${isBest ? '★ BEST OFFER' : discountText}
+                        </span>
+                        <span class="wishrite-offer-code-tag">${escapeWishriteHtml(offer.code)}</span>
+                    </div>
+                    <p class="wishrite-offer-desc">${escapeWishriteHtml(offer.description || `Get ${discountText} on eligible orders.`)}</p>
+                    <div class="wishrite-offer-terms">
+                        ${offer.minimum_order_value > 0 ? `Min. order ₹${Number(offer.minimum_order_value).toLocaleString('en-IN')}` : 'No minimum order'}
+                        ${offer.maximum_discount ? ` • Up to ₹${Number(offer.maximum_discount).toLocaleString('en-IN')}` : ''}
+                        ${offer.scope === 'jewellery' ? ' • Silver Jewellery only' : (offer.scope === 'occasion' ? ' • Festive Collection only' : '')}
+                    </div>
+                </div>
+                <div>
+                    ${isCurrentlyApplied ? `
+                        <span style="font-size:0.8rem;color:#2E7D32;font-weight:700;">✓ Applied</span>
+                    ` : `
+                        <button type="button" class="btn btn-outline btn-sm wishrite-offer-apply-btn" onclick="applyCouponCodeDirectly('${escapeWishriteHtml(offer.code)}')">
+                            APPLY
+                        </button>
+                    `}
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function applyCouponCodeDirectly(code) {
+    const modal = document.getElementById('wishrite-available-offers-modal');
+    if (modal) modal.remove();
+
+    const checkoutInput = document.getElementById('checkout-coupon-input');
+    const cartInput = document.getElementById('cart-coupon-input');
+
+    if (checkoutInput) {
+        checkoutInput.value = code;
+        applyWishriteCoupon('checkout');
+    } else if (cartInput) {
+        cartInput.value = code;
+        applyWishriteCoupon('cart');
+    }
 }
 
 function renderCart() {
@@ -184,9 +567,11 @@ function renderCart() {
 
     if (summary) {
         summary.style.display = 'block';
-        const subtotal = getCartSubtotal();
-        const shipping = getShippingFee(subtotal);
-        const total = subtotal + shipping;
+        const totals = getCheckoutTotals('prepaid');
+        const subtotal = totals.subtotal;
+        const discount = totals.discount;
+        const shipping = totals.shipping;
+        const total = totals.total;
         const savedPin = (typeof getSavedPincode === 'function') ? getSavedPincode() : null;
 
         summary.innerHTML = `
@@ -197,21 +582,30 @@ function renderCart() {
                     <span>${formatPrice(subtotal)}</span>
                 </div>
 
+                ${discount > 0 ? `
+                <div class="cart-summary-line" style="color:#2E7D32;">
+                    <span>Coupon Discount (${escapeWishriteHtml(totals.coupon?.code || '')})</span>
+                    <span>-${formatPrice(discount)}</span>
+                </div>
+                ` : ''}
+
                 <div class="cart-summary-line">
                     <span>Shipping</span>
                     <span>${shipping === 0 ? '<strong style="color:#2E7D32;">FREE</strong>' : formatPrice(shipping)}</span>
                 </div>
 
-                ${subtotal < FREE_SHIPPING_THRESHOLD ? `
+                ${renderCouponBoxHTML('cart')}
+
+                ${subtotal < (totals.rules?.freeShippingThreshold || FREE_SHIPPING_THRESHOLD) ? `
                     <div class="free-shipping-progress">
-                        <p style="font-size:0.8rem;color:var(--wr-text-muted);margin:0 0 6px;">Add <strong>${formatPrice(FREE_SHIPPING_THRESHOLD - subtotal)}</strong> more for <strong>FREE Delivery</strong></p>
+                        <p style="font-size:0.8rem;color:var(--wr-text-muted);margin:0 0 6px;">Add <strong>${formatPrice((totals.rules?.freeShippingThreshold || FREE_SHIPPING_THRESHOLD) - subtotal)}</strong> more for <strong>FREE Delivery</strong></p>
                         <div style="background:var(--wr-border);height:4px;border-radius:2px;overflow:hidden;">
-                            <div style="background:var(--wr-primary);width:${Math.min(100, Math.round((subtotal / FREE_SHIPPING_THRESHOLD) * 100))}%;height:100%;"></div>
+                            <div style="background:var(--wr-primary);width:${Math.min(100, Math.round((subtotal / (totals.rules?.freeShippingThreshold || FREE_SHIPPING_THRESHOLD)) * 100))}%;height:100%;"></div>
                         </div>
                     </div>
                 ` : `
                     <div style="background:#F4EFEB;border:1px solid #E5D9D2;padding:8px 12px;border-radius:var(--radius-sm);margin:12px 0;font-size:0.8rem;color:var(--wr-primary);">
-                        ✓ Congratulations! You have qualified for <strong>FREE Insured Express Delivery</strong>.
+                        ✓ Congratulations! You have qualified for <strong>FREE Delivery</strong>.
                     </div>
                 `}
 
@@ -366,6 +760,8 @@ function openWishriteCheckoutModal(pin) {
 
     const initialTotals = getCheckoutTotals('prepaid');
     const subtotal = initialTotals.subtotal;
+    const discount = initialTotals.discount;
+    const coupon = initialTotals.coupon;
     const shipping = initialTotals.shipping;
     const total = initialTotals.total;
 
@@ -417,6 +813,11 @@ function openWishriteCheckoutModal(pin) {
                             <strong id="wishrite-checkout-subtotal">${formatPrice(subtotal)}</strong>
                         </div>
 
+                        <div id="wishrite-checkout-discount-row" style="${discount > 0 ? 'display:flex;color:#2E7D32;' : 'display:none;'}">
+                            <span id="wishrite-checkout-discount-label">Coupon Discount ${coupon ? `(${escapeWishriteHtml(coupon.code)})` : ''}</span>
+                            <strong id="wishrite-checkout-discount">-${formatPrice(discount)}</strong>
+                        </div>
+
                         <div>
                             <span>Shipping</span>
                             <strong id="wishrite-checkout-shipping">
@@ -430,11 +831,14 @@ function openWishriteCheckoutModal(pin) {
                         </div>
 
                         <div class="wishrite-checkout-total">
-                            <span>Total</span>
+                            <span>Final Total</span>
                             <strong id="wishrite-checkout-total">${formatPrice(total)}</strong>
                         </div>
 
                     </div>
+
+                    <!-- ═══ COUPON INPUT BOX (Sections 18, 19, 20) ═══ -->
+                    ${renderCouponBoxHTML('checkout')}
 
                     <div class="wishrite-payment-section" style="margin:20px 0 24px;">
                         <div class="wishrite-form-section-title" style="margin-bottom:12px;">Payment Method</div>
@@ -450,7 +854,7 @@ function openWishriteCheckoutModal(pin) {
                                 <input type="radio" name="wishrite-payment-method" value="cod" onchange="updateWishriteCheckoutTotals('cod')">
                                 <span>
                                     <strong style="display:block;">Cash on Delivery</strong>
-                                    <small style="color:var(--wr-text-muted);">+ ₹50 COD charges</small>
+                                    <small id="wishrite-cod-subtitle" style="color:var(--wr-text-muted);">${(totals.rules?.codCharge || 0) > 0 ? `+ ${formatPrice(totals.rules.codCharge)} COD charges` : 'FREE Cash on Delivery'}</small>
                                 </span>
                             </label>
                         </div>
@@ -671,6 +1075,10 @@ function updateWishriteCheckoutTotals(paymentMethod) {
     const method = String(paymentMethod || 'prepaid').toLowerCase() === 'cod' ? 'cod' : 'prepaid';
     const totals = getCheckoutTotals(method);
 
+    const subtotalEl = document.getElementById('wishrite-checkout-subtotal');
+    const discountRow = document.getElementById('wishrite-checkout-discount-row');
+    const discountLabel = document.getElementById('wishrite-checkout-discount-label');
+    const discountEl = document.getElementById('wishrite-checkout-discount');
     const shippingEl = document.getElementById('wishrite-checkout-shipping');
     const codRow = document.getElementById('wishrite-checkout-cod-row');
     const codChargeEl = document.getElementById('wishrite-checkout-cod-charge');
@@ -679,13 +1087,38 @@ function updateWishriteCheckoutTotals(paymentMethod) {
     const codOption = document.getElementById('wishrite-cod-option');
     const noteEl = document.getElementById('wishrite-payment-note');
 
+    if (subtotalEl) subtotalEl.textContent = formatPrice(totals.subtotal);
+    if (discountRow) {
+        if (totals.discount > 0) {
+            discountRow.style.display = 'flex';
+            if (discountLabel) {
+                discountLabel.textContent = `Coupon Discount (${escapeWishriteHtml(totals.coupon?.code || '')})`;
+            }
+            if (discountEl) {
+                discountEl.textContent = `-${formatPrice(totals.discount)}`;
+            }
+        } else {
+            discountRow.style.display = 'none';
+        }
+    }
+
     if (shippingEl) {
         shippingEl.innerHTML = totals.shipping === 0
             ? '<strong style="color:#2E7D32;">FREE</strong>'
             : formatPrice(totals.shipping);
     }
     if (codRow) codRow.style.display = method === 'cod' ? 'flex' : 'none';
-    if (codChargeEl) codChargeEl.textContent = formatPrice(totals.codCharge);
+    if (codChargeEl) {
+        codChargeEl.innerHTML = totals.codCharge === 0
+            ? '<strong style="color:#2E7D32;">FREE</strong>'
+            : formatPrice(totals.codCharge);
+    }
+    const codSubtitleEl = document.getElementById('wishrite-cod-subtitle');
+    if (codSubtitleEl) {
+        const fee = totals.rules?.codCharge || 0;
+        codSubtitleEl.textContent = fee > 0 ? `+ ${formatPrice(fee)} COD charges` : 'FREE Cash on Delivery';
+        codSubtitleEl.style.color = fee > 0 ? 'var(--wr-text-muted)' : '#2E7D32';
+    }
     if (totalEl) totalEl.textContent = formatPrice(totals.total);
 
     if (prepaidOption) {
@@ -1101,8 +1534,11 @@ async function proceedToRazorpayPayment(internalOrderId) {
                         window.wishritePendingCheckout.order_status = verifyData.order_status || 'processing';
                     }
 
-                    // Clear the shopping cart using existing project cart-clear mechanism
+                    // Clear the shopping cart and applied coupon
                     clearCart();
+                    if (typeof WishRiteCoupons !== 'undefined') {
+                        WishRiteCoupons.clearAppliedCoupon();
+                    }
 
                     // Render luxury WishRite Order Confirmation UI immediately after cart is cleared
                     renderWishriteOrderConfirmation(window.wishritePendingCheckout, verifyData);
@@ -1319,6 +1755,39 @@ async function submitWishriteCustomerCheckout(event) {
             throw new Error('Supabase client is not available. Please refresh the page and try again.');
         }
 
+        // Securely re-validate applied coupon immediately before creating order record (Section 29)
+        let couponDiscount = 0;
+        let appliedCoupon = null;
+        if (typeof WishRiteCoupons !== 'undefined' && WishRiteCoupons.getAppliedCoupon) {
+            appliedCoupon = WishRiteCoupons.getAppliedCoupon();
+            if (appliedCoupon) {
+                const validation = await WishRiteCoupons.validateCoupon({
+                    code: appliedCoupon.code,
+                    cartItems: cart,
+                    customer: { name, phone, email },
+                    occasion: typeof window.getActiveOccasion === 'function' ? window.getActiveOccasion() : null,
+                    subtotal: Number(subtotal),
+                    shippingFee: Number(shipping)
+                });
+                if (validation.valid) {
+                    couponDiscount = Number(validation.discountAmount || 0);
+                    appliedCoupon = validation;
+                } else {
+                    WishRiteCoupons.clearAppliedCoupon();
+                    if (submitButton) {
+                        submitButton.disabled = false;
+                        submitButton.innerHTML = 'Continue to Secure Payment';
+                    }
+                    showCheckoutFormError(validation.message || 'The applied coupon is no longer valid for this order.');
+                    updateWishriteCheckoutTotals(paymentMethod);
+                    return;
+                }
+            }
+        }
+
+        const actualCodFee = paymentMethod === 'cod' ? getCodCharge('cod', subtotal, cart) : 0;
+        const finalDiscountedTotal = Math.max(0, Math.round(Number(subtotal) - couponDiscount + Number(shipping) + actualCodFee));
+
         const internalOrderId = crypto.randomUUID();
         const orderNumber = generateOrderNumber();
 
@@ -1334,20 +1803,60 @@ async function submitWishriteCustomerCheckout(event) {
             customer_country: 'India',
             customer_pin: pin,
             subtotal: Number(subtotal),
-            discount: 0,
+            discount: couponDiscount,
             shipping_charge: Number(shipping),
+            cod_charge: actualCodFee,
             tax: 0,
-            grand_total: Number(total),
+            grand_total: finalDiscountedTotal,
             currency: 'INR',
             payment_method: paymentMethod,
             payment_status: 'pending',
             order_status: paymentMethod === 'cod' ? 'confirmed' : 'pending'
         };
 
+        // Add extended coupon audit fields if coupon was applied
+        if (appliedCoupon && couponDiscount > 0) {
+            orderPayload.coupon_code = appliedCoupon.code;
+            orderPayload.coupon_id = appliedCoupon.couponId || null;
+            orderPayload.discount_type = appliedCoupon.discountType || null;
+            orderPayload.discount_value = appliedCoupon.discountValue || null;
+            orderPayload.coupon_discount_amount = couponDiscount;
+            orderPayload.subtotal_before_discount = Number(subtotal);
+            orderPayload.final_amount = finalDiscountedTotal;
+        }
+
         // 1. Insert order record into public.orders without SELECT/RETURNING
-        const { error: orderError } = await client
+        let { error: orderError } = await client
             .from('orders')
             .insert([orderPayload]);
+
+        // Graceful fallback if database schema has not yet been migrated with new columns
+        if (orderError && (orderError.message?.includes('column') || orderError.code === 'PGRST204')) {
+            console.warn('Orders insert retry without extended coupon columns:', orderError.message);
+            const standardPayload = {
+                id: internalOrderId,
+                order_number: orderNumber,
+                customer_name: name,
+                customer_phone: phone,
+                customer_email: email,
+                customer_address: address,
+                customer_city: city,
+                customer_state: state,
+                customer_country: 'India',
+                customer_pin: pin,
+                subtotal: Number(subtotal),
+                discount: couponDiscount,
+                shipping_charge: Number(shipping),
+                tax: 0,
+                grand_total: finalDiscountedTotal,
+                currency: 'INR',
+                payment_method: paymentMethod,
+                payment_status: 'pending',
+                order_status: paymentMethod === 'cod' ? 'confirmed' : 'pending'
+            };
+            const retryRes = await client.from('orders').insert([standardPayload]);
+            orderError = retryRes.error;
+        }
 
         if (orderError) {
             console.error('WishRite orders insert error:', orderError.message || orderError);
@@ -1403,6 +1912,22 @@ async function submitWishriteCustomerCheckout(event) {
             return;
         }
 
+        // 2.5 Record coupon usage in public.coupon_usages (Section 42)
+        if (appliedCoupon && couponDiscount > 0) {
+            try {
+                await client.from('coupon_usages').insert([{
+                    coupon_id: appliedCoupon.couponId || null,
+                    customer_email: email,
+                    customer_phone: phone,
+                    order_id: internalOrderId,
+                    coupon_code: appliedCoupon.code,
+                    discount_amount: couponDiscount
+                }]);
+            } catch (usageErr) {
+                console.warn('Coupon usage record non-blocking warning:', usageErr);
+            }
+        }
+
         // 3. Store pending checkout details in window.wishritePendingCheckout
         const orderItemsWithImages = orderItemsPayload.map((oi, idx) => {
             const cartItem = cart[idx];
@@ -1426,9 +1951,13 @@ async function submitWishriteCustomerCheckout(event) {
             customer_country: 'India',
             customer_pin: pin,
             subtotal: Number(subtotal),
+            discount: couponDiscount,
+            coupon_discount_amount: couponDiscount,
+            coupon_code: appliedCoupon ? appliedCoupon.code : null,
+            coupon_id: appliedCoupon ? appliedCoupon.couponId : null,
             shipping_charge: Number(shipping),
             cod_charge: Number(codCharge),
-            grand_total: Number(total),
+            grand_total: finalDiscountedTotal,
             payment_method: paymentMethod,
             currency: 'INR',
             items: orderItemsWithImages
@@ -1442,6 +1971,10 @@ async function submitWishriteCustomerCheckout(event) {
                 window.wishritePendingCheckout.order_status = 'confirmed';
             }
 
+            if (typeof WishRiteCoupons !== 'undefined') {
+                WishRiteCoupons.clearAppliedCoupon();
+            }
+
             clearCart();
             renderWishriteOrderConfirmation(window.wishritePendingCheckout, {
                 success: true,
@@ -1449,7 +1982,7 @@ async function submitWishriteCustomerCheckout(event) {
                 order_number: orderNumber,
                 payment_status: 'pending',
                 order_status: 'confirmed',
-                grand_total: Number(total),
+                grand_total: finalDiscountedTotal,
                 currency: 'INR'
             });
             return;
@@ -2246,6 +2779,7 @@ function renderWishriteOrderConfirmation(pendingCheckout, verifyData) {
     const currency = verifyData?.currency || pending.currency || 'INR';
     const grandTotal = verifyData?.grand_total !== undefined ? verifyData.grand_total : (pending.grand_total || 0);
     const subtotal = pending.subtotal !== undefined ? pending.subtotal : grandTotal;
+    const discount = Number(pending.discount || pending.coupon_discount_amount || 0);
     const shipping = pending.shipping_charge !== undefined ? pending.shipping_charge : 0;
     const codCharge = pending.cod_charge !== undefined ? pending.cod_charge : 0;
     const paymentMethod = String(pending.payment_method || 'razorpay').toLowerCase();
@@ -2417,6 +2951,12 @@ function renderWishriteOrderConfirmation(pendingCheckout, verifyData) {
                                     <span class="wishrite-price-label">Subtotal</span>
                                     <span class="wishrite-price-val">${formatPrice(subtotal)}</span>
                                 </div>
+                                ${discount > 0 ? `
+                                <div class="wishrite-price-row" style="color:#2E7D32;">
+                                    <span class="wishrite-price-label">Coupon Discount ${pending.coupon_code ? `(${escapeWishriteHtml(pending.coupon_code)})` : ''}</span>
+                                    <span class="wishrite-price-val">-${formatPrice(discount)}</span>
+                                </div>
+                                ` : ''}
                                 <div class="wishrite-price-row">
                                     <span class="wishrite-price-label">Shipping</span>
                                     <span class="wishrite-price-val wishrite-shipping-val">

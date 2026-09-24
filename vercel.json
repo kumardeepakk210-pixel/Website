@@ -61,6 +61,14 @@
       "destination": "/index.html"
     },
     {
+      "source": "/occasion",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/occasion/:path*",
+      "destination": "/index.html"
+    },
+    {
       "source": "/admin",
       "destination": "/index.html"
     }

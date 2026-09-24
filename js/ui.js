@@ -75,6 +75,58 @@ let heroSliderTimer = null;
 let currentHeroSlide = 0;
 const HERO_SLIDE_DURATION = 6000; // 6 seconds per slide
 
+function updateHeroContentForSlide(slideIndex) {
+    const heroContent = document.querySelector('.hero-content');
+    if (!heroContent) return;
+
+    const activeOccasion = typeof window.getActiveOccasion === 'function' ? window.getActiveOccasion() : null;
+
+    if (activeOccasion && activeOccasion.enabled && slideIndex === 0) {
+        // Dynamic Festive Edit Slide
+        heroContent.innerHTML = `
+            <div class="hero-festive-badge">
+                <span>✦</span>
+                <span>${activeOccasion.eyebrow || 'THE FESTIVE EDIT'}</span>
+                <span>✦</span>
+            </div>
+            <h1 class="hero-title festive-bengali-title">${activeOccasion.title}</h1>
+            ${activeOccasion.englishTitle ? `<p class="hero-english-title" style="font-family:var(--wr-font-heading);font-style:italic;font-size:1.2rem;color:var(--festive-secondary,#D4AF37);margin:-4px 0 12px;letter-spacing:0.02em;">${activeOccasion.englishTitle}</p>` : ''}
+            <p class="hero-description">${activeOccasion.description || activeOccasion.homepageSubtitle || 'Sarees • Statement Jewellery • Silver Pairings'}</p>
+            <div class="hero-buttons">
+                <a class="btn btn-hero-primary" onclick="navigateTo('occasion')">
+                    <span>${activeOccasion.ctaText || activeOccasion.homepageCtaText || 'Shop the Pujo collection →'}</span>
+                    <svg class="hero-btn-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                        <polyline points="12 5 19 12 12 19"></polyline>
+                    </svg>
+                </a>
+                <a class="btn btn-hero-secondary" onclick="navigateToShopWithFilter('category', 'All', 'featured', 'All Jewellery')">
+                    Explore Silver Jewellery
+                </a>
+            </div>
+        `;
+    } else {
+        // Standard Timeless Silver Slide
+        heroContent.innerHTML = `
+            <p class="hero-subtitle">TIMELESS · VERSATILE · YOURS</p>
+            <h1 class="hero-title">Timeless Silver.<br><span class="hero-title-italic">Modern Elegance.</span></h1>
+            <p class="hero-description">Thoughtfully crafted 925 sterling silver jewellery for everyday moments, meaningful occasions, and unforgettable gifts.</p>
+            <div class="hero-buttons">
+                <a class="btn btn-hero-primary" onclick="navigateToShopWithFilter('category', 'All', 'featured', 'All Jewellery')">
+                    <span>Shop Jewellery</span>
+                    <svg class="hero-btn-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                        <polyline points="12 5 19 12 12 19"></polyline>
+                    </svg>
+                </a>
+                <a class="btn btn-hero-secondary" onclick="navigateTo('collections')">
+                    Explore Collections
+                </a>
+            </div>
+        `;
+    }
+}
+
 function goToHeroSlide(index) {
     const slides = document.querySelectorAll('.hero-slide');
     const navItems = document.querySelectorAll('.hero-slide-nav');
@@ -85,6 +137,8 @@ function goToHeroSlide(index) {
     slides.forEach((slide, idx) => {
         slide.classList.toggle('active', idx === currentHeroSlide);
     });
+
+    updateHeroContentForSlide(currentHeroSlide);
 
     navItems.forEach((nav, idx) => {
         nav.classList.toggle('active', idx === currentHeroSlide);
@@ -122,6 +176,16 @@ function resetHeroSliderTimer() {
 function initHeroCarousel() {
     const slides = document.querySelectorAll('.hero-slide');
     if (!slides.length) return;
+
+    const activeOccasion = typeof window.getActiveOccasion === 'function' ? window.getActiveOccasion() : null;
+    const firstSlideImg = slides[0]?.querySelector('img');
+    if (firstSlideImg) {
+        if (activeOccasion && activeOccasion.enabled && activeOccasion.heroImage) {
+            firstSlideImg.src = activeOccasion.heroImage;
+        } else {
+            firstSlideImg.src = 'https://images.unsplash.com/photo-1617038220319-276d3cfab638?auto=format&fit=crop&w=1920&q=85';
+        }
+    }
 
     goToHeroSlide(0);
 }
@@ -183,7 +247,7 @@ async function applyFiltersAndSort() {
         return;
     }
 
-    let filtered = [...productsDB];
+    let filtered = productsDB.filter(p => p && Number(p.stockQuantity || 0) > 0);
 
     // Apply category filter (normalized matching)
     if (currentFilters.category && currentFilters.category !== 'All') {

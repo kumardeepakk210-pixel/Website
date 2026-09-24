@@ -6,7 +6,7 @@
    ============================================ */
 
 // All customer-facing storefront views
-const views = ['home', 'shop', 'collections', 'collection-detail', 'new-arrivals', 'best-sellers', 'about', 'login', 'register', 'profile', 'cart', 'wishlist', 'product'];
+const views = ['home', 'shop', 'collections', 'collection-detail', 'new-arrivals', 'best-sellers', 'about', 'login', 'register', 'profile', 'cart', 'wishlist', 'product', 'occasion'];
 
 const COLLECTIONS_CONFIG = [
     {
@@ -53,7 +53,31 @@ function getCurrentView() {
     return 'home';
 }
 
+/**
+ * Dynamically update WishRite brand subtitle in header (Requirement 6)
+ * /occasion -> activeOccasionConfig.brandSubtitle (e.g. DURGA PUJA COLLECTION)
+ * All other views -> SILVER JEWELLERY
+ */
+function updateHeaderBrandSubtitle(viewId) {
+    const subEl = document.getElementById('header-logo-sub') || document.querySelector('.header-logo-sub');
+    if (!subEl) return;
+
+    if (viewId === 'occasion') {
+        const occ = (typeof getActiveOccasion === 'function') ? getActiveOccasion() : null;
+        if (occ && occ.enabled) {
+            subEl.textContent = occ.brandSubtitle || occ.navLabel || (occ.name ? `${occ.name.toUpperCase()} COLLECTION` : 'DURGA PUJA COLLECTION');
+            return;
+        }
+    }
+    // Normal Silver Jewellery Storefront
+    subEl.textContent = 'SILVER JEWELLERY';
+}
+window.updateHeaderBrandSubtitle = updateHeaderBrandSubtitle;
+
 function navigateTo(viewId, param, pushHistory = true) {
+    // 0. Update dynamic brand subtitle based on active view
+    updateHeaderBrandSubtitle(viewId);
+
     // 1. Immediately reset product state and completely unmount sticky product action bar
     currentPdpProduct = null;
     unmountStickyCTA();
@@ -87,7 +111,8 @@ function navigateTo(viewId, param, pushHistory = true) {
         'collection-detail': 'nav-collections',
         'new-arrivals': 'nav-new-arrivals',
         'best-sellers': 'nav-bestsellers',
-        about: 'nav-about'
+        about: 'nav-about',
+        occasion: 'nav-occasion'
     };
     const activeNav = document.getElementById(navMap[viewId]);
     if (activeNav) activeNav.classList.add('active');
@@ -98,6 +123,11 @@ function navigateTo(viewId, param, pushHistory = true) {
             renderHomeSections();
             setHomeSEO();
             if (pushHistory) { try { history.pushState({ view: 'home' }, '', '/'); } catch(e){} }
+            break;
+        case 'occasion':
+            if (typeof renderOccasionPage === 'function') renderOccasionPage();
+            if (typeof setOccasionSEO === 'function') setOccasionSEO();
+            if (pushHistory) { try { history.pushState({ view: 'occasion' }, '', '/occasion'); } catch(e){} }
             break;
         case 'shop':
             buildSidebarFilters();
@@ -130,7 +160,13 @@ function navigateTo(viewId, param, pushHistory = true) {
             break;
         case 'about':
             setAboutSEO();
-            if (pushHistory) { try { history.pushState({ view: 'about' }, '', '/about'); } catch(e){} }
+            if (pushHistory) {
+                const targetUrl = param ? `/about#${param}` : '/about';
+                try { history.pushState({ view: 'about', param: param }, '', targetUrl); } catch(e){}
+            }
+            if (param) {
+                setTimeout(() => scrollToAboutSection(param), 80);
+            }
             break;
         case 'wishlist':
             renderWishlist();
@@ -160,8 +196,17 @@ function navigateTo(viewId, param, pushHistory = true) {
             break;
     }
 
-    // Scroll to top
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    // Scroll handling: if navigating to about with specific section param, scrollToAboutSection handles it
+    if (viewId === 'about' && param) {
+        // Will be scrolled by scrollToAboutSection
+    } else {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // Stop countdown timer if navigating away from occasion (Section 13: Prevent memory leaks)
+    if (viewId !== 'occasion' && typeof stopCountdownTimer === 'function') {
+        stopCountdownTimer();
+    }
 
     // Update header appearance (transparent over hero on homepage vs sticky solid on other views)
     if (typeof updateHeaderState === 'function') {
@@ -561,6 +606,34 @@ function handleInitialURLRoute(pushHistory = false) {
         }
     }
 
+    const urlParams = new URLSearchParams(search);
+    const viewParam = urlParams.get('view');
+    if (viewParam && views.includes(viewParam)) {
+        navigateTo(viewParam, urlParams.get('param') || null, pushHistory);
+        return;
+    }
+
+    // Occasion Route (path /occasion or hash #occasion)
+    if (path === '/occasion' || path.startsWith('/occasion') || hash === '#occasion' || hash.startsWith('#occasion')) {
+        navigateTo('occasion', null, pushHistory);
+        return;
+    }
+
+    // About Route and About Policy Section Deep-Links (Sections 29–36)
+    // Supports: /about, /about#shipping, /about#returns, /about#care, /about#faqs, /about#privacy, /about#contact
+    const policySections = ['shipping', 'returns', 'care', 'faqs', 'privacy', 'contact'];
+    if (path === '/about' || path.startsWith('/about') || hash.startsWith('#about') || policySections.some(s => hash === `#${s}`)) {
+        let section = null;
+        if (hash) {
+            const rawHash = hash.replace(/^#about[#/]?/, '').replace(/^#/, '');
+            if (policySections.includes(rawHash)) {
+                section = rawHash;
+            }
+        }
+        navigateTo('about', section, pushHistory);
+        return;
+    }
+
     if (path.startsWith('/product/')) {
         const slug = path.replace('/product/', '').replace(/\/$/, '');
         if (slug) {
@@ -573,34 +646,31 @@ function handleInitialURLRoute(pushHistory = false) {
             navigateTo('collection-detail', slug, pushHistory);
             return;
         }
-    } else if (path === '/collections') {
+    } else if (path === '/collections' || hash === '#collections') {
         navigateTo('collections', null, pushHistory);
         return;
-    } else if (path === '/new-arrivals') {
+    } else if (path === '/new-arrivals' || hash === '#new-arrivals') {
         navigateTo('new-arrivals', null, pushHistory);
         return;
-    } else if (path === '/best-sellers') {
+    } else if (path === '/best-sellers' || hash === '#best-sellers') {
         navigateTo('best-sellers', null, pushHistory);
         return;
-    } else if (path === '/shop') {
+    } else if (path === '/shop' || hash === '#shop') {
         navigateTo('shop', null, pushHistory);
         return;
-    } else if (path === '/about') {
-        navigateTo('about', null, pushHistory);
-        return;
-    } else if (path === '/cart') {
+    } else if (path === '/cart' || hash === '#cart') {
         navigateTo('cart', null, pushHistory);
         return;
-    } else if (path === '/wishlist') {
+    } else if (path === '/wishlist' || hash === '#wishlist') {
         navigateTo('wishlist', null, pushHistory);
         return;
-    } else if (path === '/account' || path === '/profile') {
+    } else if (path === '/account' || path === '/profile' || hash === '#account') {
         navigateTo('profile', null, pushHistory);
         return;
-    } else if (path === '/login') {
+    } else if (path === '/login' || hash === '#login') {
         navigateTo('login', null, pushHistory);
         return;
-    } else if (path === '/register') {
+    } else if (path === '/register' || hash === '#register') {
         navigateTo('register', null, pushHistory);
         return;
     } else if (path === '/admin') {
@@ -616,6 +686,103 @@ function handleInitialURLRoute(pushHistory = false) {
     navigateTo('home', null, pushHistory);
 }
 
+/**
+ * Smoothly scroll to a specific policy section in the About view (Section 36)
+ * Accounts for sticky navigation header height.
+ */
+function scrollToAboutSection(sectionId) {
+    if (!sectionId) return;
+    const cleanId = String(sectionId).replace(/^#/, '');
+    const el = document.getElementById(cleanId);
+    if (!el) return;
+
+    const header = document.querySelector('.header');
+    const headerOffset = header ? header.offsetHeight + 24 : 90;
+    const elementPosition = el.getBoundingClientRect().top;
+    const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+
+    window.scrollTo({
+        top: Math.max(0, offsetPosition),
+        behavior: 'smooth'
+    });
+}
+window.scrollToAboutSection = scrollToAboutSection;
+
+function navigateToAboutSection(sectionId, pushHistory = true) {
+    navigateTo('about', sectionId, pushHistory);
+}
+window.navigateToAboutSection = navigateToAboutSection;
+
+/**
+ * Interactive FAQ accordion toggle (Section 33)
+ */
+function toggleWishriteFaq(itemEl) {
+    if (!itemEl) return;
+    const wasOpen = itemEl.classList.contains('open');
+    document.querySelectorAll('.faq-item').forEach(i => i.classList.remove('open'));
+    if (!wasOpen) {
+        itemEl.classList.add('open');
+    }
+}
+window.toggleWishriteFaq = toggleWishriteFaq;
+
+/**
+ * Interactive Contact Us Form submission handler (Section 35)
+ */
+function handleWishriteContactSubmit(e) {
+    if (e) e.preventDefault();
+    const statusEl = document.getElementById('contact-form-status');
+    const form = document.getElementById('wishrite-contact-form');
+    if (statusEl) {
+        statusEl.innerHTML = '<span style="color:#2E7D32;font-weight:600;">✓ Thank you! Your message has been received. Our concierge team will reach out within 24 hours.</span>';
+        statusEl.style.display = 'block';
+    }
+    if (form) form.reset();
+}
+window.handleWishriteContactSubmit = handleWishriteContactSubmit;
+
+window.addEventListener('hashchange', () => {
+    const hash = window.location.hash || '';
+    const path = window.location.pathname;
+    const policySections = ['shipping', 'returns', 'care', 'faqs', 'privacy', 'contact'];
+    
+    if (path === '/about' || hash.includes('about') || policySections.some(s => hash === `#${s}`)) {
+        const rawHash = hash.replace(/^#about[#/]?/, '').replace(/^#/, '');
+        if (policySections.includes(rawHash)) {
+            if (getCurrentView() !== 'about') {
+                navigateTo('about', rawHash, false);
+            } else {
+                scrollToAboutSection(rawHash);
+            }
+        }
+    } else if (hash === '#occasion') {
+        navigateTo('occasion', null, false);
+    }
+});
+
+function initFestiveNavigation() {
+    if (typeof getActiveOccasion !== 'function') return;
+    const occasion = getActiveOccasion();
+    const desktopNav = document.getElementById('nav-occasion');
+    const mobileNav = document.getElementById('mobile-nav-occasion');
+
+    if (occasion && occasion.enabled) {
+        const label = occasion.navLabel || occasion.name || 'FESTIVE EDIT';
+        if (desktopNav) {
+            desktopNav.textContent = label.toUpperCase();
+            desktopNav.style.display = 'inline-flex';
+        }
+        if (mobileNav) {
+            mobileNav.textContent = label;
+            mobileNav.style.display = 'block';
+        }
+    } else {
+        if (desktopNav) desktopNav.style.display = 'none';
+        if (mobileNav) mobileNav.style.display = 'none';
+    }
+}
+window.initFestiveNavigation = initFestiveNavigation;
+
 window.addEventListener('popstate', (e) => {
     if (e.state && e.state.view) {
         navigateTo(e.state.view, e.state.param, false);
@@ -629,36 +796,47 @@ document.addEventListener('DOMContentLoaded', async () => {
     // 0. Ensure sticky CTA is completely unmounted initially
     unmountStickyCTA();
 
-    // 1. Initial local render (with shimmer skeletons if data pending)
-    renderHomeSections();
+    // 1. Baseline UI components
     updateAuthDropdown();
     updateCartCount();
     updateWishlistCount();
     renderCart();
-
-    // 2. UI listeners
-    initHeroCarousel();
     initHeaderScroll();
     initScrollReveal();
 
-    // 3. Route to current path
-    handleInitialURLRoute();
-
-    // 4. Asynchronously sync live inventory from Supabase database
+    // 2. Concurrently load products and active occasion settings from Supabase
     try {
-        await loadProductsFromInventory();
+        await Promise.allSettled([
+            loadProductsFromInventory(),
+            (typeof loadActiveOccasionSettings === 'function' ? loadActiveOccasionSettings() : Promise.resolve(null))
+        ]);
 
-        // 5. Initialize Supabase Realtime channel for instant price/stock synchronization
-        initRealtimeInventorySync();
-
-        // Re-render home sections and active views with live Supabase inventory
-        renderHomeSections();
-        if (getCurrentView() === 'shop') {
-            buildSidebarFilters();
-            buildMobileFilters();
-            applyFiltersAndSort();
+        // 3. Initialize Supabase Realtime channel for instant price/stock synchronization
+        if (typeof initRealtimeInventorySync === 'function') {
+            initRealtimeInventorySync();
         }
     } catch (err) {
-        console.warn('Initial inventory load notice:', err);
+        console.warn('[WishRite] Initial data load notice:', err);
+    }
+
+    // 4. Render home sections with synchronized products
+    renderHomeSections();
+
+    // 5. Initialize festive navigation links (derived strictly from Supabase)
+    initFestiveNavigation();
+
+    // 6. Initialize hero carousel (festive slide if enabled, standard silver if off)
+    initHeroCarousel();
+
+    // 7. Route to current path
+    handleInitialURLRoute();
+
+    // 8. View-specific updates
+    if (getCurrentView() === 'shop') {
+        buildSidebarFilters();
+        buildMobileFilters();
+        applyFiltersAndSort();
+    } else if (getCurrentView() === 'occasion' && typeof renderOccasionPage === 'function') {
+        renderOccasionPage();
     }
 });

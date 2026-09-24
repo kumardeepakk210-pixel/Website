@@ -1602,3 +1602,1486 @@ body:not(.view-product) .sticky-cta,
     stroke: var(--wr-white);
     stroke-width: 1.5;
 }
+
+/* ═══════════════════════════════════════════
+   FESTIVE OCCASION MODE STYLES
+   ═══════════════════════════════════════════ */
+:root {
+    --festive-primary: #6A1A24;
+    --festive-secondary: #D4AF37;
+    --festive-accent: #8B1E2D;
+    --festive-light: #FAF6F0;
+    --festive-gradient: linear-gradient(135deg, #4A0E17 0%, #6A1A24 50%, #2A080E 100%);
+}
+
+.occasion-page {
+    background: var(--wr-white);
+    min-height: 80vh;
+}
+
+/* ── Festive Hero ── */
+.festive-hero {
+    position: relative;
+    width: 100%;
+    min-height: 540px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    overflow: hidden;
+    padding: var(--space-20) var(--container-padding) var(--space-16);
+    background: var(--festive-gradient);
+    color: var(--wr-white);
+}
+
+.festive-hero-bg {
+    position: absolute;
+    inset: 0;
+    background-size: cover;
+    background-position: center 30%;
+    opacity: 0.32;
+    filter: saturate(1.15) contrast(1.05);
+    transform: scale(1.03);
+    transition: transform 1.2s var(--ease-out);
+}
+
+.festive-hero-overlay {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at center, rgba(74, 14, 23, 0.45) 0%, rgba(32, 6, 11, 0.85) 100%);
+    pointer-events: none;
+}
+
+.festive-hero-container {
+    position: relative;
+    z-index: 2;
+    max-width: 860px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.festive-hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: 6px 18px;
+    background: rgba(212, 175, 55, 0.15);
+    border: 1px solid rgba(212, 175, 55, 0.45);
+    border-radius: var(--radius-full);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    letter-spacing: var(--tracking-widest);
+    color: var(--festive-secondary);
+    text-transform: uppercase;
+    margin-bottom: var(--space-6);
+    backdrop-filter: blur(8px);
+}
+
+.festive-badge-sparkle {
+    font-size: 0.75rem;
+    color: var(--festive-secondary);
+}
+
+.festive-hero-title {
+    font-family: var(--font-display);
+    font-size: clamp(2.2rem, 5vw, 3.4rem);
+    font-weight: 500;
+    line-height: var(--leading-tight);
+    color: var(--wr-white);
+    letter-spacing: var(--tracking-tight);
+    margin: 0 0 var(--space-4);
+    text-shadow: 0 2px 14px rgba(0, 0, 0, 0.4);
+}
+
+.festive-hero-divider {
+    width: 64px;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--festive-secondary), transparent);
+    margin: 0 auto var(--space-4);
+}
+
+.festive-hero-subtitle {
+    font-family: var(--font-body);
+    font-size: clamp(0.95rem, 2vw, 1.15rem);
+    line-height: var(--leading-relaxed);
+    color: rgba(255, 255, 255, 0.9);
+    max-width: 660px;
+    margin: 0 auto var(--space-8);
+    font-weight: 300;
+    text-shadow: 0 1px 8px rgba(0, 0, 0, 0.3);
+}
+
+.festive-hero-actions {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-4);
+    flex-wrap: wrap;
+}
+
+.btn-festive-primary {
+    background: var(--festive-secondary);
+    color: #2D090E;
+    font-weight: 600;
+    font-size: var(--text-xs);
+    letter-spacing: var(--tracking-widest);
+    text-transform: uppercase;
+    padding: 15px 32px;
+    border-radius: var(--radius-none);
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    border: 1px solid var(--festive-secondary);
+    transition: all 0.25s var(--ease-out);
+    cursor: pointer;
+    box-shadow: 0 4px 20px rgba(212, 175, 55, 0.35);
+}
+
+.btn-festive-primary:hover {
+    background: #E5C358;
+    color: #1A0508;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 24px rgba(212, 175, 55, 0.5);
+}
+
+.btn-festive-secondary {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--wr-white);
+    font-weight: 500;
+    font-size: var(--text-xs);
+    letter-spacing: var(--tracking-widest);
+    text-transform: uppercase;
+    padding: 15px 28px;
+    border-radius: var(--radius-none);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    display: inline-flex;
+    align-items: center;
+    transition: all 0.25s var(--ease-out);
+    cursor: pointer;
+    backdrop-filter: blur(6px);
+}
+
+.btn-festive-secondary:hover {
+    background: rgba(255, 255, 255, 0.2);
+    border-color: var(--wr-white);
+    color: var(--wr-white);
+    transform: translateY(-2px);
+}
+
+.festive-hero-bottom {
+    position: relative;
+    z-index: 2;
+    margin-top: var(--space-12);
+}
+
+.festive-bottom-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: 6px 20px;
+    background: rgba(0, 0, 0, 0.35);
+    border-radius: var(--radius-full);
+    font-size: 0.6875rem;
+    letter-spacing: var(--tracking-wider);
+    color: rgba(255, 255, 255, 0.8);
+    text-transform: uppercase;
+    backdrop-filter: blur(4px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.festive-bottom-pill .dot {
+    width: 3px;
+    height: 3px;
+    background: var(--festive-secondary);
+    border-radius: 50%;
+}
+
+/* ── Festive Category Nav / Pills ── */
+.festive-nav-bar {
+    background: var(--wr-white);
+    border-bottom: 1px solid var(--wr-border-light);
+    padding: var(--space-4) 0;
+    position: sticky;
+    top: 72px;
+    z-index: 10;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+}
+
+.festive-filter-pills {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-3);
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: var(--space-1) 0;
+}
+
+.festive-filter-pills::-webkit-scrollbar {
+    display: none;
+}
+
+.festive-pill {
+    padding: 10px 22px;
+    background: var(--wr-bg-warm);
+    border: 1px solid var(--wr-border);
+    border-radius: var(--radius-full);
+    font-family: var(--font-body);
+    font-size: var(--text-xs);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wider);
+    color: var(--wr-text);
+    text-transform: uppercase;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s var(--ease-out);
+}
+
+.festive-pill:hover {
+    background: var(--festive-light);
+    border-color: var(--festive-primary);
+    color: var(--festive-primary);
+}
+
+.festive-pill.active {
+    background: var(--festive-primary);
+    border-color: var(--festive-primary);
+    color: var(--wr-white);
+    box-shadow: 0 2px 12px rgba(106, 26, 36, 0.25);
+}
+
+/* ── Festive Section Layout ── */
+.festive-section {
+    padding: var(--space-16) var(--container-padding);
+    border-bottom: 1px solid var(--wr-border-light);
+}
+
+.festive-bg-tint {
+    background: var(--festive-light);
+}
+
+.festive-section-header {
+    text-align: center;
+    max-width: 720px;
+    margin: 0 auto var(--space-10);
+}
+
+.festive-sub-label {
+    display: inline-block;
+    font-size: var(--text-xs);
+    font-weight: 600;
+    letter-spacing: var(--tracking-widest);
+    color: var(--festive-primary);
+    text-transform: uppercase;
+    margin-bottom: var(--space-2);
+}
+
+.festive-section-title {
+    font-family: var(--font-display);
+    font-size: clamp(1.8rem, 3.5vw, 2.4rem);
+    font-weight: 500;
+    color: var(--wr-black);
+    margin: 0 0 var(--space-3);
+}
+
+.festive-section-desc {
+    font-size: var(--text-sm);
+    line-height: var(--leading-relaxed);
+    color: var(--wr-text-muted);
+    margin: 0;
+}
+
+/* ── Return to Silver Banner ── */
+.festive-back-bar {
+    padding: var(--space-16) var(--container-padding);
+    background: var(--wr-white);
+}
+
+.festive-back-card {
+    background: var(--wr-bg-warm);
+    border: 1px solid var(--wr-border);
+    padding: var(--space-8) var(--space-10);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-6);
+}
+
+.festive-back-info h3 {
+    font-family: var(--font-display);
+    font-size: 1.4rem;
+    margin: 0 0 var(--space-2);
+    color: var(--wr-primary);
+}
+
+.festive-back-info p {
+    font-size: var(--text-sm);
+    color: var(--wr-text-muted);
+    margin: 0;
+    max-width: 580px;
+}
+
+/* ── Saree PDP Pairings ── */
+.saree-pairing-section {
+    background: var(--festive-light);
+    padding: var(--space-16) var(--container-padding);
+    border-top: 1px solid var(--wr-border-light);
+    margin-top: var(--space-12);
+}
+
+/* ── Homepage Festive Hero Banner Slide ── */
+.hero-festive-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 14px;
+    background: rgba(212, 175, 55, 0.2);
+    border: 1px solid rgba(212, 175, 55, 0.5);
+    border-radius: var(--radius-full);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: var(--tracking-widest);
+    color: #D4AF37;
+    text-transform: uppercase;
+    margin-bottom: var(--space-3);
+}
+
+/* ═══════════════════════════════════════════
+   FESTIVE OCCASION EXPERIENCE STYLES
+   ═══════════════════════════════════════════ */
+
+/* ── 1. Festive Trust Bar (Section 11) ── */
+.festive-trust-bar {
+    width: 100%;
+    background: #FAF8F5;
+    border-top: 1px solid rgba(139, 30, 45, 0.12);
+    border-bottom: 1px solid rgba(139, 30, 45, 0.12);
+    position: relative;
+    z-index: 10;
+}
+
+.festive-trust-grid {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    padding: 16px var(--container-padding);
+    gap: var(--space-4);
+    flex-wrap: wrap;
+}
+
+.festive-trust-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: var(--wr-font-body);
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--wr-primary);
+    letter-spacing: 0.01em;
+}
+
+.festive-trust-icon {
+    font-size: 1.15rem;
+    line-height: 1;
+    color: var(--festive-secondary, #D4AF37);
+}
+
+.festive-trust-text {
+    white-space: nowrap;
+}
+
+/* ── 2. Festive Hero Typography & Accent ── */
+.festive-bengali-title {
+    font-family: var(--font-display);
+    font-size: clamp(2rem, 5vw, 3.4rem);
+    line-height: 1.15;
+    font-weight: 600;
+}
+
+.festive-hero-english {
+    font-family: var(--font-display);
+    font-style: italic;
+    font-size: clamp(1.1rem, 2.5vw, 1.45rem);
+    color: var(--festive-secondary, #D4AF37);
+    margin: 4px 0 16px;
+    letter-spacing: 0.03em;
+}
+
+/* ── 3. Festive Countdown Timer (Section 12, 13) ── */
+.festive-countdown-section {
+    padding: var(--space-8) var(--container-padding);
+    background: var(--festive-bg, #F8F3EC);
+    border-bottom: 1px solid var(--wr-border-light);
+}
+
+.festive-countdown-card {
+    max-width: 680px;
+    margin: 0 auto;
+    text-align: center;
+    padding: var(--space-6) var(--space-8);
+    background: #FFFFFF;
+    border: 1px solid rgba(139, 30, 45, 0.15);
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(106, 26, 36, 0.06);
+}
+
+.countdown-eyebrow {
+    display: inline-block;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--festive-primary, #8B1E2D);
+    margin-bottom: var(--space-4);
+}
+
+.countdown-boxes {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: var(--space-4);
+}
+
+.countdown-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-width: 80px;
+    padding: 12px 14px;
+    background: rgba(139, 30, 45, 0.04);
+    border: 1px solid rgba(212, 175, 55, 0.35);
+    border-radius: 8px;
+    transition: transform 0.2s ease;
+}
+
+.countdown-val {
+    font-family: var(--font-display);
+    font-size: 2rem;
+    font-weight: 600;
+    color: var(--festive-primary, #8B1E2D);
+    line-height: 1;
+    margin-bottom: 4px;
+}
+
+.countdown-lbl {
+    font-size: 0.625rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    color: var(--wr-text-muted);
+}
+
+.countdown-expiry-msg {
+    margin-top: var(--space-3);
+    font-size: 0.875rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    color: var(--festive-primary, #8B1E2D);
+    text-transform: uppercase;
+}
+
+/* ── 4. Festive Live Offers Section (Section 14-22) ── */
+.festive-offers-section {
+    padding: var(--space-12) var(--container-padding);
+    background: var(--festive-bg, #F8F3EC);
+}
+
+.festive-offers-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    background: linear-gradient(135deg, #6A1A24 0%, #4A0E17 50%, #2A080E 100%);
+    border-radius: 16px;
+    padding: 36px 40px;
+    display: grid;
+    grid-template-columns: 1fr 1.6fr;
+    gap: var(--space-8);
+    align-items: center;
+    box-shadow: 0 10px 30px rgba(42, 8, 14, 0.2);
+    position: relative;
+    overflow: hidden;
+}
+
+.festive-offers-container::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -20%;
+    width: 400px;
+    height: 400px;
+    background: radial-gradient(circle, rgba(212, 175, 55, 0.15) 0%, transparent 70%);
+    pointer-events: none;
+}
+
+.festive-offers-left {
+    color: #FFFFFF;
+}
+
+.festive-offers-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    color: #D4AF37;
+    background: rgba(212, 175, 55, 0.15);
+    border: 1px solid rgba(212, 175, 55, 0.4);
+    border-radius: 20px;
+    padding: 4px 12px;
+    margin-bottom: var(--space-3);
+    text-transform: uppercase;
+}
+
+.festive-offers-heading {
+    font-family: var(--font-display);
+    font-size: clamp(1.6rem, 3vw, 2.2rem);
+    color: #FFFFFF;
+    line-height: 1.25;
+    margin: 0 0 var(--space-4);
+    font-weight: 500;
+}
+
+.btn-offers-cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #FFFFFF;
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    padding: 10px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-offers-cta:hover {
+    background: rgba(212, 175, 55, 0.25);
+    border-color: #D4AF37;
+    color: #D4AF37;
+}
+
+.festive-offers-right {
+    position: relative;
+    z-index: 2;
+}
+
+.live-offers-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: var(--space-4);
+}
+
+.live-offer-card {
+    background: #FFFFFF;
+    border-radius: 12px;
+    padding: 20px 24px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    position: relative;
+    border: 1px solid rgba(212, 175, 55, 0.25);
+}
+
+.live-offer-badge {
+    display: inline-block;
+    background: #FFF4E5;
+    color: #B45309;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    padding: 3px 8px;
+    border-radius: 4px;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+}
+
+.live-offer-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--wr-black);
+    margin: 0 0 6px;
+}
+
+.live-offer-text {
+    font-family: var(--font-display);
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--festive-primary, #8B1E2D);
+    margin-bottom: 8px;
+}
+
+.live-offer-validity {
+    font-size: 0.75rem;
+    color: var(--wr-text-muted);
+    margin-bottom: 12px;
+}
+
+.live-offer-coupon-box {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    background: #F8F8F8;
+    border: 1px dashed rgba(139, 30, 45, 0.3);
+    border-radius: 6px;
+    padding: 6px 10px;
+}
+
+.coupon-code {
+    font-family: monospace;
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: var(--festive-primary, #8B1E2D);
+    letter-spacing: 0.05em;
+}
+
+.btn-copy-coupon {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: #FFFFFF;
+    background: var(--festive-primary, #8B1E2D);
+    border: none;
+    border-radius: 4px;
+    padding: 4px 10px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-copy-coupon:hover {
+    background: #5A111C;
+}
+
+.btn-copy-coupon.copied {
+    background: #15803D;
+}
+
+.live-offers-empty-state {
+    text-align: center;
+    padding: 32px 20px;
+    color: #FFFFFF;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px dashed rgba(212, 175, 55, 0.3);
+    border-radius: 12px;
+}
+
+.empty-sparkle {
+    color: #D4AF37;
+    font-size: 1rem;
+    margin-bottom: 8px;
+}
+
+.live-offers-empty-state .empty-text {
+    font-size: 0.95rem;
+    color: rgba(255, 255, 255, 0.9);
+    margin: 0;
+}
+
+/* ── Mobile Responsiveness for Festive Mode ── */
+@media (max-width: 768px) {
+    .festive-hero {
+        min-height: 480px;
+        padding: var(--space-12) var(--container-padding) var(--space-10);
+    }
+
+    .festive-hero-title {
+        font-size: 2rem;
+    }
+
+    .festive-hero-subtitle {
+        font-size: 0.9375rem;
+        margin-bottom: var(--space-6);
+    }
+
+    .festive-hero-actions {
+        width: 100%;
+        flex-direction: column;
+        gap: var(--space-3);
+    }
+
+    .btn-festive-primary,
+    .btn-festive-secondary {
+        width: 100%;
+        justify-content: center;
+        padding: 14px 20px;
+    }
+
+    .festive-bottom-pill {
+        font-size: 0.625rem;
+        padding: 4px 14px;
+    }
+
+    .festive-trust-grid {
+        flex-direction: column;
+        gap: 12px;
+        align-items: center;
+        padding: 14px var(--container-padding);
+    }
+
+    .festive-trust-item {
+        font-size: 0.8125rem;
+    }
+
+    .countdown-boxes {
+        gap: 8px;
+    }
+
+    .countdown-box {
+        min-width: 64px;
+        padding: 8px 6px;
+    }
+
+    .countdown-val {
+        font-size: 1.5rem;
+    }
+
+    .festive-offers-container {
+        grid-template-columns: 1fr;
+        padding: 24px 20px;
+        gap: var(--space-6);
+    }
+
+    .festive-offers-heading {
+        font-size: 1.45rem;
+    }
+
+    .live-offers-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .festive-nav-bar {
+        top: 60px;
+        padding: var(--space-3) var(--container-padding);
+    }
+
+    .festive-filter-pills {
+        justify-content: flex-start;
+        gap: var(--space-2);
+    }
+
+    .festive-pill {
+        padding: 8px 16px;
+        font-size: 0.75rem;
+    }
+
+    .festive-section {
+        padding: var(--space-10) var(--container-padding);
+    }
+
+    .festive-section-header {
+        margin-bottom: var(--space-6);
+    }
+
+    .festive-section-title {
+        font-size: 1.6rem;
+    }
+
+    .festive-back-card {
+        flex-direction: column;
+        text-align: center;
+        padding: var(--space-6) var(--space-4);
+    }
+
+    .festive-back-card .btn {
+        width: 100%;
+    }
+}
+
+/* ==============================================================================
+   OCCASION BACKGROUND ARTWORK SYSTEM (Sections 2-9)
+   Subtle festive line-art sketch sitting behind /occasion content.
+   Never interferes with text, buttons, product cards or creates horizontal scroll.
+   ============================================================================== */
+.occasion-page {
+    position: relative;
+    overflow-x: hidden;
+    background-color: var(--festive-bg, #F8F3EC);
+}
+
+.festive-background-artwork {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: 100%;
+    min-height: 100vh;
+    pointer-events: none;
+    z-index: 0;
+    background-repeat: var(--festive-bg-repeat, no-repeat);
+    background-position: var(--festive-bg-pos, right center);
+    background-size: var(--festive-bg-size, min(650px, 45vw));
+    opacity: var(--festive-bg-opacity, 0.16);
+    transition: opacity 0.4s ease;
+}
+
+/* Ensure all occasion page sections stay strictly above background artwork */
+.festive-trust-bar,
+.festive-hero,
+.festive-countdown-section,
+.festive-offers-section,
+.festive-nav-bar,
+.festive-section,
+.festive-explore-cta {
+    position: relative;
+    z-index: 1;
+}
+
+@media (max-width: 768px) {
+    .festive-background-artwork {
+        opacity: calc(var(--festive-bg-opacity, 0.16) * 0.625); /* ~0.10 on mobile for clear yet non-intrusive visibility */
+        background-position: center top 70px;
+        background-size: min(340px, 85vw);
+    }
+}
+
+/* ==============================================================================
+   COUPON & DISCOUNT SYSTEM UI (Sections 10-25, 54)
+   WishRite Luxury Coupon Input, Applied State & Available Offers Drawer
+   ============================================================================== */
+.wishrite-coupon-box {
+    margin: 16px 0;
+    padding: 14px 16px;
+    background: #FAF8F5;
+    border: 1px dashed #D6C7BC;
+    border-radius: var(--radius-md, 8px);
+}
+
+.wishrite-coupon-box-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--wr-text, #2C2C2C);
+}
+
+.wishrite-available-offers-link {
+    background: none;
+    border: none;
+    color: var(--wr-primary, #5E3435);
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-decoration: underline;
+    cursor: pointer;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.wishrite-available-offers-link:hover {
+    color: #8B1E2D;
+}
+
+.wishrite-coupon-input-group {
+    display: flex;
+    gap: 8px;
+}
+
+.wishrite-coupon-input {
+    flex: 1;
+    padding: 8px 12px;
+    border: 1px solid var(--wr-border, #E5D9D2);
+    border-radius: var(--radius-sm, 4px);
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-weight: 600;
+    background: #FFFFFF;
+    color: var(--wr-text, #2C2C2C);
+}
+
+.wishrite-coupon-input:focus {
+    outline: none;
+    border-color: var(--wr-primary, #5E3435);
+    box-shadow: 0 0 0 2px rgba(94, 52, 53, 0.1);
+}
+
+.wishrite-coupon-btn {
+    padding: 8px 16px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+
+.wishrite-coupon-msg {
+    margin-top: 8px;
+    font-size: 0.8rem;
+    line-height: 1.4;
+}
+
+.wishrite-coupon-msg.error {
+    color: #C62828;
+}
+
+.wishrite-coupon-msg.success {
+    color: #2E7D32;
+}
+
+/* Applied Coupon Card */
+.wishrite-coupon-applied-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #F1F8E9;
+    border: 1px solid #C5E1A5;
+    border-radius: var(--radius-sm, 4px);
+    padding: 10px 14px;
+}
+
+.wishrite-coupon-applied-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.wishrite-coupon-applied-code {
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    color: #2E7D32;
+    font-size: 0.9rem;
+}
+
+.wishrite-coupon-applied-saved {
+    font-size: 0.8rem;
+    color: #33691E;
+    font-weight: 500;
+}
+
+.wishrite-coupon-remove-btn {
+    background: none;
+    border: none;
+    color: #C62828;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    text-transform: uppercase;
+    padding: 4px 8px;
+    border-radius: 3px;
+    transition: background 0.2s;
+}
+
+.wishrite-coupon-remove-btn:hover {
+    background: rgba(198, 40, 40, 0.08);
+}
+
+/* Available Coupons Modal / Drawer */
+.wishrite-offers-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    animation: fadeIn 0.2s ease;
+}
+
+.wishrite-offers-modal {
+    background: #FFFFFF;
+    border-radius: 12px;
+    max-width: 480px;
+    width: 100%;
+    max-height: 85vh;
+    overflow-y: auto;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.2);
+    display: flex;
+    flex-direction: column;
+}
+
+.wishrite-offers-modal-header {
+    padding: 18px 20px;
+    border-bottom: 1px solid var(--wr-border, #E5D9D2);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: sticky;
+    top: 0;
+    background: #FFFFFF;
+    z-index: 2;
+}
+
+.wishrite-offers-modal-title {
+    font-family: var(--wr-font-heading, 'Playfair Display', Georgia, serif);
+    font-size: 1.25rem;
+    color: var(--wr-primary, #5E3435);
+    margin: 0;
+}
+
+.wishrite-offers-modal-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    line-height: 1;
+    cursor: pointer;
+    color: var(--wr-text-muted, #767676);
+}
+
+.wishrite-offers-modal-body {
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.wishrite-offer-card {
+    border: 1px dashed #D6C7BC;
+    background: #FAF8F5;
+    border-radius: 8px;
+    padding: 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    transition: border-color 0.2s;
+}
+
+.wishrite-offer-card:hover {
+    border-color: var(--wr-primary, #5E3435);
+}
+
+.wishrite-offer-card.best-offer {
+    border: 1px solid #D4AF37;
+    background: #FFFDF9;
+    box-shadow: 0 2px 8px rgba(212, 175, 55, 0.15);
+}
+
+.wishrite-offer-badge-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.wishrite-offer-badge {
+    background: var(--wr-primary, #5E3435);
+    color: #FFFFFF;
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 4px;
+    letter-spacing: 0.5px;
+}
+
+.wishrite-offer-badge.best {
+    background: #D4AF37;
+    color: #332005;
+}
+
+.wishrite-offer-code-tag {
+    font-family: monospace;
+    font-weight: 700;
+    font-size: 0.85rem;
+    letter-spacing: 0.5px;
+    color: var(--wr-primary, #5E3435);
+    background: #ECE5DE;
+    padding: 2px 6px;
+    border-radius: 3px;
+}
+
+.wishrite-offer-desc {
+    font-size: 0.8rem;
+    color: var(--wr-text-muted, #666);
+    margin: 2px 0 0;
+    line-height: 1.35;
+}
+
+.wishrite-offer-terms {
+    font-size: 0.7rem;
+    color: #999;
+    margin-top: 4px;
+}
+
+.wishrite-offer-apply-btn {
+    padding: 6px 14px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+}
+
+/* ==============================================================================
+   MAIN HOMEPAGE JEWELLERY SKETCH WATERMARK (Section 5)
+   Small, elegant, responsive jewellery line-art/sketch at 0.08–0.12 opacity.
+   ============================================================================== */
+#home-view {
+    position: relative;
+    overflow-x: hidden;
+}
+
+.homepage-jewellery-sketch {
+    position: absolute;
+    top: 100px;
+    right: 4%;
+    width: 260px;
+    height: 260px;
+    background-image: url('../assets/jewellery-sketch.svg');
+    background-repeat: no-repeat;
+    background-size: contain;
+    background-position: center;
+    opacity: 0.10;
+    pointer-events: none;
+    z-index: 2;
+    transition: opacity 0.3s ease;
+}
+
+@media (max-width: 1024px) {
+    .homepage-jewellery-sketch {
+        width: 200px;
+        height: 200px;
+        top: 80px;
+        right: 3%;
+        opacity: 0.08;
+    }
+}
+
+@media (max-width: 640px) {
+    .homepage-jewellery-sketch {
+        display: none; /* Safely hidden on very small screens to eliminate any clutter */
+    }
+}
+
+/* ==============================================================================
+   ABOUT PAGE POLICY SECTIONS & ACCORDIONS (Sections 29–36)
+   Anchor-scrollable sections for Shipping, Returns, Care, FAQs, Privacy, Contact
+   ============================================================================== */
+.about-policy-section {
+    scroll-margin-top: 100px; /* Accounts for sticky header height */
+    padding: 64px 0;
+    border-top: 1px solid var(--wr-border-light, #eee5de);
+    position: relative;
+}
+
+.about-policy-alt {
+    background-color: #FAF6F2;
+}
+
+.about-policy-header {
+    text-align: center;
+    max-width: 720px;
+    margin: 0 auto 44px;
+}
+
+.about-policy-header h2 {
+    font-family: var(--wr-font-heading);
+    font-size: clamp(1.8rem, 3vw, 2.3rem);
+    color: var(--wr-primary, #5E3435);
+    margin: 8px 0 12px;
+}
+
+.about-policy-header p {
+    color: var(--wr-text-muted, #776A62);
+    font-size: 0.95rem;
+    line-height: 1.6;
+}
+
+/* Policy Cards Grid (Shipping, etc.) */
+.policy-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 24px;
+}
+
+.policy-card {
+    background: #FFFFFF;
+    border: 1px solid var(--wr-border, #E4D8CE);
+    border-radius: 12px;
+    padding: 28px 24px;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 4px 16px rgba(94, 52, 53, 0.04);
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.policy-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(94, 52, 53, 0.08);
+}
+
+.policy-card-icon {
+    font-size: 2rem;
+    margin-bottom: 14px;
+}
+
+.policy-card h3 {
+    font-family: var(--wr-font-heading);
+    font-size: 1.25rem;
+    color: var(--wr-primary, #5E3435);
+    margin: 0 0 8px;
+}
+
+.policy-highlight {
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: var(--wr-primary, #5E3435);
+    margin-bottom: 10px;
+    display: inline-block;
+}
+
+.policy-card p {
+    color: var(--wr-text, #443833);
+    font-size: 0.88rem;
+    line-height: 1.55;
+    flex: 1;
+    margin-bottom: 12px;
+}
+
+.policy-subnote {
+    font-size: 0.82rem;
+    color: var(--wr-text-muted, #776A62);
+    border-top: 1px dashed var(--wr-border, #E4D8CE);
+    padding-top: 10px;
+}
+
+.festive-policy-accent {
+    border-color: #D4AF37;
+    background: linear-gradient(180deg, #FFFFFF 0%, #FBF6EF 100%);
+}
+
+/* Returns & Step Cards */
+.policy-content-block {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 20px;
+}
+
+.policy-step-item {
+    background: #FFFFFF;
+    border: 1px solid var(--wr-border, #E4D8CE);
+    border-radius: 12px;
+    padding: 24px;
+    box-shadow: 0 2px 12px rgba(94, 52, 53, 0.03);
+}
+
+.step-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    background: #F2EBE4;
+    color: var(--wr-primary, #5E3435);
+    font-weight: 700;
+    font-size: 0.75rem;
+    border-radius: 4px;
+    letter-spacing: 0.5px;
+    margin-bottom: 12px;
+}
+
+.policy-step-item h4 {
+    font-family: var(--wr-font-heading);
+    font-size: 1.1rem;
+    color: var(--wr-primary, #5E3435);
+    margin: 0 0 8px;
+}
+
+.policy-step-item p {
+    font-size: 0.88rem;
+    color: var(--wr-text, #443833);
+    line-height: 1.5;
+    margin: 0;
+}
+
+/* Care Guide Cards */
+.care-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 24px;
+}
+
+.care-card {
+    background: #FFFFFF;
+    border: 1px solid var(--wr-border, #E4D8CE);
+    border-radius: 12px;
+    padding: 28px 24px;
+    box-shadow: 0 3px 14px rgba(94, 52, 53, 0.04);
+}
+
+.care-card h4 {
+    font-family: var(--wr-font-heading);
+    font-size: 1.2rem;
+    color: var(--wr-primary, #5E3435);
+    margin: 0 0 16px;
+    border-bottom: 1px solid var(--wr-border-light, #eee5de);
+    padding-bottom: 10px;
+}
+
+.care-card ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.care-card ul li {
+    font-size: 0.88rem;
+    line-height: 1.6;
+    color: var(--wr-text, #443833);
+    margin-bottom: 10px;
+    position: relative;
+    padding-left: 18px;
+}
+
+.care-card ul li::before {
+    content: "•";
+    color: var(--wr-primary, #5E3435);
+    position: absolute;
+    left: 0;
+    font-size: 1.2rem;
+    line-height: 1.3;
+}
+
+/* FAQs Accordion */
+.faq-accordion-container {
+    max-width: 820px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.faq-item {
+    background: #FFFFFF;
+    border: 1px solid var(--wr-border, #E4D8CE);
+    border-radius: 10px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.faq-item:hover {
+    border-color: var(--wr-primary, #5E3435);
+}
+
+.faq-question {
+    padding: 18px 22px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-family: var(--wr-font-heading);
+    font-size: 1.05rem;
+    color: var(--wr-primary, #5E3435);
+    user-select: none;
+}
+
+.faq-icon {
+    font-size: 1.4rem;
+    font-weight: 300;
+    transition: transform 0.3s ease;
+    line-height: 1;
+    color: var(--wr-primary, #5E3435);
+}
+
+.faq-answer {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.35s cubic-bezier(0, 1, 0, 1), padding 0.35s ease;
+    padding: 0 22px;
+}
+
+.faq-answer p {
+    font-size: 0.9rem;
+    line-height: 1.65;
+    color: var(--wr-text, #443833);
+    margin: 0;
+}
+
+.faq-item.open {
+    border-color: var(--wr-primary, #5E3435);
+    box-shadow: 0 4px 16px rgba(94, 52, 53, 0.05);
+}
+
+.faq-item.open .faq-answer {
+    max-height: 350px;
+    padding: 0 22px 20px;
+}
+
+.faq-item.open .faq-icon {
+    transform: rotate(45deg);
+}
+
+/* Privacy Policy Card */
+.policy-text-card {
+    background: #FFFFFF;
+    border: 1px solid var(--wr-border, #E4D8CE);
+    border-radius: 12px;
+    padding: 36px 32px;
+    max-width: 840px;
+    margin: 0 auto;
+    box-shadow: 0 4px 16px rgba(94, 52, 53, 0.04);
+}
+
+.policy-text-card h4 {
+    font-family: var(--wr-font-heading);
+    font-size: 1.15rem;
+    color: var(--wr-primary, #5E3435);
+    margin: 20px 0 8px;
+}
+
+.policy-text-card h4:first-child {
+    margin-top: 0;
+}
+
+.policy-text-card p {
+    font-size: 0.9rem;
+    line-height: 1.65;
+    color: var(--wr-text, #443833);
+    margin: 0 0 14px;
+}
+
+/* Contact Grid */
+.contact-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 28px;
+    max-width: 940px;
+    margin: 0 auto;
+}
+
+.contact-info-card,
+.contact-form-card {
+    background: #FFFFFF;
+    border: 1px solid var(--wr-border, #E4D8CE);
+    border-radius: 12px;
+    padding: 32px 28px;
+    box-shadow: 0 4px 16px rgba(94, 52, 53, 0.04);
+}
+
+.contact-info-card h3,
+.contact-form-card h3 {
+    font-family: var(--wr-font-heading);
+    font-size: 1.3rem;
+    color: var(--wr-primary, #5E3435);
+    margin: 0 0 16px;
+}
+
+.contact-detail-item {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    margin-bottom: 18px;
+}
+
+.contact-icon {
+    font-size: 1.35rem;
+    line-height: 1.2;
+}
+
+.contact-detail-item strong {
+    display: block;
+    font-size: 0.9rem;
+    color: var(--wr-primary, #5E3435);
+    margin-bottom: 2px;
+}
+
+.contact-detail-item p {
+    font-size: 0.88rem;
+    color: var(--wr-text-muted, #776A62);
+    margin: 0;
+}

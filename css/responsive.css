@@ -385,7 +385,12 @@
     }
 
     .header-logo-sub {
-        display: none;
+        display: block;
+        font-size: 0.52rem;
+        letter-spacing: 0.18em;
+        font-weight: 600;
+        margin-top: 1px;
+        opacity: 0.85;
     }
 
     /* Hero — Dedicated Mobile Composition */

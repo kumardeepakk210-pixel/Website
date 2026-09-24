@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="100%" height="100%" fill="none">
+  <!-- Handcrafted Silver Filigree Jewellery Pendant Sketch -->
+  <defs>
+    <linearGradient id="silverStroke" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#5A3D28" stop-opacity="0.9" />
+      <stop offset="50%" stop-color="#8C6D58" stop-opacity="0.75" />
+      <stop offset="100%" stop-color="#5A3D28" stop-opacity="0.9" />
+    </linearGradient>
+  </defs>
+
+  <!-- Delicate Neck Chain Arc -->
+  <path d="M 80 40 Q 200 120 320 40" stroke="url(#silverStroke)" stroke-width="1.8" stroke-dasharray="3,3" stroke-linecap="round"/>
+  <path d="M 95 48 Q 200 126 305 48" stroke="url(#silverStroke)" stroke-width="1" stroke-opacity="0.6"/>
+
+  <!-- Bail / Loop Ring -->
+  <ellipse cx="200" cy="115" rx="7" ry="12" stroke="url(#silverStroke)" stroke-width="2" fill="none"/>
+  <circle cx="200" cy="115" r="3" fill="#5A3D28" fill-opacity="0.4"/>
+
+  <!-- Main Ornate Pendant Body (Filigree Teardrop Motif) -->
+  <path d="M 200 130 C 160 180 130 220 130 260 C 130 305 160 340 200 340 C 240 340 270 305 270 260 C 270 220 240 180 200 130 Z" 
+        stroke="url(#silverStroke)" stroke-width="2.2" stroke-linejoin="round"/>
+
+  <!-- Inner Filigree Border -->
+  <path d="M 200 148 C 170 190 145 225 145 260 C 145 295 170 324 200 324 C 230 324 255 295 255 260 C 255 225 230 190 200 148 Z" 
+        stroke="url(#silverStroke)" stroke-width="1.2" stroke-dasharray="4,2"/>
+
+  <!-- Central Lotus & Gemstone Setting -->
+  <ellipse cx="200" cy="255" rx="18" ry="24" stroke="url(#silverStroke)" stroke-width="1.8"/>
+  <circle cx="200" cy="255" r="9" stroke="url(#silverStroke)" stroke-width="1.5" fill="#5A3D28" fill-opacity="0.15"/>
+
+  <!-- Intricate Filigree Spirals (Left Wing) -->
+  <path d="M 185 240 C 170 230 155 245 165 260 C 175 275 190 265 185 250" stroke="url(#silverStroke)" stroke-width="1.2" stroke-linecap="round"/>
+  <path d="M 180 220 C 165 210 150 225 160 238" stroke="url(#silverStroke)" stroke-width="1" stroke-linecap="round"/>
+  <path d="M 175 275 C 160 285 165 305 180 300 C 190 295 185 285 178 280" stroke="url(#silverStroke)" stroke-width="1.2" stroke-linecap="round"/>
+
+  <!-- Intricate Filigree Spirals (Right Wing) -->
+  <path d="M 215 240 C 230 230 245 245 235 260 C 225 275 210 265 215 250" stroke="url(#silverStroke)" stroke-width="1.2" stroke-linecap="round"/>
+  <path d="M 220 220 C 235 210 250 225 240 238" stroke="url(#silverStroke)" stroke-width="1" stroke-linecap="round"/>
+  <path d="M 225 275 C 240 285 235 305 220 300 C 210 295 215 285 222 280" stroke="url(#silverStroke)" stroke-width="1.2" stroke-linecap="round"/>
+
+  <!-- Crown Leaf Ornaments (Top Crest) -->
+  <path d="M 200 130 C 190 120 185 105 195 102 C 200 112 200 125 200 130 Z" stroke="url(#silverStroke)" stroke-width="1"/>
+  <path d="M 200 130 C 210 120 215 105 205 102 C 200 112 200 125 200 130 Z" stroke="url(#silverStroke)" stroke-width="1"/>
+
+  <!-- Dangling Silver Bead Drop (Jhumka / Ghungroo accent) -->
+  <path d="M 200 340 L 200 360" stroke="url(#silverStroke)" stroke-width="1.8"/>
+  <circle cx="200" cy="366" r="6" stroke="url(#silverStroke)" stroke-width="1.8" fill="#5A3D28" fill-opacity="0.2"/>
+  <circle cx="200" cy="375" r="2.5" fill="#5A3D28" fill-opacity="0.8"/>
+
+  <!-- Flanking Small Drops -->
+  <path d="M 165 320 Q 160 340 162 345" stroke="url(#silverStroke)" stroke-width="1"/>
+  <circle cx="162" cy="348" r="3.5" stroke="url(#silverStroke)" stroke-width="1.2" fill="none"/>
+  <path d="M 235 320 Q 240 340 238 345" stroke="url(#silverStroke)" stroke-width="1"/>
+  <circle cx="238" cy="348" r="3.5" stroke="url(#silverStroke)" stroke-width="1.2" fill="none"/>
+</svg>

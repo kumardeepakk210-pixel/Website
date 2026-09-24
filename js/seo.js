@@ -206,9 +206,35 @@ function setBestSellersSEO() {
     });
 }
 
+function setOccasionSEO() {
+    const activeOccasion = typeof window.getActiveOccasion === 'function' ? window.getActiveOccasion() : null;
+    const title = activeOccasion?.seoTitle || `${activeOccasion?.name || 'Festive'} Collection | Sarees & Silver Jewellery | WishRite`;
+    const description = activeOccasion?.seoDescription || `Discover WishRite's ${activeOccasion?.name || 'Festive'} collection featuring sarees, artificial jewellery and 925 sterling silver pairings.`;
+    const keywords = activeOccasion?.seoKeywords || ['festive collection', 'sarees', 'silver jewellery', 'WishRite'];
+
+    updateSEO({
+        title: title,
+        description: description,
+        keywords: keywords,
+        canonical: getSiteOrigin() + '/occasion',
+        schema: {
+            "@context": "https://schema.org",
+            "@type": "CollectionPage",
+            "name": title,
+            "description": description,
+            "url": getSiteOrigin() + '/occasion',
+            "brand": {
+                "@type": "Brand",
+                "name": "WishRite"
+            }
+        }
+    });
+}
+
 window.setCollectionsSEO = setCollectionsSEO;
 window.setCollectionDetailSEO = setCollectionDetailSEO;
 window.setNewArrivalsSEO = setNewArrivalsSEO;
 window.setBestSellersSEO = setBestSellersSEO;
+window.setOccasionSEO = setOccasionSEO;
 
 

@@ -61,7 +61,7 @@ function renderWishlist() {
     const container = document.getElementById('wishlist-grid-container');
     if (!container) return;
 
-    const wishlistProducts = productsDB.filter(p => wishlist.has(p.id));
+    const wishlistProducts = productsDB.filter(p => p && Number(p.stockQuantity || 0) > 0 && wishlist.has(p.id));
     if (wishlistProducts.length === 0) {
         container.innerHTML = `
             <div class="cart-empty" style="grid-column:1/-1;">
