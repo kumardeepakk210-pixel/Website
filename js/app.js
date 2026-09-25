@@ -78,6 +78,11 @@ function navigateTo(viewId, param, pushHistory = true) {
     // 0. Update dynamic brand subtitle based on active view
     updateHeaderBrandSubtitle(viewId);
 
+    // Sync occasion mode conditional content visibility
+    if (typeof updateOccasionContentVisibility === 'function') {
+        updateOccasionContentVisibility();
+    }
+
     // 1. Immediately reset product state and completely unmount sticky product action bar
     currentPdpProduct = null;
     unmountStickyCTA();
@@ -345,8 +350,8 @@ async function renderHomeSections() {
 
     if (!hasProducts) {
         if (typeof renderProductLoadingSkeletons === 'function') {
-            if (bsEl) renderProductLoadingSkeletons('bestsellers-container', 4);
-            if (naEl) renderProductLoadingSkeletons('new-arrivals-container', 4);
+            if (bsEl) renderProductLoadingSkeletons('bestsellers-container', 10);
+            if (naEl) renderProductLoadingSkeletons('new-arrivals-container', 10);
         }
         try {
             if (typeof productsService !== 'undefined') {
@@ -358,11 +363,11 @@ async function renderHomeSections() {
     }
 
     const bestsellers = (typeof productsService !== 'undefined') 
-        ? productsService.getBestSellers(8) 
-        : (window.productsDB || productsDB).slice(0, 8);
+        ? productsService.getBestSellers(10) 
+        : (window.productsDB || productsDB).slice(0, 10);
     const newArrivals = (typeof productsService !== 'undefined') 
-        ? productsService.getNewArrivals(8) 
-        : (window.productsDB || productsDB).slice(0, 8);
+        ? productsService.getNewArrivals(10) 
+        : (window.productsDB || productsDB).slice(0, 10);
 
     if (typeof renderProductsToContainer === 'function') {
         if (bsEl) renderProductsToContainer(bestsellers, 'bestsellers-container');
@@ -783,6 +788,61 @@ function initFestiveNavigation() {
 }
 window.initFestiveNavigation = initFestiveNavigation;
 
+/**
+ * Enforces strict separation between Silver Jewellery Mode and Occasion Mode.
+ * When Occasion Mode is OFF:
+ * All occasion-specific shipping, care instructions, badges, and mentions
+ * are completely hidden from normal Silver Jewellery pages.
+ * When Occasion Mode is ON:
+ * Occasion content becomes available only on relevant occasion experiences.
+ */
+function updateOccasionContentVisibility() {
+    const activeOccasion = (typeof getActiveOccasion === 'function') ? getActiveOccasion() : null;
+    const isOccasionOn = Boolean(activeOccasion && activeOccasion.enabled);
+
+    if (isOccasionOn) {
+        document.body.classList.add('occasion-mode-active');
+    } else {
+        document.body.classList.remove('occasion-mode-active');
+    }
+
+    // 1. Toggle all occasion-only elements
+    document.querySelectorAll('.occasion-content-only').forEach(el => {
+        el.style.display = isOccasionOn ? '' : 'none';
+    });
+
+    // 2. Adjust Care guide header, subtitle, and layout
+    const careTitle = document.getElementById('care-header-title');
+    const careDesc = document.getElementById('care-header-desc');
+    const careGrid = document.querySelector('.care-grid');
+
+    if (careTitle) {
+        careTitle.innerHTML = isOccasionOn 
+            ? 'Jewellery &amp; Fabric Care Guide' 
+            : 'Jewellery Care Guide';
+    }
+    if (careDesc) {
+        careDesc.textContent = isOccasionOn
+            ? 'Simple daily habits ensure your precious silver keeps its radiant shine and your ethnic wear remains pristine for generations.'
+            : 'Simple daily habits ensure your precious silver keeps its radiant shine for generations.';
+    }
+    if (careGrid) {
+        if (!isOccasionOn) {
+            careGrid.classList.add('single-mode');
+        } else {
+            careGrid.classList.remove('single-mode');
+        }
+    }
+
+    // 3. Navigation links
+    initFestiveNavigation();
+}
+window.updateOccasionContentVisibility = updateOccasionContentVisibility;
+
+window.addEventListener('wishrite:occasion-updated', () => {
+    updateOccasionContentVisibility();
+});
+
 window.addEventListener('popstate', (e) => {
     if (e.state && e.state.view) {
         navigateTo(e.state.view, e.state.param, false);
@@ -804,6 +864,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     initHeaderScroll();
     initScrollReveal();
 
+    // Initial occasion visibility check
+    updateOccasionContentVisibility();
+
     // 2. Concurrently load products and active occasion settings from Supabase
     try {
         await Promise.allSettled([
@@ -821,6 +884,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     } catch (err) {
         console.warn('[WishRite] Initial data load notice:', err);
     }
+
+    // Re-verify occasion visibility after settings load
+    updateOccasionContentVisibility();
 
     // 4. Render home sections with synchronized products
     renderHomeSections();

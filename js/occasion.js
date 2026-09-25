@@ -1062,7 +1062,61 @@
                     ` : ''}
                 `}
 
-                <!-- ═══ 7. BACK TO MAIN SILVER STORE BANNER (Section 30) ═══ -->
+                <!-- ═══ 7. OCCASION POLICIES & CARE SECTION ═══ -->
+                <section class="festive-section festive-info-section" style="background:#FFFFFF;border-top:1px solid rgba(0,0,0,0.06);padding:48px 0 20px;">
+                    <div class="container">
+                        <!-- Occasion Shipping -->
+                        <div class="festive-section-header" style="text-align:center;margin-bottom:32px;">
+                            <span class="festive-sub-label">CELEBRATION DISPATCH</span>
+                            <h2 class="festive-section-title">Occasion Shipping &amp; Delivery</h2>
+                            <p class="festive-section-desc">Priority handling and doorstep delivery for your festive celebrations.</p>
+                        </div>
+                        <div class="policy-cards-grid" style="margin-bottom:56px;">
+                            <div class="policy-card festive-policy-accent">
+                                <div class="policy-card-icon">🪔</div>
+                                <h3>Festive &amp; Occasion Edit</h3>
+                                <div class="policy-highlight">FREE Delivery above ₹199</div>
+                                <p>Special festive doorstep delivery on our active Occasion Collection (Sarees &amp; Statement Jewellery). Orders below ₹199 incur a minimal ₹49 shipping charge.</p>
+                                <div class="policy-subnote" style="color:#2E7D32;font-weight:600;">Cash on Delivery (COD): 100% FREE.</div>
+                            </div>
+                            <div class="policy-card">
+                                <div class="policy-card-icon">🚚</div>
+                                <h3>Priority Dispatch</h3>
+                                <div class="policy-highlight">Dispatched within 24–48 Hours</div>
+                                <p>All festive pieces are hand-inspected and dispatched from our primary fulfillment hub via Shiprocket (Blue Dart, Delhivery, DTDC, Xpressbees).</p>
+                                <div class="policy-subnote">Transit Time: 3–5 days (Metros), 4–7 days (Rest of India).</div>
+                            </div>
+                        </div>
+
+                        <!-- Occasion Care Guide -->
+                        <div class="festive-section-header" style="text-align:center;margin-bottom:32px;">
+                            <span class="festive-sub-label">PRESERVE THE RADIANCE</span>
+                            <h2 class="festive-section-title">Festive Fabric &amp; Jewellery Care</h2>
+                            <p class="festive-section-desc">Keep your handloom drapes and statement adornments pristine for generations.</p>
+                        </div>
+                        <div class="care-grid" style="margin-bottom:30px;">
+                            <div class="care-card">
+                                <h4>🥻 Festive Sarees &amp; Handloom Drapes</h4>
+                                <ul>
+                                    <li><strong>Dry Clean Only:</strong> Handcrafted silks, tussar, and organza sarees should always be professionally dry cleaned.</li>
+                                    <li><strong>Breathable Storage:</strong> Fold and store draped sarees wrapped inside a soft muslin or pure cotton bag.</li>
+                                    <li><strong>Careful Ironing:</strong> Iron on low-to-medium heat with a protective cotton cloth over delicate zari borders.</li>
+                                    <li><strong>Aerate Periodically:</strong> Unfold and air dry your sarees in a shaded, well-ventilated area every few months.</li>
+                                </ul>
+                            </div>
+                            <div class="care-card">
+                                <h4>👑 Statement Festive Jewellery</h4>
+                                <ul>
+                                    <li><strong>Keep Dry:</strong> Wipe gently with a dry cotton swab after wearing to remove traces of sweat or cosmetics.</li>
+                                    <li><strong>Store Separately:</strong> Keep intricate haslis, earrings, and bangles in separate compartments to avoid scratching.</li>
+                                    <li><strong>Last On, First Off:</strong> Make statement jewellery the final addition to your outfit and the first thing you remove.</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ═══ 8. BACK TO MAIN SILVER STORE BANNER (Section 30) ═══ -->
                 <section class="festive-back-bar">
                     <div class="container">
                         <div class="festive-back-card">

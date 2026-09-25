@@ -103,6 +103,17 @@ function normalizeCategory(raw) {
 window.normalizeCategory = normalizeCategory;
 
 /**
+ * Determines whether a product belongs to the standard 925 Silver Jewellery catalog.
+ * Excludes festive occasion sarees and artificial jewellery from normal Silver grids.
+ */
+function isSilverJewelleryProduct(p) {
+    if (!p) return false;
+    const catType = (p.catalog_type || 'silver_jewellery').toLowerCase();
+    return catType === 'silver_jewellery' || (!catType.includes('saree') && !catType.includes('artificial'));
+}
+window.isSilverJewelleryProduct = isSilverJewelleryProduct;
+
+/**
  * Map products into curated collections based on silver craftsmanship
  */
 function determineCollection(item, category) {
@@ -483,6 +494,11 @@ const productsService = {
         await this.ensureLoaded();
         let list = [...productsDB];
 
+        // By default, Silver Jewellery surfaces strictly exclude occasion sarees and artificial jewellery
+        if (!options.includeOccasionCatalog) {
+            list = list.filter(isSilverJewelleryProduct);
+        }
+
         if (options.category && options.category !== 'All') {
             const normCat = normalizeCategory(options.category).toLowerCase();
             list = list.filter(p => normalizeCategory(p.category).toLowerCase() === normCat || (p.rawCategory && p.rawCategory.toLowerCase() === normCat));
@@ -557,32 +573,32 @@ const productsService = {
     },
 
     getProductsByCategory(category) {
-        const inStock = productsDB.filter(p => p && Number(p.stockQuantity || 0) > 0);
+        const inStock = productsDB.filter(p => p && Number(p.stockQuantity || 0) > 0 && isSilverJewelleryProduct(p));
         if (!category || category === 'All') return inStock;
         const norm = normalizeCategory(category).toLowerCase();
         return inStock.filter(p => normalizeCategory(p.category).toLowerCase() === norm || (p.rawCategory && p.rawCategory.toLowerCase() === norm));
     },
 
     getProductsByCollection(collection) {
-        const inStock = productsDB.filter(p => p && Number(p.stockQuantity || 0) > 0);
+        const inStock = productsDB.filter(p => p && Number(p.stockQuantity || 0) > 0 && isSilverJewelleryProduct(p));
         if (!collection || collection === 'All') return inStock;
         return inStock.filter(p => p.collection === collection);
     },
 
     getProductsByOccasion(occasion) {
-        const inStock = productsDB.filter(p => p && Number(p.stockQuantity || 0) > 0);
+        const inStock = productsDB.filter(p => p && Number(p.stockQuantity || 0) > 0 && isSilverJewelleryProduct(p));
         if (!occasion || occasion === 'All') return inStock;
         return inStock.filter(p => p.occasions && p.occasions.includes(occasion));
     },
 
     getNewArrivals(limit = 0) {
-        const sorted = productsDB.filter(p => p && Number(p.stockQuantity || 0) > 0)
+        const sorted = productsDB.filter(p => p && Number(p.stockQuantity || 0) > 0 && isSilverJewelleryProduct(p))
             .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
         return (limit && limit > 0) ? sorted.slice(0, limit) : sorted;
     },
 
     getBestSellers(limit = 0) {
-        const sorted = productsDB.filter(p => p && Number(p.stockQuantity || 0) > 0)
+        const sorted = productsDB.filter(p => p && Number(p.stockQuantity || 0) > 0 && isSilverJewelleryProduct(p))
             .sort((a, b) => (b.salesCount - a.salesCount) || (b.stockQuantity - a.stockQuantity));
         return (limit && limit > 0) ? sorted.slice(0, limit) : sorted;
     },
@@ -706,6 +722,23 @@ function createProductCardHTML(product) {
     const imgAlt = product.images?.[0]?.alt || product.name;
     const prodCode = product.productCode || product.sku || product.code || '';
 
+    let secondImgHTML = '';
+    const secondImg = product.images?.[1];
+    const secondImgSrc = (secondImg?.url || (typeof secondImg === 'string' ? secondImg : '')) || '';
+    if (secondImgSrc && !secondImgSrc.startsWith('data:image/svg') && secondImgSrc !== imgSrc) {
+        secondImgHTML = `
+            <img 
+                class="img-secondary" 
+                src="${secondImgSrc}" 
+                alt="${imgAlt} - alternate view" 
+                loading="lazy" 
+                width="400" 
+                height="500"
+                onerror="this.style.display='none'"
+            >
+        `;
+    }
+
     return `
         <div class="product-card" data-product-code="${prodCode}" onclick="navigateTo('product', '${product.slug}')">
             <div class="product-card-image" data-product-code="${prodCode}">
@@ -721,6 +754,7 @@ function createProductCardHTML(product) {
                     data-fallback-index="0"
                     onerror="handleProductImageError(this, '${prodCode}', '${product.category || 'Jewellery'}')"
                 >
+                ${secondImgHTML}
                 ${badgeHTML}
                 <button class="product-card-wishlist ${isWishlisted ? 'active' : ''}" onclick="toggleWishlist('${product.id}', event)" aria-label="${isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}">
                     ${ICONS.heart}
@@ -1905,6 +1939,7 @@ function closeImageViewer() {
 
             // Fade out current image
             state.imgEl.classList.add('slideshow-fading');
+            cardImageEl.classList.add('slideshow-running');
 
             clearTimeout(state.fadeTimer);
             state.fadeTimer = setTimeout(() => {
@@ -1943,6 +1978,7 @@ function closeImageViewer() {
 
     function stopSlideshow(cardImageEl) {
         if (!cardImageEl) return;
+        cardImageEl.classList.remove('slideshow-running');
         const state = cardSlideshowMap.get(cardImageEl);
         if (!state) return;
 

@@ -1,0 +1,386 @@
+/* ============================================================
+   WISHRITE — GLOBAL PREMIUM PRODUCT CARD & GRID UI SYSTEM
+   Unified luxury styling applied across ALL product listing pages:
+   - Homepage (New Arrivals, Best Sellers)
+   - /shop (All Jewellery with Sidebar Filters)
+   - Category Pages (Pendants, Earrings, Rings, Necklaces, etc.)
+   - Collections Pages
+   - New Arrivals & Best Sellers Dedicated Pages
+   - Search Results & Related Product Grids
+   UI ONLY: no backend/database/auth/payment changes.
+   ============================================================ */
+
+/* ── 1. GLOBAL FULL-WIDTH PRODUCT GRIDS ── */
+.product-grid {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: clamp(16px, 1.5vw, 24px);
+    align-items: start;
+    width: 100%;
+}
+
+/* Desktop (>= 1200px): Exactly 5 products per row */
+@media (min-width: 1200px) {
+    .product-grid {
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: clamp(16px, 1.5vw, 24px);
+    }
+}
+
+/* Tablet Landscape (900px – 1199px): 4 columns */
+@media (min-width: 900px) and (max-width: 1199px) {
+    .product-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 18px 14px;
+    }
+}
+
+/* Tablet Portrait (600px – 899px): 3 columns */
+@media (min-width: 600px) and (max-width: 899px) {
+    .product-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 16px 12px;
+    }
+}
+
+/* Mobile (< 600px): 2 columns */
+@media (max-width: 599px) {
+    .product-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px 10px;
+    }
+}
+
+/* ── 2. /SHOP PAGE PRODUCT GRID (WITH SIDEBAR) ── */
+/* When sidebar is present, keep grid balanced without crowding cards */
+.shop-main .product-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: clamp(14px, 1.3vw, 20px);
+}
+
+@media (min-width: 1400px) {
+    .shop-main .product-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: clamp(16px, 1.4vw, 22px);
+    }
+}
+
+@media (min-width: 1200px) and (max-width: 1399px) {
+    .shop-main .product-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 16px 14px;
+    }
+}
+
+@media (min-width: 900px) and (max-width: 1199px) {
+    .shop-main .product-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 16px 12px;
+    }
+}
+
+@media (min-width: 600px) and (max-width: 899px) {
+    .shop-main .product-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px 10px;
+    }
+}
+
+@media (max-width: 599px) {
+    .shop-main .product-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px 8px;
+    }
+}
+
+/* ── 3. CURVED / FLOATING PRODUCT CARDS (GLOBAL) ── */
+.product-card {
+    background: transparent;
+    border: 0;
+    border-radius: 18px;
+    overflow: visible;
+    cursor: pointer;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    transform: translateY(0);
+    transition: transform 350ms cubic-bezier(.2, .7, .2, 1);
+}
+
+.product-card:hover {
+    transform: translateY(-5px);
+}
+
+/* ── 4. PRODUCT IMAGE (FLOATING CURVED PANEL) ── */
+.product-card-image {
+    aspect-ratio: 4 / 5;
+    margin-bottom: 12px;
+    border-radius: 18px;
+    overflow: hidden;
+    position: relative;
+    background: #f7f5f2;
+    border: 0;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.06);
+    transition: box-shadow 350ms ease, transform 350ms cubic-bezier(.2, .7, .2, 1);
+}
+
+.product-card:hover .product-card-image {
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.10);
+}
+
+/* Subtle luxury lighting gradient overlay */
+.product-card-image::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0) 75%, rgba(255, 255, 255, 0.08) 100%);
+    z-index: 2;
+    border-radius: 18px;
+}
+
+/* Primary Product Image */
+.product-card-image > img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    border-radius: 18px;
+    transition: opacity 350ms ease, transform 550ms cubic-bezier(.2, .7, .2, 1);
+}
+
+.product-card:hover .product-card-image > img {
+    transform: scale(1.03);
+}
+
+/* ── 5. SECOND IMAGE ON HOVER (SMOOTH CROSSFADE) ── */
+.product-card-image .img-secondary {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 18px;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 1;
+    transform: scale(1.015);
+    transition: opacity 380ms ease, transform 450ms cubic-bezier(.2, .7, .2, 1);
+}
+
+.product-card:hover .product-card-image .img-secondary {
+    opacity: 1;
+    transform: scale(1.03);
+}
+
+/* Cleanly hide secondary crossfade if JS multi-image slideshow is running */
+.product-card-image.slideshow-running .img-secondary {
+    opacity: 0 !important;
+}
+
+/* ── 6. CIRCULAR WISHLIST BUTTON ── */
+.product-card-wishlist {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.85);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 4;
+    transition: transform 220ms ease, background 200ms ease, box-shadow 200ms ease;
+}
+
+.product-card-wishlist svg {
+    width: 18px;
+    height: 18px;
+    transition: transform 200ms ease;
+}
+
+.product-card-wishlist:hover {
+    background: #ffffff;
+    transform: scale(1.08);
+    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.12);
+}
+
+.product-card-wishlist.active svg {
+    fill: var(--wr-heart, #C62828);
+    stroke: var(--wr-heart, #C62828);
+}
+
+/* ── 7. SALE / FEW LEFT / STATUS BADGES ── */
+.product-card-badge {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    padding: 5px 9px;
+    border-radius: 5px;
+    font-size: 9.5px;
+    font-weight: 600;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    z-index: 4;
+    line-height: 1.1;
+    background: var(--wr-primary, #5e3435);
+    color: #ffffff;
+}
+
+/* SALE: compact red premium badge */
+.product-card-badge.badge-sale {
+    background: #C62828;
+    color: #ffffff;
+}
+
+/* FEW LEFT / GOLD: WishRite dark maroon badge */
+.product-card-badge.badge-gold,
+.product-card-badge.badge-few-left {
+    background: var(--wr-primary, #5e3435);
+    color: #ffffff;
+}
+
+/* NEW: deep carbon black badge */
+.product-card-badge.badge-new {
+    background: #261816;
+    color: #ffffff;
+}
+
+/* ── 8. PRODUCT INFORMATION & EDITORIAL HIERARCHY ── */
+.product-card-info {
+    padding: 4px 2px 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.product-card-meta-line {
+    margin-bottom: 4px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* Product Code: small uppercase light text */
+.product-card-sku {
+    color: #9e8e89;
+    font-size: 9px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    font-family: inherit;
+}
+
+/* Category: subtle gold accent */
+.product-card-category {
+    color: var(--wr-gold, #c49a45);
+    font-size: 9px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    font-weight: 600;
+}
+
+/* Product Name: clean readable text with 2-line clamp */
+.product-card-name {
+    margin-bottom: 5px;
+    font-size: clamp(13px, .92vw, 15px);
+    line-height: 1.35;
+    font-weight: 500;
+    color: var(--wr-text, #261816);
+    letter-spacing: .005em;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    min-height: 2.7em;
+}
+
+.product-card-price {
+    margin-bottom: 0;
+    gap: 8px;
+    display: flex;
+    align-items: baseline;
+}
+
+/* Selling Price: strong prominent price */
+.product-card-price .price-current {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--wr-primary, #5e3435);
+}
+
+/* MRP: smaller grey struck-through */
+.product-card-price .price-original {
+    font-size: 12px;
+    color: #9e8e89;
+    text-decoration: line-through;
+}
+
+/* Discount: green */
+.product-card-price .price-discount {
+    font-size: 11px;
+    letter-spacing: .02em;
+    font-weight: 600;
+    color: #2e7d32;
+}
+
+/* ── 9. FLOATING QUICK ADD PILL ── */
+.product-card-quick {
+    position: absolute;
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    width: calc(100% - 24px);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.94);
+    color: var(--wr-primary, #5e3435);
+    border: 1px solid rgba(255, 255, 255, 0.9);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.10);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(10px);
+    transition: opacity 300ms cubic-bezier(.2, .7, .2, 1), transform 300ms cubic-bezier(.2, .7, .2, 1), background 200ms ease, color 200ms ease;
+    z-index: 4;
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    padding: 10px 14px;
+    text-align: center;
+}
+
+.product-card:hover .product-card-quick {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0);
+}
+
+.product-card-quick:hover {
+    background: var(--wr-primary, #5e3435);
+    color: #ffffff;
+    border-color: var(--wr-primary, #5e3435);
+}
+
+/* ── 10. MOBILE TOUCH RESETS (< 600px) ── */
+@media (max-width: 599px) {
+    .product-card:hover {
+        transform: none;
+    }
+
+    .product-card:hover .product-card-image {
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.06);
+    }
+
+    .product-card:hover .product-card-image > img {
+        transform: none;
+    }
+}

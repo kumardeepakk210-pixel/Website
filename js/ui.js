@@ -247,7 +247,7 @@ async function applyFiltersAndSort() {
         return;
     }
 
-    let filtered = productsDB.filter(p => p && Number(p.stockQuantity || 0) > 0);
+    let filtered = productsDB.filter(p => p && Number(p.stockQuantity || 0) > 0 && (typeof isSilverJewelleryProduct === 'function' ? isSilverJewelleryProduct(p) : true));
 
     // Apply category filter (normalized matching)
     if (currentFilters.category && currentFilters.category !== 'All') {

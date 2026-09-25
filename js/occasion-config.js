@@ -570,6 +570,9 @@
             if (!rawData) {
                 resetFestiveModeToOff(null);
                 occasionSettingsLoaded = true;
+                try {
+                    window.dispatchEvent(new CustomEvent('wishrite:occasion-updated', { detail: FESTIVE_MODE }));
+                } catch (e) { }
                 return null;
             }
 
@@ -596,6 +599,9 @@
             if (!isFestiveOn || !activeSlug) {
                 resetFestiveModeToOff(selectedSlug);
                 occasionSettingsLoaded = true;
+                try {
+                    window.dispatchEvent(new CustomEvent('wishrite:occasion-updated', { detail: FESTIVE_MODE }));
+                } catch (e) { }
                 return null;
             }
 
@@ -651,6 +657,9 @@
             FESTIVE_MODE.bannerImage = s.banner_image || staticConfig.bannerImage || staticConfig.heroImage;
 
             occasionSettingsLoaded = true;
+            try {
+                window.dispatchEvent(new CustomEvent('wishrite:occasion-updated', { detail: FESTIVE_MODE }));
+            } catch (e) { }
             return getActiveOccasion();
         })();
 

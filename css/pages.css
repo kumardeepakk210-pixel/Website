@@ -443,8 +443,8 @@
    ═══════════════════════════════════════════ */
 .product-grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: var(--space-6);
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: clamp(14px, 1.5vw, 24px);
 }
 
 .product-grid-3 {
@@ -819,7 +819,7 @@
 }
 
 .shop-main .product-grid {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 /* ═══════════════════════════════════════════
@@ -3189,4 +3189,16 @@ body:not(.view-product) .sticky-cta,
     .sticky-cta {
         display: none !important;
     }
+}
+
+/* ═══════════════════════════════════════════
+   OCCASION MODE CONDITIONAL VISIBILITY
+   ═══════════════════════════════════════════ */
+body:not(.occasion-mode-active) .occasion-content-only {
+    display: none !important;
+}
+
+.care-grid.single-mode {
+    max-width: 720px;
+    margin: 0 auto;
 }
