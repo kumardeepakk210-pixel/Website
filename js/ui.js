@@ -94,7 +94,7 @@ function updateHeroContentForSlide(slideIndex) {
             <p class="hero-description">${activeOccasion.description || activeOccasion.homepageSubtitle || 'Sarees • Statement Jewellery • Silver Pairings'}</p>
             <div class="hero-buttons">
                 <a class="btn btn-hero-primary" onclick="navigateTo('occasion')">
-                    <span>${activeOccasion.ctaText || activeOccasion.homepageCtaText || 'Shop the Pujo collection →'}</span>
+                    <span>${activeOccasion.ctaText || activeOccasion.homepageCtaText || 'Shop festive collection →'}</span>
                     <svg class="hero-btn-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
                         <line x1="5" y1="12" x2="19" y2="12"></line>
                         <polyline points="12 5 19 12 12 19"></polyline>

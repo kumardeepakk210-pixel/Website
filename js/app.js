@@ -65,7 +65,7 @@ function updateHeaderBrandSubtitle(viewId) {
     if (viewId === 'occasion') {
         const occ = (typeof getActiveOccasion === 'function') ? getActiveOccasion() : null;
         if (occ && occ.enabled) {
-            subEl.textContent = occ.brandSubtitle || occ.navLabel || (occ.name ? `${occ.name.toUpperCase()} COLLECTION` : 'DURGA PUJA COLLECTION');
+            subEl.textContent = occ.brandSubtitle || occ.navLabel || (occ.name ? `${occ.name.toUpperCase()} COLLECTION` : 'FESTIVE COLLECTION');
             return;
         }
     }
@@ -811,7 +811,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             (typeof loadActiveOccasionSettings === 'function' ? loadActiveOccasionSettings() : Promise.resolve(null))
         ]);
 
-        // 3. Initialize Supabase Realtime channel for instant price/stock synchronization
+        // 3. Initialize Supabase Realtime channel for instant occasion settings and inventory sync
+        if (typeof initOccasionRealtimeSync === 'function') {
+            initOccasionRealtimeSync();
+        }
         if (typeof initRealtimeInventorySync === 'function') {
             initRealtimeInventorySync();
         }

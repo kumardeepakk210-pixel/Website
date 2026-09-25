@@ -296,8 +296,104 @@
                 image: 'https://images.unsplash.com/photo-1599643477877-530eb83abc8e?auto=format&fit=crop&w=700&q=80',
                 tag: 'FESTIVE SET'
             }
+        ],
+
+        'wedding': [
+            {
+                id: 'saree-wd-001',
+                productCode: 'SRE-WD01',
+                sku: 'SRE-WD01',
+                code: 'SRE-WD01',
+                name: 'Royal Crimson Red Regal Bridal Banarasi Silk Saree',
+                slug: 'royal-crimson-red-regal-bridal-banarasi-silk-saree',
+                catalog_type: 'saree',
+                category: 'Sarees',
+                rawCategory: 'Saree',
+                sellingPrice: 6999,
+                price: 6999,
+                mrp: 9999,
+                discount: 30,
+                stockQuantity: 6,
+                isAvailable: true,
+                color: 'Crimson Red & Antique Gold',
+                fabric: 'Pure Katan Silk',
+                design: 'Regal Zari Jaal Weave',
+                occasion: 'Wedding Season',
+                occasion_slug: 'wedding',
+                matching_tags: 'wedding, bridal, saree, red, gold, silk, banarasi',
+                is_occasion_featured: true,
+                description: 'Magnificent bridal Banarasi silk saree crafted with rich gold zari motifs and ornate pallu for grand wedding ceremonies.',
+                shortDescription: 'Pure bridal Banarasi silk saree with opulent antique gold zari craftsmanship.',
+                images: [{ url: 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=700&q=80', alt: 'Royal Bridal Banarasi Saree' }],
+                image: 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=700&q=80',
+                material: 'Pure Katan Silk',
+                tag: 'BRIDAL'
+            },
+            {
+                id: 'art-wd-001',
+                productCode: 'ART-WD01',
+                sku: 'ART-WD01',
+                code: 'ART-WD01',
+                name: 'Imperial Polki Kundan Bridal Choker & Matha Patti Set',
+                slug: 'imperial-polki-kundan-bridal-choker-matha-patti-set',
+                catalog_type: 'artificial_jewellery',
+                category: 'Necklaces',
+                rawCategory: 'Bridal Set',
+                sellingPrice: 3999,
+                price: 3999,
+                mrp: 5499,
+                discount: 27,
+                stockQuantity: 5,
+                isAvailable: true,
+                color: 'Antique Gold & Pearl',
+                material: 'Handcrafted Kundan Polki with 22K Gold Finish',
+                occasion: 'Wedding Season',
+                occasion_slug: 'wedding',
+                matching_tags: 'wedding, bridal, choker, kundan, polki, jewelry, set',
+                is_occasion_featured: true,
+                description: 'Regal bridal jewellery set featuring a lavish Kundan polki choker, matching chandelier earrings, and maang tikka.',
+                shortDescription: 'Opulent bridal Kundan polki choker set with earrings and maang tikka.',
+                images: [{ url: 'https://images.unsplash.com/photo-1599643477877-530eb83abc8e?auto=format&fit=crop&w=700&q=80', alt: 'Imperial Bridal Set' }],
+                image: 'https://images.unsplash.com/photo-1599643477877-530eb83abc8e?auto=format&fit=crop&w=700&q=80',
+                tag: 'BRIDAL EDIT'
+            }
+        ],
+
+        'valentines-day': [
+            {
+                id: 'saree-vl-001',
+                productCode: 'SRE-VL01',
+                sku: 'SRE-VL01',
+                code: 'SRE-VL01',
+                name: 'Blush Rose Organza Saree with Delicate Zari Border',
+                slug: 'blush-rose-organza-saree-delicate-zari-border',
+                catalog_type: 'saree',
+                category: 'Sarees',
+                rawCategory: 'Saree',
+                sellingPrice: 3899,
+                price: 3899,
+                mrp: 4999,
+                discount: 22,
+                stockQuantity: 5,
+                isAvailable: true,
+                color: 'Blush Rose',
+                fabric: 'Pure Organza',
+                occasion: 'Valentine’s Day',
+                occasion_slug: 'valentines-day',
+                matching_tags: 'valentine, romantic, pink, rose, organza, saree',
+                is_occasion_featured: true,
+                description: 'Ethereal blush rose organza saree with delicate scalloped gold zari embroidery, tailored for romantic evenings.',
+                shortDescription: 'Pure blush rose organza saree with gold zari scalloped borders.',
+                images: [{ url: 'https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?auto=format&fit=crop&w=700&q=80', alt: 'Blush Rose Organza Saree' }],
+                image: 'https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?auto=format&fit=crop&w=700&q=80',
+                material: 'Pure Organza',
+                tag: 'ROMANTIC EDIT'
+            }
         ]
     };
+
+    // Alias valentine to valentines-day
+    SHOWCASE_OCCASION_PRODUCTS['valentine'] = SHOWCASE_OCCASION_PRODUCTS['valentines-day'];
 
     /**
      * Fallback 925 sterling silver pairing items
@@ -409,16 +505,23 @@
             const pTags = (p.matching_tags || '').toLowerCase();
             const pCol = (p.collection || '').toLowerCase();
 
+            const isValentine = (slug === 'valentines-day' || slug === 'valentine');
+            const isWedding = (slug === 'wedding');
+
             return (
                 pSlug === slug ||
                 pOccasion.includes(slug) ||
                 pTags.includes(slug) ||
+                (isValentine && (pSlug === 'valentine' || pSlug === 'valentines-day' || pTags.includes('valentine') || pOccasion.includes('valentine'))) ||
+                (isWedding && (pSlug === 'wedding' || pTags.includes('wedding') || pTags.includes('bridal') || pOccasion.includes('wedding'))) ||
                 (slug === 'durga-puja' && (pCol.includes('occasion') || pTags.includes('festive') || pTags.includes('puja')))
             );
         });
 
         // 2. Showcase / seed items for the active occasion to guarantee rich experience
-        const seedItems = SHOWCASE_OCCASION_PRODUCTS[slug] || [];
+        const seedItems = SHOWCASE_OCCASION_PRODUCTS[slug] ||
+            (slug === 'valentines-day' ? SHOWCASE_OCCASION_PRODUCTS['valentine'] : null) ||
+            (slug === 'valentine' ? SHOWCASE_OCCASION_PRODUCTS['valentines-day'] : null) || [];
 
         // Combine, ensuring no duplicate IDs
         const seenIds = new Set();

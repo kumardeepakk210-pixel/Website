@@ -387,16 +387,83 @@
                 description: 'Exquisite silver jewellery sets, opulent bridal sarees and celebration pairings for the wedding season at WishRite.',
                 keywords: ['wedding silver jewellery', 'bridal sarees', 'silver bridal sets']
             }
+        },
+
+        'valentines-day': {
+            name: 'Valentine’s Day',
+            slug: 'valentines-day',
+            collectionTitle: 'Valentine’s Day Collection',
+            brandSubtitle: 'VALENTINE’S COLLECTION',
+            navLabel: 'VALENTINE COLLECTION',
+            eyebrow: 'THE LOVE EDIT',
+            title: 'Celebrate Eternal Love',
+            englishTitle: 'Timeless Tokens of Heartfelt Affection',
+            description: 'Heartfelt silver jewellery, romantic keepsakes and meaningful symbols of eternal affection.',
+            ctaText: 'Shop Valentine collection →',
+            homepageCtaText: 'Shop Valentine collection →',
+            homepageSubtitle: 'Solitaires • Heart Motifs • Meaningful Silver',
+            heroImage: 'https://images.unsplash.com/photo-1518199266791-5375a83190b7?auto=format&fit=crop&w=1800&q=85',
+            heroMobileImage: 'https://images.unsplash.com/photo-1518199266791-5375a83190b7?auto=format&fit=crop&w=800&q=85',
+            backgroundImage: '',
+            background: {
+                artwork: 'assets/festive/valentine/valentine-sketch.svg',
+                opacity: 0.14,
+                position: 'right center',
+                size: 'contain',
+                repeat: 'no-repeat'
+            },
+            theme: {
+                primary: '#5C1D2E',
+                secondary: '#E8A598',
+                accent: '#C44569',
+                text: '#FFFFFF',
+                pageBackground: '#FDF7F8'
+            },
+            countdown: {
+                enabled: true,
+                targetDate: '2027-02-14T00:00:00+05:30',
+                expiryMessage: 'HAPPY VALENTINE’S DAY'
+            },
+            trust: {
+                enabled: true,
+                shipping: 'Free shipping ₹199+',
+                cod: 'Cash on Delivery',
+                design: 'Special romantic packaging'
+            },
+            offers: {
+                enabled: true,
+                badge: 'VALENTINE OFFERS',
+                title: 'Love Everyday, Delivered Home',
+                buttonText: 'See all Valentine offers →',
+                emptyMessage: 'Valentine offers coming soon.',
+                items: []
+            },
+            productSettings: {
+                showSarees: true,
+                showArtificialJewellery: true,
+                showSilverJewellery: true,
+                matchingEnabled: true
+            },
+            seo: {
+                title: 'Valentine’s Day Collection | WishRite',
+                description: 'Shop timeless Valentine’s gifts in hallmarked 925 sterling silver. Romantic pendants, couple rings and keepsake jewellery.',
+                keywords: ['valentine silver jewellery', 'romantic silver gifts', 'silver pendants']
+            }
         }
     };
 
+    // Slug alias: ensure both 'valentine' and 'valentines-day' resolve seamlessly
+    OCCASIONS['valentine'] = OCCASIONS['valentines-day'];
+
     /**
      * SINGLE ACTIVE OCCASION CONTROLLER (Runtime State)
-     * Populated strictly from Supabase public.occasion_settings.
+     * Authoritative Source: Inventory API (https://inventory-mu-lilac.vercel.app/api/settings/occasion)
+     * via same-origin proxy /api/occasion-settings.
      * Default state is OFF (enabled: false, activeOccasion: null).
      */
     const FESTIVE_MODE = {
         enabled: false,
+        selectedOccasion: null,
         activeOccasion: null,
         slug: null,
         name: null,
@@ -411,6 +478,7 @@
 
     let occasionSettingsLoaded = false;
     let occasionSettingsPromise = null;
+    let occasionRealtimeChannel = null;
 
     /**
      * Safe reference to Supabase client
@@ -420,22 +488,22 @@
     }
 
     /**
-     * Format today's date in user's local timezone as YYYY-MM-DD string
-     * Avoids timezone shifting and off-by-one errors with date-only SQL types.
+     * Normalize occasion slugs (e.g. 'valentines-day' <-> 'valentine')
      */
-    function getLocalDateString(d = new Date()) {
-        const year = d.getFullYear();
-        const month = String(d.getMonth() + 1).padStart(2, '0');
-        const day = String(d.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
+    function normalizeOccasionSlug(slug) {
+        if (!slug || typeof slug !== 'string') return null;
+        const clean = slug.trim().toLowerCase();
+        if (clean === 'valentine') return 'valentines-day';
+        return clean;
     }
 
     /**
-     * Reset runtime festive state to OFF
+     * Reset runtime festive state to OFF while preserving selectedOccasion
      */
-    function resetFestiveModeToOff() {
+    function resetFestiveModeToOff(selectedOccasion = null) {
         FESTIVE_MODE.enabled = false;
         FESTIVE_MODE.activeOccasion = null;
+        FESTIVE_MODE.selectedOccasion = selectedOccasion;
         FESTIVE_MODE.slug = null;
         FESTIVE_MODE.name = null;
         FESTIVE_MODE.pageTitle = null;
@@ -444,11 +512,19 @@
     }
 
     /**
-     * Reads public.occasion_settings from Supabase (Single Source of Truth)
-     * Determines active occasion via is_active = true and start/end dates.
-     * Maps database fields to runtime FESTIVE_MODE.
+     * Loads authoritative occasion settings from Inventory.
+     * 1. Calls same-origin /api/occasion-settings
+     * 2. Fallback to direct inventory API if proxy is unavailable
+     * 3. Maps to FESTIVE_MODE:
+     *    - festive_mode_enabled = false -> enabled = false, activeOccasion = null, selectedOccasion = selected_occasion_slug
+     *    - festive_mode_enabled = true  -> enabled = true, activeOccasion = active_occasion_slug, selectedOccasion = selected_occasion_slug
      */
     async function loadActiveOccasionSettings(forceRefresh = false) {
+        if (forceRefresh) {
+            occasionSettingsLoaded = false;
+            occasionSettingsPromise = null;
+        }
+
         if (occasionSettingsLoaded && !forceRefresh) {
             return getActiveOccasion();
         }
@@ -457,109 +533,206 @@
         }
 
         occasionSettingsPromise = (async () => {
-            resetFestiveModeToOff();
+            const cacheParam = forceRefresh ? `?_t=${Date.now()}` : '';
+            let rawData = null;
 
-            const client = getSupabaseClient();
-            if (!client) {
-                console.warn('[WishRite Occasion] Supabase client unavailable. Festive Mode = OFF.');
-                occasionSettingsLoaded = true;
-                return null;
-            }
-
+            // 1. Fetch from same-origin proxy endpoint
             try {
-                const { data, error } = await client
-                    .from('occasion_settings')
-                    .select('id, occasion_name, occasion_slug, page_title, page_description, banner_image, is_active, start_date, end_date, created_at, updated_at')
-                    .eq('is_active', true);
-
-                if (error) {
-                    console.warn('[WishRite Occasion] Failed to query occasion_settings:', error.message || error);
-                    occasionSettingsLoaded = true;
-                    return null;
-                }
-
-                if (!Array.isArray(data) || data.length === 0) {
-                    occasionSettingsLoaded = true;
-                    return null;
-                }
-
-                const todayStr = getLocalDateString();
-                const validRows = data.filter(row => {
-                    if (!row || !row.is_active || !row.occasion_slug) return false;
-
-                    // Date range checks (local date comparison avoids timezone shift)
-                    if (row.start_date) {
-                        const startStr = String(row.start_date).slice(0, 10);
-                        if (todayStr < startStr) return false;
-                    }
-                    if (row.end_date) {
-                        const endStr = String(row.end_date).slice(0, 10);
-                        if (todayStr > endStr) return false;
-                    }
-                    return true;
+                const proxyRes = await fetch(`/api/occasion-settings${cacheParam}`, {
+                    method: 'GET',
+                    headers: { 'Accept': 'application/json' },
+                    cache: forceRefresh ? 'no-store' : 'default'
                 });
-
-                if (validRows.length === 0) {
-                    occasionSettingsLoaded = true;
-                    return null;
+                if (proxyRes.ok) {
+                    rawData = await proxyRes.json();
                 }
-
-                // Multiple active rows handling (deterministic tie-breaker + warning)
-                let activeRow;
-                if (validRows.length === 1) {
-                    activeRow = validRows[0];
-                } else {
-                    console.warn(
-                        `[WishRite Occasion] Multiple active occasions found in database (${validRows.length}):`,
-                        validRows.map(r => r.occasion_slug).join(', '),
-                        'Deterministically selecting the most recently updated occasion. Please ensure only ONE occasion is active in Inventory Admin.'
-                    );
-                    validRows.sort((a, b) => {
-                        const timeA = new Date(a.updated_at || a.created_at || 0).getTime();
-                        const timeB = new Date(b.updated_at || b.created_at || 0).getTime();
-                        if (timeB !== timeA) return timeB - timeA;
-                        return String(a.id || '').localeCompare(String(b.id || ''));
-                    });
-                    activeRow = validRows[0];
-                }
-
-                const slug = String(activeRow.occasion_slug).trim().toLowerCase();
-                const staticConfig = OCCASIONS[slug];
-                if (!staticConfig) {
-                    console.warn(`[WishRite Occasion] Active occasion slug "${slug}" not found in static OCCASIONS registry. Festive Mode = OFF.`);
-                    occasionSettingsLoaded = true;
-                    return null;
-                }
-
-                // Populate runtime FESTIVE_MODE from database row
-                FESTIVE_MODE.enabled = true;
-                FESTIVE_MODE.activeOccasion = slug;
-                FESTIVE_MODE.slug = slug;
-                FESTIVE_MODE.name = activeRow.occasion_name || staticConfig.name || slug;
-                FESTIVE_MODE.pageTitle = activeRow.page_title || null;
-                FESTIVE_MODE.pageDescription = activeRow.page_description || null;
-                FESTIVE_MODE.bannerImage = activeRow.banner_image || null;
-
-                occasionSettingsLoaded = true;
-                return getActiveOccasion();
             } catch (err) {
-                console.warn('[WishRite Occasion] Exception loading occasion settings:', err);
-                resetFestiveModeToOff();
+                // Local dev / proxy failure, fall through to direct endpoint
+            }
+
+            // 2. Direct fallback to Inventory authoritative endpoint
+            if (!rawData || (!rawData.success && !rawData.settings && !rawData.data)) {
+                try {
+                    const directUrl = `https://inventory-mu-lilac.vercel.app/api/settings/occasion${cacheParam}`;
+                    const directRes = await fetch(directUrl, {
+                        method: 'GET',
+                        headers: { 'Accept': 'application/json' },
+                        cache: forceRefresh ? 'no-store' : 'default'
+                    });
+                    if (directRes.ok) {
+                        rawData = await directRes.json();
+                    }
+                } catch (err) {
+                    console.warn('[WishRite Occasion] Failed to fetch occasion settings:', err);
+                }
+            }
+
+            if (!rawData) {
+                resetFestiveModeToOff(null);
                 occasionSettingsLoaded = true;
                 return null;
-            } finally {
-                occasionSettingsPromise = null;
             }
+
+            const s = rawData.settings || rawData.data || rawData || {};
+
+            // Authoritative Festive Mode state
+            // Must evaluate festive_mode_enabled or isLive
+            const isFestiveOn = Boolean(
+                s.festive_mode_enabled !== undefined
+                    ? s.festive_mode_enabled
+                    : (s.isLive !== undefined ? s.isLive : false)
+            );
+
+            const selectedSlugRaw = s.selected_occasion_slug || s.selectedOccasion || null;
+            const selectedSlug = normalizeOccasionSlug(selectedSlugRaw);
+
+            const activeSlugRaw = isFestiveOn
+                ? (s.active_occasion_slug || s.activeOccasion || selectedSlugRaw)
+                : null;
+            const activeSlug = isFestiveOn ? normalizeOccasionSlug(activeSlugRaw) : null;
+
+            // RULE: If festive_mode_enabled = false
+            // enabled = false, activeOccasion = null, preserve selectedOccasion = selected_occasion_slug
+            if (!isFestiveOn || !activeSlug) {
+                resetFestiveModeToOff(selectedSlug);
+                occasionSettingsLoaded = true;
+                return null;
+            }
+
+            // RULE: If festive_mode_enabled = true
+            // enabled = true, activeOccasion = active_occasion_slug, selectedOccasion = selected_occasion_slug
+            let staticConfig = OCCASIONS[activeSlug];
+            if (!staticConfig && activeSlug === 'valentines-day') {
+                staticConfig = OCCASIONS['valentine'];
+            } else if (!staticConfig && activeSlug === 'valentine') {
+                staticConfig = OCCASIONS['valentines-day'];
+            }
+
+            // Fallback for new festival added in Inventory that isn't yet in static registry
+            if (!staticConfig) {
+                const displayName = s.active_occasion_name || s.selected_occasion_name || activeSlug.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+                staticConfig = {
+                    name: displayName,
+                    slug: activeSlug,
+                    collectionTitle: `${displayName} Collection`,
+                    brandSubtitle: `${displayName.toUpperCase()} COLLECTION`,
+                    navLabel: `${displayName.toUpperCase()} COLLECTION`,
+                    eyebrow: `${displayName.toUpperCase()} EDIT`,
+                    title: displayName,
+                    englishTitle: `Celebrate with ${displayName}`,
+                    description: `Explore the WishRite ${displayName} collection featuring curated festive pieces and 925 sterling silver.`,
+                    ctaText: `Shop ${displayName} collection →`,
+                    homepageCtaText: `Shop ${displayName} collection →`,
+                    homepageSubtitle: 'Sarees • Statement Jewellery • Silver Pairings',
+                    heroImage: 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=1800&q=85',
+                    theme: {
+                        primary: '#8B1E2D',
+                        secondary: '#D4AF37',
+                        accent: '#C6281C',
+                        text: '#FFFFFF',
+                        pageBackground: '#F8F3EC'
+                    },
+                    countdown: { enabled: false },
+                    trust: { enabled: true, shipping: 'Free shipping ₹199+', cod: 'Cash on Delivery', design: 'Authentic festive designs' },
+                    offers: { enabled: false, items: [] },
+                    productSettings: { showSarees: true, showArtificialJewellery: true, showSilverJewellery: true, matchingEnabled: true },
+                    seo: { title: `${displayName} Collection | WishRite`, description: `WishRite ${displayName} Collection.`, keywords: [`${activeSlug} jewellery`] }
+                };
+                OCCASIONS[activeSlug] = staticConfig;
+            }
+
+            FESTIVE_MODE.enabled = true;
+            FESTIVE_MODE.selectedOccasion = selectedSlug;
+            FESTIVE_MODE.activeOccasion = activeSlug;
+            FESTIVE_MODE.slug = activeSlug;
+            FESTIVE_MODE.name = s.active_occasion_name || s.selected_occasion_name || staticConfig.name || activeSlug;
+            FESTIVE_MODE.pageTitle = s.page_title || staticConfig.pageTitle || staticConfig.title;
+            FESTIVE_MODE.pageDescription = s.page_description || staticConfig.pageDescription || staticConfig.description;
+            FESTIVE_MODE.bannerImage = s.banner_image || staticConfig.bannerImage || staticConfig.heroImage;
+
+            occasionSettingsLoaded = true;
+            return getActiveOccasion();
         })();
 
-        return occasionSettingsPromise;
+        try {
+            return await occasionSettingsPromise;
+        } finally {
+            occasionSettingsPromise = null;
+        }
+    }
+
+    /**
+     * Dedicated Supabase Realtime subscription for public.occasion_settings.
+     * Listens for INSERT, UPDATE, DELETE events.
+     * Guarantees a single unique channel instance without duplicates.
+     */
+    function initOccasionRealtimeSync() {
+        const client = getSupabaseClient();
+        if (!client || typeof client.channel !== 'function') {
+            return null;
+        }
+
+        // Prevent duplicate subscriptions
+        if (occasionRealtimeChannel) {
+            return occasionRealtimeChannel;
+        }
+
+        try {
+            occasionRealtimeChannel = client
+                .channel('wishrite-occasion-settings-sync')
+                .on(
+                    'postgres_changes',
+                    {
+                        event: '*',
+                        schema: 'public',
+                        table: 'occasion_settings'
+                    },
+                    async (payload) => {
+                        console.log('[WishRite Occasion] Realtime change detected in occasion_settings:', payload.eventType);
+
+                        // 1. Invalidate cache & 2. fetch /api/occasion-settings with forceRefresh = true
+                        await loadActiveOccasionSettings(true);
+
+                        // 4. Refresh festive navigation
+                        if (typeof window.initFestiveNavigation === 'function') {
+                            window.initFestiveNavigation();
+                        }
+
+                        // 5. Refresh homepage festive UI
+                        if (typeof window.initHeroCarousel === 'function') {
+                            window.initHeroCarousel();
+                        }
+                        if (typeof window.updateHeaderBrandSubtitle === 'function' && typeof window.getCurrentView === 'function') {
+                            window.updateHeaderBrandSubtitle(window.getCurrentView());
+                        }
+
+                        // 6. Refresh occasion page if currently open
+                        if (typeof window.getCurrentView === 'function' && window.getCurrentView() === 'occasion') {
+                            if (typeof window.renderOccasionPage === 'function') {
+                                window.renderOccasionPage();
+                            }
+                        }
+
+                        window.dispatchEvent(new CustomEvent('wishrite:occasion-updated', { detail: FESTIVE_MODE }));
+                    }
+                )
+                .subscribe((status) => {
+                    if (status === 'SUBSCRIBED') {
+                        console.log('[WishRite Occasion] Subscribed to occasion_settings realtime updates.');
+                    }
+                });
+        } catch (err) {
+            console.warn('[WishRite Occasion] Realtime subscription notice:', err);
+        }
+
+        return occasionRealtimeChannel;
     }
 
     /**
      * OFFERS SYSTEM NOTE:
      * Promotional offers and coupons are loaded dynamically from the Supabase
      * 'coupons' database table via window.WishRiteCoupons (see js/coupons.js).
-     * No hardcoded sample or screenshot offers are stored or rendered.
+     * No hardcoded sample or promotional data is stored here.
      */
     const LIVE_OFFERS = {
         enabled: false,
@@ -568,18 +741,20 @@
 
     /**
      * Returns the fully resolved active occasion configuration object.
-     * Merges occasion metadata with current festive settings from Supabase.
+     * Merges occasion metadata with current festive settings from Inventory.
+     * STRICT RULE: Returns NULL when FESTIVE_MODE.enabled is false or activeOccasion is null.
      */
     function getActiveOccasion() {
         if (!FESTIVE_MODE.enabled || !FESTIVE_MODE.activeOccasion) return null;
 
         const slug = FESTIVE_MODE.activeOccasion;
-        const base = OCCASIONS[slug];
+        const base = OCCASIONS[slug] || (slug === 'valentines-day' ? OCCASIONS['valentine'] : (slug === 'valentine' ? OCCASIONS['valentines-day'] : null));
         if (!base) return null;
 
         return {
             ...base,
             enabled: true,
+            selectedOccasion: FESTIVE_MODE.selectedOccasion,
             activeOccasion: slug,
             slug: slug,
             name: FESTIVE_MODE.name || base.name || slug,
@@ -601,6 +776,8 @@
     window.FESTIVE_MODE = FESTIVE_MODE;
     window.getActiveOccasion = getActiveOccasion;
     window.loadActiveOccasionSettings = loadActiveOccasionSettings;
+    window.initOccasionRealtimeSync = initOccasionRealtimeSync;
+    window.normalizeOccasionSlug = normalizeOccasionSlug;
     window.LIVE_OFFERS = LIVE_OFFERS;
 
 })();
