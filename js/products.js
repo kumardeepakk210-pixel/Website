@@ -803,7 +803,24 @@ function renderProductDetail(product) {
     }
 
     currentPdpProduct = product;
-    currentPdpImageIndex = 0;
+
+    const images =
+        (typeof getProductImages === 'function')
+            ? getProductImages(product)
+            : (
+                Array.isArray(product.images)
+                    ? product.images
+                    : []
+            );
+
+    if (
+        !Number.isInteger(currentPdpImageIndex) ||
+        currentPdpImageIndex < 0 ||
+        currentPdpImageIndex >= images.length
+    ) {
+        currentPdpImageIndex = 0;
+    }
+
     pdpQty = 1;
 
     // Asynchronously resolve real Storage images dynamically for PDP
@@ -839,13 +856,17 @@ function renderProductDetail(product) {
     }
 
     // Resolve images
-    const images = (typeof getProductImages === 'function') ? getProductImages(product) : (product.images || []);
-    const mainImage = images[0] || { url: '', alt: product.name };
-
+    const mainImage =
+        images[currentPdpImageIndex] ||
+        images[0] ||
+        {
+            url: '',
+            alt: product.name
+        };
     // Thumbnail gallery with error handling to gracefully hide failed extra views
     const imagesHTML = images.map((img, i) =>
-        `<div class="pdp-thumbnail ${i === 0 ? 'active' : ''}" onclick="switchPdpImage(${i})" role="button" aria-label="View image ${i + 1}">
-            <img src="${img.url}" alt="${img.alt}" loading="lazy" width="72" height="72" onerror="handleThumbnailError(this)">
+        `<div class="pdp-thumbnail ${i === currentPdpImageIndex ? 'active' : ''}" onclick="switchPdpImage(${i})" role="button" aria-label="View image ${i + 1}">
+            <img src="${img.url}" alt="${img.alt}" loading="lazy" width="82" height="82" onerror="handleThumbnailError(this)">
         </div>`
     ).join('');
 
@@ -882,7 +903,7 @@ function renderProductDetail(product) {
     // Dynamic Specifications Table based on catalog_type (Section 11, 12, 13)
     const specsArr = [];
     if (product.productCode) specsArr.push(`<tr><td>Product Code</td><td><code>${product.productCode}</code></td></tr>`);
-    
+
     if (product.catalog_type === 'saree') {
         if (product.fabric) specsArr.push(`<tr><td>Fabric</td><td>${product.fabric}</td></tr>`);
         if (product.design) specsArr.push(`<tr><td>Weave & Design</td><td>${product.design}</td></tr>`);
@@ -1014,8 +1035,8 @@ function renderProductDetail(product) {
                         id="pdp-main-img" 
                         src="${mainImage.url}" 
                         alt="${mainImage.alt}" 
-                        width="700" 
-                        height="875"
+                       width="2400"
+height="2400"
                         data-product-code="${product.productCode}"
                         data-category="${product.category}"
                         data-fallback-index="0"
@@ -1242,64 +1263,392 @@ async function handleNotifyMeSubmit(event) {
 // PDP Gallery Controls & Viewer
 // ════════════════════════════════════════════════════
 function updatePdpGallery(images, product) {
-    if (!Array.isArray(images) || images.length === 0) return;
-    const p = product || currentPdpProduct;
+    if (
+        !Array.isArray(images) ||
+        images.length === 0
+    ) {
+        return;
+    }
+
+    const p =
+        product ||
+        currentPdpProduct;
+
     if (currentPdpProduct) {
         currentPdpProduct.images = images;
-        currentPdpProduct.image = images[0].url;
+        currentPdpProduct.image =
+            images[0]?.url || '';
     }
-    currentPdpImageIndex = 0;
 
-    const mainImg = document.getElementById('pdp-main-img');
-    if (mainImg) {
+    /*
+     * Preserve currently selected image.
+     * Only reset if the selected index is invalid.
+     */
+    if (
+        !Number.isInteger(currentPdpImageIndex) ||
+        currentPdpImageIndex < 0 ||
+        currentPdpImageIndex >= images.length
+    ) {
+        currentPdpImageIndex = 0;
+    }
+
+    const selectedIndex =
+        currentPdpImageIndex;
+
+    const selectedImage =
+        images[selectedIndex] ||
+        images[0];
+
+    if (!selectedImage) {
+        return;
+    }
+
+    const mainImg =
+        document.getElementById(
+            'pdp-main-img'
+        );
+
+    const thumbsContainer =
+        document.getElementById(
+            'pdp-thumbnails'
+        );
+
+    const counter =
+        document.getElementById(
+            'pdp-image-counter'
+        );
+
+    /*
+     * Main image
+     */
+    if (
+        mainImg &&
+        selectedImage.url
+    ) {
         mainImg.src =
-            `${images[0].url}${images[0].url.includes('?') ? '&' : '?'
-            }wrimg=${Date.now()}`;
-        mainImg.alt = images[0].alt || (p?.name || 'WishRite Silver Jewellery');
-        mainImg.classList.remove('is-placeholder-img');
-        mainImg.dataset.fallbackIndex = '0';
+            selectedImage.url;
+
+        mainImg.alt =
+            selectedImage.alt ||
+            p?.name ||
+            'WishRite Product';
+
+        mainImg.dataset.fallbackIndex =
+            String(selectedIndex);
+
+        mainImg.classList.remove(
+            'is-placeholder-img'
+        );
     }
 
-    const thumbsContainer = document.getElementById('pdp-thumbnails');
-    const counter = document.getElementById('pdp-image-counter');
-
+    /*
+     * Thumbnails
+     */
     if (thumbsContainer) {
+
         if (images.length > 1) {
-            thumbsContainer.style.display = 'flex';
-            thumbsContainer.innerHTML = images.map((img, i) =>
-                `<div class="pdp-thumbnail ${i === 0 ? 'active' : ''}" onclick="switchPdpImage(${i})" role="button" aria-label="View image ${i + 1}">
-                    <img src="${img.url}" alt="${img.alt || (p?.name || '')}" loading="lazy" width="72" height="72" onerror="handleThumbnailError(this)">
-                </div>`
-            ).join('');
-            if (counter) {
-                counter.style.display = 'block';
-                counter.textContent = `1 / ${images.length}`;
-            }
+
+            thumbsContainer.style.display =
+                'flex';
+
+            thumbsContainer.innerHTML =
+                images.map((img, i) => `
+                    <div
+                        class="pdp-thumbnail ${i === selectedIndex
+                        ? 'active'
+                        : ''
+                    }"
+                        onclick="switchPdpImage(${i})"
+                        role="button"
+                        tabindex="0"
+                        aria-label="View image ${i + 1}"
+                        aria-current="${i === selectedIndex
+                        ? 'true'
+                        : 'false'
+                    }"
+                    >
+                        <img
+                            src="${img.url}"
+                            alt="${img.alt || p?.name || ''}"
+                            loading="lazy"
+                            width="82"
+                            height="82"
+                            onerror="handleThumbnailError(this)"
+                        >
+                    </div>
+                `).join('');
+
         } else {
-            thumbsContainer.style.display = 'none';
-            if (counter) counter.style.display = 'none';
+
+            thumbsContainer.style.display =
+                'none';
+        }
+    }
+
+    /*
+     * Counter
+     */
+    if (counter) {
+
+        if (images.length > 1) {
+
+            counter.style.display =
+                'block';
+
+            counter.textContent =
+                `${selectedIndex + 1} / ${images.length}`;
+
+        } else {
+
+            counter.style.display =
+                'none';
         }
     }
 }
 window.updatePdpGallery = updatePdpGallery;
 
+// ============================================================
+// WISHRITE PDP IMAGE GALLERY CONTROLLER
+// Mouse + Keyboard + Page Navigation
+// ============================================================
+
 function switchPdpImage(index) {
-    if (!currentPdpProduct) return;
-    const images = currentPdpProduct.images || [];
-    if (!images[index]) return;
 
-    currentPdpImageIndex = index;
-    const mainImg = document.getElementById('pdp-main-img');
-    const counter = document.getElementById('pdp-image-counter');
-    const thumbs = document.querySelectorAll('.pdp-thumbnail');
-
-    if (mainImg) {
-        mainImg.src = images[index].url;
-        mainImg.alt = images[index].alt || currentPdpProduct.name;
+    if (!currentPdpProduct) {
+        return;
     }
-    if (counter) counter.textContent = `${index + 1} / ${images.length}`;
-    thumbs.forEach((t, i) => t.classList.toggle('active', i === index));
+
+    const images =
+        Array.isArray(
+            currentPdpProduct.images
+        )
+            ? currentPdpProduct.images
+            : [];
+
+    if (images.length === 0) {
+        return;
+    }
+
+    index = Number(index);
+
+    if (!Number.isFinite(index)) {
+        return;
+    }
+
+    /*
+     * Circular navigation
+     */
+    index =
+        (
+            (index % images.length) +
+            images.length
+        ) % images.length;
+
+    const selectedImage =
+        images[index];
+
+    if (
+        !selectedImage ||
+        !selectedImage.url
+    ) {
+        return;
+    }
+
+    /*
+     * Store selected index
+     */
+    currentPdpImageIndex =
+        index;
+
+    const mainImg =
+        document.getElementById(
+            'pdp-main-img'
+        );
+
+    const counter =
+        document.getElementById(
+            'pdp-image-counter'
+        );
+
+    const thumbs =
+        document.querySelectorAll(
+            '#pdp-thumbnails .pdp-thumbnail'
+        );
+
+    /*
+     * Main image
+     */
+    if (mainImg) {
+
+        mainImg.src =
+            selectedImage.url;
+
+        mainImg.alt =
+            selectedImage.alt ||
+            currentPdpProduct.name ||
+            'WishRite Product';
+
+        mainImg.dataset.fallbackIndex =
+            String(index);
+
+        mainImg.classList.remove(
+            'is-placeholder-img'
+        );
+    }
+
+    /*
+     * Counter
+     */
+    if (counter) {
+
+        counter.textContent =
+            `${index + 1} / ${images.length}`;
+    }
+
+    /*
+     * Active thumbnail
+     */
+    thumbs.forEach(
+        (thumb, i) => {
+
+            const active =
+                i === index;
+
+            thumb.classList.toggle(
+                'active',
+                active
+            );
+
+            thumb.setAttribute(
+                'aria-current',
+                active
+                    ? 'true'
+                    : 'false'
+            );
+        }
+    );
+
+    /*
+     * Keep active thumbnail visible
+     */
+    const activeThumb =
+        thumbs[index];
+
+    if (activeThumb) {
+
+        activeThumb.scrollIntoView({
+            behavior: 'smooth',
+            block: 'nearest',
+            inline: 'nearest'
+        });
+    }
 }
+
+// Make the function explicitly available to inline HTML onclick
+window.switchPdpImage = switchPdpImage;
+
+
+// ============================================================
+// KEYBOARD NAVIGATION
+// ============================================================
+
+function handlePdpKeyboardNavigation(event) {
+
+    const mainImage =
+        document.getElementById(
+            'pdp-main-img'
+        );
+
+    if (!mainImage) {
+        return;
+    }
+
+    const images =
+        currentPdpProduct &&
+            Array.isArray(
+                currentPdpProduct.images
+            )
+            ? currentPdpProduct.images
+            : [];
+
+    if (images.length <= 1) {
+        return;
+    }
+
+    /*
+     * Do not interfere with typing.
+     */
+    const activeElement =
+        document.activeElement;
+
+    if (
+        activeElement &&
+        (
+            activeElement.tagName === 'INPUT' ||
+            activeElement.tagName === 'TEXTAREA' ||
+            activeElement.tagName === 'SELECT' ||
+            activeElement.isContentEditable
+        )
+    ) {
+        return;
+    }
+
+    let direction = 0;
+
+    /*
+     * Next image
+     */
+    if (
+        event.key === 'ArrowRight' ||
+        event.key === 'ArrowDown' ||
+        event.key === 'PageDown'
+    ) {
+        direction = 1;
+    }
+
+    /*
+     * Previous image
+     */
+    else if (
+        event.key === 'ArrowLeft' ||
+        event.key === 'ArrowUp' ||
+        event.key === 'PageUp'
+    ) {
+        direction = -1;
+    }
+
+    if (direction === 0) {
+        return;
+    }
+
+    /*
+     * Prevent browser/page scrolling.
+     */
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation();
+
+    const newIndex =
+        (
+            currentPdpImageIndex +
+            direction +
+            images.length
+        ) % images.length;
+
+    switchPdpImage(
+        newIndex
+    );
+}
+
+
+// PDP keyboard image navigation (Capture before other document handlers)
+window.addEventListener(
+    'keydown',
+    handlePdpKeyboardNavigation,
+    {
+        capture: true
+    }
+);
 
 function updateQty(delta) {
     pdpQty = Math.max(1, pdpQty + delta);
