@@ -689,30 +689,14 @@ async function validateCheckoutPincode() {
 }
 
 async function proceedToCheckoutOrder() {
+    console.log('[CHECKOUT-DIAG] Proceed to Checkout clicked');
+
     if (cart.length === 0) {
-        showToast('Your cart is empty.', 'error');
-        return;
-    }
-
-    // Ensure PIN code is valid and verified
-    const input = document.getElementById('checkout-pincode-input');
-    const pin = input
-        ? input.value.trim()
-        : (typeof getSavedPincode === 'function' ? getSavedPincode() : null);
-
-    if (!pin || pin.length !== 6) {
-        showToast('Please enter a valid 6-digit delivery PIN code.', 'error');
-        if (input) input.focus();
-        return;
-    }
-
-    const isValid = await validateCheckoutPincode();
-
-    if (!isValid) {
-        showToast(
-            'Delivery is unavailable to the selected PIN code. Please change the delivery location.',
-            'error'
-        );
+        if (typeof showToast === 'function') {
+            showToast('Your cart is empty.', 'error');
+        } else {
+            console.warn('Your cart is empty.');
+        }
         return;
     }
 
@@ -724,10 +708,12 @@ async function proceedToCheckoutOrder() {
                 : item;
 
         if (product && product.stockQuantity <= 0) {
-            showToast(
-                `"${item.name}" is now out of stock. Please remove it from your bag to proceed.`,
-                'error'
-            );
+            if (typeof showToast === 'function') {
+                showToast(
+                    `"${item.name}" is now out of stock. Please remove it from your bag to proceed.`,
+                    'error'
+                );
+            }
             return;
         }
 
@@ -735,14 +721,23 @@ async function proceedToCheckoutOrder() {
             product &&
             Number(item.qty) > Number(product.stockQuantity)
         ) {
-            showToast(
-                `Only ${product.stockQuantity} item(s) of "${item.name}" are available.`,
-                'error'
-            );
+            if (typeof showToast === 'function') {
+                showToast(
+                    `Only ${product.stockQuantity} item(s) of "${item.name}" are available.`,
+                    'error'
+                );
+            }
             return;
         }
     }
 
+    // Read optional pre-filled delivery PIN if customer already entered one (without blocking modal open)
+    const input = document.getElementById('checkout-pincode-input');
+    const pin = input
+        ? input.value.trim()
+        : (typeof getSavedPincode === 'function' ? getSavedPincode() : null);
+
+    console.log('[CHECKOUT-DIAG] Opening customer details modal');
     openWishriteCheckoutModal(pin);
 }
 
@@ -752,6 +747,7 @@ async function proceedToCheckoutOrder() {
    ========================================================= */
 
 function openWishriteCheckoutModal(pin) {
+    console.log('[CHECKOUT-DIAG] openWishriteCheckoutModal started');
     const existingModal = document.getElementById('wishrite-checkout-modal');
 
     if (existingModal) {
@@ -854,7 +850,7 @@ function openWishriteCheckoutModal(pin) {
                                 <input type="radio" name="wishrite-payment-method" value="cod" onchange="updateWishriteCheckoutTotals('cod')">
                                 <span>
                                     <strong style="display:block;">Cash on Delivery</strong>
-                                    <small id="wishrite-cod-subtitle" style="color:var(--wr-text-muted);">${(totals.rules?.codCharge || 0) > 0 ? `+ ${formatPrice(totals.rules.codCharge)} COD charges` : 'FREE Cash on Delivery'}</small>
+                                    <small id="wishrite-cod-subtitle" style="color:var(--wr-text-muted);">${(initialTotals.rules?.codCharge || 0) > 0 ? `+ ${formatPrice(initialTotals.rules.codCharge)} COD charges` : 'FREE Cash on Delivery'}</small>
                                 </span>
                             </label>
                         </div>
@@ -1052,6 +1048,7 @@ function openWishriteCheckoutModal(pin) {
     `;
 
     document.body.appendChild(modal);
+    console.log('[CHECKOUT-DIAG] Customer details modal rendered successfully');
 
     document.body.style.overflow = 'hidden';
 
@@ -1397,6 +1394,7 @@ async function proceedToRazorpayPayment(internalOrderId) {
     try {
         await loadRazorpaySdk();
 
+        console.log('[CHECKOUT-DIAG] Calling create-razorpay-order');
         const { data: efData, error: efError } = await client.functions.invoke('create-razorpay-order', {
             body: {
                 order_id: internalOrderId
@@ -1602,6 +1600,7 @@ async function proceedToRazorpayPayment(internalOrderId) {
 
 async function submitWishriteCustomerCheckout(event) {
     if (event) event.preventDefault();
+    console.log('[CHECKOUT-DIAG] Continue to Secure Payment clicked');
 
     // Prevent duplicate clicks if order creation or Razorpay invocation is in progress
     if (isCreatingRazorpayOrder) return;
@@ -1696,6 +1695,7 @@ async function submitWishriteCustomerCheckout(event) {
         return;
     }
 
+    console.log('[CHECKOUT-DIAG] Validating delivery PIN');
     if (!/^\d{6}$/.test(pin)) {
         showCheckoutFormError(
             'Please enter a valid 6-digit PIN code.'
@@ -1826,6 +1826,7 @@ async function submitWishriteCustomerCheckout(event) {
         }
 
         // 1. Insert order record into public.orders without SELECT/RETURNING
+        console.log('[CHECKOUT-DIAG] Creating internal order');
         let { error: orderError } = await client
             .from('orders')
             .insert([orderPayload]);
@@ -2009,10 +2010,14 @@ function showCheckoutFormError(message, success = false) {
     );
 
     if (!errorEl) {
-        showToast(
-            message,
-            success ? 'success' : 'error'
-        );
+        if (typeof showToast === 'function') {
+            showToast(
+                message,
+                success ? 'success' : 'error'
+            );
+        } else {
+            console.warn('[Checkout Form Error]', message);
+        }
         return;
     }
 
