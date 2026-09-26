@@ -10,6 +10,13 @@
     box-sizing: border-box;
 }
 
+html,
+body {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+}
+
 html {
     scroll-behavior: smooth;
     -webkit-text-size-adjust: 100%;
@@ -23,7 +30,6 @@ body {
     -moz-osx-font-smoothing: grayscale;
     line-height: var(--leading-normal);
     font-size: var(--text-base);
-    overflow-x: hidden;
 }
 
 body.menu-open {
