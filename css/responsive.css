@@ -225,6 +225,48 @@
         padding: var(--space-6) var(--container-padding);
     }
 
+    .shop-hero.all-jewellery-hero,
+    .shop-hero.collections-hero,
+    .shop-hero.new-arrivals-hero,
+    .shop-hero.best-sellers-hero,
+    .shop-hero.kids-hero,
+    .new-arrivals-hero {
+        min-height: 360px;
+        background-size: cover;
+        background-position: center;
+    }
+
+    .shop-hero.all-jewellery-hero::before,
+    .shop-hero.collections-hero::before,
+    .shop-hero.new-arrivals-hero::before,
+    .shop-hero.best-sellers-hero::before,
+    .shop-hero.kids-hero::before,
+    .new-arrivals-hero::before {
+        background: rgba(248, 246, 243, 0.60);
+    }
+
+    .shop-hero.kids-hero,
+    .kids-hero {
+        min-height: 720px;
+        height: auto;
+        padding-top: var(--space-10);
+        padding-bottom: var(--space-10);
+    }
+
+    .kids-gender-panels {
+        grid-template-columns: 1fr;
+        gap: 12px;
+        max-width: 100%;
+    }
+
+    .kids-gender-panel {
+        min-height: 210px;
+    }
+
+    .kids-gender-title {
+        font-size: 1.7rem;
+    }
+
     /* PDP */
     .pdp-layout {
         grid-template-columns: 1fr;
@@ -847,3 +889,54 @@
         --container-padding: calc((100% - 1600px) / 2);
     }
 }
+
+/* ── Responsive Variant Selector Rules (Part 22) ── */
+@media (max-width: 768px) {
+    .pdp-variant-section {
+        margin-top: var(--space-4, 16px);
+        padding: 14px 14px;
+    }
+
+    .pdp-alphabet-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .alphabet-btn {
+        width: 42px;
+        height: 42px;
+        min-height: 42px;
+        min-width: 42px;
+        font-size: 14px;
+        padding: 0;
+    }
+}
+
+@media (max-width: 480px) {
+    .pdp-variant-section {
+        padding: 12px 10px;
+    }
+
+    .pdp-alphabet-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    .alphabet-btn {
+        width: 40px;
+        height: 40px;
+        min-height: 40px;
+        min-width: 40px;
+        font-size: 13.5px;
+        padding: 0;
+    }
+
+    .variant-chip {
+        min-height: 40px;
+        padding: 6px 12px;
+        font-size: 12.5px;
+    }
+}
+

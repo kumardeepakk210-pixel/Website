@@ -219,7 +219,8 @@ let currentFilters = {
     category: 'All',
     collection: 'All',
     priceRange: 'All',
-    occasion: 'All'
+    occasion: 'All',
+    audience: 'All'
 };
 
 let currentSort = 'featured';
@@ -247,7 +248,7 @@ async function applyFiltersAndSort() {
         return;
     }
 
-    let filtered = productsDB.filter(p => p && Number(p.stockQuantity || 0) > 0 && (typeof isSilverJewelleryProduct === 'function' ? isSilverJewelleryProduct(p) : true));
+    let filtered = (window.productsDB || productsDB).filter(p => p && Number(p.stockQuantity || 0) > 0 && (typeof isSilverJewelleryProduct === 'function' ? isSilverJewelleryProduct(p) : true));
 
     // Apply category filter (normalized matching)
     if (currentFilters.category && currentFilters.category !== 'All') {
@@ -275,6 +276,15 @@ async function applyFiltersAndSort() {
         filtered = filtered.filter(p => {
             if (max) return p.sellingPrice >= min && p.sellingPrice <= max;
             return p.sellingPrice >= min;
+        });
+    }
+
+    // Apply audience filter ('Female', 'Men', 'Kids-Girl', 'Kids-Boy')
+    if (currentFilters.audience && currentFilters.audience !== 'All') {
+        const audTarget = currentFilters.audience.toLowerCase();
+        filtered = filtered.filter(p => {
+            if (!p.audience) return false;
+            return p.audience.toLowerCase() === audTarget;
         });
     }
 
@@ -327,6 +337,8 @@ function navigateToShopWithFilter(filterType, filterValue, sortOption = 'feature
         currentFilters.occasion = filterValue || 'All';
     } else if (filterType === 'priceRange') {
         currentFilters.priceRange = filterValue || 'All';
+    } else if (filterType === 'audience') {
+        currentFilters.audience = filterValue || 'All';
     }
 
     currentSort = sortOption || 'featured';
@@ -400,6 +412,26 @@ function handleOccasionFilter(occasion) {
     if (title) title.textContent = occasion === 'All' ? 'All Jewellery' : `${occasion} Jewellery`;
 }
 
+function handleAudienceFilter(audience) {
+    currentFilters.audience = audience;
+    if (typeof getCurrentView === 'function' && getCurrentView() !== 'shop') {
+        navigateTo('shop', null, true);
+    }
+    applyFiltersAndSort();
+    const title = document.getElementById('shop-title');
+    if (title && audience !== 'All') {
+        const labelMap = { 'Female': "Women's Jewellery", 'Men': "Men's Jewellery", 'Kids-Girl': 'Kids (Girls)', 'Kids-Boy': 'Kids (Boys)' };
+        title.textContent = labelMap[audience] || `${audience} Jewellery`;
+    }
+    document.querySelectorAll('.filter-option-aud').forEach(el => {
+        const isMatch = el.dataset.value === audience;
+        el.classList.toggle('active', isMatch);
+        const radio = el.querySelector('input[type="radio"]');
+        if (radio) radio.checked = isMatch;
+    });
+}
+window.handleAudienceFilter = handleAudienceFilter;
+
 function handlePriceFilter(range) {
     currentFilters.priceRange = range;
     if (typeof getCurrentView === 'function' && getCurrentView() !== 'shop') {
@@ -409,7 +441,7 @@ function handlePriceFilter(range) {
 }
 
 function resetFilters() {
-    currentFilters = { category: 'All', collection: 'All', priceRange: 'All', occasion: 'All' };
+    currentFilters = { category: 'All', collection: 'All', priceRange: 'All', occasion: 'All', audience: 'All' };
     currentSort = 'featured';
     const sortSelect = document.getElementById('shop-sort-select') || document.querySelector('.shop-sort select');
     if (sortSelect) sortSelect.value = 'featured';
@@ -486,6 +518,13 @@ function buildSidebarFilters() {
     const rawCategories = typeof getCategories === 'function' ? getCategories() : [];
     const categories = ['All', ...rawCategories.filter(c => c !== 'All')];
     const occasions = ['All', 'Everyday', 'Office', 'Date Night', 'Festive', 'Gifting', 'Special Occasions'];
+    const audiences = [
+        { label: 'All', value: 'All' },
+        { label: 'Women', value: 'Female' },
+        { label: 'Men', value: 'Men' },
+        { label: 'Kids (Girls)', value: 'Kids-Girl' },
+        { label: 'Kids (Boys)', value: 'Kids-Boy' }
+    ];
     const priceRanges = [
         { label: 'All', value: 'All' },
         { label: 'Under ₹2,000', value: '0-2000' },
@@ -495,6 +534,13 @@ function buildSidebarFilters() {
     ];
 
     sidebar.innerHTML = `
+        <h4 class="filter-group-title">Audience</h4>
+        ${audiences.map(a => `
+            <label class="filter-option filter-option-aud ${a.value === currentFilters.audience ? 'active' : ''}" data-value="${a.value}">
+                <input type="radio" name="audience" ${a.value === currentFilters.audience ? 'checked' : ''} onchange="handleAudienceFilter('${a.value}')"> ${a.label}
+            </label>
+        `).join('')}
+
         <h4 class="filter-group-title">Category</h4>
         ${categories.map(c => `
             <label class="filter-option filter-option-cat ${c === currentFilters.category ? 'active' : ''}" data-value="${c}">
@@ -526,6 +572,13 @@ function buildMobileFilters() {
     const rawCategories = typeof getCategories === 'function' ? getCategories() : [];
     const categories = ['All', ...rawCategories.filter(c => c !== 'All')];
     const occasions = ['All', 'Everyday', 'Office', 'Date Night', 'Festive', 'Gifting', 'Special Occasions'];
+    const audiences = [
+        { label: 'All', value: 'All' },
+        { label: 'Women', value: 'Female' },
+        { label: 'Men', value: 'Men' },
+        { label: 'Kids (Girls)', value: 'Kids-Girl' },
+        { label: 'Kids (Boys)', value: 'Kids-Boy' }
+    ];
     const priceRanges = [
         { label: 'All', value: 'All' },
         { label: 'Under ₹2,000', value: '0-2000' },
@@ -535,6 +588,13 @@ function buildMobileFilters() {
     ];
 
     sheet.innerHTML = `
+        <h4 class="filter-group-title">Audience</h4>
+        ${audiences.map(a => `
+            <label class="filter-option ${a.value === currentFilters.audience ? 'active' : ''}">
+                <input type="radio" name="m-audience" ${a.value === currentFilters.audience ? 'checked' : ''} onchange="currentFilters.audience='${a.value}'"> ${a.label}
+            </label>
+        `).join('')}
+
         <h4 class="filter-group-title">Category</h4>
         ${categories.map(c => `
             <label class="filter-option ${c === currentFilters.category ? 'active' : ''}">

@@ -231,10 +231,20 @@ function setOccasionSEO() {
     });
 }
 
+function setKidsSEO() {
+    updateSEO({
+        title: 'Kids Jewellery | WishRite',
+        description: 'Discover adorable 925 sterling silver jewellery for little boys and girls at WishRite.',
+        keywords: ['kids jewellery', 'kids silver jewellery', 'little boys jewellery', 'little girls jewellery', '925 silver for kids', 'WishRite kids'],
+        canonical: getSiteOrigin() + '/kids'
+    });
+}
+
 window.setCollectionsSEO = setCollectionsSEO;
 window.setCollectionDetailSEO = setCollectionDetailSEO;
 window.setNewArrivalsSEO = setNewArrivalsSEO;
 window.setBestSellersSEO = setBestSellersSEO;
+window.setKidsSEO = setKidsSEO;
 window.setOccasionSEO = setOccasionSEO;
 
 

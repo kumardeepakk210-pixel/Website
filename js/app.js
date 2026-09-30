@@ -6,7 +6,7 @@
    ============================================ */
 
 // All customer-facing storefront views
-const views = ['home', 'shop', 'collections', 'collection-detail', 'new-arrivals', 'best-sellers', 'about', 'login', 'register', 'profile', 'cart', 'wishlist', 'product', 'occasion'];
+const views = ['home', 'shop', 'collections', 'collection-detail', 'new-arrivals', 'best-sellers', 'kids', 'about', 'login', 'register', 'profile', 'cart', 'wishlist', 'product', 'occasion'];
 
 const COLLECTIONS_CONFIG = [
     {
@@ -116,6 +116,7 @@ function navigateTo(viewId, param, pushHistory = true) {
         'collection-detail': 'nav-collections',
         'new-arrivals': 'nav-new-arrivals',
         'best-sellers': 'nav-bestsellers',
+        kids: 'nav-kids',
         about: 'nav-about',
         occasion: 'nav-occasion'
     };
@@ -159,6 +160,11 @@ function navigateTo(viewId, param, pushHistory = true) {
             renderBestSellersPage();
             if (typeof setBestSellersSEO === 'function') setBestSellersSEO();
             if (pushHistory) { try { history.pushState({ view: 'best-sellers' }, '', '/best-sellers'); } catch(e){} }
+            break;
+        case 'kids':
+            renderKidsPage();
+            if (typeof setKidsSEO === 'function') setKidsSEO();
+            if (pushHistory) { try { history.pushState({ view: 'kids' }, '', '/kids'); } catch(e){} }
             break;
         case 'product':
             handleProductViewNavigation(param, targetView, pushHistory);
@@ -390,6 +396,8 @@ window.addEventListener('wishrite:productsLoaded', () => {
         renderNewArrivalsPage();
     } else if (current === 'best-sellers') {
         renderBestSellersPage();
+    } else if (current === 'kids') {
+        renderKidsPage();
     }
 });
 
@@ -425,13 +433,15 @@ function renderCollectionsPage() {
     }).join('');
 
     container.innerHTML = `
-        <div class="page-header" style="text-align:center;padding:60px 20px 40px;background:var(--wr-cream);">
-            <div class="container">
-                <span class="sub-label">WishRite Curations</span>
-                <h1 style="font-family:var(--wr-font-heading);font-size:2.4rem;color:var(--wr-primary);margin-top:8px;">Curated Collections</h1>
-                <p style="color:var(--wr-text-muted);max-width:600px;margin:12px auto 0;font-size:1.05rem;">
-                    Every collection embodies thoughtful design, hallmarked 925 purity, and effortless silver luxury.
-                </p>
+        <div class="shop-hero collections-hero">
+            <div class="container" style="max-width:800px;margin:0 auto;text-align:center;">
+                <div class="breadcrumbs" style="margin-bottom:12px;font-size:0.85rem;color:var(--wr-text-muted);">
+                    <a onclick="navigateTo('home')" style="cursor:pointer;color:inherit;">Home</a>
+                    <span style="margin:0 8px;">/</span>
+                    <span style="color:var(--wr-primary);font-weight:500;">Collections</span>
+                </div>
+                <h1>Collections</h1>
+                <p>Explore thoughtfully curated collections designed for every story, style and occasion.</p>
             </div>
         </div>
         <div class="container" style="padding:40px 20px 80px;">
@@ -595,6 +605,207 @@ async function renderBestSellersPage() {
     }
 }
 
+// ── Centralized configuration for Kids collection & gender mapping (Requirement 7) ──
+const KIDS_PRODUCT_CONFIG = {
+    // Product codes or IDs specifically designated for Little Boys
+    boys: [],
+    // Product codes or IDs specifically designated for Little Girls
+    girls: [],
+    // Category or tag keywords that designate Kids items
+    kidsKeywords: ['kid', 'kids', 'child', 'children', 'baby', 'toddler', 'nazariya', 'little'],
+    // Product codes explicitly assigned to Kids collection (can be populated as inventory expands)
+    productCodes: []
+};
+window.KIDS_PRODUCT_CONFIG = KIDS_PRODUCT_CONFIG;
+
+let currentKidsFilter = 'all';
+
+/**
+ * Filter products for Kids collection with dedicated gender mapping (Parts 15, 16, 17)
+ * Uses database audience ('Kids-Girl', 'Kids-Boy') as PRIMARY source of truth.
+ * Does NOT filter out products with stock_quantity = 0.
+ */
+function getFilteredKidsProducts(filter = 'all') {
+    const db = (typeof window !== 'undefined' && Array.isArray(window.productsDB) && window.productsDB.length > 0)
+        ? window.productsDB
+        : (typeof productsDB !== 'undefined' && Array.isArray(productsDB) ? productsDB : []);
+
+    if (!db || !db.length) return [];
+
+    const kidsKeywords = (typeof KIDS_PRODUCT_CONFIG !== 'undefined' && Array.isArray(KIDS_PRODUCT_CONFIG.kidsKeywords))
+        ? KIDS_PRODUCT_CONFIG.kidsKeywords
+        : ['kid', 'kids', 'child', 'children', 'baby', 'toddler', 'nazariya', 'little', 'peppa', 'elephant', 'penguin', 'strawberry'];
+
+    // Filter products belonging to Kids (only in-stock products)
+    const allKids = db.filter(p => {
+        if (!p || Number(p.stockQuantity || 0) <= 0) return false;
+        if (typeof isSilverJewelleryProduct === 'function' && !isSilverJewelleryProduct(p)) return false;
+
+        // Primary source of truth: database audience
+        const aud = (p.audience || '').trim();
+        if (aud === 'Kids-Girl' || aud === 'Kids-Boy') return true;
+        if (aud.toLowerCase().includes('kid')) return true;
+
+        // Metadata & Keyword checks
+        const name = (p.name || p.product_name || '').toLowerCase();
+        const desc = (p.description || p.product_description || '').toLowerCase();
+        const cat = (p.category || '').toLowerCase();
+        const rawCat = (p.rawCategory || '').toLowerCase();
+        const gender = (p.gender || p.target_gender || '').toLowerCase();
+        const ageGroup = (p.age_group || p.target_audience || '').toLowerCase();
+
+        if (ageGroup === 'kids' || ageGroup === 'children' || ageGroup === 'baby') return true;
+        if (gender === 'kids' || gender === 'boys' || gender === 'girls') return true;
+
+        if (kidsKeywords.some(kw => name.includes(kw) || cat.includes(kw) || rawCat.includes(kw) || desc.includes(kw))) {
+            return true;
+        }
+
+        return false;
+    });
+
+    if (filter === 'boys') {
+        return allKids.filter(p => {
+            const aud = (p.audience || '').trim();
+            if (aud === 'Kids-Boy') return true;
+            if (aud === 'Kids-Girl') {
+                const name = (p.name || p.product_name || '').toLowerCase();
+                if (name.includes('baby kada') || name.includes('baby ball chain') || name.includes('nazariya') || name.includes('kada')) {
+                    return true;
+                }
+                return false;
+            }
+            const gender = (p.gender || p.target_gender || '').toLowerCase();
+            const name = (p.name || p.product_name || '').toLowerCase();
+            return gender === 'boy' || gender === 'boys' || gender === 'male' || name.includes('boy') || name.includes('kada') || name.includes('chain') || name.includes('penguin') || name.includes('elephant');
+        });
+    }
+
+    if (filter === 'girls') {
+        return allKids.filter(p => {
+            const aud = (p.audience || '').trim();
+            if (aud === 'Kids-Girl') return true;
+            if (aud === 'Kids-Boy') {
+                const name = (p.name || p.product_name || '').toLowerCase();
+                if (name.includes('baby kada') || name.includes('baby ball chain') || name.includes('nazariya') || name.includes('kada')) {
+                    return true;
+                }
+                return false;
+            }
+            const gender = (p.gender || p.target_gender || '').toLowerCase();
+            const name = (p.name || p.product_name || '').toLowerCase();
+            return gender === 'girl' || gender === 'girls' || gender === 'female' || name.includes('girl') || name.includes('payel') || name.includes('balli') || name.includes('stud') || name.includes('bracelet');
+        });
+    }
+
+    return allKids;
+}
+window.getFilteredKidsProducts = getFilteredKidsProducts;
+
+/**
+ * Update Kids category filter without reloading page
+ */
+function setKidsFilter(filter) {
+    currentKidsFilter = filter || 'all';
+
+    // Update active state and aria-pressed on filter buttons and panels
+    document.querySelectorAll('.kids-filter-btn, .kids-gender-panel').forEach(btn => {
+        const btnFilter = btn.getAttribute('data-kids-filter');
+        const isActive = btnFilter === currentKidsFilter;
+        btn.classList.toggle('active', isActive);
+        btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+    });
+
+    renderKidsProductsList();
+}
+window.setKidsFilter = setKidsFilter;
+
+/**
+ * Render Kids products to container and update dynamic counts
+ */
+function renderKidsProductsList() {
+    const countEl = document.getElementById('kids-count');
+    const gridEl = document.getElementById('kids-grid');
+    if (!gridEl) return;
+
+    const products = getFilteredKidsProducts(currentKidsFilter);
+
+    // Update count display dynamically
+    if (countEl) {
+        if (currentKidsFilter === 'boys') {
+            countEl.textContent = `Showing ${products.length} Little Boys Pieces`;
+        } else if (currentKidsFilter === 'girls') {
+            countEl.textContent = `Showing ${products.length} Little Girls Pieces`;
+        } else {
+            countEl.textContent = `Showing ${products.length} Kids Pieces`;
+        }
+    }
+
+    if (products.length === 0) {
+        let emptyTitle = "No pieces available yet.";
+        let emptyDesc = "Adorable jewellery for little ones is coming soon to WishRite.";
+        if (currentKidsFilter === 'boys') {
+            emptyTitle = "Little Boys pieces are coming soon.";
+            emptyDesc = "Thoughtfully crafted silver treasures for little boys will be arriving soon.";
+        } else if (currentKidsFilter === 'girls') {
+            emptyTitle = "Little Girls pieces are coming soon.";
+            emptyDesc = "Delicate silver pieces crafted for little girls will be arriving soon.";
+        }
+
+        gridEl.innerHTML = `
+            <div class="kids-empty-state" style="grid-column:1/-1;padding:60px 20px;text-align:center;">
+                <div style="width:56px;height:56px;margin:0 auto 16px;border-radius:50%;background:rgba(94,52,53,0.06);display:flex;align-items:center;justify-content:center;color:var(--wr-primary);">
+                    <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8L12 2z"/>
+                    </svg>
+                </div>
+                <h3 style="font-family:var(--wr-font-heading);font-size:1.3rem;color:var(--wr-primary);margin-bottom:8px;">${emptyTitle}</h3>
+                <p style="color:var(--wr-text-muted);font-size:0.95rem;max-width:480px;margin:0 auto 20px;">${emptyDesc}</p>
+                <button class="btn btn-primary btn-sm" onclick="navigateTo('shop')">Explore All Jewellery</button>
+            </div>
+        `;
+    } else {
+        if (typeof renderProductsToContainer === 'function') {
+            renderProductsToContainer(products, 'kids-grid');
+        }
+    }
+}
+
+/**
+ * Render dedicated Kids storefront view
+ */
+async function renderKidsPage() {
+    // Reset to default ALL KIDS on entry
+    currentKidsFilter = 'all';
+
+    document.querySelectorAll('.kids-filter-btn, .kids-gender-panel').forEach(btn => {
+        const btnFilter = btn.getAttribute('data-kids-filter');
+        const isActive = btnFilter === 'all';
+        btn.classList.toggle('active', isActive);
+        btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+    });
+
+    const countEl = document.getElementById('kids-count');
+    const gridEl = document.getElementById('kids-grid');
+    if (!gridEl) return;
+
+    const isLoaded = typeof window !== 'undefined' && Array.isArray(window.productsDB) && window.productsDB.length > 0;
+    if (!isLoaded) {
+        if (countEl) countEl.textContent = 'Loading products...';
+        if (typeof renderProductLoadingSkeletons === 'function') {
+            renderProductLoadingSkeletons('kids-grid', 8);
+        }
+        if (typeof productsService !== 'undefined') {
+            try {
+                await productsService.ensureLoaded();
+            } catch (e) {}
+        }
+    }
+
+    renderKidsProductsList();
+}
+window.renderKidsPage = renderKidsPage;
+
 // ── Browser URL Navigation & History Handling ──
 function handleInitialURLRoute(pushHistory = false) {
     const path = window.location.pathname;
@@ -659,6 +870,9 @@ function handleInitialURLRoute(pushHistory = false) {
         return;
     } else if (path === '/best-sellers' || hash === '#best-sellers') {
         navigateTo('best-sellers', null, pushHistory);
+        return;
+    } else if (path === '/kids' || hash === '#kids') {
+        navigateTo('kids', null, pushHistory);
         return;
     } else if (path === '/shop' || hash === '#shop') {
         navigateTo('shop', null, pushHistory);

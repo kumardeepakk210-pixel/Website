@@ -23,8 +23,8 @@
     <link rel="stylesheet" href="css/base.css?v=2.0">
     <link rel="stylesheet" href="css/components.css?v=2.0">
     <link rel="stylesheet" href="css/layout.css?v=2.0">
-    <link rel="stylesheet" href="css/pages.css?v=2.0">
-    <link rel="stylesheet" href="css/responsive.css?v=3.0">
+    <link rel="stylesheet" href="css/pages.css?v=20260930-v3">
+    <link rel="stylesheet" href="css/responsive.css?v=20260930-v3">
     <link rel="stylesheet" href="css/home-premium.css?v=20260926-v5">
 
     <!-- Supabase -->
@@ -67,11 +67,12 @@
         <nav class="header-nav" aria-label="Main navigation">
             <a onclick="navigateTo('occasion')" id="nav-occasion" class="nav-festive-item"
                 style="display: none;">FESTIVE EDIT</a>
-            <a onclick="navigateToShopWithFilter('category', 'All', 'featured', 'All Jewellery')" id="nav-shop">ALL
-                JEWELLERY</a>
+            <a onclick="navigateToShopWithFilter('category', 'All', 'featured', 'All Jewellery')" id="nav-shop">ALL JEWELLERY</a>
+            <a onclick="navigateToShopWithFilter('audience', 'Men', 'featured', 'Men\'s Jewellery')" id="nav-men">MEN</a>
             <a onclick="navigateTo('collections')" id="nav-collections">COLLECTIONS</a>
             <a onclick="navigateTo('new-arrivals')" id="nav-new-arrivals">NEW ARRIVALS</a>
             <a onclick="navigateTo('best-sellers')" id="nav-bestsellers">BEST SELLERS</a>
+            <a onclick="navigateTo('kids')" id="nav-kids">KIDS</a>
             <a onclick="navigateTo('about')" id="nav-about">ABOUT</a>
         </nav>
 
@@ -135,9 +136,12 @@
                 style="display: none;">Festive Edit</a>
             <a
                 onclick="closeMobileMenu(); navigateToShopWithFilter('category', 'All', 'featured', 'All Jewellery')">Jewellery</a>
+            <a
+                onclick="closeMobileMenu(); navigateToShopWithFilter('audience', 'Men', 'featured', 'Men\'s Jewellery')">Men</a>
             <a onclick="closeMobileMenu(); navigateTo('collections')">Collections</a>
             <a onclick="closeMobileMenu(); navigateTo('new-arrivals')">New Arrivals</a>
             <a onclick="closeMobileMenu(); navigateTo('best-sellers')">Best Sellers</a>
+            <a onclick="closeMobileMenu(); navigateTo('kids')">Kids</a>
             <a onclick="closeMobileMenu(); navigateTo('about')">About WishRite</a>
         </nav>
         <div class="mobile-menu-footer">
@@ -605,7 +609,7 @@
 
         <!-- ═══ NEW ARRIVALS VIEW ═══ -->
         <div id="new-arrivals-view" style="display: none;">
-            <div class="shop-hero">
+            <div class="shop-hero new-arrivals-hero">
                 <div class="container" style="max-width:800px;margin:0 auto;text-align:center;">
                     <div class="breadcrumbs" style="margin-bottom:12px;font-size:0.85rem;color:var(--wr-text-muted);">
                         <a onclick="navigateTo('home')" style="cursor:pointer;color:inherit;">Home</a>
@@ -628,7 +632,7 @@
 
         <!-- ═══ BEST SELLERS VIEW ═══ -->
         <div id="best-sellers-view" style="display: none;">
-            <div class="shop-hero">
+            <div class="shop-hero best-sellers-hero">
                 <div class="container" style="max-width:800px;margin:0 auto;text-align:center;">
                     <div class="breadcrumbs" style="margin-bottom:12px;font-size:0.85rem;color:var(--wr-text-muted);">
                         <a onclick="navigateTo('home')" style="cursor:pointer;color:inherit;">Home</a>
@@ -649,9 +653,92 @@
             </div>
         </div>
 
+        <!-- ═══ KIDS VIEW ═══ -->
+        <div id="kids-view" style="display: none;">
+            <div class="shop-hero kids-hero">
+                <div class="container" style="max-width:800px;margin:0 auto;text-align:center;">
+                    <div class="breadcrumbs" style="margin-bottom:12px;font-size:0.85rem;color:var(--wr-text-muted);">
+                        <a onclick="navigateTo('home')" style="cursor:pointer;color:inherit;">Home</a>
+                        <span style="margin:0 8px;">/</span>
+                        <span style="color:var(--wr-primary);font-weight:500;">Kids</span>
+                    </div>
+                    <h1>Little Moments, Made Special</h1>
+                    <p>Discover adorable jewellery made for little celebrations and treasured memories.</p>
+
+                    <div class="kids-gender-panels" role="group" aria-label="Kids jewellery categories">
+
+                        <button
+                            type="button"
+                            class="kids-gender-panel"
+                            data-kids-filter="boys"
+                            aria-label="Shop Boys jewellery"
+                            onclick="setKidsFilter('boys')">
+
+                            <span class="kids-gender-image">
+                                <img
+                                    src="assets/kids-boys.jpg"
+                                    alt="Boys Jewellery"
+                                    loading="eager"
+                                    onerror="this.parentElement.classList.add('image-missing');">
+                            </span>
+
+                            <span class="kids-gender-overlay"></span>
+
+                            <span class="kids-gender-content">
+                                <span class="kids-gender-eyebrow">FOR LITTLE ONES</span>
+                                <span class="kids-gender-title">Boys</span>
+                                <span class="kids-gender-link">Explore Boys →</span>
+                            </span>
+
+                        </button>
+
+
+                        <button
+                            type="button"
+                            class="kids-gender-panel"
+                            data-kids-filter="girls"
+                            aria-label="Shop Girls jewellery"
+                            onclick="setKidsFilter('girls')">
+
+                            <span class="kids-gender-image">
+                                <img
+                                    src="assets/kids-girls.jpg"
+                                    alt="Girls Jewellery"
+                                    loading="eager"
+                                    onerror="this.parentElement.classList.add('image-missing');">
+                            </span>
+
+                            <span class="kids-gender-overlay"></span>
+
+                            <span class="kids-gender-content">
+                                <span class="kids-gender-eyebrow">FOR LITTLE ONES</span>
+                                <span class="kids-gender-title">Girls</span>
+                                <span class="kids-gender-link">Explore Girls →</span>
+                            </span>
+
+                        </button>
+
+                    </div>
+                </div>
+            </div>
+            <div class="shop-toolbar" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+                <div class="shop-toolbar-left">
+                    <span class="shop-toolbar-count" id="kids-count">Loading products...</span>
+                </div>
+                <div class="kids-filter-pills" role="tablist" aria-label="Kids category filters">
+                    <button type="button" class="kids-filter-btn active" data-kids-filter="all" onclick="setKidsFilter('all')">All Kids</button>
+                    <button type="button" class="kids-filter-btn" data-kids-filter="boys" onclick="setKidsFilter('boys')">Little Boys</button>
+                    <button type="button" class="kids-filter-btn" data-kids-filter="girls" onclick="setKidsFilter('girls')">Little Girls</button>
+                </div>
+            </div>
+            <div class="container" style="padding: 24px 20px 80px;">
+                <div class="product-grid" id="kids-grid"></div>
+            </div>
+        </div>
+
         <!-- ═══ SHOP VIEW ═══ -->
         <div id="shop-view" style="display: none;">
-            <div class="shop-hero">
+            <div class="shop-hero all-jewellery-hero">
                 <h1 id="shop-title">All Jewellery</h1>
                 <p>Discover our complete range of premium 925 sterling silver jewellery.</p>
             </div>
@@ -1560,16 +1647,16 @@
     <script src="js/auth.js"></script>
     <script src="js/shipping.js?v=20260919-shiprocket"></script>
     <script src="js/images.js"></script>
-    <script src="js/products.js?v=20260926-v2"></script>
+    <script src="js/products.js?v=20260930-v3"></script>
     <script src="js/coupons.js?v=20260920-coupons"></script>
     <script src="js/cart.js?v=20260926-checkout"></script>
     <script src="js/wishlist.js"></script>
-    <script src="js/search.js"></script>
-    <script src="js/ui.js?v=20260925-v3"></script>
+    <script src="js/search.js?v=20260930-v3"></script>
+    <script src="js/ui.js?v=20260930-v3"></script>
     <script src="js/seo.js"></script>
     <script src="js/occasion-config.js?v=20260925-v3"></script>
     <script src="js/occasion.js?v=20260925-v3"></script>
-    <script src="js/app.js?v=20260926-v4"></script>
+    <script src="js/app.js?v=20260930-v3"></script>
 
 </body>
 

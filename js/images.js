@@ -155,6 +155,29 @@
         return '';
     }
 
+    function extractStorageFolder(productOrCode) {
+        if (!productOrCode) {
+            return '';
+        }
+
+        if (typeof productOrCode === 'string') {
+            return normalizeProductCode(productOrCode);
+        }
+
+        if (typeof productOrCode === 'object') {
+            return normalizeProductCode(
+                productOrCode.storage_folder ||
+                productOrCode.storageFolder ||
+                productOrCode.productCode ||
+                productOrCode.product_code ||
+                productOrCode.sku ||
+                productOrCode.code
+            );
+        }
+
+        return '';
+    }
+
     /* ============================================================
        6. CHECK IMAGE EXTENSION
        ============================================================ */
@@ -322,11 +345,12 @@
        10. BUILD IMAGE RECORD
        ============================================================ */
 
-    function buildImageRecord(file, productCode, index) {
+    function buildImageRecord(file, productCode, index, folderName) {
         const fileName = String(file.name || '').trim();
+        const activeFolder = normalizeProductCode(folderName) || productCode;
 
         const storagePath =
-            `${productCode}/${fileName}`;
+            `${activeFolder}/${fileName}`;
 
         const url =
             getSupabaseStoragePublicUrl(storagePath);
@@ -353,13 +377,14 @@
        11. LIST IMAGES FROM SUPABASE STORAGE
        ============================================================ */
 
-    async function listProductImagesFromStorage(productCode) {
+    async function listProductImagesFromStorage(productCode, folderName) {
         const cleanCode = normalizeProductCode(productCode);
+        const cleanFolder = normalizeProductCode(folderName) || cleanCode;
 
-        if (!cleanCode) {
+        if (!cleanCode && !cleanFolder) {
             return {
                 images: [],
-                error: new Error('Missing product code')
+                error: new Error('Missing product code or storage folder')
             };
         }
 
@@ -371,7 +396,7 @@
             );
 
             console.warn(
-                `[WishRite Images] Supabase client unavailable for ${cleanCode}`
+                `[WishRite Images] Supabase client unavailable for ${cleanCode || cleanFolder}`
             );
 
             return {
@@ -382,16 +407,16 @@
 
         try {
             console.info(
-                `[WishRite Images] Checking Storage folder: product-images/${cleanCode}/`
+                `[WishRite Images] Checking Storage folder: product-images/${cleanFolder}/`
             );
 
-            const {
+            let {
                 data,
                 error
             } = await client
                 .storage
                 .from(STORAGE_BUCKET)
-                .list(cleanCode, {
+                .list(cleanFolder, {
                     limit: 100,
                     offset: 0,
                     sortBy: {
@@ -400,9 +425,31 @@
                     }
                 });
 
+            // If primary storage_folder is empty or failed, attempt fallback to product_code if different
+            if ((!data || data.length === 0) && cleanFolder !== cleanCode && cleanCode) {
+                console.info(
+                    `[WishRite Images] Storage folder '${cleanFolder}' yielded no items, attempting fallback to '${cleanCode}'`
+                );
+                const fallbackRes = await client
+                    .storage
+                    .from(STORAGE_BUCKET)
+                    .list(cleanCode, {
+                        limit: 100,
+                        offset: 0,
+                        sortBy: {
+                            column: 'name',
+                            order: 'asc'
+                        }
+                    });
+                if (fallbackRes.data && fallbackRes.data.length > 0) {
+                    data = fallbackRes.data;
+                    error = fallbackRes.error;
+                }
+            }
+
             if (error) {
                 console.error(
-                    `[WishRite Images] Storage listing failed for ${cleanCode}:`,
+                    `[WishRite Images] Storage listing failed for ${cleanFolder}:`,
                     error
                 );
 
@@ -435,17 +482,18 @@
                     buildImageRecord(
                         file,
                         cleanCode,
-                        index
+                        index,
+                        cleanFolder
                     )
                 );
 
             console.info(
-                `[WishRite Images] ${cleanCode}: found ${images.length} image(s).`
+                `[WishRite Images] ${cleanCode} (${cleanFolder}): found ${images.length} image(s).`
             );
 
             if (images.length === 0) {
                 console.warn(
-                    `[WishRite Images] No image files found in product-images/${cleanCode}/`
+                    `[WishRite Images] No image files found in product-images/${cleanFolder}/`
                 );
             }
 
@@ -750,10 +798,12 @@
     ) {
         const cleanCode =
             extractProductCode(productOrCode);
+        const cleanFolder =
+            extractStorageFolder(productOrCode) || cleanCode;
 
-        if (!cleanCode) {
+        if (!cleanCode && !cleanFolder) {
             console.warn(
-                '[WishRite Images] Cannot resolve images: missing product code.'
+                '[WishRite Images] Cannot resolve images: missing product code or storage folder.'
             );
 
             return [
@@ -807,7 +857,8 @@
                 try {
                     const storageResult =
                         await listProductImagesFromStorage(
-                            cleanCode
+                            cleanCode,
+                            cleanFolder
                         );
 
                     let images =

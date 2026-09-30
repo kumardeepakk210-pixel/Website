@@ -180,6 +180,19 @@ function mapInventoryToProduct(item, existingSlugs = new Set()) {
     const rawCategory = (item.category || '').trim();
     const stock = typeof item.stock_quantity === 'number' ? item.stock_quantity : (parseInt(item.stock_quantity, 10) || 0);
     const sellingPrice = Number(item.selling_price) || 0;
+    const purchasePrice = Number(item.purchase_price) || 0;
+    const storageFolder = (item.storage_folder || '').trim() || null;
+    const audience = (item.audience || '').trim() || null;
+
+    // Design Group & Generic Variant System (Part 1, 2, 3, 11)
+    const designGroup = (item.design_group || '').trim() || null;
+    const variantType = (item.variant_type || '').trim().toLowerCase() || null;
+    const variantValue = (item.variant_value || '').trim() || null;
+    const productSlug = (item.product_slug || '').trim() || null;
+
+    if (variantType && !variantValue) {
+        console.warn(`WishRite: Product variant configuration incomplete for ${productCode} (variant_type "${variantType}" has no variant_value)`);
+    }
 
     // Approximate MRP based on jewellery standard markup if not explicitly set
     const mrp = sellingPrice > 0 ? Math.round((sellingPrice * 1.25) / 50) * 50 : sellingPrice;
@@ -195,8 +208,47 @@ function mapInventoryToProduct(item, existingSlugs = new Set()) {
         ? String(item.size).trim()
         : null;
 
-    // Deterministic slug
-    const slug = generateProductSlug(name, productCode, existingSlugs);
+    // Target Audience & Gender mapping from database schema: 'Female', 'Men', 'Kids-Girl', 'Kids-Boy'
+    let gender = '';
+    let targetGender = '';
+    let ageGroup = 'adult';
+    let targetAudience = 'women';
+
+    if (audience === 'Female') {
+        gender = 'female';
+        targetGender = 'female';
+        ageGroup = 'adult';
+        targetAudience = 'women';
+    } else if (audience === 'Men') {
+        gender = 'men';
+        targetGender = 'male';
+        ageGroup = 'adult';
+        targetAudience = 'men';
+    } else if (audience === 'Kids-Girl') {
+        gender = 'girls';
+        targetGender = 'female';
+        ageGroup = 'kids';
+        targetAudience = 'kids';
+    } else if (audience === 'Kids-Boy') {
+        gender = 'boys';
+        targetGender = 'male';
+        ageGroup = 'kids';
+        targetAudience = 'kids';
+    } else {
+        gender = item.gender || item.target_gender || '';
+        targetGender = item.target_gender || item.gender || '';
+        ageGroup = item.age_group || item.target_audience || 'adult';
+        targetAudience = item.target_audience || item.age_group || '';
+    }
+
+    // Deterministic slug (Part 11: clean product URLs from product_slug if available, otherwise deterministic fallback)
+    let slug = '';
+    if (productSlug) {
+        slug = productSlug.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+        existingSlugs.add(slug);
+    } else {
+        slug = generateProductSlug(name, productCode, existingSlugs);
+    }
 
     // Dynamic collection & occasions
     const collection = determineCollection(item, category);
@@ -246,8 +298,32 @@ function mapInventoryToProduct(item, existingSlugs = new Set()) {
         sku: productCode,
         code: productCode,
         name: name,
+        product_name: name,
         slug: slug,
+        design_group: designGroup,
+        designGroup: designGroup,
+        variant_type: variantType,
+        variantType: variantType,
+        variant_value: variantValue,
+        variantValue: variantValue,
+        product_slug: productSlug,
+        productSlug: productSlug,
         catalog_type: catalogType,
+        audience: audience,
+        gender: gender,
+        target_gender: targetGender,
+        age_group: ageGroup,
+        target_audience: targetAudience,
+        storage_folder: storageFolder,
+        storageFolder: storageFolder,
+        purchase_price: purchasePrice,
+        purchasePrice: purchasePrice,
+        purchase_date: item.purchase_date || null,
+        purchaseDate: item.purchase_date || null,
+        shop_name: item.shop_name || '',
+        shopName: item.shop_name || '',
+        shop_address: item.shop_address || '',
+        shopAddress: item.shop_address || '',
         occasion_slug: occasionSlug,
         color: color,
         fabric: fabric,
@@ -257,6 +333,7 @@ function mapInventoryToProduct(item, existingSlugs = new Set()) {
         matching_tags: matchingTags,
         is_occasion_featured: isOccasionFeatured,
         description: item.product_description || `${name} crafted with fine attention to detail and luxury finishing.`,
+        product_description: item.product_description || '',
         shortDescription: item.product_description || `${material} ${category} crafted for effortless luxury.`,
         category: category,
         rawCategory: rawCategory,
@@ -265,12 +342,15 @@ function mapInventoryToProduct(item, existingSlugs = new Set()) {
         occasion: item.occasion || occasions.join(', '),
         price: sellingPrice,
         sellingPrice: sellingPrice,
+        selling_price: sellingPrice,
         mrp: mrp,
         discount: discount,
         stockQuantity: stock,
+        stock_quantity: stock,
         isAvailable: stock > 0,
         isPublished: true,
         weight: weightStr,
+        rawWeight: item.weight != null ? Number(item.weight) : null,
         size: sizeStr,
         availability: availability,
         lowStock: lowStock,
@@ -279,7 +359,9 @@ function mapInventoryToProduct(item, existingSlugs = new Set()) {
         finish: finish,
         status: stock > 0 ? 'Active' : 'Currently Unavailable',
         createdAt: item.created_at,
+        created_at: item.created_at,
         updatedAt: item.updated_at,
+        updated_at: item.updated_at,
         salesCount: salesCount,
         care: catalogType === 'saree'
             ? 'Dry clean only. Store in a breathable muslin or cotton saree bag. Avoid direct perfume or spray on zari motifs.'
@@ -301,6 +383,7 @@ function mapInventoryToProduct(item, existingSlugs = new Set()) {
         product.images = [];
     }
     product.image = product.images[0]?.url || '';
+    product.image_url = product.images[0]?.url || '';
 
     return product;
 }
@@ -357,8 +440,7 @@ const productsService = {
                 }
 
                 // 2. Fetch inventory records directly from public.inventory
-                // Requirement 6 & 7: Filter at database/query level so stock_quantity > 0
-                const inventoryUrl = `${WR_SUPABASE_URL}/rest/v1/inventory?select=*&stock_quantity=gt.0&order=created_at.desc`;
+                const inventoryUrl = `${WR_SUPABASE_URL}/rest/v1/inventory?select=*&order=created_at.desc`;
                 const invRes = await fetch(inventoryUrl, { headers });
 
                 if (!invRes.ok) {
@@ -370,23 +452,18 @@ const productsService = {
                     throw new Error('Invalid inventory data format received from database');
                 }
 
-                // Double safety layer: Filter out any items where stock_quantity <= 0
-                const inStockRawItems = rawItems.filter(item => {
-                    const qty = typeof item.stock_quantity === 'number' ? item.stock_quantity : parseInt(item.stock_quantity, 10);
-                    return !isNaN(qty) && qty > 0;
-                });
-
                 const existingSlugs = new Set();
-                const mapped = inStockRawItems
+                const mapped = rawItems
                     .map(item => mapInventoryToProduct(item, existingSlugs))
-                    .filter(p => p && Number(p.stockQuantity || 0) > 0);
+                    .filter(Boolean);
 
-                // Mark top 15 newest items
-                const sortedByDate = [...mapped].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+                // Mark top 15 newest items (among in-stock products)
+                const inStockItems = mapped.filter(p => Number(p.stockQuantity || 0) > 0);
+                const sortedByDate = [...inStockItems].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
                 sortedByDate.slice(0, 15).forEach(p => { p.isNew = true; });
 
                 // Mark bestsellers (by real sales count or high in-stock popularity)
-                const sortedBySales = [...mapped].sort((a, b) => (b.salesCount - a.salesCount) || (b.stockQuantity - a.stockQuantity));
+                const sortedBySales = [...inStockItems].sort((a, b) => (b.salesCount - a.salesCount) || (b.stockQuantity - a.stockQuantity));
                 sortedBySales.slice(0, 12).forEach(p => { p.isBestseller = true; });
 
                 productsDB = mapped;
@@ -396,9 +473,16 @@ const productsService = {
                 productSlugMap.clear();
                 productCodeMap.clear();
                 productsDB.forEach(p => {
-                    productSlugMap.set(p.slug, p);
+                    if (p.slug) {
+                        productSlugMap.set(p.slug.toLowerCase(), p);
+                        productSlugMap.set(p.slug, p);
+                    }
+                    if (p.product_slug) {
+                        productSlugMap.set(p.product_slug.toLowerCase(), p);
+                    }
                     if (p.productCode) {
                         productCodeMap.set(p.productCode.toUpperCase(), p);
+                        productSlugMap.set(p.productCode.toLowerCase(), p);
                     }
                     if (p.id) {
                         productSlugMap.set(p.id, p);
@@ -411,10 +495,10 @@ const productsService = {
                     localStorage.setItem('wishrite_inventory_sync_time', String(Date.now()));
                 } catch (e) { }
 
-                console.info(`✓ Loaded ${mapped.length} active products dynamically from WishRite Supabase database.`);
+                console.info(`✓ Loaded ${mapped.length} products dynamically from WishRite Supabase database.`);
 
                 // Automatically resolve images from Supabase Storage
-                // for every product using its product code.
+                // for every product using its product code or storage_folder.
                 if (typeof resolveProductImages === 'function') {
                     mapped.forEach(p => {
                         if (!p.productCode) return;
@@ -449,6 +533,9 @@ const productsService = {
                     }
                     if (typeof renderCollectionsPage === 'function' && typeof getCurrentView === 'function' && getCurrentView() === 'collections') {
                         renderCollectionsPage();
+                    }
+                    if (typeof renderKidsProductsList === 'function' && typeof getCurrentView === 'function' && getCurrentView() === 'kids') {
+                        renderKidsProductsList();
                     }
                 } catch (uiErr) { }
 
@@ -558,16 +645,24 @@ const productsService = {
         const s = String(slug).trim().toLowerCase();
         const found = productSlugMap.get(slug) ||
             productSlugMap.get(s) ||
-            productsDB.find(p => p && Number(p.stockQuantity || 0) > 0 && ((p.slug && p.slug.toLowerCase() === s) ||
+            productsDB.find(p => p && (
+                (p.slug && p.slug.toLowerCase() === s) ||
+                (p.product_slug && p.product_slug.toLowerCase() === s) ||
+                (p.productSlug && p.productSlug.toLowerCase() === s) ||
                 (p.productCode && p.productCode.toLowerCase() === s) ||
                 p.id === slug ||
-                (p.productCode && p.productCode.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() === s.replace(/[^a-zA-Z0-9]/g, '').toLowerCase())));
-        if (found && Number(found.stockQuantity || 0) > 0) return found;
+                (p.productCode && p.productCode.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() === s.replace(/[^a-zA-Z0-9]/g, '').toLowerCase())
+            ));
+        if (found) return found;
         if (typeof window.getOccasionShowcaseProducts === 'function') {
             const showcase = window.getOccasionShowcaseProducts();
-            return showcase.find(p => p && Number(p.stockQuantity || 0) > 0 && ((p.slug && p.slug.toLowerCase() === s) ||
+            return showcase.find(p => p && (
+                (p.slug && p.slug.toLowerCase() === s) ||
+                (p.product_slug && p.product_slug.toLowerCase() === s) ||
+                (p.productSlug && p.productSlug.toLowerCase() === s) ||
                 (p.productCode && p.productCode.toLowerCase() === s) ||
-                p.id === slug)) || null;
+                p.id === slug
+            )) || null;
         }
         return null;
     },
@@ -660,7 +755,6 @@ const productsService = {
 window.productsService = productsService;
 window.loadProductsFromInventory = () => productsService.ensureLoaded();
 window.getProductBySlug = (slug) => productsService.getProductBySlug(slug);
-window.productsService = productsService;
 window.getProductById = (id) => productsService.getProductById(id);
 window.getProductByCode = (code) => productsService.getProductByCode(code);
 window.getProductsByCategory = (cat) => productsService.getProductsByCategory(cat);
@@ -674,6 +768,59 @@ window.renderProductCard = createProductCardHTML;
 window.renderProductDetail = renderProductDetail;
 window.renderProductsToContainer = renderProductsToContainer;
 window.renderProductLoadingSkeletons = renderProductLoadingSkeletons;
+window.getProductVariants = getProductVariants;
+window.getDesignGroupVariants = getDesignGroupVariants;
+window.getVariantProduct = getVariantProduct;
+window.getVariantURL = getVariantURL;
+window.handleVariantSelection = handleVariantSelection;
+window.renderProductVariantSelector = renderProductVariantSelector;
+window.getKidsProducts = getKidsProducts;
+window.getKidsProductsByAudience = getKidsProductsByAudience;
+
+// ── Supabase Realtime Inventory Sync ──
+let inventoryRealtimeChannel = null;
+
+function initRealtimeInventorySync() {
+    const client = (typeof window.supabaseClient !== 'undefined' && window.supabaseClient)
+        ? window.supabaseClient
+        : (window.supabase ? window.supabase : null);
+
+    if (!client || typeof client.channel !== 'function') {
+        return null;
+    }
+
+    if (inventoryRealtimeChannel) {
+        return inventoryRealtimeChannel;
+    }
+
+    try {
+        inventoryRealtimeChannel = client
+            .channel('wishrite-inventory-realtime-sync')
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'inventory'
+                },
+                async (payload) => {
+                    console.log('[WishRite Inventory] Realtime update detected on table public.inventory:', payload.eventType);
+                    productsService.loadPromise = null;
+                    await productsService.ensureLoaded();
+                }
+            )
+            .subscribe((status) => {
+                if (status === 'SUBSCRIBED') {
+                    console.log('[WishRite Inventory] Subscribed to public.inventory realtime updates.');
+                }
+            });
+    } catch (err) {
+        console.warn('[WishRite Inventory] Realtime subscription notice:', err);
+    }
+
+    return inventoryRealtimeChannel;
+}
+window.initRealtimeInventorySync = initRealtimeInventorySync;
 
 /**
  * Render loading skeleton cards
@@ -698,14 +845,250 @@ function renderProductLoadingSkeletons(containerId, count = 8) {
     container.innerHTML = skeletonHTML;
 }
 
+// ════════════════════════════════════════════════════
+// PRODUCT DESIGN GROUP & VARIANT SYSTEM (PARTS 1-33)
+// ════════════════════════════════════════════════════
+
 /**
- * Create a product card HTML
+ * Get all variants for a given product's design_group and variant_type
  */
-function createProductCardHTML(product) {
-    // Requirement 6: Critical - Never show zero stock products anywhere on website
-    if (!product || Number(product.stockQuantity || 0) <= 0) {
+function getProductVariants(product) {
+    if (!product || !product.design_group) return [];
+    return getDesignGroupVariants(product.design_group, product.variant_type || 'alphabet');
+}
+
+/**
+ * Get all products matching a design_group and optional variant_type from productsDB
+ * Alphabet variants are strictly sorted A to Z (Part 21).
+ */
+function getDesignGroupVariants(designGroup, variantType) {
+    const db = (typeof window !== 'undefined' && Array.isArray(window.productsDB) && window.productsDB.length > 0)
+        ? window.productsDB
+        : (Array.isArray(productsDB) ? productsDB : []);
+
+    if (!designGroup || !db.length) return [];
+
+    const dg = String(designGroup).trim().toLowerCase();
+    const vType = (variantType || '').trim().toLowerCase();
+
+    const matches = db.filter(p => {
+        if (!p || !p.design_group) return false;
+        if (String(p.design_group).trim().toLowerCase() !== dg) return false;
+        if (vType && p.variant_type && p.variant_type.toLowerCase() !== vType) return false;
+        return true;
+    });
+
+    if (vType === 'alphabet') {
+        // Strict alphabetical sort A-Z by variant_value (Part 21)
+        matches.sort((a, b) => {
+            const valA = String(a.variant_value || a.variantValue || '').toUpperCase();
+            const valB = String(b.variant_value || b.variantValue || '').toUpperCase();
+            return valA.localeCompare(valB);
+        });
+    } else {
+        // Natural alphanumeric sort for size, color, finish, style, material, custom
+        matches.sort((a, b) => {
+            const valA = String(a.variant_value || a.variantValue || '');
+            const valB = String(b.variant_value || b.variantValue || '');
+            return valA.localeCompare(valB, undefined, { numeric: true, sensitivity: 'base' });
+        });
+    }
+
+    return matches;
+}
+
+/**
+ * Find variant product by variant_value within the same design_group
+ */
+function getVariantProduct(product, variantValue) {
+    if (!product || !product.design_group || !variantValue) return null;
+    const variants = getProductVariants(product);
+    const target = String(variantValue).trim().toUpperCase();
+    return variants.find(v => String(v.variant_value || v.variantValue || '').trim().toUpperCase() === target) || null;
+}
+
+/**
+ * Get clean URL for variant navigation
+ */
+function getVariantURL(product) {
+    if (!product) return '#';
+    const slug = product.product_slug || product.slug || product.productCode || product.id;
+    return `/product/${slug}`;
+}
+
+/**
+ * Navigate to selected variant product using existing website router
+ */
+function handleVariantSelection(target) {
+    if (!target) return;
+    if (typeof navigateTo === 'function') {
+        navigateTo('product', target);
+    } else {
+        window.location.hash = `#product/${target}`;
+    }
+}
+
+/**
+ * Render luxury Product Variant Selector HTML for PDP
+ * Directly placed below product image/gallery area (Part 4 & 22)
+ */
+function renderProductVariantSelector(product) {
+    if (!product || !product.design_group) {
         return '';
     }
+
+    if (product.variant_type && !product.variant_value) {
+        console.warn(`WishRite: Product variant configuration incomplete for ${product.productCode || product.id}`);
+        return '';
+    }
+
+    const variants = getProductVariants(product);
+    if (!variants || variants.length === 0) {
+        return '';
+    }
+
+    const variantType = (product.variant_type || 'alphabet').toLowerCase();
+
+    // ── Alphabet Selector (Available alphabets only) ──
+    if (variantType === 'alphabet') {
+        const currentLetter = String(product.variant_value || product.variantValue || '').trim().toUpperCase();
+
+        // Only include alphabets that are available and in-stock (stockQuantity > 0)
+        const availableVariants = variants.filter(v => {
+            const letter = String(v.variant_value || v.variantValue || '').trim().toUpperCase();
+            if (!letter) return false;
+            return Number(v.stockQuantity || 0) > 0;
+        });
+
+        // Do not render section if no letters are available
+        if (availableVariants.length === 0) {
+            return '';
+        }
+
+        // Strict alphabetical sort A to Z
+        availableVariants.sort((a, b) => {
+            const valA = String(a.variant_value || a.variantValue || '').toUpperCase();
+            const valB = String(b.variant_value || b.variantValue || '').toUpperCase();
+            return valA.localeCompare(valB);
+        });
+
+        const buttonsHTML = availableVariants.map(targetProd => {
+            const letter = String(targetProd.variant_value || targetProd.variantValue || '').trim().toUpperCase();
+            const isSelected = letter === currentLetter;
+            const targetKey = targetProd.product_slug || targetProd.slug || targetProd.productCode;
+            const selectedClass = isSelected ? 'selected active' : '';
+
+            return `
+                <button 
+                    type="button" 
+                    class="alphabet-btn ${selectedClass}" 
+                    onclick="handleVariantSelection('${targetKey}')" 
+                    aria-label="Select alphabet ${letter}" 
+                    aria-selected="${isSelected ? 'true' : 'false'}" 
+                    data-letter="${letter}" 
+                    data-product-code="${targetProd.productCode || ''}"
+                >
+                    <span class="letter-char">${letter}</span>
+                </button>
+            `;
+        }).join('');
+
+        return `
+            <div class="pdp-variant-section pdp-alphabet-section" data-design-group="${product.design_group}" data-variant-type="alphabet">
+                <div class="pdp-variant-header">
+                    <span class="pdp-variant-title">CHOOSE YOUR INITIAL</span>
+                    <span class="pdp-variant-subtitle">Personalize your style with your favorite letter</span>
+                </div>
+                <div class="pdp-alphabet-grid" role="group" aria-label="Choose your initial">
+                    ${buttonsHTML}
+                </div>
+                <div class="pdp-current-selection">
+                    <span class="current-label">CURRENT LETTER:</span>
+                    <span class="current-value">${currentLetter || 'A'}</span>
+                </div>
+            </div>
+        `;
+    }
+
+    // ── Generic Variant Selector (size, color, finish, style, material, custom) ──
+    const currentVal = String(product.variant_value || product.variantValue || '').trim();
+    const typeLabel = (product.variant_type || 'option').toUpperCase();
+
+    // Only show available (in-stock) variants
+    const availableVariants = variants.filter(v => Number(v.stockQuantity || 0) > 0);
+    if (availableVariants.length <= 1) {
+        return '';
+    }
+
+    const chipsHTML = availableVariants.map(v => {
+        const val = String(v.variant_value || v.variantValue || '').trim();
+        const isSelected = val.toLowerCase() === currentVal.toLowerCase();
+        const targetKey = v.product_slug || v.slug || v.productCode;
+        const selectedClass = isSelected ? 'selected active' : '';
+
+        return `
+            <button 
+                type="button" 
+                class="variant-chip ${selectedClass}" 
+                onclick="handleVariantSelection('${targetKey}')" 
+                aria-label="Select ${product.variant_type} ${val}" 
+                aria-selected="${isSelected ? 'true' : 'false'}" 
+                data-variant="${val}"
+            >
+                <span class="chip-text">${val}</span>
+            </button>
+        `;
+    }).join('');
+
+    return `
+        <div class="pdp-variant-section pdp-generic-variant-section" data-design-group="${product.design_group}" data-variant-type="${product.variant_type}">
+            <div class="pdp-variant-header">
+                <span class="pdp-variant-title">CHOOSE YOUR ${typeLabel}</span>
+                <span class="pdp-variant-subtitle">Select your preferred ${product.variant_type}</span>
+            </div>
+            <div class="pdp-chips-wrap" role="group" aria-label="Choose your ${product.variant_type}">
+                ${chipsHTML}
+            </div>
+            <div class="pdp-current-selection">
+                <span class="current-label">CURRENT SELECTION:</span>
+                <span class="current-value">${currentVal}</span>
+            </div>
+        </div>
+    `;
+}
+
+/**
+ * Filter and retrieve Kids products dynamically from database audience (Parts 15-17)
+ */
+function getKidsProducts() {
+    const db = (typeof window !== 'undefined' && Array.isArray(window.productsDB) && window.productsDB.length > 0)
+        ? window.productsDB
+        : (Array.isArray(productsDB) ? productsDB : []);
+
+    return db.filter(p => {
+        if (!p) return false;
+        const aud = (p.audience || '').trim();
+        return aud === 'Kids-Girl' || aud === 'Kids-Boy';
+    });
+}
+
+function getKidsProductsByAudience(audience) {
+    const db = (typeof window !== 'undefined' && Array.isArray(window.productsDB) && window.productsDB.length > 0)
+        ? window.productsDB
+        : (Array.isArray(productsDB) ? productsDB : []);
+
+    const aud = (audience || '').trim();
+    if (!aud || aud.toLowerCase() === 'all') {
+        return getKidsProducts();
+    }
+    return db.filter(p => (p.audience || '').trim() === aud);
+}
+
+/**
+ * Create a product card HTML (strictly hides out-of-stock items)
+ */
+function createProductCardHTML(product) {
+    if (!product || Number(product.stockQuantity || 0) <= 0) return '';
 
     const isWishlisted = typeof wishlist !== 'undefined' && wishlist.has(product.id);
 
@@ -739,6 +1122,8 @@ function createProductCardHTML(product) {
         `;
     }
 
+    const actionButtonHTML = `<button class="product-card-quick" onclick="addToCart('${product.id}', event)">Quick Add</button>`;
+
     return `
         <div class="product-card" data-product-code="${prodCode}" onclick="navigateTo('product', '${product.slug}')">
             <div class="product-card-image" data-product-code="${prodCode}">
@@ -759,7 +1144,7 @@ function createProductCardHTML(product) {
                 <button class="product-card-wishlist ${isWishlisted ? 'active' : ''}" onclick="toggleWishlist('${product.id}', event)" aria-label="${isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}">
                     ${ICONS.heart}
                 </button>
-                <button class="product-card-quick" onclick="addToCart('${product.id}', event)">Quick Add</button>
+                ${actionButtonHTML}
             </div>
             <div class="product-card-info">
                 <div class="product-card-meta-line">
@@ -800,15 +1185,18 @@ function renderProductsToContainer(products, containerId) {
         return;
     }
 
-    if (!products || !products.length) {
+    // Strictly filter out out-of-stock items so they are never displayed on the website
+    const availableProducts = (products || []).filter(p => p && Number(p.stockQuantity || 0) > 0);
+
+    if (!availableProducts.length) {
         container.innerHTML = '<p class="cart-empty" style="grid-column:1/-1;">No products found matching your criteria.</p>';
         return;
     }
 
-    container.innerHTML = products.map(createProductCardHTML).join('');
+    container.innerHTML = availableProducts.map(createProductCardHTML).filter(Boolean).join('');
 
     // Pre-attach resolved images if already present in product model
-    products.forEach(p => {
+    availableProducts.forEach(p => {
         if (p && p.productCode && Array.isArray(p.images) && p.images.length > 0) {
             const cardImages = container.querySelectorAll(`.product-card-image[data-product-code="${p.productCode}"]`);
             cardImages.forEach(el => {
@@ -957,6 +1345,10 @@ function renderProductDetail(product) {
         if (product.material) specsArr.push(`<tr><td>Precious Metal</td><td>${product.material}</td></tr>`);
         if (product.silverPurity) specsArr.push(`<tr><td>Silver Purity</td><td>${product.silverPurity} Standard</td></tr>`);
         if (product.category) specsArr.push(`<tr><td>Category</td><td>${product.category}</td></tr>`);
+        if (product.audience) {
+            const audLabel = product.audience === 'Kids-Girl' ? 'Kids (Girls)' : (product.audience === 'Kids-Boy' ? 'Kids (Boys)' : (product.audience === 'Female' ? 'Women' : product.audience));
+            specsArr.push(`<tr><td>Audience</td><td>${audLabel}</td></tr>`);
+        }
         if (product.finish) specsArr.push(`<tr><td>Finish</td><td>${product.finish}</td></tr>`);
         if (product.weight) specsArr.push(`<tr><td>Jewellery Weight</td><td>${product.weight}</td></tr>`);
         if (product.size) specsArr.push(`<tr><td>Size</td><td>${product.size}</td></tr>`);
@@ -1100,10 +1492,15 @@ height="2400"
 
                 <!-- Stock availability -->
                 <div class="pdp-stock-status">
-                    <span class="stock-badge in-stock"><span class="stock-dot"></span>${product.availability || 'In Stock'}</span>
+                    <span class="stock-badge ${product.stockQuantity > 0 ? (product.lowStock ? 'low-stock' : 'in-stock') : 'out-of-stock'}">
+                        <span class="stock-dot"></span>${product.availability || (product.stockQuantity > 0 ? 'In Stock' : 'Currently Unavailable')}
+                    </span>
                 </div>
 
                 <p class="pdp-short-desc">${product.shortDescription}</p>
+
+                <!-- Product Variant / Initial / Design Selector -->
+                ${renderProductVariantSelector(product)}
 
                 <div class="pdp-features">
                     ${featuresHTML}
@@ -1113,6 +1510,7 @@ height="2400"
                 ${pincodeHTML}
 
                 <!-- Customer Action Area -->
+                ${product.stockQuantity > 0 ? `
                 <div class="pdp-quantity">
                     <label for="pdp-qty">Quantity</label>
                     <div class="qty-controls">
@@ -1129,6 +1527,14 @@ height="2400"
                         ${ICONS.heart}
                     </button>
                 </div>
+                ` : `
+                <div class="pdp-actions">
+                    <button class="btn btn-primary btn-lg" onclick="openNotifyMeModal('${product.id}')">Notify Me When Available</button>
+                    <button class="pdp-wishlist-btn ${isWishlisted ? 'active' : ''}" onclick="toggleWishlist('${product.id}', event)" aria-label="${isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}">
+                        ${ICONS.heart}
+                    </button>
+                </div>
+                `}
 
                 <!-- Trust signals -->
                 ${trustSignalsHTML}
@@ -1154,8 +1560,12 @@ height="2400"
 
         <!-- Sticky Action Bar -->
         <div class="sticky-cta active" id="sticky-cta" aria-hidden="false">
-            <button class="btn btn-primary" onclick="addToCart('${product.id}', event)">ADD TO CART — ${formatPrice(product.sellingPrice)}</button>
-            <button class="btn btn-secondary" onclick="buyNowFromPDP('${product.id}')">BUY NOW</button>
+            ${product.stockQuantity > 0 ? `
+                <button class="btn btn-primary" onclick="addToCart('${product.id}', event)">ADD TO CART — ${formatPrice(product.sellingPrice)}</button>
+                <button class="btn btn-secondary" onclick="buyNowFromPDP('${product.id}')">BUY NOW</button>
+            ` : `
+                <button class="btn btn-primary" onclick="openNotifyMeModal('${product.id}')">NOTIFY ME WHEN AVAILABLE</button>
+            `}
         </div>
     `;
 }

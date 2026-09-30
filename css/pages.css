@@ -709,6 +709,226 @@
     font-size: var(--text-md);
 }
 
+/* ── Dedicated Hero Sections ── */
+.shop-hero.all-jewellery-hero,
+.shop-hero.collections-hero,
+.shop-hero.new-arrivals-hero,
+.shop-hero.best-sellers-hero,
+.shop-hero.kids-hero,
+.new-arrivals-hero {
+    position: relative;
+    min-height: 430px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+
+    background-color: #f8f6f3;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+
+.shop-hero.all-jewellery-hero::before,
+.shop-hero.collections-hero::before,
+.shop-hero.new-arrivals-hero::before,
+.shop-hero.best-sellers-hero::before,
+.shop-hero.kids-hero::before,
+.new-arrivals-hero::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: rgba(248, 246, 243, 0.45);
+    z-index: 0;
+}
+
+.shop-hero.all-jewellery-hero > *,
+.shop-hero.collections-hero > *,
+.shop-hero.new-arrivals-hero > *,
+.shop-hero.best-sellers-hero > *,
+.shop-hero.kids-hero > *,
+.new-arrivals-hero > * {
+    position: relative;
+    z-index: 1;
+}
+
+.shop-hero.all-jewellery-hero .container,
+.shop-hero.collections-hero .container,
+.shop-hero.new-arrivals-hero .container,
+.shop-hero.best-sellers-hero .container,
+.shop-hero.kids-hero .container,
+.new-arrivals-hero .container {
+    position: relative;
+    z-index: 2;
+    width: 100%;
+}
+
+.shop-hero.all-jewellery-hero,
+.all-jewellery-hero {
+    background-image: url("../assets/all-jewellery-hero.jpg");
+}
+
+.shop-hero.collections-hero,
+.collections-hero {
+    background-image: url("../assets/collections-hero.jpg");
+}
+
+.shop-hero.new-arrivals-hero,
+.new-arrivals-hero {
+    background-image: url("../assets/new-arrivals-hero.jpg");
+}
+
+.shop-hero.best-sellers-hero,
+.best-sellers-hero {
+    background-image: url("../assets/best-sellers-hero.jpg");
+}
+
+.shop-hero.kids-hero,
+.kids-hero {
+    background-image: url("../assets/kids-hero.jpg");
+    min-height: 650px;
+    height: auto;
+    padding-top: var(--space-16);
+    padding-bottom: var(--space-16);
+}
+
+/* ── Kids Hero Gender Panels ── */
+.kids-gender-panels {
+    width: 100%;
+    max-width: 760px;
+    margin: 28px auto 0;
+
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px;
+}
+
+.kids-gender-panel {
+    position: relative;
+    min-height: 230px;
+
+    padding: 0;
+    border: 0;
+    border-radius: 16px;
+
+    overflow: hidden;
+    cursor: pointer;
+
+    background: #eee8e2;
+
+    text-align: left;
+
+    box-shadow:
+        0 8px 30px rgba(55, 35, 30, 0.12);
+
+    transition:
+        transform 0.35s ease,
+        box-shadow 0.35s ease;
+}
+
+.kids-gender-panel:hover {
+    transform: translateY(-4px);
+
+    box-shadow:
+        0 16px 40px rgba(55, 35, 30, 0.18);
+}
+
+.kids-gender-panel.active {
+    box-shadow:
+        0 0 0 2px var(--wr-primary),
+        0 16px 40px rgba(55, 35, 30, 0.18);
+}
+
+.kids-gender-image {
+    position: absolute;
+    inset: 0;
+    display: block;
+}
+
+.kids-gender-image img {
+    width: 100%;
+    height: 100%;
+
+    object-fit: cover;
+    object-position: center;
+
+    display: block;
+
+    transition:
+        transform 0.6s ease;
+}
+
+.kids-gender-panel:hover .kids-gender-image img {
+    transform: scale(1.05);
+}
+
+.kids-gender-overlay {
+    position: absolute;
+    inset: 0;
+
+    background:
+        linear-gradient(
+            180deg,
+            rgba(0,0,0,0.02) 15%,
+            rgba(0,0,0,0.15) 45%,
+            rgba(45,25,25,0.72) 100%
+        );
+
+    z-index: 1;
+}
+
+.kids-gender-content {
+    position: absolute;
+
+    left: 24px;
+    right: 24px;
+    bottom: 22px;
+
+    display: flex;
+    flex-direction: column;
+
+    z-index: 2;
+
+    color: #fff;
+}
+
+.kids-gender-eyebrow {
+    font-size: 0.65rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+
+    margin-bottom: 5px;
+
+    opacity: 0.9;
+}
+
+.kids-gender-title {
+    font-family: var(--wr-font-heading);
+    font-size: 2rem;
+    line-height: 1.1;
+
+    margin-bottom: 7px;
+}
+
+.kids-gender-link {
+    font-family: var(--font-body);
+    font-size: 0.78rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+/* ── Kids Empty State ── */
+.kids-empty-state {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 60px 20px;
+    background: #FAF8F5;
+    border: 1px solid var(--wr-border-light);
+    border-radius: 8px;
+    margin: 20px auto;
+    max-width: 600px;
+}
+
 .shop-toolbar {
     display: flex;
     justify-content: space-between;
@@ -726,6 +946,41 @@
 .shop-toolbar-count {
     font-size: var(--text-sm);
     color: var(--wr-text-muted);
+}
+
+/* ── Kids Filter Pills ── */
+.kids-filter-pills {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #FAF7F5;
+    padding: 3px;
+    border-radius: 30px;
+    border: 1px solid rgba(94, 52, 53, 0.12);
+}
+
+.kids-filter-btn {
+    border: none;
+    background: transparent;
+    padding: 6px 16px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--wr-text-muted);
+    border-radius: 20px;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    user-select: none;
+}
+
+.kids-filter-btn:hover {
+    color: var(--wr-primary);
+}
+
+.kids-filter-btn.active {
+    background: var(--wr-primary);
+    color: #FFFFFF;
+    font-weight: 600;
+    box-shadow: 0 2px 8px rgba(94, 52, 53, 0.2);
 }
 
 .shop-toolbar-right {
@@ -1095,9 +1350,28 @@
    ABOUT PAGE
    ═══════════════════════════════════════════ */
 .about-hero {
+    position: relative;
     text-align: center;
     padding: var(--space-24) var(--container-padding);
-    background: var(--wr-bg-warm);
+    background-color: var(--wr-bg-warm);
+    background-image: url("../assets/about-hero.jpg");
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    overflow: hidden;
+}
+
+.about-hero::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: rgba(248, 246, 243, 0.45);
+    z-index: 0;
+}
+
+.about-hero > * {
+    position: relative;
+    z-index: 1;
 }
 
 .about-hero .sub-label {
@@ -3366,4 +3640,225 @@ body:not(.occasion-mode-active) .occasion-content-only {
 .care-grid.single-mode {
     max-width: 720px;
     margin: 0 auto;
+}
+
+/* ════════════════════════════════════════════════════════════
+   WISHRITE — PRODUCT DESIGN GROUP & VARIANT SELECTOR
+   Luxury Jewellery Alphabet & Option Selector (Parts 4, 22, 23)
+   Brand Maroon: #5e3435 | Pure White: #FFFFFF
+   ════════════════════════════════════════════════════════════ */
+.pdp-variant-section {
+    margin-top: var(--space-5, 20px);
+    padding: 18px 20px;
+    background: #FAF7F5;
+    border: 1px solid rgba(94, 52, 53, 0.16);
+    border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(94, 52, 53, 0.04);
+}
+
+.pdp-info .pdp-variant-section {
+    margin: 18px 0 22px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.pdp-gallery .pdp-variant-section {
+    grid-column: 1 / -1;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.pdp-variant-header {
+    margin-bottom: 12px;
+    text-align: left;
+}
+
+.pdp-variant-title {
+    display: block;
+    font-family: var(--font-display, Georgia, serif);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #5e3435;
+    margin-bottom: 3px;
+}
+
+.pdp-variant-subtitle {
+    display: block;
+    font-size: 11.5px;
+    color: var(--wr-text-muted, #71717A);
+    letter-spacing: 0.03em;
+}
+
+/* Alphabet Button Grid (Available Alphabets Only) */
+.pdp-alphabet-grid {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin: 12px 0 14px;
+}
+
+.alphabet-btn {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    min-height: 44px;
+    min-width: 44px;
+    padding: 0;
+    background: #FFFFFF;
+    color: #5e3435;
+    border: 1px solid #5e3435;
+    border-radius: 4px;
+    font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 0 1px 2px rgba(94, 52, 53, 0.06);
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.alphabet-btn:hover:not(.disabled):not(:disabled) {
+    background: rgba(94, 52, 53, 0.9);
+    color: #FFFFFF;
+    border-color: #5e3435;
+    transform: translateY(-1px);
+    box-shadow: 0 3px 8px rgba(94, 52, 53, 0.22);
+}
+
+.alphabet-btn:focus-visible {
+    outline: 2px solid #5e3435;
+    outline-offset: 2px;
+}
+
+/* Active / Selected Letter */
+.alphabet-btn.selected,
+.alphabet-btn.active {
+    background: #5e3435 !important;
+    color: #FFFFFF !important;
+    border-color: #5e3435 !important;
+    box-shadow: 0 2px 8px rgba(94, 52, 53, 0.36) !important;
+    font-weight: 700;
+}
+
+/* Hide disabled or missing letters completely */
+.alphabet-btn.disabled,
+.alphabet-btn.missing,
+.alphabet-btn:disabled {
+    display: none !important;
+}
+
+.variant-stock-dot {
+    position: absolute;
+    top: 2px;
+    right: 4px;
+    font-size: 14px;
+    line-height: 1;
+    color: #D97706;
+}
+
+.pdp-current-selection {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-top: 10px;
+    border-top: 1px dashed rgba(94, 52, 53, 0.2);
+    font-size: 11.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.pdp-current-selection .current-label {
+    color: var(--wr-text-muted, #71717A);
+    font-weight: 500;
+}
+
+.pdp-current-selection .current-value {
+    color: #5e3435;
+    font-weight: 700;
+    font-size: 13.5px;
+}
+
+/* Generic Variant Chips (Size, Color, Finish, Style, Material, Custom) */
+.pdp-chips-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 12px 0 14px;
+}
+
+.variant-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 42px;
+    padding: 8px 16px;
+    background: #FFFFFF;
+    color: #5e3435;
+    border: 1px solid #5e3435;
+    border-radius: 4px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 2px rgba(94, 52, 53, 0.06);
+    user-select: none;
+}
+
+.variant-chip:hover:not(:disabled) {
+    background: rgba(94, 52, 53, 0.9);
+    color: #FFFFFF;
+    border-color: #5e3435;
+    transform: translateY(-1px);
+}
+
+.variant-chip.selected,
+.variant-chip.active {
+    background: #5e3435 !important;
+    color: #FFFFFF !important;
+    border-color: #5e3435 !important;
+    box-shadow: 0 2px 8px rgba(94, 52, 53, 0.35);
+}
+
+.variant-chip .chip-stock-note {
+    font-size: 10px;
+    padding: 1px 5px;
+    background: rgba(217, 119, 6, 0.15);
+    color: #B45309;
+    border-radius: 2px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.variant-chip.selected .chip-stock-note {
+    background: rgba(255, 255, 255, 0.25);
+    color: #FFFFFF;
+}
+
+/* Product Card Out-of-Stock Badge & Notify Button (Part 18) */
+.product-card-badge.badge-soldout {
+    background: #334155;
+    color: #FFFFFF;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    letter-spacing: 0.08em;
+}
+
+.product-card-quick.product-card-notify {
+    background: rgba(51, 65, 85, 0.96);
+    color: #FFFFFF;
+}
+
+.product-card-quick.product-card-notify:hover {
+    background: #1E293B;
+}
+
+.product-card.is-out-of-stock .product-card-image img {
+    opacity: 0.88;
 }
