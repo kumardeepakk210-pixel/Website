@@ -819,7 +819,7 @@
             <!-- ═══ 0. OCCASION BACKGROUND ARTWORK LAYER (Sections 2-9) ═══ -->
             ${bgConfig.artwork ? `
             <div class="festive-background-artwork" aria-hidden="true" style="
-                background-image: url('${bgConfig.artwork}');
+                background-image: url('${(bgConfig.artwork.startsWith('http') || bgConfig.artwork.startsWith('/')) ? bgConfig.artwork : '/' + bgConfig.artwork}');
                 --festive-bg-opacity: ${bgConfig.opacity !== undefined ? bgConfig.opacity : 0.08};
                 --festive-bg-pos: ${bgConfig.position || 'right center'};
                 --festive-bg-size: ${bgConfig.size || 'contain'};

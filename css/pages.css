@@ -858,6 +858,14 @@
         transform 0.6s ease;
 }
 
+.kids-gender-image.image-missing {
+    background: #eee8e2;
+}
+
+.kids-gender-image.image-missing img {
+    opacity: 0;
+}
+
 .kids-gender-panel:hover .kids-gender-image img {
     transform: scale(1.05);
 }
@@ -946,41 +954,6 @@
 .shop-toolbar-count {
     font-size: var(--text-sm);
     color: var(--wr-text-muted);
-}
-
-/* ── Kids Filter Pills ── */
-.kids-filter-pills {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    background: #FAF7F5;
-    padding: 3px;
-    border-radius: 30px;
-    border: 1px solid rgba(94, 52, 53, 0.12);
-}
-
-.kids-filter-btn {
-    border: none;
-    background: transparent;
-    padding: 6px 16px;
-    font-size: 0.85rem;
-    font-weight: 500;
-    color: var(--wr-text-muted);
-    border-radius: 20px;
-    cursor: pointer;
-    transition: all 0.25s ease;
-    user-select: none;
-}
-
-.kids-filter-btn:hover {
-    color: var(--wr-primary);
-}
-
-.kids-filter-btn.active {
-    background: var(--wr-primary);
-    color: #FFFFFF;
-    font-weight: 600;
-    box-shadow: 0 2px 8px rgba(94, 52, 53, 0.2);
 }
 
 .shop-toolbar-right {

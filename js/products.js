@@ -209,36 +209,38 @@ function mapInventoryToProduct(item, existingSlugs = new Set()) {
         : null;
 
     // Target Audience & Gender mapping from database schema: 'Female', 'Men', 'Kids-Girl', 'Kids-Boy'
-    let gender = '';
-    let targetGender = '';
-    let ageGroup = 'adult';
-    let targetAudience = 'women';
+    const rawGender = item.gender || item.target_gender || '';
+    const rawTargetGender = item.target_gender || item.gender || '';
+    const rawAgeGroup = item.age_group || item.target_audience || '';
+    const rawTargetAudience = item.target_audience || item.age_group || '';
 
-    if (audience === 'Female') {
-        gender = 'female';
-        targetGender = 'female';
-        ageGroup = 'adult';
-        targetAudience = 'women';
-    } else if (audience === 'Men') {
-        gender = 'men';
-        targetGender = 'male';
-        ageGroup = 'adult';
-        targetAudience = 'men';
-    } else if (audience === 'Kids-Girl') {
-        gender = 'girls';
-        targetGender = 'female';
-        ageGroup = 'kids';
-        targetAudience = 'kids';
-    } else if (audience === 'Kids-Boy') {
-        gender = 'boys';
-        targetGender = 'male';
-        ageGroup = 'kids';
-        targetAudience = 'kids';
-    } else {
-        gender = item.gender || item.target_gender || '';
-        targetGender = item.target_gender || item.gender || '';
-        ageGroup = item.age_group || item.target_audience || 'adult';
-        targetAudience = item.target_audience || item.age_group || '';
+    let gender = rawGender;
+    let targetGender = rawTargetGender;
+    let ageGroup = rawAgeGroup;
+    let targetAudience = rawTargetAudience;
+
+    if (!gender && !targetGender) {
+        if (audience === 'Female') {
+            gender = 'female';
+            targetGender = 'female';
+            ageGroup = ageGroup || 'adult';
+            targetAudience = targetAudience || 'women';
+        } else if (audience === 'Men') {
+            gender = 'men';
+            targetGender = 'male';
+            ageGroup = ageGroup || 'adult';
+            targetAudience = targetAudience || 'men';
+        } else if (audience === 'Kids-Girl') {
+            gender = 'girls';
+            targetGender = 'female';
+            ageGroup = ageGroup || 'kids';
+            targetAudience = targetAudience || 'kids';
+        } else if (audience === 'Kids-Boy') {
+            gender = 'boys';
+            targetGender = 'male';
+            ageGroup = ageGroup || 'kids';
+            targetAudience = targetAudience || 'kids';
+        }
     }
 
     // Deterministic slug (Part 11: clean product URLs from product_slug if available, otherwise deterministic fallback)
@@ -310,10 +312,10 @@ function mapInventoryToProduct(item, existingSlugs = new Set()) {
         productSlug: productSlug,
         catalog_type: catalogType,
         audience: audience,
-        gender: gender,
-        target_gender: targetGender,
-        age_group: ageGroup,
-        target_audience: targetAudience,
+        gender: item.gender || item.target_gender || gender || '',
+        target_gender: item.target_gender || item.gender || targetGender || '',
+        age_group: item.age_group || item.target_audience || ageGroup || '',
+        target_audience: item.target_audience || item.age_group || targetAudience || '',
         storage_folder: storageFolder,
         storageFolder: storageFolder,
         purchase_price: purchasePrice,
@@ -539,9 +541,12 @@ const productsService = {
                     }
                 } catch (uiErr) { }
 
-                return productsDB;
             } catch (err) {
-                console.error('Supabase inventory sync error:', err);
+                console.error(
+                    `[WishRite] Product loading failed\n` +
+                    `[WishRite] API URL: ${WR_SUPABASE_URL}/rest/v1/inventory\n` +
+                    `[WishRite] Error: ${err.message || err}`
+                );
                 this.error = err;
                 inventorySyncError = err;
 
@@ -656,14 +661,26 @@ const productsService = {
         if (found) return found;
         if (typeof window.getOccasionShowcaseProducts === 'function') {
             const showcase = window.getOccasionShowcaseProducts();
-            return showcase.find(p => p && (
+            const foundShowcase = showcase.find(p => p && (
                 (p.slug && p.slug.toLowerCase() === s) ||
                 (p.product_slug && p.product_slug.toLowerCase() === s) ||
                 (p.productSlug && p.productSlug.toLowerCase() === s) ||
                 (p.productCode && p.productCode.toLowerCase() === s) ||
                 p.id === slug
-            )) || null;
+            ));
+            if (foundShowcase) return foundShowcase;
         }
+
+        // Robust fallback: Check if slug contains or ends with a product code pattern (e.g. "...pdt-0017")
+        const codeMatch = s.match(/(?:^|[-_])([a-z]{2,5}[-_]?[0-9]{3,5})(?:[-_]|$)/i);
+        if (codeMatch) {
+            const codeCandidate = codeMatch[1].replace(/[-_]/g, '').toLowerCase();
+            const matchedByCode = productsDB.find(p => p && p.productCode &&
+                p.productCode.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() === codeCandidate
+            );
+            if (matchedByCode) return matchedByCode;
+        }
+
         return null;
     },
 

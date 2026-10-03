@@ -283,6 +283,11 @@ async function handleProductViewNavigation(param, targetView, pushHistory = true
             } catch (e) {}
         }
     } else {
+        console.error(
+            `[WishRite] Product loading failed\n` +
+            `[WishRite] Slug: ${param}\n` +
+            `[WishRite] HTTP status: 404`
+        );
         unmountStickyCTA();
         document.body.classList.remove('view-product');
         targetView.innerHTML = `

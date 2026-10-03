@@ -405,6 +405,8 @@
             };
         }
 
+        let usedFolder = cleanFolder;
+
         try {
             console.info(
                 `[WishRite Images] Checking Storage folder: product-images/${cleanFolder}/`
@@ -444,12 +446,13 @@
                 if (fallbackRes.data && fallbackRes.data.length > 0) {
                     data = fallbackRes.data;
                     error = fallbackRes.error;
+                    usedFolder = cleanCode;
                 }
             }
 
             if (error) {
                 console.error(
-                    `[WishRite Images] Storage listing failed for ${cleanFolder}:`,
+                    `[WishRite] Product image listing failed for ${usedFolder}:`,
                     error
                 );
 
@@ -483,17 +486,19 @@
                         file,
                         cleanCode,
                         index,
-                        cleanFolder
+                        usedFolder
                     )
                 );
 
             console.info(
-                `[WishRite Images] ${cleanCode} (${cleanFolder}): found ${images.length} image(s).`
+                `[WishRite Images] ${cleanCode} (${usedFolder}): found ${images.length} image(s).`
             );
 
             if (images.length === 0) {
                 console.warn(
-                    `[WishRite Images] No image files found in product-images/${cleanFolder}/`
+                    `[WishRite] Product image loading failed\n` +
+                    `[WishRite] Product code: ${cleanCode}\n` +
+                    `[WishRite] Storage folder: ${usedFolder}`
                 );
             }
 
@@ -504,7 +509,10 @@
 
         } catch (error) {
             console.error(
-                `[WishRite Images] Unexpected Storage error for ${cleanCode}:`,
+                `[WishRite] Product image loading failed\n` +
+                `[WishRite] Product code: ${cleanCode}\n` +
+                `[WishRite] Storage folder: ${usedFolder}\n` +
+                `[WishRite] Error: ${error.message || error}`,
                 error
             );
 
