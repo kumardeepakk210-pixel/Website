@@ -639,67 +639,91 @@ function getFilteredKidsProducts(filter = 'all') {
 
     const kidsKeywords = (typeof KIDS_PRODUCT_CONFIG !== 'undefined' && Array.isArray(KIDS_PRODUCT_CONFIG.kidsKeywords))
         ? KIDS_PRODUCT_CONFIG.kidsKeywords
-        : ['kid', 'kids', 'child', 'children', 'baby', 'toddler', 'nazariya', 'little', 'peppa', 'elephant', 'penguin', 'strawberry'];
+        : ['kid', 'kids', 'child', 'children', 'baby', 'toddler', 'nazariya', 'little'];
+
+    const normalizeGender = value =>
+        String(value || '')
+            .trim()
+            .toLowerCase()
+            .replace(/[_-]/g, ' ')
+            .replace(/\s+/g, ' ');
+
+    const BOY_GENDERS = new Set(['boy', 'boys', 'male', 'little boy', 'little boys']);
+    const GIRL_GENDERS = new Set(['girl', 'girls', 'female', 'little girl', 'little girls']);
 
     // Filter products belonging to Kids (only in-stock products)
     const allKids = db.filter(p => {
         if (!p || Number(p.stockQuantity || 0) <= 0) return false;
         if (typeof isSilverJewelleryProduct === 'function' && !isSilverJewelleryProduct(p)) return false;
 
+        // Explicit config mappings
+        const pCode = (p.productCode || p.code || p.id || '').trim();
+        if (typeof KIDS_PRODUCT_CONFIG !== 'undefined') {
+            if (Array.isArray(KIDS_PRODUCT_CONFIG.productCodes) && KIDS_PRODUCT_CONFIG.productCodes.includes(pCode)) return true;
+            if (Array.isArray(KIDS_PRODUCT_CONFIG.boys) && KIDS_PRODUCT_CONFIG.boys.includes(pCode)) return true;
+            if (Array.isArray(KIDS_PRODUCT_CONFIG.girls) && KIDS_PRODUCT_CONFIG.girls.includes(pCode)) return true;
+        }
+
         // Primary source of truth: database audience
         const aud = (p.audience || '').trim();
         if (aud === 'Kids-Girl' || aud === 'Kids-Boy') return true;
         if (aud.toLowerCase().includes('kid')) return true;
 
-        // Metadata & Keyword checks
+        // Category contains: kids, kid, children, child, baby, toddler, little
+        const cat = String(p.category || '').toLowerCase();
+        const rawCat = String(p.rawCategory || '').toLowerCase();
+        const isKidsCategory = ['kids', 'kid', 'children', 'child', 'baby', 'toddler', 'little'].some(k => 
+            cat.includes(k) || rawCat.includes(k)
+        );
+        if (isKidsCategory) return true;
+
+        // age_group / target_audience contains Kids/Children/Baby
+        const ageGroup = String(p.age_group || p.target_audience || '').toLowerCase();
+        const targetAudience = String(p.target_audience || p.age_group || '').toLowerCase();
+        if (['kids', 'children', 'baby', 'child', 'toddler'].some(k => ageGroup.includes(k) || targetAudience.includes(k))) return true;
+
+        // gender contains Boys/Girls when product is clearly part of Kids inventory
+        const gender = normalizeGender(p.gender || p.target_gender || '');
+        const targetGender = normalizeGender(p.target_gender || p.gender || '');
+        const hasGenderTag = BOY_GENDERS.has(gender) || BOY_GENDERS.has(targetGender) || GIRL_GENDERS.has(gender) || GIRL_GENDERS.has(targetGender);
+
         const name = (p.name || p.product_name || '').toLowerCase();
         const desc = (p.description || p.product_description || '').toLowerCase();
-        const cat = (p.category || '').toLowerCase();
-        const rawCat = (p.rawCategory || '').toLowerCase();
-        const gender = (p.gender || p.target_gender || '').toLowerCase();
-        const ageGroup = (p.age_group || p.target_audience || '').toLowerCase();
+        const hasKidsKeyword = kidsKeywords.some(kw => name.includes(kw) || desc.includes(kw));
 
-        if (ageGroup === 'kids' || ageGroup === 'children' || ageGroup === 'baby') return true;
-        if (gender === 'kids' || gender === 'boys' || gender === 'girls') return true;
-
-        if (kidsKeywords.some(kw => name.includes(kw) || cat.includes(kw) || rawCat.includes(kw) || desc.includes(kw))) {
-            return true;
-        }
+        if (hasGenderTag && hasKidsKeyword) return true;
+        if (hasKidsKeyword) return true;
 
         return false;
     });
 
     if (filter === 'boys') {
         return allKids.filter(p => {
+            const pCode = (p.productCode || p.code || p.id || '').trim();
+            if (typeof KIDS_PRODUCT_CONFIG !== 'undefined' && Array.isArray(KIDS_PRODUCT_CONFIG.boys) && KIDS_PRODUCT_CONFIG.boys.includes(pCode)) {
+                return true;
+            }
             const aud = (p.audience || '').trim();
             if (aud === 'Kids-Boy') return true;
-            if (aud === 'Kids-Girl') {
-                const name = (p.name || p.product_name || '').toLowerCase();
-                if (name.includes('baby kada') || name.includes('baby ball chain') || name.includes('nazariya') || name.includes('kada')) {
-                    return true;
-                }
-                return false;
-            }
-            const gender = (p.gender || p.target_gender || '').toLowerCase();
-            const name = (p.name || p.product_name || '').toLowerCase();
-            return gender === 'boy' || gender === 'boys' || gender === 'male' || name.includes('boy') || name.includes('kada') || name.includes('chain') || name.includes('penguin') || name.includes('elephant');
+
+            const gender = normalizeGender(p.gender || p.target_gender || '');
+            const targetGender = normalizeGender(p.target_gender || '');
+            return BOY_GENDERS.has(gender) || BOY_GENDERS.has(targetGender);
         });
     }
 
     if (filter === 'girls') {
         return allKids.filter(p => {
+            const pCode = (p.productCode || p.code || p.id || '').trim();
+            if (typeof KIDS_PRODUCT_CONFIG !== 'undefined' && Array.isArray(KIDS_PRODUCT_CONFIG.girls) && KIDS_PRODUCT_CONFIG.girls.includes(pCode)) {
+                return true;
+            }
             const aud = (p.audience || '').trim();
             if (aud === 'Kids-Girl') return true;
-            if (aud === 'Kids-Boy') {
-                const name = (p.name || p.product_name || '').toLowerCase();
-                if (name.includes('baby kada') || name.includes('baby ball chain') || name.includes('nazariya') || name.includes('kada')) {
-                    return true;
-                }
-                return false;
-            }
-            const gender = (p.gender || p.target_gender || '').toLowerCase();
-            const name = (p.name || p.product_name || '').toLowerCase();
-            return gender === 'girl' || gender === 'girls' || gender === 'female' || name.includes('girl') || name.includes('payel') || name.includes('balli') || name.includes('stud') || name.includes('bracelet');
+
+            const gender = normalizeGender(p.gender || p.target_gender || '');
+            const targetGender = normalizeGender(p.target_gender || '');
+            return GIRL_GENDERS.has(gender) || GIRL_GENDERS.has(targetGender);
         });
     }
 
@@ -713,15 +737,29 @@ window.getFilteredKidsProducts = getFilteredKidsProducts;
 function setKidsFilter(filter) {
     currentKidsFilter = filter || 'all';
 
-    // Update active state and aria-pressed on filter buttons and panels
-    document.querySelectorAll('.kids-filter-btn, .kids-gender-panel').forEach(btn => {
+    // Update active state and aria-pressed on kids gender panels
+    document.querySelectorAll('.kids-gender-panel').forEach(btn => {
         const btnFilter = btn.getAttribute('data-kids-filter');
-        const isActive = btnFilter === currentKidsFilter;
+        const isActive = (btnFilter === currentKidsFilter);
         btn.classList.toggle('active', isActive);
         btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
     });
 
     renderKidsProductsList();
+
+    // Smoothly scroll to product section with header offset
+    if (filter === 'boys' || filter === 'girls') {
+        const targetEl = document.getElementById('kids-grid');
+        if (targetEl) {
+            const headerHeight = document.querySelector('.header')?.offsetHeight || 75;
+            const elementPosition = targetEl.getBoundingClientRect().top;
+            const offsetPosition = elementPosition + window.pageYOffset - headerHeight - 16;
+            window.scrollTo({
+                top: Math.max(0, offsetPosition),
+                behavior: 'smooth'
+            });
+        }
+    }
 }
 window.setKidsFilter = setKidsFilter;
 
@@ -738,9 +776,9 @@ function renderKidsProductsList() {
     // Update count display dynamically
     if (countEl) {
         if (currentKidsFilter === 'boys') {
-            countEl.textContent = `Showing ${products.length} Little Boys Pieces`;
+            countEl.textContent = `Showing ${products.length} Boys Pieces`;
         } else if (currentKidsFilter === 'girls') {
-            countEl.textContent = `Showing ${products.length} Little Girls Pieces`;
+            countEl.textContent = `Showing ${products.length} Girls Pieces`;
         } else {
             countEl.textContent = `Showing ${products.length} Kids Pieces`;
         }
@@ -750,11 +788,11 @@ function renderKidsProductsList() {
         let emptyTitle = "No pieces available yet.";
         let emptyDesc = "Adorable jewellery for little ones is coming soon to WishRite.";
         if (currentKidsFilter === 'boys') {
-            emptyTitle = "Little Boys pieces are coming soon.";
-            emptyDesc = "Thoughtfully crafted silver treasures for little boys will be arriving soon.";
+            emptyTitle = "Boys Jewellery Coming Soon";
+            emptyDesc = "Thoughtfully crafted silver treasures for boys will be arriving soon.";
         } else if (currentKidsFilter === 'girls') {
-            emptyTitle = "Little Girls pieces are coming soon.";
-            emptyDesc = "Delicate silver pieces crafted for little girls will be arriving soon.";
+            emptyTitle = "Girls Jewellery Coming Soon";
+            emptyDesc = "Delicate silver pieces crafted for girls will be arriving soon.";
         }
 
         gridEl.innerHTML = `
@@ -780,14 +818,12 @@ function renderKidsProductsList() {
  * Render dedicated Kids storefront view
  */
 async function renderKidsPage() {
-    // Reset to default ALL KIDS on entry
+    // Reset to default ALL KIDS on entry (neither panel active)
     currentKidsFilter = 'all';
 
-    document.querySelectorAll('.kids-filter-btn, .kids-gender-panel').forEach(btn => {
-        const btnFilter = btn.getAttribute('data-kids-filter');
-        const isActive = btnFilter === 'all';
-        btn.classList.toggle('active', isActive);
-        btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+    document.querySelectorAll('.kids-gender-panel').forEach(btn => {
+        btn.classList.remove('active');
+        btn.setAttribute('aria-pressed', 'false');
     });
 
     const countEl = document.getElementById('kids-count');
