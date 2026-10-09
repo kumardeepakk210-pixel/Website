@@ -1,0 +1,952 @@
+/* ============================================
+   WISHRITE — RESPONSIVE
+   Mobile-first breakpoints 320px → 1920px
+   ============================================ */
+
+/* ── Tablet (≤ 1024px) ── */
+@media (max-width: 1024px) {
+    .product-grid {
+        grid-template-columns: repeat(3, 1fr);
+        gap: var(--space-5);
+    }
+
+    .categories-grid {
+        grid-template-columns: repeat(3, 1fr);
+        gap: var(--space-3);
+    }
+
+    .occasions-grid {
+        grid-template-columns: repeat(3, 1fr);
+        gap: var(--space-5);
+    }
+
+    .why-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: var(--space-5);
+    }
+
+    .editorial-content {
+        padding: var(--space-10);
+    }
+
+    .footer-grid {
+        grid-template-columns: 1fr 1fr;
+        gap: var(--space-8);
+    }
+
+    .pdp-layout {
+        gap: var(--space-8);
+    }
+
+    .about-philosophy {
+        gap: var(--space-5);
+    }
+
+    .shop-main .product-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+/* ── Tablet Small (≤ 768px) ── */
+@media (max-width: 768px) {
+    :root {
+        --text-5xl: 2.5rem;
+        --text-4xl: 2rem;
+        --text-3xl: 1.75rem;
+    }
+
+    .section {
+        padding: var(--space-16) var(--container-padding);
+    }
+
+    /* Header */
+    .header-nav {
+        display: none;
+    }
+
+    .mobile-menu-toggle {
+        display: flex;
+    }
+
+    .header-actions {
+        gap: var(--space-3);
+    }
+
+    .header-icon {
+        width: 32px;
+        height: 32px;
+    }
+
+    .header-icon svg {
+        width: 18px;
+        height: 18px;
+    }
+
+    /* Hero */
+    .hero {
+        height: 100svh;
+        min-height: 640px;
+    }
+
+    .hero-container {
+        padding: 0 var(--container-padding);
+        padding-top: 60px;
+    }
+
+    .hero-title {
+        font-size: clamp(2.4rem, 6vw, 3.8rem);
+    }
+
+    .hero-description {
+        font-size: var(--text-sm);
+        margin-bottom: 28px;
+    }
+
+    .hero-arrow {
+        display: none;
+    }
+
+    /* Category Grid */
+    .categories-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    /* Products */
+    .product-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: var(--space-4);
+    }
+
+    .product-scroll .product-card {
+        min-width: 220px;
+    }
+
+    /* Occasions */
+    .occasions-grid {
+        grid-template-columns: repeat(3, 1fr);
+        gap: var(--space-4);
+    }
+
+    /* Editorial */
+    .editorial-section {
+        grid-template-columns: 1fr;
+    }
+
+    .editorial-image {
+        min-height: 300px;
+    }
+
+    .editorial-content {
+        padding: var(--space-10) var(--container-padding);
+    }
+
+    /* Trust Bar (Tablet: 2x2 grid) */
+    .trust-bar {
+        padding: var(--space-7) 0;
+    }
+
+    .trust-bar-container {
+        grid-template-columns: repeat(2, 1fr);
+        row-gap: var(--space-6);
+        column-gap: var(--space-4);
+        max-width: 700px;
+        margin: 0 auto;
+    }
+
+    .trust-badge {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 10px 16px;
+    }
+
+    .trust-badge:not(:last-child)::after {
+        display: none;
+    }
+
+    .trust-badge:nth-child(odd)::after {
+        display: block;
+        content: '';
+        position: absolute;
+        right: 0;
+        top: 15%;
+        height: 70%;
+        width: 1px;
+        background: var(--wr-border-light);
+    }
+
+    .trust-badge-icon {
+        margin: 0 auto 10px auto;
+    }
+
+    .trust-badge-content {
+        align-items: center;
+        text-align: center;
+    }
+
+    .trust-badge-title {
+        text-align: center;
+        white-space: normal;
+    }
+
+    .trust-badge-sub {
+        text-align: center;
+    }
+
+    /* Trust */
+    .trust-section {
+        justify-content: center;
+        gap: var(--space-6);
+        padding: var(--space-8) var(--container-padding);
+    }
+
+    /* Why Grid */
+    .why-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: var(--space-4);
+    }
+
+    /* Shop */
+    .shop-sidebar {
+        display: none;
+    }
+
+    .shop-filter-btn {
+        display: flex;
+    }
+
+    .shop-main .product-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .shop-content {
+        padding: var(--space-6) var(--container-padding);
+    }
+
+    .shop-hero.all-jewellery-hero,
+    .shop-hero.collections-hero,
+    .shop-hero.new-arrivals-hero,
+    .shop-hero.best-sellers-hero,
+    .shop-hero.kids-hero,
+    .new-arrivals-hero {
+        min-height: 360px;
+        background-size: cover;
+        background-position: center;
+    }
+
+    .shop-hero.all-jewellery-hero::before,
+    .shop-hero.collections-hero::before,
+    .shop-hero.new-arrivals-hero::before,
+    .shop-hero.best-sellers-hero::before,
+    .shop-hero.kids-hero::before,
+    .new-arrivals-hero::before {
+        background: rgba(248, 246, 243, 0.60);
+    }
+
+    .shop-hero.kids-hero,
+    .kids-hero {
+        min-height: 720px;
+        height: auto;
+        padding-top: var(--space-10);
+        padding-bottom: var(--space-10);
+    }
+
+    .kids-gender-panels {
+        grid-template-columns: 1fr;
+        gap: 12px;
+        max-width: 100%;
+    }
+
+    .kids-gender-panel {
+        min-height: 210px;
+    }
+
+    .kids-gender-title {
+        font-size: 1.7rem;
+    }
+
+    /* PDP */
+    .pdp-layout {
+        grid-template-columns: 1fr;
+        gap: var(--space-4);
+        padding: 0;
+    }
+
+    .pdp-gallery {
+        position: relative;
+        top: 0;
+    }
+
+    .pdp-main-image {
+        aspect-ratio: 1/1;
+        margin-bottom: var(--space-2);
+    }
+
+    .pdp-thumbnails {
+        padding: 0 var(--space-4);
+        gap: var(--space-2);
+    }
+
+    .pdp-thumbnail {
+        width: 60px;
+        height: 60px;
+    }
+
+    .pdp-info {
+        padding: var(--space-4) var(--container-padding) var(--space-16);
+    }
+
+    .pdp-name {
+        font-size: var(--text-2xl);
+    }
+
+    .pdp-trust {
+        flex-wrap: wrap;
+        gap: var(--space-3);
+    }
+
+    .pdp-actions {
+        flex-direction: column;
+    }
+
+    /* Sticky CTA on mobile (strictly only when active on PDP) */
+    .sticky-cta {
+        display: none !important;
+    }
+
+    body.view-product #product-view .sticky-cta.active,
+    body.view-product .sticky-cta.active {
+        display: flex !important;
+    }
+
+    body:not(.view-product) .sticky-cta {
+        display: none !important;
+    }
+
+    /* About */
+    .about-philosophy {
+        grid-template-columns: 1fr;
+    }
+
+    .about-hero {
+        padding: var(--space-16) var(--container-padding);
+    }
+
+    /* Footer */
+    .footer-grid {
+        grid-template-columns: 1fr;
+        gap: var(--space-8);
+    }
+
+    .footer-brand {
+        text-align: center;
+    }
+
+    .footer-brand p {
+        max-width: none;
+    }
+
+    .footer-bottom {
+        flex-direction: column;
+        gap: var(--space-4);
+        text-align: center;
+    }
+
+    /* Cart */
+    .cart-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--space-3);
+    }
+
+    .cart-summary {
+        text-align: left;
+    }
+
+    /* Auth */
+    .auth-card {
+        padding: var(--space-8) var(--space-5);
+    }
+
+    .auth-section {
+        padding: var(--space-10) var(--container-padding);
+        min-height: auto;
+    }
+
+    /* Section headers */
+    .section-header-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--space-4);
+    }
+
+    /* Newsletter */
+    .newsletter-form {
+        flex-direction: column;
+    }
+
+    .newsletter-form input {
+        border-right: 1px solid var(--wr-border);
+    }
+
+    /* Breadcrumbs */
+    .breadcrumbs {
+        font-size: 10px;
+        padding: var(--space-3) var(--container-padding);
+    }
+
+    /* Related */
+    .related-section {
+        padding: var(--space-10) var(--container-padding);
+    }
+}
+
+/* ── Mobile (≤ 480px) ── */
+@media (max-width: 480px) {
+    :root {
+        --container-padding: 4.5%;
+        --text-5xl: 2rem;
+        --text-4xl: 1.75rem;
+        --text-3xl: 1.5rem;
+    }
+
+    .announcement-bar {
+        font-size: 10px;
+        min-height: 34px;
+    }
+
+    .header {
+        padding: var(--space-3) var(--container-padding);
+    }
+
+    .header-logo-text {
+        font-size: 1.35rem;
+        letter-spacing: 0.18em;
+    }
+
+    .header-logo-svg {
+        height: 38px;
+        max-width: 140px;
+    }
+
+    .header-logo-sub {
+        display: block;
+        font-size: 0.58rem;
+        letter-spacing: 0.2em;
+        font-weight: 600;
+        margin-top: 2px;
+        opacity: 0.85;
+    }
+
+    /* Hero — Dedicated Mobile Composition */
+    .hero {
+        height: 100svh;
+        min-height: 580px;
+        align-items: flex-end;
+        padding-bottom: 78px;
+    }
+
+    .hero-slide img {
+        object-position: center 22%;
+    }
+
+    .hero-container {
+        padding: 0 20px;
+        display: flex;
+        justify-content: center;
+        width: 100%;
+    }
+
+    .hero-content {
+        max-width: 440px;
+        width: 100%;
+        margin: 0 auto;
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .hero-subtitle {
+        display: block;
+        text-align: center;
+        font-size: 10px;
+        letter-spacing: 0.24em;
+        color: rgba(255, 255, 255, 0.88);
+        margin: 0 auto 12px auto;
+        width: 100%;
+    }
+
+    .hero-subtitle::before {
+        display: none;
+    }
+
+    .hero-title {
+        font-family: var(--font-display);
+        font-size: clamp(2.05rem, 7.5vw, 2.85rem);
+        line-height: 1.14;
+        text-align: center;
+        color: #ffffff;
+        margin: 0 auto 14px auto;
+        width: 100%;
+    }
+
+    .hero-title-italic {
+        font-style: italic;
+        font-weight: 400;
+    }
+
+    .hero-description {
+        font-size: 13px;
+        line-height: 1.6;
+        color: rgba(255, 255, 255, 0.85);
+        text-align: center;
+        max-width: 360px;
+        margin: 0 auto 22px auto;
+        font-weight: 300;
+    }
+
+    .hero-buttons {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+        width: 100%;
+        max-width: 340px;
+        margin: 0 auto;
+    }
+
+    .btn-hero-primary,
+    .btn-hero-secondary {
+        width: 100%;
+        padding: 14px 20px;
+        font-size: 10.5px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        box-sizing: border-box;
+    }
+
+    .btn-hero-primary span {
+        display: inline-block;
+        text-align: center;
+    }
+
+    .hero-btn-arrow {
+        width: 16px;
+        height: 16px;
+        margin-left: 8px;
+        flex-shrink: 0;
+    }
+
+    .hero-bottom-bar {
+        bottom: 14px;
+        padding: 0 20px;
+    }
+
+    .hero-editorial-tag,
+    .hero-editorial-badge,
+    .hero-scroll-indicator {
+        display: none;
+    }
+
+    .hero-pagination {
+        gap: 12px;
+    }
+
+    .hero-progress-line {
+        width: 28px;
+    }
+
+    /* Product Cards */
+    .product-grid {
+        gap: var(--space-3);
+    }
+
+    .product-card-name {
+        font-size: var(--text-sm);
+    }
+
+    .product-card-price .price-current {
+        font-size: var(--text-sm);
+    }
+
+    .product-card-action {
+        padding: 9px;
+        font-size: 10px;
+    }
+
+    .product-card-wishlist {
+        width: 32px;
+        height: 32px;
+    }
+
+    .product-card-wishlist svg {
+        width: 15px;
+        height: 15px;
+    }
+
+    .product-card-badge {
+        font-size: 9px;
+        padding: 4px 8px;
+    }
+
+    /* Category */
+    .categories-grid {
+        gap: var(--space-2);
+    }
+
+    .category-card-name {
+        font-size: var(--text-base);
+    }
+
+    /* Occasions */
+    .occasions-grid {
+        grid-template-columns: repeat(3, 1fr);
+        gap: var(--space-3);
+    }
+
+    .occasion-card-name {
+        font-size: 10px;
+    }
+
+    /* Trust Bar (Mobile: Premium 2x2 Centered Luxury Grid) */
+    .trust-bar {
+        padding: 26px 0;
+    }
+
+    .trust-bar-container {
+        position: relative;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        column-gap: 20px;
+        row-gap: 26px;
+        width: 100%;
+        max-width: 440px;
+        margin: 0 auto;
+        padding: 4px 18px;
+        box-sizing: border-box;
+    }
+
+    /* Subtle thin elegant crosshair dividers between cells */
+    .trust-bar-container::before {
+        content: '';
+        position: absolute;
+        top: 4%;
+        bottom: 4%;
+        left: 50%;
+        width: 1px;
+        background: rgba(94, 52, 53, 0.10);
+        transform: translateX(-50%);
+        pointer-events: none;
+    }
+
+    .trust-bar-container::after {
+        content: '';
+        position: absolute;
+        left: 4%;
+        right: 4%;
+        top: 50%;
+        height: 1px;
+        background: rgba(94, 52, 53, 0.10);
+        transform: translateY(-50%);
+        pointer-events: none;
+    }
+
+    .trust-badge {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 6px 4px;
+        width: 100%;
+        height: 100%;
+        min-width: 0;
+        box-sizing: border-box;
+    }
+
+    .trust-badge:not(:last-child)::after,
+    .trust-badge:nth-child(odd)::after {
+        display: none !important;
+    }
+
+    .trust-badge-icon {
+        flex: 0 0 46px;
+        width: 46px;
+        height: 46px;
+        min-width: 46px;
+        max-width: 46px;
+        margin: 0 auto 10px auto;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid rgba(94, 52, 53, 0.16);
+        border-radius: 50%;
+        background: #ffffff;
+        box-shadow: 0 2px 8px rgba(94, 52, 53, 0.05);
+        box-sizing: border-box;
+    }
+
+    .trust-badge-icon svg {
+        width: 22px;
+        height: 22px;
+        stroke: var(--wr-primary, #5E3435);
+        stroke-width: 1.5;
+        fill: none;
+    }
+
+    .trust-badge-content {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        width: 100%;
+        min-width: 0;
+    }
+
+    .trust-badge-title {
+        font-family: var(--font-body);
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 1.4px;
+        text-transform: uppercase;
+        line-height: 1.35;
+        color: var(--wr-text, #1A1A1A);
+        text-align: center;
+        margin: 0 0 4px 0;
+        white-space: normal;
+        word-break: normal;
+    }
+
+    .trust-badge-sub {
+        font-family: var(--font-body);
+        font-size: 11.5px;
+        line-height: 1.5;
+        color: var(--wr-text-muted, #7c6d6d);
+        text-align: center;
+        margin: 0;
+        white-space: normal;
+    }
+
+    /* Legacy trust section if present */
+    .trust-section {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--space-4);
+    }
+
+    /* Why */
+    .why-grid {
+        grid-template-columns: 1fr;
+        gap: var(--space-2);
+    }
+
+    .why-card {
+        padding: var(--space-5);
+    }
+
+    /* PDP mobile */
+    .pdp-name {
+        font-size: var(--text-xl);
+    }
+
+    .pdp-price {
+        font-size: var(--text-xl);
+    }
+
+    .pdp-trust {
+        flex-direction: column;
+    }
+
+    /* Sticky CTA */
+    .sticky-cta .btn {
+        padding: 12px;
+        font-size: var(--text-xs);
+    }
+
+    /* Cart */
+    .cart-item-image {
+        width: 70px;
+        height: 70px;
+    }
+
+    /* Mobile Menu */
+    .mobile-menu-nav a {
+        font-size: var(--text-xl);
+        padding: var(--space-3) 0;
+    }
+
+    /* Shop */
+    .shop-hero {
+        padding: var(--space-10) var(--container-padding) var(--space-6);
+    }
+
+    .shop-hero h1 {
+        font-size: var(--text-3xl);
+    }
+
+    .shop-toolbar {
+        flex-wrap: wrap;
+        gap: var(--space-2);
+    }
+
+    /* About */
+    .philosophy-card {
+        padding: var(--space-6);
+    }
+
+    /* Newsletter */
+    .newsletter-section {
+        padding: var(--space-12) var(--container-padding);
+    }
+}
+
+/* ── Very Small Mobile (≤ 360px) ── */
+@media (max-width: 360px) {
+    :root {
+        --container-padding: 4%;
+    }
+
+    .header-logo-text {
+        font-size: 1.2rem;
+        letter-spacing: 0.15em;
+    }
+
+    .header-logo-svg {
+        height: 32px;
+        max-width: 120px;
+    }
+
+    .header-actions {
+        gap: var(--space-2);
+    }
+
+    .hero-content h1 {
+        font-size: 1.75rem;
+    }
+
+    .product-card-name {
+        font-size: var(--text-xs);
+    }
+
+    .product-card-price .price-current {
+        font-size: var(--text-xs);
+    }
+
+    .category-card-name {
+        font-size: var(--text-sm);
+    }
+
+    .trust-bar {
+        padding: 22px 0;
+    }
+
+    .trust-bar-container {
+        column-gap: 14px;
+        row-gap: 22px;
+        padding: 4px 12px;
+    }
+
+    .trust-badge-icon {
+        flex: 0 0 42px;
+        width: 42px;
+        height: 42px;
+        min-width: 42px;
+        max-width: 42px;
+        margin-bottom: 8px;
+    }
+
+    .trust-badge-icon svg {
+        width: 20px;
+        height: 20px;
+    }
+
+    .trust-badge-title {
+        font-size: 11px;
+        letter-spacing: 1.1px;
+    }
+
+    .trust-badge-sub {
+        font-size: 10.5px;
+        line-height: 1.45;
+    }
+}
+
+/* ── Large Desktop (≥ 1440px) ── */
+@media (min-width: 1440px) {
+    .product-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
+
+    .shop-main .product-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
+
+    .categories-grid {
+        grid-template-columns: repeat(6, 1fr);
+    }
+}
+
+/* ── Extra Large Desktop (≥ 1920px) ── */
+@media (min-width: 1920px) {
+    :root {
+        --container-padding: calc((100% - 1600px) / 2);
+    }
+}
+
+/* ── Responsive Variant Selector Rules (Part 22) ── */
+@media (max-width: 768px) {
+    .pdp-variant-section {
+        margin-top: var(--space-4, 16px);
+        padding: 14px 14px;
+    }
+
+    .pdp-alphabet-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .alphabet-btn {
+        width: 42px;
+        height: 42px;
+        min-height: 42px;
+        min-width: 42px;
+        font-size: 14px;
+        padding: 0;
+    }
+}
+
+@media (max-width: 480px) {
+    .pdp-variant-section {
+        padding: 12px 10px;
+    }
+
+    .pdp-alphabet-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    .alphabet-btn {
+        width: 40px;
+        height: 40px;
+        min-height: 40px;
+        min-width: 40px;
+        font-size: 13.5px;
+        padding: 0;
+    }
+
+    .variant-chip {
+        min-height: 40px;
+        padding: 6px 12px;
+        font-size: 12.5px;
+    }
+}
+

@@ -1,0 +1,2501 @@
+/* ============================================
+   WISHRITE — CENTRAL PRODUCT DATA SERVICE & STOREFRONT LAYER
+   Strictly customer-facing: reads from Supabase public.inventory,
+   aggregates sales ranking from public.sales,
+   resolves images from Supabase Storage bucket 'product-images',
+   and handles the 'CURRENTLY UNAVAILABLE' / 'NOTIFY ME' workflow.
+   ============================================ */
+
+// Configuration
+var WR_SUPABASE_URL = window.SUPABASE_URL || (typeof SUPABASE_URL !== 'undefined' ? SUPABASE_URL : 'https://ptpuepejciqiktmcpuon.supabase.co');
+var WR_SUPABASE_ANON_KEY = window.SUPABASE_ANON_KEY || (typeof SUPABASE_ANON_KEY !== 'undefined' ? SUPABASE_ANON_KEY : 'sb_publishable_ZHwzEtRBkW9u4T2d_0R2Ag_BX1EeJRX');
+
+// Icon SVG Constants
+window.ICONS = {
+    heart: `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+    chevronDown: `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><polyline points="6 9 12 15 18 9" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+    chevronRight: `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><polyline points="9 18 15 12 9 6" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+    check: `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><polyline points="20 6 9 17 4 12" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+    shield: `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+    truck: `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="3" width="15" height="13" stroke-linecap="round" stroke-linejoin="round"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>`,
+    gift: `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><polyline points="20 12 20 22 4 22 4 12" stroke-linecap="round" stroke-linejoin="round"/><rect x="2" y="7" width="20" height="5" stroke-linecap="round" stroke-linejoin="round"/><line x1="12" y1="22" x2="12" y2="7" stroke-linecap="round"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+    diamond: `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M6 3h12l4 6-10 13L2 9z" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 9h20" stroke-linecap="round"/><path d="M10 3l-4 6 6 13 6-13-4-6" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+    sparkle: `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8L12 2z" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+    lock: `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`,
+    rotate: `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>`,
+    camera: `<svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" fill="none" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>`
+};
+var ICONS = window.ICONS;
+
+// Global stores & indices
+let productsDB = [];
+window.productsDB = productsDB;
+let productSlugMap = new Map();
+let productCodeMap = new Map();
+let productSalesMap = new Map();
+let inventorySyncError = null;
+
+/**
+ * Format Indian Rupee currency
+ */
+function formatPrice(amount) {
+    return '₹' + Number(amount || 0).toLocaleString('en-IN');
+}
+window.formatPrice = formatPrice;
+
+/**
+ * Deterministic SEO slug generator
+ */
+function generateProductSlug(name, code, existingSlugs = new Set()) {
+    let base = (name || 'jewellery')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)/g, '');
+
+    const codePart = (code || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+    let candidate = codePart ? `${base}-${codePart}` : base;
+
+    if (!existingSlugs.has(candidate)) {
+        existingSlugs.add(candidate);
+        return candidate;
+    }
+
+    let count = 2;
+    while (existingSlugs.has(`${candidate}-${count}`)) {
+        count++;
+    }
+    const finalSlug = `${candidate}-${count}`;
+    existingSlugs.add(finalSlug);
+    return finalSlug;
+}
+
+/**
+ * Normalize database categories into clean luxury taxonomy
+ */
+function normalizeCategory(raw) {
+    if (!raw) return 'Jewellery';
+    const clean = String(raw).trim();
+    const map = {
+        'Chain': 'Chains',
+        'Ring': 'Rings',
+        'Ring ': 'Rings',
+        'Earring': 'Earrings',
+        'Pendant': 'Pendants',
+        'Bracelet': 'Bracelets',
+        'Necklace': 'Necklaces',
+        'Toe Rings': 'Toe Rings',
+        'Anklet': 'Anklets',
+        'Rakhi': 'Silver Rakhis',
+        'Nose Pin': 'Nose Pins',
+        'Bali': 'Balis & Hoops',
+        'Set': 'Jewellery Sets',
+        'Gift Sets': 'Jewellery Sets',
+        'Gift Set': 'Jewellery Sets',
+        'Sets': 'Jewellery Sets',
+        'Jewellery Set': 'Jewellery Sets',
+        'Silver Jewellery': 'Silver Jewellery',
+        'Fashion Jewellery': 'Fashion Jewellery',
+        'Accessories': 'Accessories',
+        'Other': 'Accessories'
+    };
+    return map[clean] || (clean.endsWith('s') ? clean : clean + 's');
+}
+window.normalizeCategory = normalizeCategory;
+
+/**
+ * Determines whether a product belongs to the standard 925 Silver Jewellery catalog.
+ * Excludes festive occasion sarees and artificial jewellery from normal Silver grids.
+ */
+function isSilverJewelleryProduct(p) {
+    if (!p) return false;
+    const catType = (p.catalog_type || 'silver_jewellery').toLowerCase();
+    return catType === 'silver_jewellery' || (!catType.includes('saree') && !catType.includes('artificial'));
+}
+window.isSilverJewelleryProduct = isSilverJewelleryProduct;
+
+/**
+ * Map products into curated collections based on silver craftsmanship
+ */
+function determineCollection(item, category) {
+    const cat = (category || '').toLowerCase();
+    const name = (item.product_name || '').toLowerCase();
+
+    if (cat.includes('set') || cat.includes('necklace') || name.includes('statement') || name.includes('choker')) {
+        return 'The Occasion & Evening Edit';
+    }
+    if (cat.includes('toe') || cat.includes('nose') || name.includes('band') || name.includes('stud') || name.includes('daily')) {
+        return 'Daily Elegance';
+    }
+    if (cat.includes('chain') || cat.includes('bracelet') || cat.includes('bali') || name.includes('rope') || name.includes('box')) {
+        return '925 Silver Signature Collection';
+    }
+    return 'Modern Solitaires & Keepsakes';
+}
+
+/**
+ * Map products into occasions based on style & jewellery type
+ */
+function determineOccasions(item, category) {
+    const cat = (category || '').toLowerCase();
+    const occasions = new Set();
+
+    // Everyday
+    if (cat.includes('toe') || cat.includes('nose') || cat.includes('chain') || cat.includes('ring') || cat.includes('earring') || cat.includes('bali')) {
+        occasions.add('Everyday');
+    }
+    // Office
+    if (cat.includes('ring') || cat.includes('pendant') || cat.includes('chain') || cat.includes('bracelet') || cat.includes('earring')) {
+        occasions.add('Office');
+    }
+    // Date Night
+    if (cat.includes('pendant') || cat.includes('earring') || cat.includes('necklace') || cat.includes('bracelet') || cat.includes('ring')) {
+        occasions.add('Date Night');
+    }
+    // Festive
+    if (cat.includes('set') || cat.includes('anklet') || cat.includes('rakhi') || cat.includes('necklace') || cat.includes('pendant')) {
+        occasions.add('Festive');
+    }
+    // Gifting
+    if (cat.includes('pendant') || cat.includes('rakhi') || cat.includes('chain') || cat.includes('set') || cat.includes('ring')) {
+        occasions.add('Gifting');
+    }
+    // Special Occasions
+    if (cat.includes('set') || cat.includes('necklace') || cat.includes('anklet') || cat.includes('bracelet')) {
+        occasions.add('Special Occasions');
+    }
+
+    if (occasions.size === 0) occasions.add('Everyday');
+    return Array.from(occasions);
+}
+
+/**
+ * Map raw database row from public.inventory into unified storefront product model
+ */
+function mapInventoryToProduct(item, existingSlugs = new Set()) {
+    if (!item) return null;
+
+    const productCode = (item.product_code || item.sku || '').trim();
+    const name = (item.product_name || 'Handcrafted Silver Piece').trim();
+    const category = normalizeCategory(item.category);
+    const rawCategory = (item.category || '').trim();
+    const stock = typeof item.stock_quantity === 'number' ? item.stock_quantity : (parseInt(item.stock_quantity, 10) || 0);
+    const sellingPrice = Number(item.selling_price) || 0;
+    const purchasePrice = Number(item.purchase_price) || 0;
+    const storageFolder = (item.storage_folder || '').trim() || null;
+    const audience = (item.audience || '').trim() || null;
+
+    // Design Group & Generic Variant System (Part 1, 2, 3, 11)
+    const designGroup = (item.design_group || '').trim() || null;
+    const variantType = (item.variant_type || '').trim().toLowerCase() || null;
+    const variantValue = (item.variant_value || '').trim() || null;
+    const productSlug = (item.product_slug || '').trim() || null;
+
+    if (variantType && !variantValue) {
+        console.warn(`WishRite: Product variant configuration incomplete for ${productCode} (variant_type "${variantType}" has no variant_value)`);
+    }
+
+    // Approximate MRP based on jewellery standard markup if not explicitly set
+    const mrp = sellingPrice > 0 ? Math.round((sellingPrice * 1.25) / 50) * 50 : sellingPrice;
+    const discount = mrp > sellingPrice ? Math.round(((mrp - sellingPrice) / mrp) * 100) : 0;
+
+    // Formatted weight
+    const weightStr = (item.weight !== null && item.weight !== undefined && String(item.weight).trim() !== '')
+        ? `${item.weight}g`
+        : null;
+
+    // Formatted size
+    const sizeStr = (item.size !== null && item.size !== undefined && String(item.size).trim() !== '')
+        ? String(item.size).trim()
+        : null;
+
+    // Target Audience & Gender mapping from database schema: 'Female', 'Men', 'Kids-Girl', 'Kids-Boy'
+    const rawGender = item.gender || item.target_gender || '';
+    const rawTargetGender = item.target_gender || item.gender || '';
+    const rawAgeGroup = item.age_group || item.target_audience || '';
+    const rawTargetAudience = item.target_audience || item.age_group || '';
+
+    let gender = rawGender;
+    let targetGender = rawTargetGender;
+    let ageGroup = rawAgeGroup;
+    let targetAudience = rawTargetAudience;
+
+    if (!gender && !targetGender) {
+        if (audience === 'Female') {
+            gender = 'female';
+            targetGender = 'female';
+            ageGroup = ageGroup || 'adult';
+            targetAudience = targetAudience || 'women';
+        } else if (audience === 'Men') {
+            gender = 'men';
+            targetGender = 'male';
+            ageGroup = ageGroup || 'adult';
+            targetAudience = targetAudience || 'men';
+        } else if (audience === 'Kids-Girl') {
+            gender = 'girls';
+            targetGender = 'female';
+            ageGroup = ageGroup || 'kids';
+            targetAudience = targetAudience || 'kids';
+        } else if (audience === 'Kids-Boy') {
+            gender = 'boys';
+            targetGender = 'male';
+            ageGroup = ageGroup || 'kids';
+            targetAudience = targetAudience || 'kids';
+        }
+    }
+
+    // Deterministic slug (Part 11: clean product URLs from product_slug if available, otherwise deterministic fallback)
+    let slug = '';
+    if (productSlug) {
+        slug = productSlug.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+        existingSlugs.add(slug);
+    } else {
+        slug = generateProductSlug(name, productCode, existingSlugs);
+    }
+
+    // Dynamic collection & occasions
+    const collection = determineCollection(item, category);
+    const occasions = determineOccasions(item, category);
+
+    // Sales count from sales table
+    const salesCount = productSalesMap.get(productCode) || 0;
+
+    // Stock availability
+    let availability = 'Currently Unavailable';
+    let lowStock = false;
+    if (stock > 3) {
+        availability = 'In Stock';
+    } else if (stock > 0) {
+        availability = `Only ${stock} left`;
+        lowStock = true;
+    }
+
+    // Extended Festive Catalog Support (Backward-compatible with safe defaults)
+    const catalogType = item.catalog_type || 'silver_jewellery';
+    const occasionSlug = item.occasion_slug || '';
+    const color = item.color || '';
+    const fabric = item.fabric || '';
+    const design = item.design || '';
+    const pattern = item.pattern || '';
+    const borderStyle = item.border_style || '';
+    const matchingTags = item.matching_tags || '';
+    const isOccasionFeatured = Boolean(item.is_occasion_featured);
+
+    let material = '925 Sterling Silver';
+    let silverPurity = '92.5%';
+    let finish = 'High-Polish Rhodium';
+
+    if (catalogType === 'saree') {
+        material = fabric || 'Traditional Handloom Silk';
+        silverPurity = null;
+        finish = 'Authentic Handloom Weave';
+    } else if (catalogType === 'artificial_jewellery') {
+        material = item.material || 'Heritage Brass with Micron Gold Polish';
+        silverPurity = null;
+        finish = 'Antique Micron Polish';
+    }
+
+    const product = {
+        id: item.id,
+        productCode: productCode,
+        sku: productCode,
+        code: productCode,
+        name: name,
+        product_name: name,
+        slug: slug,
+        design_group: designGroup,
+        designGroup: designGroup,
+        variant_type: variantType,
+        variantType: variantType,
+        variant_value: variantValue,
+        variantValue: variantValue,
+        product_slug: productSlug,
+        productSlug: productSlug,
+        catalog_type: catalogType,
+        audience: audience,
+        gender: item.gender || item.target_gender || gender || '',
+        target_gender: item.target_gender || item.gender || targetGender || '',
+        age_group: item.age_group || item.target_audience || ageGroup || '',
+        target_audience: item.target_audience || item.age_group || targetAudience || '',
+        storage_folder: storageFolder,
+        storageFolder: storageFolder,
+        purchase_price: purchasePrice,
+        purchasePrice: purchasePrice,
+        purchase_date: item.purchase_date || null,
+        purchaseDate: item.purchase_date || null,
+        shop_name: item.shop_name || '',
+        shopName: item.shop_name || '',
+        shop_address: item.shop_address || '',
+        shopAddress: item.shop_address || '',
+        occasion_slug: occasionSlug,
+        color: color,
+        fabric: fabric,
+        design: design,
+        pattern: pattern,
+        border_style: borderStyle,
+        matching_tags: matchingTags,
+        is_occasion_featured: isOccasionFeatured,
+        description: item.product_description || `${name} crafted with fine attention to detail and luxury finishing.`,
+        product_description: item.product_description || '',
+        shortDescription: item.product_description || `${material} ${category} crafted for effortless luxury.`,
+        category: category,
+        rawCategory: rawCategory,
+        collection: collection,
+        occasions: occasions,
+        occasion: item.occasion || occasions.join(', '),
+        price: sellingPrice,
+        sellingPrice: sellingPrice,
+        selling_price: sellingPrice,
+        mrp: mrp,
+        discount: discount,
+        stockQuantity: stock,
+        stock_quantity: stock,
+        isAvailable: stock > 0,
+        isPublished: true,
+        weight: weightStr,
+        rawWeight: item.weight != null ? Number(item.weight) : null,
+        size: sizeStr,
+        availability: availability,
+        lowStock: lowStock,
+        material: material,
+        silverPurity: silverPurity,
+        finish: finish,
+        status: stock > 0 ? 'Active' : 'Currently Unavailable',
+        createdAt: item.created_at,
+        created_at: item.created_at,
+        updatedAt: item.updated_at,
+        updated_at: item.updated_at,
+        salesCount: salesCount,
+        care: catalogType === 'saree'
+            ? 'Dry clean only. Store in a breathable muslin or cotton saree bag. Avoid direct perfume or spray on zari motifs.'
+            : 'Store in an airtight pouch. Keep away from water, perfumes, and sprays. Clean gently using a soft jewellery polishing cloth.',
+        shippingInfo: 'Complimentary insured express shipping across India. Usually dispatched within 24 to 48 hours.',
+        returnInfo: 'Easy 7-day return and exchange policy with original packaging and certificate.',
+        whatsIncluded: catalogType === 'saree'
+            ? '1 Saree in WishRite protective luxury packaging with unstitched blouse piece where applicable.'
+            : '1 piece in signature WishRite luxury gift box with 925 Authenticity Certificate.',
+        isNew: false, // Calculated dynamically across catalog
+        isBestseller: false, // Calculated dynamically across catalog
+        tag: stock <= 0 ? 'UNAVAILABLE' : (discount >= 20 ? 'SALE' : (stock <= 3 ? 'FEW LEFT' : ''))
+    };
+
+    // Attach resolved images via image layer
+    if (typeof getProductImages === 'function') {
+        product.images = getProductImages(product);
+    } else {
+        product.images = [];
+    }
+    product.image = product.images[0]?.url || '';
+    product.image_url = product.images[0]?.url || '';
+
+    return product;
+}
+
+// ════════════════════════════════════════════════════
+// 5. CENTRAL PRODUCT DATA SERVICE
+// ════════════════════════════════════════════════════
+const productsService = {
+    isLoading: false,
+    loadPromise: null,
+    error: null,
+
+    /**
+     * Guarantees a single in-flight Promise for all callers.
+     * Prevents returning empty array [] while network request is underway.
+     */
+    async ensureLoaded() {
+        if (productsDB.length > 0 && !this.isLoading) {
+            return productsDB;
+        }
+        if (this.loadPromise) {
+            return this.loadPromise;
+        }
+
+        this.isLoading = true;
+        this.error = null;
+
+        this.loadPromise = (async () => {
+            try {
+                const headers = {
+                    'apikey': WR_SUPABASE_ANON_KEY,
+                    'Authorization': `Bearer ${WR_SUPABASE_ANON_KEY}`,
+                    'Accept': 'application/json'
+                };
+
+                // 1. Fetch sales aggregation in parallel (best-effort)
+                try {
+                    const salesRes = await fetch(`${WR_SUPABASE_URL}/rest/v1/sales?select=product_code,quantity`, { headers });
+                    if (salesRes.ok) {
+                        const salesRows = await salesRes.json();
+                        productSalesMap.clear();
+                        if (Array.isArray(salesRows)) {
+                            salesRows.forEach(row => {
+                                const code = (row.product_code || '').trim();
+                                if (code) {
+                                    const prev = productSalesMap.get(code) || 0;
+                                    productSalesMap.set(code, prev + (Number(row.quantity) || 1));
+                                }
+                            });
+                        }
+                    }
+                } catch (salesErr) {
+                    console.info('Sales data notice: using in-stock ranking.', salesErr.message);
+                }
+
+                // 2. Fetch inventory records directly from public.inventory
+                const inventoryUrl = `${WR_SUPABASE_URL}/rest/v1/inventory?select=*&order=created_at.desc`;
+                const invRes = await fetch(inventoryUrl, { headers });
+
+                if (!invRes.ok) {
+                    throw new Error(`Failed to load inventory: HTTP ${invRes.status}`);
+                }
+
+                const rawItems = await invRes.json();
+                if (!Array.isArray(rawItems)) {
+                    throw new Error('Invalid inventory data format received from database');
+                }
+
+                const existingSlugs = new Set();
+                const mapped = rawItems
+                    .map(item => mapInventoryToProduct(item, existingSlugs))
+                    .filter(Boolean);
+
+                // Mark top 15 newest items (among in-stock products)
+                const inStockItems = mapped.filter(p => Number(p.stockQuantity || 0) > 0);
+                const sortedByDate = [...inStockItems].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+                sortedByDate.slice(0, 15).forEach(p => { p.isNew = true; });
+
+                // Mark bestsellers (by real sales count or high in-stock popularity)
+                const sortedBySales = [...inStockItems].sort((a, b) => (b.salesCount - a.salesCount) || (b.stockQuantity - a.stockQuantity));
+                sortedBySales.slice(0, 12).forEach(p => { p.isBestseller = true; });
+
+                productsDB = mapped;
+                window.productsDB = mapped;
+
+                // Rebuild fast index maps
+                productSlugMap.clear();
+                productCodeMap.clear();
+                productsDB.forEach(p => {
+                    if (p.slug) {
+                        productSlugMap.set(p.slug.toLowerCase(), p);
+                        productSlugMap.set(p.slug, p);
+                    }
+                    if (p.product_slug) {
+                        productSlugMap.set(p.product_slug.toLowerCase(), p);
+                    }
+                    if (p.productCode) {
+                        productCodeMap.set(p.productCode.toUpperCase(), p);
+                        productSlugMap.set(p.productCode.toLowerCase(), p);
+                    }
+                    if (p.id) {
+                        productSlugMap.set(p.id, p);
+                    }
+                });
+
+                // Cache in localStorage for offline resilience
+                try {
+                    localStorage.setItem('wishrite_inventory_cache', JSON.stringify(mapped));
+                    localStorage.setItem('wishrite_inventory_sync_time', String(Date.now()));
+                } catch (e) { }
+
+                console.info(`✓ Loaded ${mapped.length} products dynamically from WishRite Supabase database.`);
+
+                // Automatically resolve images from Supabase Storage
+                // for every product using its product code or storage_folder.
+                if (typeof resolveProductImages === 'function') {
+                    mapped.forEach(p => {
+                        if (!p.productCode) return;
+
+                        resolveProductImages(p)
+                            .then(images => {
+                                if (
+                                    Array.isArray(images) &&
+                                    images.length > 0
+                                ) {
+                                    p.images = images;
+                                    p.image = images[0]?.url || '';
+                                    p.image_url = images[0]?.url || '';
+                                }
+                            })
+                            .catch(error => {
+                                console.error(
+                                    `[WishRite] Image resolution failed for ${p.productCode}:`,
+                                    error
+                                );
+                            });
+                    });
+                }
+                // Automatically update waiting UI sections across pages
+                try {
+                    window.dispatchEvent(new CustomEvent('wishrite:productsLoaded', { detail: { products: mapped } }));
+                    if (typeof renderHomeSections === 'function' && typeof getCurrentView === 'function' && getCurrentView() === 'home') {
+                        renderHomeSections();
+                    }
+                    if (typeof applyFiltersAndSort === 'function' && typeof getCurrentView === 'function' && getCurrentView() === 'shop') {
+                        applyFiltersAndSort();
+                    }
+                    if (typeof renderCollectionsPage === 'function' && typeof getCurrentView === 'function' && getCurrentView() === 'collections') {
+                        renderCollectionsPage();
+                    }
+                    if (typeof renderKidsProductsList === 'function' && typeof getCurrentView === 'function' && getCurrentView() === 'kids') {
+                        renderKidsProductsList();
+                    }
+                } catch (uiErr) { }
+
+            } catch (err) {
+                console.error(
+                    `[WishRite] Product loading failed\n` +
+                    `[WishRite] API URL: ${WR_SUPABASE_URL}/rest/v1/inventory\n` +
+                    `[WishRite] Error: ${err.message || err}`
+                );
+                this.error = err;
+                inventorySyncError = err;
+
+                // Attempt restore from offline cache
+                try {
+                    const cached = localStorage.getItem('wishrite_inventory_cache');
+                    if (cached) {
+                        const parsed = JSON.parse(cached);
+                        if (Array.isArray(parsed) && parsed.length > 0) {
+                            const inStock = parsed.filter(p => p && Number(p.stockQuantity || 0) > 0);
+                            productsDB = inStock;
+                            window.productsDB = inStock;
+                            productSlugMap.clear();
+                            productCodeMap.clear();
+                            productsDB.forEach(p => {
+                                productSlugMap.set(p.slug, p);
+                                if (p.productCode) productCodeMap.set(p.productCode.toUpperCase(), p);
+                                if (p.id) productSlugMap.set(p.id, p);
+                            });
+                            console.info(`✓ Restored ${inStock.length} in-stock products from offline cache.`);
+                            return productsDB;
+                        }
+                    }
+                } catch (cacheErr) { }
+
+                throw err;
+            } finally {
+                this.isLoading = false;
+                this.loadPromise = null;
+            }
+        })();
+
+        return this.loadPromise;
+    },
+
+    async getProducts(options = {}) {
+        await this.ensureLoaded();
+        let list = [...productsDB];
+
+        // By default, Silver Jewellery surfaces strictly exclude occasion sarees and artificial jewellery
+        if (!options.includeOccasionCatalog) {
+            list = list.filter(isSilverJewelleryProduct);
+        }
+
+        if (options.category && options.category !== 'All') {
+            const normCat = normalizeCategory(options.category).toLowerCase();
+            list = list.filter(p => normalizeCategory(p.category).toLowerCase() === normCat || (p.rawCategory && p.rawCategory.toLowerCase() === normCat));
+        }
+
+        if (options.collection && options.collection !== 'All') {
+            list = list.filter(p => p.collection === options.collection);
+        }
+
+        if (options.occasion && options.occasion !== 'All') {
+            list = list.filter(p => p.occasions && p.occasions.includes(options.occasion));
+        }
+
+        if (options.sort) {
+            switch (options.sort) {
+                case 'price-low':
+                    list.sort((a, b) => a.sellingPrice - b.sellingPrice);
+                    break;
+                case 'price-high':
+                    list.sort((a, b) => b.sellingPrice - a.sellingPrice);
+                    break;
+                case 'newest':
+                    list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+                    break;
+                case 'name-asc':
+                    list.sort((a, b) => a.name.localeCompare(b.name));
+                    break;
+                case 'featured':
+                default:
+                    list.sort((a, b) => (b.salesCount - a.salesCount) || (b.isBestseller ? 1 : 0) - (a.isBestseller ? 1 : 0));
+                    break;
+            }
+        }
+
+        return list;
+    },
+
+    getProductByCode(code) {
+        if (!code) return null;
+        const clean = String(code).trim().toUpperCase();
+        return productCodeMap.get(clean) || productsDB.find(p => p.productCode?.toUpperCase() === clean);
+    },
+
+    getProductById(id) {
+        if (!id) return null;
+        const found = productSlugMap.get(id) || productsDB.find(p => p.id === id || String(p.id) === String(id) || p.productCode?.toUpperCase() === String(id).toUpperCase());
+        if (found) return found;
+        if (typeof window.getOccasionShowcaseProducts === 'function') {
+            const showcase = window.getOccasionShowcaseProducts();
+            return showcase.find(p => p.id === id || String(p.id) === String(id) || p.productCode?.toUpperCase() === String(id).toUpperCase()) || null;
+        }
+        return null;
+    },
+
+    getProductBySlug(slug) {
+        if (!slug) return null;
+        const s = String(slug).trim().toLowerCase();
+        const found = productSlugMap.get(slug) ||
+            productSlugMap.get(s) ||
+            productsDB.find(p => p && (
+                (p.slug && p.slug.toLowerCase() === s) ||
+                (p.product_slug && p.product_slug.toLowerCase() === s) ||
+                (p.productSlug && p.productSlug.toLowerCase() === s) ||
+                (p.productCode && p.productCode.toLowerCase() === s) ||
+                p.id === slug ||
+                (p.productCode && p.productCode.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() === s.replace(/[^a-zA-Z0-9]/g, '').toLowerCase())
+            ));
+        if (found) return found;
+        if (typeof window.getOccasionShowcaseProducts === 'function') {
+            const showcase = window.getOccasionShowcaseProducts();
+            const foundShowcase = showcase.find(p => p && (
+                (p.slug && p.slug.toLowerCase() === s) ||
+                (p.product_slug && p.product_slug.toLowerCase() === s) ||
+                (p.productSlug && p.productSlug.toLowerCase() === s) ||
+                (p.productCode && p.productCode.toLowerCase() === s) ||
+                p.id === slug
+            ));
+            if (foundShowcase) return foundShowcase;
+        }
+
+        // Robust fallback: Check if slug contains or ends with a product code pattern (e.g. "...pdt-0017")
+        const codeMatch = s.match(/(?:^|[-_])([a-z]{2,5}[-_]?[0-9]{3,5})(?:[-_]|$)/i);
+        if (codeMatch) {
+            const codeCandidate = codeMatch[1].replace(/[-_]/g, '').toLowerCase();
+            const matchedByCode = productsDB.find(p => p && p.productCode &&
+                p.productCode.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() === codeCandidate
+            );
+            if (matchedByCode) return matchedByCode;
+        }
+
+        return null;
+    },
+
+    getProductsByCategory(category) {
+        const inStock = productsDB.filter(p => p && Number(p.stockQuantity || 0) > 0 && isSilverJewelleryProduct(p));
+        if (!category || category === 'All') return inStock;
+        const norm = normalizeCategory(category).toLowerCase();
+        return inStock.filter(p => normalizeCategory(p.category).toLowerCase() === norm || (p.rawCategory && p.rawCategory.toLowerCase() === norm));
+    },
+
+    getProductsByCollection(collection) {
+        const inStock = productsDB.filter(p => p && Number(p.stockQuantity || 0) > 0 && isSilverJewelleryProduct(p));
+        if (!collection || collection === 'All') return inStock;
+        return inStock.filter(p => p.collection === collection);
+    },
+
+    getProductsByOccasion(occasion) {
+        const inStock = productsDB.filter(p => p && Number(p.stockQuantity || 0) > 0 && isSilverJewelleryProduct(p));
+        if (!occasion || occasion === 'All') return inStock;
+        return inStock.filter(p => p.occasions && p.occasions.includes(occasion));
+    },
+
+    getNewArrivals(limit = 0) {
+        const sorted = productsDB.filter(p => p && Number(p.stockQuantity || 0) > 0 && isSilverJewelleryProduct(p))
+            .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        return (limit && limit > 0) ? sorted.slice(0, limit) : sorted;
+    },
+
+    getBestSellers(limit = 0) {
+        const sorted = productsDB.filter(p => p && Number(p.stockQuantity || 0) > 0 && isSilverJewelleryProduct(p))
+            .sort((a, b) => (b.salesCount - a.salesCount) || (b.stockQuantity - a.stockQuantity));
+        return (limit && limit > 0) ? sorted.slice(0, limit) : sorted;
+    },
+
+    searchProducts(query) {
+        if (!query || query.trim().length < 2) return [];
+        const q = query.toLowerCase().trim();
+        return productsDB.filter(p =>
+            p && Number(p.stockQuantity || 0) > 0 && (
+                (p.name && p.name.toLowerCase().includes(q)) ||
+                (p.productCode && p.productCode.toLowerCase().includes(q)) ||
+                (p.category && p.category.toLowerCase().includes(q)) ||
+                (p.rawCategory && p.rawCategory.toLowerCase().includes(q)) ||
+                (p.collection && p.collection.toLowerCase().includes(q)) ||
+                (p.description && p.description.toLowerCase().includes(q)) ||
+                (p.material && p.material.toLowerCase().includes(q))
+            )
+        );
+    },
+
+    getCategories() {
+        if (productsDB && productsDB.length > 0) {
+            const set = [...new Set(productsDB.map(p => p.category))].filter(Boolean);
+            if (set.length > 0) return set;
+        }
+        return [
+            'Anklets',
+            'Earrings',
+            'Bracelets',
+            'Necklaces',
+            'Nose Pins',
+            'Chains',
+            'Pendants',
+            'Jewellery Sets',
+            'Rings',
+            'Toe Rings',
+            'Balis & Hoops',
+            'Silver Rakhis',
+            'Accessories'
+        ];
+    },
+
+    getCollections() {
+        return [
+            'All',
+            '925 Silver Signature Collection',
+            'Daily Elegance',
+            'The Occasion & Evening Edit',
+            'Modern Solitaires & Keepsakes'
+        ];
+    },
+
+    getOccasions() {
+        return ['All', 'Everyday', 'Office', 'Date Night', 'Festive', 'Gifting', 'Special Occasions'];
+    }
+};
+
+// Global backward-compatible bridge
+window.productsService = productsService;
+window.loadProductsFromInventory = () => productsService.ensureLoaded();
+window.getProductBySlug = (slug) => productsService.getProductBySlug(slug);
+window.getProductById = (id) => productsService.getProductById(id);
+window.getProductByCode = (code) => productsService.getProductByCode(code);
+window.getProductsByCategory = (cat) => productsService.getProductsByCategory(cat);
+window.getProductsByCollection = (col) => productsService.getProductsByCollection(col);
+window.getNewArrivals = (limit) => productsService.getNewArrivals(limit);
+window.getBestSellers = (limit) => productsService.getBestSellers(limit);
+window.getCategories = () => productsService.getCategories();
+window.getCollections = () => productsService.getCollections();
+window.createProductCardHTML = createProductCardHTML;
+window.renderProductCard = createProductCardHTML;
+window.renderProductDetail = renderProductDetail;
+window.renderProductsToContainer = renderProductsToContainer;
+window.renderProductLoadingSkeletons = renderProductLoadingSkeletons;
+window.getProductVariants = getProductVariants;
+window.getDesignGroupVariants = getDesignGroupVariants;
+window.getVariantProduct = getVariantProduct;
+window.getVariantURL = getVariantURL;
+window.handleVariantSelection = handleVariantSelection;
+window.renderProductVariantSelector = renderProductVariantSelector;
+window.getKidsProducts = getKidsProducts;
+window.getKidsProductsByAudience = getKidsProductsByAudience;
+
+// ── Supabase Realtime Inventory Sync ──
+let inventoryRealtimeChannel = null;
+
+function initRealtimeInventorySync() {
+    const client = (typeof window.supabaseClient !== 'undefined' && window.supabaseClient)
+        ? window.supabaseClient
+        : (window.supabase ? window.supabase : null);
+
+    if (!client || typeof client.channel !== 'function') {
+        return null;
+    }
+
+    if (inventoryRealtimeChannel) {
+        return inventoryRealtimeChannel;
+    }
+
+    try {
+        inventoryRealtimeChannel = client
+            .channel('wishrite-inventory-realtime-sync')
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'inventory'
+                },
+                async (payload) => {
+                    console.log('[WishRite Inventory] Realtime update detected on table public.inventory:', payload.eventType);
+                    productsService.loadPromise = null;
+                    await productsService.ensureLoaded();
+                }
+            )
+            .subscribe((status) => {
+                if (status === 'SUBSCRIBED') {
+                    console.log('[WishRite Inventory] Subscribed to public.inventory realtime updates.');
+                }
+            });
+    } catch (err) {
+        console.warn('[WishRite Inventory] Realtime subscription notice:', err);
+    }
+
+    return inventoryRealtimeChannel;
+}
+window.initRealtimeInventorySync = initRealtimeInventorySync;
+
+/**
+ * Render loading skeleton cards
+ */
+function renderProductLoadingSkeletons(containerId, count = 8) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    let skeletonHTML = '';
+    for (let i = 0; i < count; i++) {
+        skeletonHTML += `
+            <div class="product-card skeleton-card" aria-hidden="true">
+                <div class="product-card-image skeleton-box" style="aspect-ratio:4/5;background:linear-gradient(90deg, #F5F1EE 25%, #EBE5E1 50%, #F5F1EE 75%);background-size:200% 100%;animation:skeletonShimmer 1.5s infinite;border-radius:4px;"></div>
+                <div class="product-card-info" style="padding:16px 0;">
+                    <div style="height:12px;width:35%;background:#EBE5E1;border-radius:2px;margin-bottom:8px;"></div>
+                    <div style="height:18px;width:75%;background:#EBE5E1;border-radius:2px;margin-bottom:8px;"></div>
+                    <div style="height:16px;width:45%;background:#EBE5E1;border-radius:2px;"></div>
+                </div>
+            </div>
+        `;
+    }
+    container.innerHTML = skeletonHTML;
+}
+
+// ════════════════════════════════════════════════════
+// PRODUCT DESIGN GROUP & VARIANT SYSTEM (PARTS 1-33)
+// ════════════════════════════════════════════════════
+
+/**
+ * Get all variants for a given product's design_group and variant_type
+ */
+function getProductVariants(product) {
+    if (!product || !product.design_group) return [];
+    return getDesignGroupVariants(product.design_group, product.variant_type || 'alphabet');
+}
+
+/**
+ * Get all products matching a design_group and optional variant_type from productsDB
+ * Alphabet variants are strictly sorted A to Z (Part 21).
+ */
+function getDesignGroupVariants(designGroup, variantType) {
+    const db = (typeof window !== 'undefined' && Array.isArray(window.productsDB) && window.productsDB.length > 0)
+        ? window.productsDB
+        : (Array.isArray(productsDB) ? productsDB : []);
+
+    if (!designGroup || !db.length) return [];
+
+    const dg = String(designGroup).trim().toLowerCase();
+    const vType = (variantType || '').trim().toLowerCase();
+
+    const matches = db.filter(p => {
+        if (!p || !p.design_group) return false;
+        if (String(p.design_group).trim().toLowerCase() !== dg) return false;
+        if (vType && p.variant_type && p.variant_type.toLowerCase() !== vType) return false;
+        return true;
+    });
+
+    if (vType === 'alphabet') {
+        // Strict alphabetical sort A-Z by variant_value (Part 21)
+        matches.sort((a, b) => {
+            const valA = String(a.variant_value || a.variantValue || '').toUpperCase();
+            const valB = String(b.variant_value || b.variantValue || '').toUpperCase();
+            return valA.localeCompare(valB);
+        });
+    } else {
+        // Natural alphanumeric sort for size, color, finish, style, material, custom
+        matches.sort((a, b) => {
+            const valA = String(a.variant_value || a.variantValue || '');
+            const valB = String(b.variant_value || b.variantValue || '');
+            return valA.localeCompare(valB, undefined, { numeric: true, sensitivity: 'base' });
+        });
+    }
+
+    return matches;
+}
+
+/**
+ * Find variant product by variant_value within the same design_group
+ */
+function getVariantProduct(product, variantValue) {
+    if (!product || !product.design_group || !variantValue) return null;
+    const variants = getProductVariants(product);
+    const target = String(variantValue).trim().toUpperCase();
+    return variants.find(v => String(v.variant_value || v.variantValue || '').trim().toUpperCase() === target) || null;
+}
+
+/**
+ * Get clean URL for variant navigation
+ */
+function getVariantURL(product) {
+    if (!product) return '#';
+    const slug = product.product_slug || product.slug || product.productCode || product.id;
+    return `/product/${slug}`;
+}
+
+/**
+ * Navigate to selected variant product using existing website router
+ */
+function handleVariantSelection(target) {
+    if (!target) return;
+    if (typeof navigateTo === 'function') {
+        navigateTo('product', target);
+    } else {
+        window.location.hash = `#product/${target}`;
+    }
+}
+
+/**
+ * Render luxury Product Variant Selector HTML for PDP
+ * Directly placed below product image/gallery area (Part 4 & 22)
+ */
+function renderProductVariantSelector(product) {
+    if (!product || !product.design_group) {
+        return '';
+    }
+
+    if (product.variant_type && !product.variant_value) {
+        console.warn(`WishRite: Product variant configuration incomplete for ${product.productCode || product.id}`);
+        return '';
+    }
+
+    const variants = getProductVariants(product);
+    if (!variants || variants.length === 0) {
+        return '';
+    }
+
+    const variantType = (product.variant_type || 'alphabet').toLowerCase();
+
+    // ── Alphabet Selector (Available alphabets only) ──
+    if (variantType === 'alphabet') {
+        const currentLetter = String(product.variant_value || product.variantValue || '').trim().toUpperCase();
+
+        // Only include alphabets that are available and in-stock (stockQuantity > 0)
+        const availableVariants = variants.filter(v => {
+            const letter = String(v.variant_value || v.variantValue || '').trim().toUpperCase();
+            if (!letter) return false;
+            return Number(v.stockQuantity || 0) > 0;
+        });
+
+        // Do not render section if no letters are available
+        if (availableVariants.length === 0) {
+            return '';
+        }
+
+        // Strict alphabetical sort A to Z
+        availableVariants.sort((a, b) => {
+            const valA = String(a.variant_value || a.variantValue || '').toUpperCase();
+            const valB = String(b.variant_value || b.variantValue || '').toUpperCase();
+            return valA.localeCompare(valB);
+        });
+
+        const buttonsHTML = availableVariants.map(targetProd => {
+            const letter = String(targetProd.variant_value || targetProd.variantValue || '').trim().toUpperCase();
+            const isSelected = letter === currentLetter;
+            const targetKey = targetProd.product_slug || targetProd.slug || targetProd.productCode;
+            const selectedClass = isSelected ? 'selected active' : '';
+
+            return `
+                <button 
+                    type="button" 
+                    class="alphabet-btn ${selectedClass}" 
+                    onclick="handleVariantSelection('${targetKey}')" 
+                    aria-label="Select alphabet ${letter}" 
+                    aria-selected="${isSelected ? 'true' : 'false'}" 
+                    data-letter="${letter}" 
+                    data-product-code="${targetProd.productCode || ''}"
+                >
+                    <span class="letter-char">${letter}</span>
+                </button>
+            `;
+        }).join('');
+
+        return `
+            <div class="pdp-variant-section pdp-alphabet-section" data-design-group="${product.design_group}" data-variant-type="alphabet">
+                <div class="pdp-variant-header">
+                    <span class="pdp-variant-title">CHOOSE YOUR INITIAL</span>
+                    <span class="pdp-variant-subtitle">Personalize your style with your favorite letter</span>
+                </div>
+                <div class="pdp-alphabet-grid" role="group" aria-label="Choose your initial">
+                    ${buttonsHTML}
+                </div>
+                <div class="pdp-current-selection">
+                    <span class="current-label">CURRENT LETTER:</span>
+                    <span class="current-value">${currentLetter || 'A'}</span>
+                </div>
+            </div>
+        `;
+    }
+
+    // ── Generic Variant Selector (size, color, finish, style, material, custom) ──
+    const currentVal = String(product.variant_value || product.variantValue || '').trim();
+    const typeLabel = (product.variant_type || 'option').toUpperCase();
+
+    // Only show available (in-stock) variants
+    const availableVariants = variants.filter(v => Number(v.stockQuantity || 0) > 0);
+    if (availableVariants.length <= 1) {
+        return '';
+    }
+
+    const chipsHTML = availableVariants.map(v => {
+        const val = String(v.variant_value || v.variantValue || '').trim();
+        const isSelected = val.toLowerCase() === currentVal.toLowerCase();
+        const targetKey = v.product_slug || v.slug || v.productCode;
+        const selectedClass = isSelected ? 'selected active' : '';
+
+        return `
+            <button 
+                type="button" 
+                class="variant-chip ${selectedClass}" 
+                onclick="handleVariantSelection('${targetKey}')" 
+                aria-label="Select ${product.variant_type} ${val}" 
+                aria-selected="${isSelected ? 'true' : 'false'}" 
+                data-variant="${val}"
+            >
+                <span class="chip-text">${val}</span>
+            </button>
+        `;
+    }).join('');
+
+    return `
+        <div class="pdp-variant-section pdp-generic-variant-section" data-design-group="${product.design_group}" data-variant-type="${product.variant_type}">
+            <div class="pdp-variant-header">
+                <span class="pdp-variant-title">CHOOSE YOUR ${typeLabel}</span>
+                <span class="pdp-variant-subtitle">Select your preferred ${product.variant_type}</span>
+            </div>
+            <div class="pdp-chips-wrap" role="group" aria-label="Choose your ${product.variant_type}">
+                ${chipsHTML}
+            </div>
+            <div class="pdp-current-selection">
+                <span class="current-label">CURRENT SELECTION:</span>
+                <span class="current-value">${currentVal}</span>
+            </div>
+        </div>
+    `;
+}
+
+/**
+ * Filter and retrieve Kids products dynamically from database audience (Parts 15-17)
+ */
+function getKidsProducts() {
+    const db = (typeof window !== 'undefined' && Array.isArray(window.productsDB) && window.productsDB.length > 0)
+        ? window.productsDB
+        : (Array.isArray(productsDB) ? productsDB : []);
+
+    return db.filter(p => {
+        if (!p) return false;
+        const aud = (p.audience || '').trim();
+        return aud === 'Kids-Girl' || aud === 'Kids-Boy';
+    });
+}
+
+function getKidsProductsByAudience(audience) {
+    const db = (typeof window !== 'undefined' && Array.isArray(window.productsDB) && window.productsDB.length > 0)
+        ? window.productsDB
+        : (Array.isArray(productsDB) ? productsDB : []);
+
+    const aud = (audience || '').trim();
+    if (!aud || aud.toLowerCase() === 'all') {
+        return getKidsProducts();
+    }
+    return db.filter(p => (p.audience || '').trim() === aud);
+}
+
+/**
+ * Create a product card HTML (strictly hides out-of-stock items)
+ */
+function createProductCardHTML(product) {
+    if (!product || Number(product.stockQuantity || 0) <= 0) return '';
+
+    const isWishlisted = typeof wishlist !== 'undefined' && wishlist.has(product.id);
+
+    let badgeHTML = '';
+    if (product.tag && product.tag !== 'UNAVAILABLE') {
+        const badgeClass = product.tag === 'NEW' ? 'badge-new' : (product.tag === 'SALE' ? 'badge-sale' : 'badge-gold');
+        badgeHTML = `<span class="product-card-badge ${badgeClass}">${product.tag}</span>`;
+    }
+
+    const discountHTML = product.discount > 0 ? `<span class="price-discount">${product.discount}% OFF</span>` : '';
+    const mrpHTML = (product.mrp > product.sellingPrice) ? `<span class="price-original">${formatPrice(product.mrp)}</span>` : '';
+
+    const imgSrc = product.images?.[0]?.url || product.image || '';
+    const imgAlt = product.images?.[0]?.alt || product.name;
+    const prodCode = product.productCode || product.sku || product.code || '';
+
+    let secondImgHTML = '';
+    const secondImg = product.images?.[1];
+    const secondImgSrc = (secondImg?.url || (typeof secondImg === 'string' ? secondImg : '')) || '';
+    if (secondImgSrc && !secondImgSrc.startsWith('data:image/svg') && secondImgSrc !== imgSrc) {
+        secondImgHTML = `
+            <img 
+                class="img-secondary" 
+                src="${secondImgSrc}" 
+                alt="${imgAlt} - alternate view" 
+                loading="lazy" 
+                width="400" 
+                height="500"
+                onerror="this.style.display='none'"
+            >
+        `;
+    }
+
+    const actionButtonHTML = `<button class="product-card-quick" onclick="addToCart('${product.id}', event)">Quick Add</button>`;
+
+    return `
+        <div class="product-card" data-product-code="${prodCode}" onclick="navigateTo('product', '${product.slug}')">
+            <div class="product-card-image" data-product-code="${prodCode}">
+                <img 
+                    src="${imgSrc}" 
+                    alt="${imgAlt}" 
+                    loading="lazy" 
+                    width="400" 
+                    height="500"
+                    data-product-code="${prodCode}"
+                    data-original-src="${imgSrc}"
+                    data-category="${product.category || 'Jewellery'}"
+                    data-fallback-index="0"
+                    onerror="handleProductImageError(this, '${prodCode}', '${product.category || 'Jewellery'}')"
+                >
+                ${secondImgHTML}
+                ${badgeHTML}
+                <button class="product-card-wishlist ${isWishlisted ? 'active' : ''}" onclick="toggleWishlist('${product.id}', event)" aria-label="${isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}">
+                    ${ICONS.heart}
+                </button>
+                ${actionButtonHTML}
+            </div>
+            <div class="product-card-info">
+                <div class="product-card-meta-line">
+                    <span class="product-card-sku">${prodCode}</span>
+                    <span class="product-card-category">${product.category}</span>
+                </div>
+                <h3 class="product-card-name">${product.name}</h3>
+                <div class="product-card-price">
+                    <span class="price-current">${formatPrice(product.sellingPrice)}</span>
+                    ${mrpHTML}
+                    ${discountHTML}
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+/**
+ * Render products to a container with proper Loading, Empty, and Error states
+ */
+function renderProductsToContainer(products, containerId) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    if (productsService.isLoading) {
+        renderProductLoadingSkeletons(containerId, 8);
+        return;
+    }
+
+    if (productsService.error && (!products || !products.length)) {
+        container.innerHTML = `
+            <div class="cart-empty" style="grid-column:1/-1;padding:60px 20px;text-align:center;">
+                <p style="font-size:1.1rem;color:var(--wr-primary);font-family:var(--wr-font-heading);margin-bottom:8px;">Unable to load jewellery collection right now.</p>
+                <p style="color:var(--wr-text-muted);font-size:0.9rem;margin-bottom:20px;">Please check your connection or tap below to retry.</p>
+                <button class="btn btn-outline btn-sm" onclick="productsService.ensureLoaded().then(() => { if(typeof applyFiltersAndSort==='function') applyFiltersAndSort(); if(typeof renderHomeSections==='function') renderHomeSections(); })">Reload Collection</button>
+            </div>
+        `;
+        return;
+    }
+
+    // Strictly filter out out-of-stock items so they are never displayed on the website
+    const availableProducts = (products || []).filter(p => p && Number(p.stockQuantity || 0) > 0);
+
+    if (!availableProducts.length) {
+        container.innerHTML = '<p class="cart-empty" style="grid-column:1/-1;">No products found matching your criteria.</p>';
+        return;
+    }
+
+    container.innerHTML = availableProducts.map(createProductCardHTML).filter(Boolean).join('');
+
+    // Pre-attach resolved images if already present in product model
+    availableProducts.forEach(p => {
+        if (p && p.productCode && Array.isArray(p.images) && p.images.length > 0) {
+            const cardImages = container.querySelectorAll(`.product-card-image[data-product-code="${p.productCode}"]`);
+            cardImages.forEach(el => {
+                el._productImages = p.images;
+            });
+        }
+    });
+}
+
+// ════════════════════════════════════════════════════
+// 18. PRODUCT DETAIL PAGE (PDP)
+// ════════════════════════════════════════════════════
+let currentPdpProduct = null;
+let currentPdpImageIndex = 0;
+let pdpQty = 1;
+
+function renderProductDetail(product) {
+    if (!product) {
+        return `
+            <div class="container" style="padding:80px 0;text-align:center;">
+                <h2 style="font-family:var(--wr-font-heading);color:var(--wr-primary);">Product currently unavailable.</h2>
+                <p style="color:var(--wr-text-muted);margin:12px 0 24px;">The piece you are looking for may have been updated or moved.</p>
+                <button class="btn btn-primary" onclick="navigateTo('shop')">Return to Shop</button>
+            </div>
+        `;
+    }
+
+    currentPdpProduct = product;
+
+    const images =
+        (typeof getProductImages === 'function')
+            ? getProductImages(product)
+            : (
+                Array.isArray(product.images)
+                    ? product.images
+                    : []
+            );
+
+    if (
+        !Number.isInteger(currentPdpImageIndex) ||
+        currentPdpImageIndex < 0 ||
+        currentPdpImageIndex >= images.length
+    ) {
+        currentPdpImageIndex = 0;
+    }
+
+    pdpQty = 1;
+
+    // Asynchronously resolve real Storage images dynamically for PDP
+    if (typeof resolveProductImages === 'function') {
+        resolveProductImages(product)
+            .then(resolvedImgs => {
+                if (
+                    Array.isArray(resolvedImgs) &&
+                    resolvedImgs.length > 0 &&
+                    !resolvedImgs[0].isPlaceholder
+                ) {
+                    product.images = resolvedImgs;
+                    product.image = resolvedImgs[0].url;
+
+                    if (
+                        currentPdpProduct &&
+                        currentPdpProduct.productCode ===
+                        product.productCode
+                    ) {
+                        updatePdpGallery(
+                            resolvedImgs,
+                            product
+                        );
+                    }
+                }
+            })
+            .catch(error => {
+                console.error(
+                    `[WishRite] PDP image resolution failed for ${product.productCode}:`,
+                    error
+                );
+            });
+    }
+
+    // Resolve images
+    const mainImage =
+        images[currentPdpImageIndex] ||
+        images[0] ||
+        {
+            url: '',
+            alt: product.name
+        };
+    // Thumbnail gallery with error handling to gracefully hide failed extra views
+    const imagesHTML = images.map((img, i) =>
+        `<div class="pdp-thumbnail ${i === currentPdpImageIndex ? 'active' : ''}" onclick="switchPdpImage(${i})" role="button" aria-label="View image ${i + 1}">
+            <img src="${img.url}" alt="${img.alt}" loading="lazy" width="82" height="82" onerror="handleThumbnailError(this)">
+        </div>`
+    ).join('');
+
+    const isWishlisted = typeof wishlist !== 'undefined' && wishlist.has(product.id);
+    const mrpHTML = product.mrp > product.sellingPrice ? `<span class="pdp-price-original">${formatPrice(product.mrp)}</span>` : '';
+    const discountHTML = product.discount > 0 ? `<span class="pdp-price-discount">${product.discount}% OFF</span>` : '';
+
+    // Trust & Feature Badges based on catalog_type
+    const features = [];
+    if (product.catalog_type === 'saree') {
+        if (product.fabric) features.push(`Fabric: ${product.fabric}`);
+        if (product.design) features.push(`Design: ${product.design}`);
+        if (product.color) features.push(`Color: ${product.color}`);
+        features.push('Authentic Festive Handloom Weave');
+        features.push('Complimentary Luxury Festive Packaging');
+    } else if (product.catalog_type === 'artificial_jewellery') {
+        features.push('Heritage Micron Gold Polish');
+        if (product.design) features.push(`Style: ${product.design}`);
+        if (product.color) features.push(`Color: ${product.color}`);
+        features.push('Handcrafted Festive Adornment');
+        features.push('Complimentary Luxury Gift Box');
+    } else {
+        features.push('Hallmarked 925 Pure Silver');
+        if (product.weight) features.push(`Weight: ${product.weight}`);
+        if (product.size) features.push(`Size: ${product.size}`);
+        features.push('High-Polish Rhodium Finish');
+        features.push('Complimentary Luxury Gift Box');
+    }
+
+    const featuresHTML = features.map(f =>
+        `<div class="feature-item">${ICONS.check}<span>${f}</span></div>`
+    ).join('');
+
+    // Dynamic Specifications Table based on catalog_type (Section 11, 12, 13)
+    const specsArr = [];
+    if (product.productCode) specsArr.push(`<tr><td>Product Code</td><td><code>${product.productCode}</code></td></tr>`);
+
+    if (product.catalog_type === 'saree') {
+        if (product.fabric) specsArr.push(`<tr><td>Fabric</td><td>${product.fabric}</td></tr>`);
+        if (product.design) specsArr.push(`<tr><td>Weave & Design</td><td>${product.design}</td></tr>`);
+        if (product.pattern) specsArr.push(`<tr><td>Pattern Motif</td><td>${product.pattern}</td></tr>`);
+        if (product.border_style) specsArr.push(`<tr><td>Border Style</td><td>${product.border_style}</td></tr>`);
+        if (product.color) specsArr.push(`<tr><td>Color Palette</td><td>${product.color}</td></tr>`);
+        if (product.occasion) specsArr.push(`<tr><td>Occasion</td><td>${product.occasion}</td></tr>`);
+        if (product.size) specsArr.push(`<tr><td>Length & Dimensions</td><td>${product.size}</td></tr>`);
+    } else if (product.catalog_type === 'artificial_jewellery') {
+        if (product.material) specsArr.push(`<tr><td>Base Metal & Craft</td><td>${product.material}</td></tr>`);
+        if (product.finish) specsArr.push(`<tr><td>Finish</td><td>${product.finish}</td></tr>`);
+        if (product.design) specsArr.push(`<tr><td>Style & Design</td><td>${product.design}</td></tr>`);
+        if (product.color) specsArr.push(`<tr><td>Color</td><td>${product.color}</td></tr>`);
+        if (product.category) specsArr.push(`<tr><td>Category</td><td>${product.category}</td></tr>`);
+        if (product.occasion) specsArr.push(`<tr><td>Occasion</td><td>${product.occasion}</td></tr>`);
+    } else {
+        if (product.material) specsArr.push(`<tr><td>Precious Metal</td><td>${product.material}</td></tr>`);
+        if (product.silverPurity) specsArr.push(`<tr><td>Silver Purity</td><td>${product.silverPurity} Standard</td></tr>`);
+        if (product.category) specsArr.push(`<tr><td>Category</td><td>${product.category}</td></tr>`);
+        if (product.audience) {
+            const audLabel = product.audience === 'Kids-Girl' ? 'Kids (Girls)' : (product.audience === 'Kids-Boy' ? 'Kids (Boys)' : (product.audience === 'Female' ? 'Women' : product.audience));
+            specsArr.push(`<tr><td>Audience</td><td>${audLabel}</td></tr>`);
+        }
+        if (product.finish) specsArr.push(`<tr><td>Finish</td><td>${product.finish}</td></tr>`);
+        if (product.weight) specsArr.push(`<tr><td>Jewellery Weight</td><td>${product.weight}</td></tr>`);
+        if (product.size) specsArr.push(`<tr><td>Size</td><td>${product.size}</td></tr>`);
+    }
+
+    // Dynamic Accordions with tailored titles and content
+    let specsTitle = 'Specifications & Hallmarking';
+    let careTitle = 'Silver Care Guide';
+    if (product.catalog_type === 'saree') {
+        specsTitle = 'Saree Details & Weave Specifications';
+        careTitle = 'Saree Care & Muslin Storage Guide';
+    } else if (product.catalog_type === 'artificial_jewellery') {
+        specsTitle = 'Jewellery Specifications & Finish';
+        careTitle = 'Jewellery Care Guide';
+    }
+
+    const accordionSections = [];
+    if (product.description) {
+        accordionSections.push({ title: 'Product Story & Details', content: `<p>${product.description}</p>` });
+    }
+    if (specsArr.length > 0) {
+        accordionSections.push({
+            title: specsTitle,
+            content: `<table class="pdp-specs-table">${specsArr.join('')}</table>`
+        });
+    }
+    if (product.care) {
+        accordionSections.push({ title: careTitle, content: `<p>${product.care}</p>` });
+    }
+    if (product.shippingInfo || product.returnInfo) {
+        let shipContent = '';
+        if (product.shippingInfo) shipContent += `<p>${product.shippingInfo}</p>`;
+        if (product.returnInfo) shipContent += `<p style="margin-top:8px;">${product.returnInfo}</p>`;
+        accordionSections.push({ title: 'Shipping, Delivery & Returns', content: shipContent });
+    }
+    if (product.whatsIncluded) {
+        accordionSections.push({ title: 'In the Box', content: `<p>${product.whatsIncluded}</p>` });
+    }
+
+    const accordionsHTML = accordionSections.map(s =>
+        `<div class="accordion-item">
+            <button class="accordion-trigger" onclick="toggleAccordion(this)" aria-expanded="false">
+                ${s.title}
+                ${ICONS.chevronDown}
+            </button>
+            <div class="accordion-content">
+                <div class="accordion-content-inner">${s.content}</div>
+            </div>
+        </div>`
+    ).join('');
+
+    // Strictly in-stock related products
+    const related = productsDB.filter(p => p && Number(p.stockQuantity || 0) > 0 && p.id !== product.id && p.category === product.category).slice(0, 4);
+    const relatedAlt = related.length < 4 ? productsDB.filter(p => p && Number(p.stockQuantity || 0) > 0 && p.id !== product.id).slice(0, 4) : related;
+
+    // Pincode checker HTML
+    const pincodeHTML = (typeof renderPincodeCheckerHTML === 'function') ? renderPincodeCheckerHTML() : '';
+
+    // Dynamic subtitle & trust signals by catalog_type
+    let subtitleMaterial = `Hallmarked ${product.material}`;
+    let trustSignalsHTML = `
+        <div class="pdp-trust">
+            <div class="pdp-trust-item">${ICONS.diamond}<span>925 Certified Silver</span></div>
+            <div class="pdp-trust-item">${ICONS.shield}<span>Quality Inspected</span></div>
+            <div class="pdp-trust-item">${ICONS.lock}<span>Secure Checkout</span></div>
+            <div class="pdp-trust-item">${ICONS.gift}<span>Luxury Gift Box</span></div>
+        </div>
+    `;
+
+    let breadcrumbCategory = `<a onclick="navigateTo('shop'); handleCategoryFilter('${product.category}');">${product.category}</a>`;
+
+    if (product.catalog_type === 'saree') {
+        subtitleMaterial = `${product.fabric || 'Traditional Handloom'} • Festive Edit`;
+        breadcrumbCategory = `<a onclick="navigateTo('occasion')">Festive Sarees</a>`;
+        trustSignalsHTML = `
+            <div class="pdp-trust">
+                <div class="pdp-trust-item">${ICONS.sparkle || ICONS.diamond}<span>Authentic Handloom</span></div>
+                <div class="pdp-trust-item">${ICONS.shield}<span>Quality Inspected</span></div>
+                <div class="pdp-trust-item">${ICONS.lock}<span>Secure Checkout</span></div>
+                <div class="pdp-trust-item">${ICONS.gift}<span>Festive Packaging</span></div>
+            </div>
+        `;
+    } else if (product.catalog_type === 'artificial_jewellery') {
+        subtitleMaterial = `${product.material || 'Festive Adornment'} • Heritage Craft`;
+        breadcrumbCategory = `<a onclick="navigateTo('occasion')">Festive Jewellery</a>`;
+        trustSignalsHTML = `
+            <div class="pdp-trust">
+                <div class="pdp-trust-item">${ICONS.sparkle || ICONS.diamond}<span>Heritage Craft</span></div>
+                <div class="pdp-trust-item">${ICONS.shield}<span>Quality Inspected</span></div>
+                <div class="pdp-trust-item">${ICONS.lock}<span>Secure Checkout</span></div>
+                <div class="pdp-trust-item">${ICONS.gift}<span>Signature Gift Box</span></div>
+            </div>
+        `;
+    }
+
+    return `
+        <nav class="breadcrumbs" aria-label="Breadcrumb">
+            <a onclick="navigateTo('home')">Home</a>
+            <span class="separator">›</span>
+            ${breadcrumbCategory}
+            <span class="separator">›</span>
+            <span class="current">${product.name}</span>
+        </nav>
+
+        <div class="pdp-layout">
+            <!-- Gallery -->
+            <div class="pdp-gallery" id="pdp-gallery">
+                <div class="pdp-main-image" onclick="openImageViewer()" role="button" aria-label="Zoom image">
+                    <img 
+                        id="pdp-main-img" 
+                        src="${mainImage.url}" 
+                        alt="${mainImage.alt}" 
+                       width="2400"
+height="2400"
+                        data-product-code="${product.productCode}"
+                        data-category="${product.category}"
+                        data-fallback-index="0"
+                        onerror="handleProductImageError(this, '${product.productCode}', '${product.category}')"
+                    >
+                    <span class="image-counter" id="pdp-image-counter">1 / ${images.length}</span>
+                </div>
+                <div class="pdp-thumbnails" id="pdp-thumbnails">
+                    ${imagesHTML}
+                </div>
+            </div>
+
+            <!-- Product Info -->
+            <div class="pdp-info">
+                <div class="pdp-header-meta">
+                    <span class="pdp-sku-badge">CODE: ${product.productCode}</span>
+                </div>
+
+                <h1 class="pdp-name">${product.name}</h1>
+                <p class="pdp-material">${subtitleMaterial}</p>
+
+                <div class="pdp-price-block">
+                    <span class="pdp-price">${formatPrice(product.sellingPrice)}</span>
+                    ${mrpHTML}
+                    ${discountHTML}
+                </div>
+
+                <!-- Stock availability -->
+                <div class="pdp-stock-status">
+                    <span class="stock-badge ${product.stockQuantity > 0 ? (product.lowStock ? 'low-stock' : 'in-stock') : 'out-of-stock'}">
+                        <span class="stock-dot"></span>${product.availability || (product.stockQuantity > 0 ? 'In Stock' : 'Currently Unavailable')}
+                    </span>
+                </div>
+
+                <p class="pdp-short-desc">${product.shortDescription}</p>
+
+                <!-- Product Variant / Initial / Design Selector -->
+                ${renderProductVariantSelector(product)}
+
+                <div class="pdp-features">
+                    ${featuresHTML}
+                </div>
+
+                <!-- PINCODE SHIPPING VALIDATION -->
+                ${pincodeHTML}
+
+                <!-- Customer Action Area -->
+                ${product.stockQuantity > 0 ? `
+                <div class="pdp-quantity">
+                    <label for="pdp-qty">Quantity</label>
+                    <div class="qty-controls">
+                        <button class="qty-btn" onclick="updateQty(-1)" aria-label="Decrease quantity">−</button>
+                        <span class="qty-value" id="pdp-qty">1</span>
+                        <button class="qty-btn" onclick="updateQty(1)" aria-label="Increase quantity">+</button>
+                    </div>
+                </div>
+
+                <div class="pdp-actions">
+                    <button class="btn btn-primary btn-lg" onclick="addToCartFromPDP('${product.id}')">Add to Bag</button>
+                    <button class="btn btn-outline btn-lg" onclick="buyNowFromPDP('${product.id}')">Buy Now</button>
+                    <button class="pdp-wishlist-btn ${isWishlisted ? 'active' : ''}" onclick="toggleWishlist('${product.id}', event)" aria-label="${isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}">
+                        ${ICONS.heart}
+                    </button>
+                </div>
+                ` : `
+                <div class="pdp-actions">
+                    <button class="btn btn-primary btn-lg" onclick="openNotifyMeModal('${product.id}')">Notify Me When Available</button>
+                    <button class="pdp-wishlist-btn ${isWishlisted ? 'active' : ''}" onclick="toggleWishlist('${product.id}', event)" aria-label="${isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}">
+                        ${ICONS.heart}
+                    </button>
+                </div>
+                `}
+
+                <!-- Trust signals -->
+                ${trustSignalsHTML}
+
+                <!-- Accordions -->
+                <div class="pdp-accordions">
+                    ${accordionsHTML}
+                </div>
+            </div>
+        </div>
+
+        ${product.catalog_type === 'saree' && typeof window.renderSareeSilverPairingHTML === 'function' ? `
+            ${window.renderSareeSilverPairingHTML(product)}
+        ` : (relatedAlt.length ? `
+        <section class="related-section">
+            <div class="section-header">
+                <span class="sub-label">Handcrafted Complementary Pieces</span>
+                <h2>Complete the Look</h2>
+            </div>
+            <div class="product-grid">${relatedAlt.map(createProductCardHTML).join('')}</div>
+        </section>
+        ` : '')}
+
+        <!-- Sticky Action Bar -->
+        <div class="sticky-cta active" id="sticky-cta" aria-hidden="false">
+            ${product.stockQuantity > 0 ? `
+                <button class="btn btn-primary" onclick="addToCart('${product.id}', event)">ADD TO CART — ${formatPrice(product.sellingPrice)}</button>
+                <button class="btn btn-secondary" onclick="buyNowFromPDP('${product.id}')">BUY NOW</button>
+            ` : `
+                <button class="btn btn-primary" onclick="openNotifyMeModal('${product.id}')">NOTIFY ME WHEN AVAILABLE</button>
+            `}
+        </div>
+    `;
+}
+
+// ════════════════════════════════════════════════════
+// 20. NOTIFY ME MODAL & SUBSCRIPTION WORKFLOW
+// ════════════════════════════════════════════════════
+function openNotifyMeModal(productId) {
+    const product = productsService.getProductById(productId) || currentPdpProduct;
+    if (!product) return;
+
+    const modal = document.getElementById('notify-me-modal');
+    if (!modal) return;
+
+    // Populate hidden fields and labels
+    document.getElementById('notify-product-id').value = product.id;
+    document.getElementById('notify-product-code').value = product.productCode || '';
+    document.getElementById('notify-product-name').value = product.name || '';
+    document.getElementById('notify-modal-title').textContent = `Notify Me — ${product.name}`;
+    document.getElementById('notify-modal-subtitle').textContent = `We will email you the moment ${product.name} (${product.productCode}) is back in stock.`;
+
+    // Reset status messages
+    const errEl = document.getElementById('notify-error-msg');
+    const successEl = document.getElementById('notify-success-msg');
+    const emailInput = document.getElementById('notify-email');
+    if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
+    if (successEl) { successEl.style.display = 'none'; }
+    if (emailInput) {
+        emailInput.value = '';
+        emailInput.disabled = false;
+    }
+    const submitBtn = document.getElementById('notify-submit-btn');
+    if (submitBtn) {
+        submitBtn.style.display = 'block';
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'NOTIFY ME';
+    }
+
+    modal.style.display = 'flex';
+    setTimeout(() => emailInput && emailInput.focus(), 100);
+}
+
+function closeNotifyMeModal() {
+    const modal = document.getElementById('notify-me-modal');
+    if (modal) modal.style.display = 'none';
+}
+
+async function handleNotifyMeSubmit(event) {
+    event.preventDefault();
+    const emailInput = document.getElementById('notify-email');
+    const errEl = document.getElementById('notify-error-msg');
+    const successEl = document.getElementById('notify-success-msg');
+    const submitBtn = document.getElementById('notify-submit-btn');
+
+    const email = (emailInput?.value || '').trim().toLowerCase();
+    const productId = document.getElementById('notify-product-id')?.value;
+    const productCode = document.getElementById('notify-product-code')?.value;
+    const productName = document.getElementById('notify-product-name')?.value;
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email || !emailRegex.test(email)) {
+        if (errEl) {
+            errEl.style.display = 'block';
+            errEl.textContent = 'Please enter a valid email address.';
+        }
+        return;
+    }
+
+    if (errEl) errEl.style.display = 'none';
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Submitting...';
+    }
+
+    // Duplicate check in localStorage
+    const localKey = `wishrite_notified_${productCode}_${email}`;
+    if (localStorage.getItem(localKey)) {
+        if (successEl) {
+            successEl.style.display = 'block';
+            successEl.innerHTML = "<p>✓ You're on the list. We'll email you when this piece is available again.</p>";
+        }
+        if (submitBtn) submitBtn.style.display = 'none';
+        if (emailInput) emailInput.disabled = true;
+        return;
+    }
+
+    // Attempt insertion into public.product_stock_notifications via Supabase REST
+    try {
+        const payload = {
+            product_id: productId,
+            product_code: productCode,
+            product_name: productName,
+            customer_email: email,
+            status: 'pending',
+            created_at: new Date().toISOString()
+        };
+
+        const res = await fetch(`${WR_SUPABASE_URL}/rest/v1/product_stock_notifications`, {
+            method: 'POST',
+            headers: {
+                'apikey': WR_SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${WR_SUPABASE_ANON_KEY}`,
+                'Content-Type': 'application/json',
+                'Prefer': 'return=minimal'
+            },
+            body: JSON.stringify(payload)
+        });
+
+        // Store in local storage for duplicate protection & offline resilience
+        localStorage.setItem(localKey, 'true');
+
+        // Also track locally in array
+        try {
+            const list = JSON.parse(localStorage.getItem('wishrite_saved_notifications') || '[]');
+            list.push({ productCode, email, date: new Date().toISOString() });
+            localStorage.setItem('wishrite_saved_notifications', JSON.stringify(list));
+        } catch (e) { }
+
+    } catch (apiErr) {
+        // Graceful fallback — save to localStorage so customer experience is flawless
+        localStorage.setItem(localKey, 'true');
+    }
+
+    // Show customer confirmation
+    if (successEl) {
+        successEl.style.display = 'block';
+        successEl.innerHTML = "<p>✓ You're on the list. We'll email you when this piece is available again.</p>";
+    }
+    if (submitBtn) submitBtn.style.display = 'none';
+    if (emailInput) emailInput.disabled = true;
+
+    if (typeof showToast === 'function') {
+        showToast("You're on the list. We'll email you when this piece is back in stock.", 'success');
+    }
+}
+
+// ════════════════════════════════════════════════════
+// PDP Gallery Controls & Viewer
+// ════════════════════════════════════════════════════
+function updatePdpGallery(images, product) {
+    if (
+        !Array.isArray(images) ||
+        images.length === 0
+    ) {
+        return;
+    }
+
+    const p =
+        product ||
+        currentPdpProduct;
+
+    if (currentPdpProduct) {
+        currentPdpProduct.images = images;
+        currentPdpProduct.image =
+            images[0]?.url || '';
+    }
+
+    /*
+     * Preserve currently selected image.
+     * Only reset if the selected index is invalid.
+     */
+    if (
+        !Number.isInteger(currentPdpImageIndex) ||
+        currentPdpImageIndex < 0 ||
+        currentPdpImageIndex >= images.length
+    ) {
+        currentPdpImageIndex = 0;
+    }
+
+    const selectedIndex =
+        currentPdpImageIndex;
+
+    const selectedImage =
+        images[selectedIndex] ||
+        images[0];
+
+    if (!selectedImage) {
+        return;
+    }
+
+    const mainImg =
+        document.getElementById(
+            'pdp-main-img'
+        );
+
+    const thumbsContainer =
+        document.getElementById(
+            'pdp-thumbnails'
+        );
+
+    const counter =
+        document.getElementById(
+            'pdp-image-counter'
+        );
+
+    /*
+     * Main image
+     */
+    if (
+        mainImg &&
+        selectedImage.url
+    ) {
+        mainImg.src =
+            selectedImage.url;
+
+        mainImg.alt =
+            selectedImage.alt ||
+            p?.name ||
+            'WishRite Product';
+
+        mainImg.dataset.fallbackIndex =
+            String(selectedIndex);
+
+        mainImg.classList.remove(
+            'is-placeholder-img'
+        );
+    }
+
+    /*
+     * Thumbnails
+     */
+    if (thumbsContainer) {
+
+        if (images.length > 1) {
+
+            thumbsContainer.style.display =
+                'flex';
+
+            thumbsContainer.innerHTML =
+                images.map((img, i) => `
+                    <div
+                        class="pdp-thumbnail ${i === selectedIndex
+                        ? 'active'
+                        : ''
+                    }"
+                        onclick="switchPdpImage(${i})"
+                        role="button"
+                        tabindex="0"
+                        aria-label="View image ${i + 1}"
+                        aria-current="${i === selectedIndex
+                        ? 'true'
+                        : 'false'
+                    }"
+                    >
+                        <img
+                            src="${img.url}"
+                            alt="${img.alt || p?.name || ''}"
+                            loading="lazy"
+                            width="82"
+                            height="82"
+                            onerror="handleThumbnailError(this)"
+                        >
+                    </div>
+                `).join('');
+
+        } else {
+
+            thumbsContainer.style.display =
+                'none';
+        }
+    }
+
+    /*
+     * Counter
+     */
+    if (counter) {
+
+        if (images.length > 1) {
+
+            counter.style.display =
+                'block';
+
+            counter.textContent =
+                `${selectedIndex + 1} / ${images.length}`;
+
+        } else {
+
+            counter.style.display =
+                'none';
+        }
+    }
+}
+window.updatePdpGallery = updatePdpGallery;
+
+// ============================================================
+// WISHRITE PDP IMAGE GALLERY CONTROLLER
+// Mouse + Keyboard + Page Navigation
+// ============================================================
+
+function switchPdpImage(index) {
+
+    if (!currentPdpProduct) {
+        return;
+    }
+
+    const images =
+        Array.isArray(
+            currentPdpProduct.images
+        )
+            ? currentPdpProduct.images
+            : [];
+
+    if (images.length === 0) {
+        return;
+    }
+
+    index = Number(index);
+
+    if (!Number.isFinite(index)) {
+        return;
+    }
+
+    /*
+     * Circular navigation
+     */
+    index =
+        (
+            (index % images.length) +
+            images.length
+        ) % images.length;
+
+    const selectedImage =
+        images[index];
+
+    if (
+        !selectedImage ||
+        !selectedImage.url
+    ) {
+        return;
+    }
+
+    /*
+     * Store selected index
+     */
+    currentPdpImageIndex =
+        index;
+
+    const mainImg =
+        document.getElementById(
+            'pdp-main-img'
+        );
+
+    const counter =
+        document.getElementById(
+            'pdp-image-counter'
+        );
+
+    const thumbs =
+        document.querySelectorAll(
+            '#pdp-thumbnails .pdp-thumbnail'
+        );
+
+    /*
+     * Main image
+     */
+    if (mainImg) {
+
+        mainImg.src =
+            selectedImage.url;
+
+        mainImg.alt =
+            selectedImage.alt ||
+            currentPdpProduct.name ||
+            'WishRite Product';
+
+        mainImg.dataset.fallbackIndex =
+            String(index);
+
+        mainImg.classList.remove(
+            'is-placeholder-img'
+        );
+    }
+
+    /*
+     * Counter
+     */
+    if (counter) {
+
+        counter.textContent =
+            `${index + 1} / ${images.length}`;
+    }
+
+    /*
+     * Active thumbnail
+     */
+    thumbs.forEach(
+        (thumb, i) => {
+
+            const active =
+                i === index;
+
+            thumb.classList.toggle(
+                'active',
+                active
+            );
+
+            thumb.setAttribute(
+                'aria-current',
+                active
+                    ? 'true'
+                    : 'false'
+            );
+        }
+    );
+
+    /*
+     * Keep active thumbnail visible
+     */
+    const activeThumb =
+        thumbs[index];
+
+    if (activeThumb) {
+
+        activeThumb.scrollIntoView({
+            behavior: 'smooth',
+            block: 'nearest',
+            inline: 'nearest'
+        });
+    }
+}
+
+// Make the function explicitly available to inline HTML onclick
+window.switchPdpImage = switchPdpImage;
+
+
+// ============================================================
+// KEYBOARD NAVIGATION
+// ============================================================
+
+function handlePdpKeyboardNavigation(event) {
+
+    const mainImage =
+        document.getElementById(
+            'pdp-main-img'
+        );
+
+    if (!mainImage) {
+        return;
+    }
+
+    const images =
+        currentPdpProduct &&
+            Array.isArray(
+                currentPdpProduct.images
+            )
+            ? currentPdpProduct.images
+            : [];
+
+    if (images.length <= 1) {
+        return;
+    }
+
+    /*
+     * Do not interfere with typing.
+     */
+    const activeElement =
+        document.activeElement;
+
+    if (
+        activeElement &&
+        (
+            activeElement.tagName === 'INPUT' ||
+            activeElement.tagName === 'TEXTAREA' ||
+            activeElement.tagName === 'SELECT' ||
+            activeElement.isContentEditable
+        )
+    ) {
+        return;
+    }
+
+    let direction = 0;
+
+    /*
+     * Next image
+     */
+    if (
+        event.key === 'ArrowRight' ||
+        event.key === 'ArrowDown' ||
+        event.key === 'PageDown'
+    ) {
+        direction = 1;
+    }
+
+    /*
+     * Previous image
+     */
+    else if (
+        event.key === 'ArrowLeft' ||
+        event.key === 'ArrowUp' ||
+        event.key === 'PageUp'
+    ) {
+        direction = -1;
+    }
+
+    if (direction === 0) {
+        return;
+    }
+
+    /*
+     * Prevent browser/page scrolling.
+     */
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation();
+
+    const newIndex =
+        (
+            currentPdpImageIndex +
+            direction +
+            images.length
+        ) % images.length;
+
+    switchPdpImage(
+        newIndex
+    );
+}
+
+
+// PDP keyboard image navigation (Capture before other document handlers)
+window.addEventListener(
+    'keydown',
+    handlePdpKeyboardNavigation,
+    {
+        capture: true
+    }
+);
+
+function updateQty(delta) {
+    pdpQty = Math.max(1, pdpQty + delta);
+    const qtyEl = document.getElementById('pdp-qty');
+    if (qtyEl) qtyEl.textContent = pdpQty;
+}
+
+function addToCartFromPDP(productId) {
+    if (typeof addToCart === 'function') {
+        addToCart(productId, null, pdpQty);
+    }
+}
+
+function buyNowFromPDP(productId) {
+    if (typeof addToCart === 'function') {
+        addToCart(productId, null, pdpQty);
+        navigateTo('cart');
+    }
+}
+
+function toggleAccordion(btn) {
+    const item = btn.closest('.accordion-item');
+    const isOpen = item.classList.contains('open');
+    item.classList.toggle('open', !isOpen);
+    btn.setAttribute('aria-expanded', !isOpen);
+}
+
+function openImageViewer() {
+    if (!currentPdpProduct) return;
+    const images = currentPdpProduct.images || [];
+    const currentImg = images[currentPdpImageIndex] || images[0];
+    if (!currentImg) return;
+
+    let viewer = document.getElementById('image-viewer-modal');
+    if (!viewer) {
+        viewer = document.createElement('div');
+        viewer.id = 'image-viewer-modal';
+        viewer.className = 'image-viewer-backdrop';
+        viewer.onclick = (e) => { if (e.target === viewer) closeImageViewer(); };
+        document.body.appendChild(viewer);
+    }
+
+    viewer.innerHTML = `
+        <div class="image-viewer-content">
+            <button class="image-viewer-close" onclick="closeImageViewer()" aria-label="Close">✕</button>
+            <img src="${currentImg.url}" alt="${currentImg.alt || currentPdpProduct.name}">
+        </div>
+    `;
+    viewer.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+
+function closeImageViewer() {
+    const viewer = document.getElementById('image-viewer-modal');
+    if (viewer) {
+        viewer.style.display = 'none';
+        document.body.style.overflow = '';
+    }
+}
+
+/* ============================================================
+   19. PRODUCT CARD HOVER IMAGE SLIDESHOW
+   ------------------------------------------------------------
+   Automatic slideshow cycling through product.images on hover.
+   - Starts when mouse enters .product-card-image
+   - Only cycles if product has >= 2 images
+   - Cycles every 1000ms with a 280ms smooth fade transition
+   - Preloads upcoming images in background
+   - Immediately stops and restores Image 1 on mouseleave
+   - Always restarts from Image 1 on re-hover
+   - Disabled on touch / mobile devices
+   - Purely visual: preserves card navigation, cart & wishlist
+   ============================================================ */
+
+(function initProductCardHoverSlideshow() {
+    'use strict';
+
+    const SLIDESHOW_INTERVAL = 1000;
+    const FADE_DURATION = 280;
+
+    const cardSlideshowMap = new WeakMap();
+    let activeCardImageEl = null;
+    const preloadedUrls = new Set();
+
+    function canHover() {
+        return Boolean(
+            window.matchMedia &&
+            window.matchMedia('(hover: hover) and (pointer: fine)').matches
+        );
+    }
+
+    function preloadImage(url) {
+        if (!url || typeof url !== 'string' || preloadedUrls.has(url)) return;
+        if (url.startsWith('data:image/svg')) return;
+        preloadedUrls.add(url);
+        const img = new Image();
+        img.src = url;
+    }
+
+    function getCardImageUrls(cardImageEl) {
+        const imgEl = cardImageEl.querySelector('img');
+        if (!imgEl) return [];
+
+        const productCode = (
+            cardImageEl.dataset.productCode ||
+            imgEl.dataset.productCode ||
+            cardImageEl.closest('.product-card')?.dataset.productCode ||
+            ''
+        ).trim();
+
+        let rawList = [];
+
+        // 1. Direct property on element (set by resolver or renderer)
+        if (Array.isArray(cardImageEl._productImages) && cardImageEl._productImages.length > 0) {
+            rawList = cardImageEl._productImages;
+        }
+        // 2. Global storage cache in images.js
+        else if (productCode && window.wishriteImageDebug && typeof window.wishriteImageDebug.getCache === 'function') {
+            const cached = window.wishriteImageDebug.getCache(productCode);
+            if (Array.isArray(cached) && cached.length > 0) {
+                rawList = cached;
+            }
+        }
+
+        // 3. Products database / service lookup
+        if ((!rawList || rawList.length === 0) && productCode) {
+            let prod = null;
+            if (typeof productsService !== 'undefined' && typeof productsService.getProductByCode === 'function') {
+                prod = productsService.getProductByCode(productCode);
+            } else if (Array.isArray(window.productsDB)) {
+                prod = window.productsDB.find(p =>
+                    (p.productCode && p.productCode.toUpperCase() === productCode.toUpperCase()) ||
+                    (p.slug && p.slug.toLowerCase() === productCode.toLowerCase()) ||
+                    p.id === productCode
+                );
+            }
+
+            if (prod) {
+                if (typeof window.getProductImages === 'function') {
+                    rawList = window.getProductImages(prod);
+                } else if (Array.isArray(prod.images) && prod.images.length > 0) {
+                    rawList = prod.images;
+                }
+            }
+        }
+
+        if (!Array.isArray(rawList)) return [];
+
+        const urls = [];
+        rawList.forEach(item => {
+            let u = '';
+            if (typeof item === 'string') {
+                u = item.trim();
+            } else if (item && typeof item === 'object') {
+                if (item.isPlaceholder) return;
+                u = (item.url || item.src || '').trim();
+            }
+
+            if (u && !u.startsWith('data:image/svg') && !urls.includes(u)) {
+                urls.push(u);
+            }
+        });
+
+        // Ensure current primary image on card is at index 0 if not already present
+        const currentSrc = (imgEl.getAttribute('data-original-src') || imgEl.src || '').trim();
+        if (currentSrc && !currentSrc.startsWith('data:image/svg') && !urls.includes(currentSrc)) {
+            urls.unshift(currentSrc);
+        }
+
+        return urls;
+    }
+
+    function startSlideshow(cardImageEl) {
+        if (!canHover()) return;
+        if (!cardImageEl) return;
+
+        const imgEl = cardImageEl.querySelector('img');
+        if (!imgEl) return;
+
+        // Stop any other active slideshow
+        if (activeCardImageEl && activeCardImageEl !== cardImageEl) {
+            stopSlideshow(activeCardImageEl);
+        }
+
+        // Clear existing timer on this card
+        stopSlideshow(cardImageEl);
+
+        const urls = getCardImageUrls(cardImageEl);
+        if (urls.length < 2) {
+            // Only 1 image — do nothing
+            return;
+        }
+
+        // Record primary image URL to always restore it reliably
+        const primaryUrl = imgEl.getAttribute('data-original-src') || urls[0] || imgEl.src;
+        if (!imgEl.getAttribute('data-original-src')) {
+            imgEl.setAttribute('data-original-src', primaryUrl);
+        }
+
+        const state = {
+            isActive: true,
+            timer: null,
+            fadeTimer: null,
+            currentIndex: 0,
+            primaryUrl: primaryUrl,
+            imageUrls: urls,
+            failedUrls: new Set(),
+            imgEl: imgEl,
+            cardEl: cardImageEl
+        };
+
+        cardSlideshowMap.set(cardImageEl, state);
+        activeCardImageEl = cardImageEl;
+
+        // Preload next image immediately
+        preloadImage(urls[1]);
+
+        // Schedule first transition after 1000ms
+        scheduleNextSlide(cardImageEl);
+    }
+
+    function scheduleNextSlide(cardImageEl) {
+        const state = cardSlideshowMap.get(cardImageEl);
+        if (!state || !state.isActive) return;
+
+        clearTimeout(state.timer);
+        state.timer = setTimeout(() => {
+            if (!state.isActive) return;
+            cycleNextImage(cardImageEl);
+        }, SLIDESHOW_INTERVAL);
+    }
+
+    function cycleNextImage(cardImageEl) {
+        const state = cardSlideshowMap.get(cardImageEl);
+        if (!state || !state.isActive) return;
+
+        const available = state.imageUrls.filter(u => !state.failedUrls.has(u));
+        if (available.length < 2) {
+            stopSlideshow(cardImageEl);
+            return;
+        }
+
+        const nextIndex = (state.currentIndex + 1) % available.length;
+        const nextUrl = available[nextIndex];
+
+        // Preload upcoming image for subsequent cycle
+        const upcomingIndex = (nextIndex + 1) % available.length;
+        preloadImage(available[upcomingIndex]);
+
+        // Validate image via preloader before initiating DOM change
+        const tester = new Image();
+        tester.onload = () => {
+            if (!state.isActive) return;
+
+            // Fade out current image
+            state.imgEl.classList.add('slideshow-fading');
+            cardImageEl.classList.add('slideshow-running');
+
+            clearTimeout(state.fadeTimer);
+            state.fadeTimer = setTimeout(() => {
+                if (!state.isActive) return;
+
+                // Swap src while faded out
+                state.imgEl.src = nextUrl;
+                state.currentIndex = nextIndex;
+
+                // Smoothly fade back in
+                requestAnimationFrame(() => {
+                    if (state.isActive) {
+                        state.imgEl.classList.remove('slideshow-fading');
+                    }
+                });
+
+                // Schedule next slide after transition completes
+                scheduleNextSlide(cardImageEl);
+            }, FADE_DURATION);
+        };
+
+        tester.onerror = () => {
+            if (!state.isActive) return;
+            // Record failed URL and skip to next valid image
+            state.failedUrls.add(nextUrl);
+            const remaining = state.imageUrls.filter(u => !state.failedUrls.has(u));
+            if (remaining.length < 2) {
+                stopSlideshow(cardImageEl);
+            } else {
+                cycleNextImage(cardImageEl);
+            }
+        };
+
+        tester.src = nextUrl;
+    }
+
+    function stopSlideshow(cardImageEl) {
+        if (!cardImageEl) return;
+        cardImageEl.classList.remove('slideshow-running');
+        const state = cardSlideshowMap.get(cardImageEl);
+        if (!state) return;
+
+        state.isActive = false;
+
+        if (state.timer) {
+            clearTimeout(state.timer);
+            state.timer = null;
+        }
+        if (state.fadeTimer) {
+            clearTimeout(state.fadeTimer);
+            state.fadeTimer = null;
+        }
+
+        if (state.imgEl) {
+            state.imgEl.classList.remove('slideshow-fading');
+            state.imgEl.style.opacity = '';
+
+            // Restore primary image immediately
+            if (state.primaryUrl && state.imgEl.src !== state.primaryUrl) {
+                state.imgEl.src = state.primaryUrl;
+            }
+        }
+
+        // Reset index to 0 so next hover starts from image 1 again
+        state.currentIndex = 0;
+
+        if (activeCardImageEl === cardImageEl) {
+            activeCardImageEl = null;
+        }
+    }
+
+    function stopAllSlideshows() {
+        if (activeCardImageEl) {
+            stopSlideshow(activeCardImageEl);
+        }
+    }
+
+    // Delegated mouse event listeners on document
+    document.addEventListener('mouseover', (e) => {
+        if (!canHover()) return;
+        const cardImageEl = e.target.closest('.product-card-image');
+        if (!cardImageEl) return;
+
+        const fromEl = e.relatedTarget ? e.relatedTarget.closest('.product-card-image') : null;
+        if (fromEl === cardImageEl) return;
+
+        startSlideshow(cardImageEl);
+    }, { passive: true });
+
+    document.addEventListener('mouseout', (e) => {
+        if (!canHover()) return;
+        const cardImageEl = e.target.closest('.product-card-image');
+        if (!cardImageEl) return;
+
+        const toEl = e.relatedTarget ? e.relatedTarget.closest('.product-card-image') : null;
+        if (toEl === cardImageEl) return;
+
+        stopSlideshow(cardImageEl);
+    }, { passive: true });
+
+    // Stop slideshow on window blur, navigation, or popstate
+    window.addEventListener('blur', stopAllSlideshows);
+    window.addEventListener('popstate', stopAllSlideshows);
+
+    // Reactive update when Supabase Storage finishes dynamic image resolution
+    window.addEventListener('wishrite:productImagesResolved', (e) => {
+        const detail = e.detail;
+        if (!detail || !detail.productCode || !Array.isArray(detail.images)) return;
+        const cleanCode = String(detail.productCode).toUpperCase();
+
+        const cardImages = document.querySelectorAll(
+            `.product-card-image[data-product-code="${cleanCode}"], .product-card-image[data-product-code="${detail.productCode}"]`
+        );
+        cardImages.forEach(cardImageEl => {
+            cardImageEl._productImages = detail.images;
+            const img = cardImageEl.querySelector('img');
+            if (img && detail.images[0]?.url) {
+                img.setAttribute('data-original-src', detail.images[0].url);
+            }
+        });
+
+        if (canHover() && detail.images.length > 1 && detail.images[1]?.url) {
+            preloadImage(detail.images[1].url);
+        }
+    });
+
+    window.stopAllProductCardSlideshows = stopAllSlideshows;
+    window.startProductCardSlideshow = startSlideshow;
+    window.stopProductCardSlideshow = stopSlideshow;
+
+})();
+

@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 1000" width="100%" height="100%" fill="none">
+  <!-- WISHRITE FESTIVE LINE-ART — CHRISTMAS ELEGANT BOTANICAL & HOLIDAY ARTWORK -->
+  <defs>
+    <linearGradient id="xmasGoldStroke" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#143D28" stop-opacity="0.9"/>
+      <stop offset="50%" stop-color="#D4AF37" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#7B1824" stop-opacity="0.7"/>
+    </linearGradient>
+  </defs>
+
+  <g stroke="url(#xmasGoldStroke)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <!-- North Star (Star of Bethlehem) Top Center -->
+    <path d="M400 80 L400 170 M355 125 L445 125" stroke-width="2"/>
+    <path d="M370 95 L430 155 M370 155 L430 95" stroke-width="1.2"/>
+    <circle cx="400" cy="125" r="4" fill="#D4AF37" fill-opacity="0.5"/>
+
+    <!-- Minimalist Luxury Pine Tree Silhouette Lines -->
+    <!-- Tier 1 -->
+    <path d="M400 180 L350 250 L380 250 L320 330 L360 330 L290 430 L350 430 L260 550 L330 550 L220 700 L580 700 L470 550 L540 550 L450 430 L510 430 L440 330 L480 330 L420 250 L450 250 Z" stroke-width="1.8"/>
+
+    <!-- Delicate Hanging Glass Baubles & Ornaments -->
+    <circle cx="340" cy="350" r="14" stroke-width="1.5"/>
+    <line x1="340" y1="330" x2="340" y2="336" stroke-width="1.5"/>
+    <circle cx="460" cy="360" r="12" stroke-width="1.5"/>
+    <line x1="460" y1="330" x2="460" y2="348" stroke-width="1.5"/>
+    
+    <circle cx="300" cy="460" r="16" stroke-width="1.5"/>
+    <line x1="300" y1="430" x2="300" y2="444" stroke-width="1.5"/>
+    <circle cx="500" cy="470" r="14" stroke-width="1.5"/>
+    <line x1="500" y1="430" x2="500" y2="456" stroke-width="1.5"/>
+    
+    <circle cx="280" cy="580" r="18" stroke-width="1.5"/>
+    <circle cx="520" cy="590" r="18" stroke-width="1.5"/>
+
+    <!-- Subtle Ribbon Swirls & Garland Arches -->
+    <path d="M360 270 Q400 300 440 270" stroke-dasharray="3,6" stroke-width="1.4"/>
+    <path d="M330 380 Q400 420 470 380" stroke-dasharray="3,6" stroke-width="1.4"/>
+    <path d="M290 500 Q400 550 510 500" stroke-dasharray="3,6" stroke-width="1.4"/>
+    <path d="M250 630 Q400 700 550 630" stroke-dasharray="3,6" stroke-width="1.4"/>
+
+    <!-- Elegant Holiday Bells at Base -->
+    <g transform="translate(370, 720)">
+      <path d="M20 20 C20 40, 5 50, 0 60 L60 60 C55 50, 40 40, 40 20 Z" stroke-width="1.5"/>
+      <circle cx="30" cy="65" r="5" fill="#D4AF37" fill-opacity="0.4"/>
+      <!-- Holly Leaf & Berries -->
+      <circle cx="30" cy="12" r="4" fill="#7B1824" fill-opacity="0.5"/>
+      <circle cx="24" cy="18" r="4" fill="#7B1824" fill-opacity="0.5"/>
+      <circle cx="36" cy="18" r="4" fill="#7B1824" fill-opacity="0.5"/>
+    </g>
+
+    <!-- Floating Crisp Snowflakes Around the Tree -->
+    <!-- Snowflake 1 (Top Left) -->
+    <g transform="translate(180, 200)" stroke-width="1.2">
+      <line x1="0" y1="-25" x2="0" y2="25"/>
+      <line x1="-25" y1="0" x2="25" y2="0"/>
+      <line x1="-18" y1="-18" x2="18" y2="18"/>
+      <line x1="-18" y1="18" x2="18" y2="-18"/>
+      <circle cx="0" cy="0" r="3" fill="#D4AF37" fill-opacity="0.5"/>
+    </g>
+    <!-- Snowflake 2 (Top Right) -->
+    <g transform="translate(620, 220)" stroke-width="1.2">
+      <line x1="0" y1="-20" x2="0" y2="20"/>
+      <line x1="-20" y1="0" x2="20" y2="0"/>
+      <line x1="-14" y1="-14" x2="14" y2="14"/>
+      <line x1="-14" y1="14" x2="14" y2="-14"/>
+    </g>
+    <!-- Snowflake 3 (Bottom Left) -->
+    <g transform="translate(140, 520)" stroke-width="1.2">
+      <line x1="0" y1="-30" x2="0" y2="30"/>
+      <line x1="-30" y1="0" x2="30" y2="0"/>
+      <line x1="-21" y1="-21" x2="21" y2="21"/>
+      <line x1="-21" y1="21" x2="21" y2="-21"/>
+    </g>
+    <!-- Snowflake 4 (Bottom Right) -->
+    <g transform="translate(660, 540)" stroke-width="1.2">
+      <line x1="0" y1="-24" x2="0" y2="24"/>
+      <line x1="-24" y1="0" x2="24" y2="0"/>
+      <line x1="-17" y1="-17" x2="17" y2="17"/>
+      <line x1="-17" y1="17" x2="17" y2="-17"/>
+    </g>
+  </g>
+</svg>

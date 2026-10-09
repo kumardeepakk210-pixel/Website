@@ -1,0 +1,3023 @@
+/* ============================================
+WISHRITE — CART & CHECKOUT
+Cart state management, inventory stock checks,
+pincode validation before order placement, dynamic shipping charges
+============================================ */
+
+let cart = [];
+
+/* ==============================================================================
+   CENTRAL COMMERCE RULES (Section 15, 16, 17, 18, 48)
+   One central source of truth for Silver Jewellery, Occasion Collection,
+   and Mixed Cart business logic.
+   ============================================================================== */
+window.COMMERCE_RULES = {
+    silver: {
+        categoryName: 'Silver Jewellery',
+        freeShippingThreshold: 2999,
+        standardShippingFee: 99,
+        codCharge: 50,
+        codEnabled: true
+    },
+    occasion: {
+        categoryName: 'Occasion Collection',
+        freeShippingThreshold: 199,
+        standardShippingFee: 49,
+        codCharge: 0,
+        codEnabled: true
+    },
+    mixed: {
+        categoryName: 'Mixed Cart (Silver & Occasion)',
+        freeShippingThreshold: 2999,
+        standardShippingFee: 99,
+        codCharge: 50,
+        codEnabled: true
+    }
+};
+
+const FREE_SHIPPING_THRESHOLD = window.COMMERCE_RULES.silver.freeShippingThreshold;
+const STANDARD_SHIPPING_FEE = window.COMMERCE_RULES.silver.standardShippingFee;
+const COD_CHARGE = window.COMMERCE_RULES.silver.codCharge;
+
+/**
+ * Helper to identify if an item belongs to the festive/occasion catalog
+ */
+function isOccasionCartItem(item) {
+    if (!item) return false;
+    const catType = String(item.catalog_type || '').toLowerCase();
+    if (catType === 'saree' || catType === 'artificial_jewellery') return true;
+    if (item.occasion_slug) return true;
+    const cat = String(item.category || '').toLowerCase();
+    if (cat.includes('saree') || cat.includes('artificial') || cat.includes('occasion')) return true;
+    return false;
+}
+
+/**
+ * Determine cart composition: 'silver', 'occasion', or 'mixed'
+ */
+function getCartCommerceType(cartItems = cart) {
+    if (!Array.isArray(cartItems) || cartItems.length === 0) {
+        const isOccasionPage = (typeof isOccasionViewActive === 'function' && isOccasionViewActive()) ||
+            window.location.pathname.includes('/occasion') ||
+            window.location.hash.includes('occasion');
+        return isOccasionPage ? 'occasion' : 'silver';
+    }
+    const hasOccasion = cartItems.some(item => isOccasionCartItem(item));
+    const hasSilver = cartItems.some(item => !isOccasionCartItem(item));
+    if (hasOccasion && hasSilver) return 'mixed';
+    if (hasOccasion) return 'occasion';
+    return 'silver';
+}
+
+/**
+ * Retrieve active commerce shipping & payment rules for current cart
+ */
+function getActiveCommerceRules(cartItems = cart) {
+    const type = getCartCommerceType(cartItems);
+    return window.COMMERCE_RULES[type] || window.COMMERCE_RULES.silver;
+}
+
+function getShippingFee(subtotal, cartItems = cart) {
+    if (subtotal <= 0) return 0;
+    const rules = getActiveCommerceRules(cartItems);
+    return subtotal >= rules.freeShippingThreshold ? 0 : rules.standardShippingFee;
+}
+
+function getCodCharge(paymentMethod, subtotal = getCartSubtotal(), cartItems = cart) {
+    if (String(paymentMethod || '').toLowerCase() !== 'cod' || subtotal <= 0) return 0;
+    const rules = getActiveCommerceRules(cartItems);
+    return rules.codCharge;
+}
+
+function getCheckoutTotals(paymentMethod = 'prepaid') {
+    const subtotal = getCartSubtotal();
+    const rules = getActiveCommerceRules(cart);
+    const appliedCoupon = (typeof WishRiteCoupons !== 'undefined' && WishRiteCoupons.getAppliedCoupon)
+        ? WishRiteCoupons.getAppliedCoupon()
+        : null;
+
+    let discount = 0;
+    if (appliedCoupon && appliedCoupon.discountAmount > 0) {
+        discount = Number(appliedCoupon.discountAmount);
+    }
+
+    let shipping = getShippingFee(subtotal, cart);
+    if (appliedCoupon && appliedCoupon.discountType === 'free_shipping') {
+        shipping = 0;
+    }
+
+    const codCharge = getCodCharge(paymentMethod, subtotal, cart);
+    const payableTotal = Math.max(0, subtotal - discount + shipping + codCharge);
+
+    return {
+        subtotal,
+        discount,
+        coupon: appliedCoupon,
+        shipping,
+        codCharge,
+        total: payableTotal,
+        cartType: getCartCommerceType(cart),
+        rules: rules
+    };
+}
+
+function getCart() {
+    return cart;
+}
+window.getCart = getCart;
+
+function addToCart(id, event, qtyToAdd = 1) {
+    if (event) event.stopPropagation();
+    const product = typeof getProductById === 'function'
+        ? getProductById(id)
+        : productsDB.find(p => p.id === id || String(p.id) === String(id));
+
+    if (!product) return;
+
+    // Strict zero-stock guard: Requirements 6 & 49 (never allow 0 stock purchase, no "Out of Stock" or "Notify" UI)
+    if (Number(product.stockQuantity || 0) <= 0) {
+        if (typeof showToast === 'function') {
+            showToast(`"${product.name}" is currently unavailable.`, 'info');
+        }
+        return;
+    }
+
+    const requestedQty = Math.max(1, qtyToAdd);
+    const existing = cart.find(item => item.id === product.id || String(item.id) === String(product.id));
+
+    if (existing) {
+        if (existing.qty + requestedQty > product.stockQuantity) {
+            if (typeof showToast === 'function') {
+                showToast(`Only ${product.stockQuantity} item(s) available in stock.`, 'warning');
+            }
+            existing.qty = product.stockQuantity;
+        } else {
+            existing.qty += requestedQty;
+        }
+    } else {
+        const initialQty = Math.min(requestedQty, product.stockQuantity);
+        cart.push({ ...product, qty: initialQty });
+    }
+
+    updateCartCount();
+    renderCart();
+
+    if (typeof showToast === 'function') {
+        showToast(`Added "${product.name}" to your shopping bag.`, 'success');
+    }
+
+    // Button feedback
+    if (event && event.target) {
+        const btn = event.target;
+        const originalText = btn.innerText;
+        btn.innerText = "Added ✓";
+        btn.style.background = "var(--wr-primary)";
+        btn.style.color = "#FFF";
+        btn.style.borderColor = "var(--wr-primary)";
+        setTimeout(() => {
+            btn.innerText = originalText;
+            btn.style.background = "";
+            btn.style.color = "";
+            btn.style.borderColor = "";
+        }, 1200);
+    }
+}
+
+function removeFromCart(id) {
+    cart = cart.filter(item => item.id !== id && String(item.id) !== String(id));
+    updateCartCount();
+    renderCart();
+}
+
+function clearCart() {
+    cart = [];
+    updateCartCount();
+    renderCart();
+}
+
+function updateCartItemQty(id, delta) {
+    const item = cart.find(c => c.id === id || String(c.id) === String(id));
+    if (!item) return;
+
+    const product = typeof getProductById === 'function' ? getProductById(id) : item;
+    const maxStock = product?.stockQuantity || 99;
+
+    if (delta > 0 && item.qty >= maxStock) {
+        if (typeof showToast === 'function') {
+            showToast(`Maximum available stock reached (${maxStock}).`, 'warning');
+        }
+        return;
+    }
+
+    item.qty = Math.max(1, item.qty + delta);
+    updateCartCount();
+    renderCart();
+}
+
+function updateCartCount() {
+    const totalItems = cart.reduce((sum, item) => sum + item.qty, 0);
+    const countEls = document.querySelectorAll('.cart-count-value');
+    countEls.forEach(el => {
+        el.textContent = totalItems;
+        el.style.display = totalItems > 0 ? 'flex' : 'none';
+    });
+}
+
+function getCartSubtotal() {
+    return cart.reduce((sum, item) => sum + (item.sellingPrice * item.qty), 0);
+}
+
+function getCartTotal() {
+    const totals = getCheckoutTotals('prepaid');
+    return totals.total;
+}
+
+/**
+ * Generates the WishRite luxury coupon component HTML (Sections 18, 19, 20, 54).
+ */
+function renderCouponBoxHTML(context = 'checkout') {
+    const applied = (typeof WishRiteCoupons !== 'undefined' && WishRiteCoupons.getAppliedCoupon)
+        ? WishRiteCoupons.getAppliedCoupon()
+        : null;
+
+    const inputId = `${context}-coupon-input`;
+    const msgId = `${context}-coupon-msg`;
+
+    if (applied && applied.discountAmount > 0) {
+        return `
+            <div class="wishrite-coupon-box" id="${context}-coupon-box">
+                <div class="wishrite-coupon-box-header">
+                    <span>Applied Promotion</span>
+                    <button type="button" class="wishrite-available-offers-link" onclick="openWishriteAvailableCouponsModal()">View all offers</button>
+                </div>
+                <div class="wishrite-coupon-applied-card">
+                    <div class="wishrite-coupon-applied-info">
+                        <span style="font-size:1.1rem;color:#2E7D32;">✓</span>
+                        <div>
+                            <span class="wishrite-coupon-applied-code">${escapeWishriteHtml(applied.code)}</span>
+                            <div class="wishrite-coupon-applied-saved">You saved ${formatPrice(applied.discountAmount)}</div>
+                        </div>
+                    </div>
+                    <button type="button" class="wishrite-coupon-remove-btn" onclick="removeWishriteCoupon('${context}')">Remove</button>
+                </div>
+                <div id="${msgId}" class="wishrite-coupon-msg success" style="margin-top:6px;">${escapeWishriteHtml(applied.message || 'Coupon applied successfully.')}</div>
+            </div>
+        `;
+    }
+
+    return `
+        <div class="wishrite-coupon-box" id="${context}-coupon-box">
+            <div class="wishrite-coupon-box-header">
+                <span>Have a coupon code?</span>
+                <button type="button" class="wishrite-available-offers-link" onclick="openWishriteAvailableCouponsModal()">% View available offers</button>
+            </div>
+            <div class="wishrite-coupon-input-group">
+                <input 
+                    type="text" 
+                    id="${inputId}" 
+                    class="wishrite-coupon-input" 
+                    placeholder="ENTER COUPON CODE" 
+                    maxlength="30"
+                    autocomplete="off"
+                    onkeydown="if(event.key==='Enter'){event.preventDefault();applyWishriteCoupon('${context}');}"
+                />
+                <button type="button" class="btn btn-outline wishrite-coupon-btn" onclick="applyWishriteCoupon('${context}')">APPLY</button>
+            </div>
+            <div id="${msgId}" class="wishrite-coupon-msg" style="display:none;"></div>
+        </div>
+    `;
+}
+
+/**
+ * Validates and applies a coupon entered by the customer.
+ */
+async function applyWishriteCoupon(context = 'checkout') {
+    const input = document.getElementById(`${context}-coupon-input`);
+    const msgEl = document.getElementById(`${context}-coupon-msg`);
+    const rawCode = input ? input.value : '';
+
+    if (!rawCode || !rawCode.trim()) {
+        if (msgEl) {
+            msgEl.textContent = 'Please enter a coupon code.';
+            msgEl.className = 'wishrite-coupon-msg error';
+            msgEl.style.display = 'block';
+        }
+        return;
+    }
+
+    if (typeof WishRiteCoupons === 'undefined') {
+        if (msgEl) {
+            msgEl.textContent = 'Coupon system is initializing. Please try again.';
+            msgEl.className = 'wishrite-coupon-msg error';
+            msgEl.style.display = 'block';
+        }
+        return;
+    }
+
+    // Capture customer context if available
+    const nameInput = document.getElementById('checkout-customer-name');
+    const phoneInput = document.getElementById('checkout-customer-phone');
+    const emailInput = document.getElementById('checkout-customer-email');
+    const customer = {
+        name: nameInput?.value?.trim() || '',
+        phone: phoneInput?.value?.trim() || '',
+        email: emailInput?.value?.trim() || ''
+    };
+
+    const subtotal = getCartSubtotal();
+    const shipping = getShippingFee(subtotal);
+
+    const btn = input?.nextElementSibling;
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Applying…';
+    }
+
+    try {
+        const result = await WishRiteCoupons.validateCoupon({
+            code: rawCode,
+            cartItems: cart,
+            customer,
+            occasion: typeof window.getActiveOccasion === 'function' ? window.getActiveOccasion() : null,
+            subtotal,
+            shippingFee: shipping
+        });
+
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = 'APPLY';
+        }
+
+        if (!result.valid) {
+            if (msgEl) {
+                msgEl.textContent = result.message || 'Invalid or expired coupon.';
+                msgEl.className = 'wishrite-coupon-msg error';
+                msgEl.style.display = 'block';
+            }
+            return;
+        }
+
+        // Save applied coupon in session
+        WishRiteCoupons.setAppliedCoupon(result);
+
+        // Update UI dynamically
+        if (context === 'cart') {
+            renderCart();
+        } else {
+            const boxContainer = document.getElementById('checkout-coupon-box');
+            if (boxContainer) {
+                boxContainer.outerHTML = renderCouponBoxHTML('checkout');
+            }
+            const activeMethod = document.querySelector('input[name="wishrite-payment-method"]:checked')?.value || 'prepaid';
+            updateWishriteCheckoutTotals(activeMethod);
+            if (document.getElementById('cart-summary')) {
+                renderCart();
+            }
+        }
+
+        if (typeof showToast === 'function') {
+            showToast(`Coupon ${result.code} applied! Saved ${formatPrice(result.discountAmount)}`, 'success');
+        }
+
+    } catch (err) {
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = 'APPLY';
+        }
+        if (msgEl) {
+            msgEl.textContent = 'Unable to validate coupon. Please try again.';
+            msgEl.className = 'wishrite-coupon-msg error';
+            msgEl.style.display = 'block';
+        }
+    }
+}
+
+/**
+ * Removes the currently applied coupon and restores totals.
+ */
+function removeWishriteCoupon(context = 'checkout') {
+    if (typeof WishRiteCoupons !== 'undefined') {
+        WishRiteCoupons.clearAppliedCoupon();
+    }
+    if (context === 'cart') {
+        renderCart();
+    } else {
+        const boxContainer = document.getElementById('checkout-coupon-box');
+        if (boxContainer) {
+            boxContainer.outerHTML = renderCouponBoxHTML('checkout');
+        }
+        const activeMethod = document.querySelector('input[name="wishrite-payment-method"]:checked')?.value || 'prepaid';
+        updateWishriteCheckoutTotals(activeMethod);
+        if (document.getElementById('cart-summary')) {
+            renderCart();
+        }
+    }
+    if (typeof showToast === 'function') {
+        showToast('Coupon removed.', 'info');
+    }
+}
+
+/**
+ * Opens available offers drawer / modal (Section 20).
+ */
+async function openWishriteAvailableCouponsModal() {
+    const existing = document.getElementById('wishrite-available-offers-modal');
+    if (existing) existing.remove();
+
+    const activeOccasion = typeof window.getActiveOccasion === 'function' ? window.getActiveOccasion() : null;
+    const activeOccasionSlug = activeOccasion?.slug || null;
+
+    const modal = document.createElement('div');
+    modal.id = 'wishrite-available-offers-modal';
+    modal.className = 'wishrite-offers-modal-overlay';
+    modal.onclick = function (e) {
+        if (e.target === modal) modal.remove();
+    };
+
+    modal.innerHTML = `
+        <div class="wishrite-offers-modal">
+            <div class="wishrite-offers-modal-header">
+                <h3 class="wishrite-offers-modal-title">Available Offers</h3>
+                <button type="button" class="wishrite-offers-modal-close" onclick="document.getElementById('wishrite-available-offers-modal').remove()">×</button>
+            </div>
+            <div class="wishrite-offers-modal-body" id="wishrite-available-offers-list">
+                <div style="text-align:center;padding:24px;color:var(--wr-text-muted);">
+                    Loading eligible offers for your cart…
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    let offers = [];
+    if (typeof WishRiteCoupons !== 'undefined') {
+        offers = await WishRiteCoupons.fetchAvailableCoupons(cart, null, activeOccasionSlug);
+    }
+
+    const listEl = document.getElementById('wishrite-available-offers-list');
+    if (!listEl) return;
+
+    if (offers.length === 0) {
+        listEl.innerHTML = `
+            <div style="text-align:center;padding:32px 16px;">
+                <p style="font-size:1.05rem;color:var(--wr-text);margin-bottom:8px;">No offers currently available for your cart.</p>
+                <p style="font-size:0.85rem;color:var(--wr-text-muted);">Add eligible festive collection or silver jewellery items to unlock exclusive promotions.</p>
+            </div>
+        `;
+        return;
+    }
+
+    const applied = (typeof WishRiteCoupons !== 'undefined') ? WishRiteCoupons.getAppliedCoupon() : null;
+
+    listEl.innerHTML = offers.map((offer, idx) => {
+        const isBest = idx === 0 && offers.length > 1;
+        const isCurrentlyApplied = applied && applied.code === offer.code;
+        const discountText = offer.discount_type === 'percentage'
+            ? `${offer.discount_value}% OFF`
+            : (offer.discount_type === 'free_shipping' ? 'FREE SHIPPING' : `₹${Number(offer.discount_value).toLocaleString('en-IN')} OFF`);
+
+        return `
+            <div class="wishrite-offer-card ${isBest ? 'best-offer' : ''}">
+                <div style="flex:1;">
+                    <div class="wishrite-offer-badge-row">
+                        <span class="wishrite-offer-badge ${isBest ? 'best' : ''}">
+                            ${isBest ? '★ BEST OFFER' : discountText}
+                        </span>
+                        <span class="wishrite-offer-code-tag">${escapeWishriteHtml(offer.code)}</span>
+                    </div>
+                    <p class="wishrite-offer-desc">${escapeWishriteHtml(offer.description || `Get ${discountText} on eligible orders.`)}</p>
+                    <div class="wishrite-offer-terms">
+                        ${offer.minimum_order_value > 0 ? `Min. order ₹${Number(offer.minimum_order_value).toLocaleString('en-IN')}` : 'No minimum order'}
+                        ${offer.maximum_discount ? ` • Up to ₹${Number(offer.maximum_discount).toLocaleString('en-IN')}` : ''}
+                        ${offer.scope === 'jewellery' ? ' • Silver Jewellery only' : (offer.scope === 'occasion' ? ' • Festive Collection only' : '')}
+                    </div>
+                </div>
+                <div>
+                    ${isCurrentlyApplied ? `
+                        <span style="font-size:0.8rem;color:#2E7D32;font-weight:700;">✓ Applied</span>
+                    ` : `
+                        <button type="button" class="btn btn-outline btn-sm wishrite-offer-apply-btn" onclick="applyCouponCodeDirectly('${escapeWishriteHtml(offer.code)}')">
+                            APPLY
+                        </button>
+                    `}
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function applyCouponCodeDirectly(code) {
+    const modal = document.getElementById('wishrite-available-offers-modal');
+    if (modal) modal.remove();
+
+    const checkoutInput = document.getElementById('checkout-coupon-input');
+    const cartInput = document.getElementById('cart-coupon-input');
+
+    if (checkoutInput) {
+        checkoutInput.value = code;
+        applyWishriteCoupon('checkout');
+    } else if (cartInput) {
+        cartInput.value = code;
+        applyWishriteCoupon('cart');
+    }
+}
+
+function renderCart() {
+    const container = document.getElementById('cart-items-container');
+    const summary = document.getElementById('cart-summary');
+    if (!container) return;
+
+    if (cart.length === 0) {
+        container.innerHTML = `
+                <div class="cart-empty">
+                    <svg viewBox="0 0 24 24" width="48" height="48" stroke="var(--wr-primary)" fill="none" stroke-width="1.5"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+                    <p style="margin-top:16px;font-size:1.1rem;color:var(--wr-text);">Your shopping bag is empty.</p>
+                    <p style="color:var(--wr-text-muted);font-size:0.9rem;margin-bottom:24px;">Discover pure 925 sterling silver treasures to adorn your collection.</p>
+                    <button class="btn btn-primary" onclick="navigateTo('shop')">Explore Jewellery</button>
+                </div>
+            `;
+        if (summary) summary.style.display = 'none';
+        return;
+    }
+
+    container.innerHTML = cart.map(item => {
+        const imgSrc = item.images?.[0]?.url || item.image;
+        return `
+                <div class="cart-item">
+                    <div class="cart-item-info">
+                        <img class="cart-item-image" src="${imgSrc}" alt="${item.name}" loading="lazy" width="90" height="90">
+                        <div>
+                            <span style="font-size:0.75rem;color:var(--wr-gold);text-transform:uppercase;letter-spacing:0.5px;font-weight:600;">${item.sku || '925 SILVER'}</span>
+                            <h4 class="cart-item-name" style="margin:2px 0 4px;font-size:0.95rem;">${item.name}</h4>
+                            <p class="cart-item-price">${formatPrice(item.sellingPrice)}</p>
+                        </div>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:var(--space-4)">
+                        <div class="qty-controls">
+                            <button class="qty-btn" onclick="updateCartItemQty('${item.id}', -1)" aria-label="Decrease">−</button>
+                            <span class="qty-value">${item.qty}</span>
+                            <button class="qty-btn" onclick="updateCartItemQty('${item.id}', 1)" aria-label="Increase">+</button>
+                        </div>
+                        <button class="cart-item-remove" onclick="removeFromCart('${item.id}')">✕</button>
+                    </div>
+                </div>
+            `;
+    }).join('');
+
+    if (summary) {
+        summary.style.display = 'block';
+        const totals = getCheckoutTotals('prepaid');
+        const subtotal = totals.subtotal;
+        const discount = totals.discount;
+        const shipping = totals.shipping;
+        const total = totals.total;
+        const savedPin = (typeof getSavedPincode === 'function') ? getSavedPincode() : null;
+
+        summary.innerHTML = `
+                <h3 style="font-family:var(--wr-font-heading);font-size:1.2rem;margin-bottom:16px;">Order Summary</h3>
+                
+                <div class="cart-summary-line">
+                    <span>Subtotal</span>
+                    <span>${formatPrice(subtotal)}</span>
+                </div>
+
+                ${discount > 0 ? `
+                <div class="cart-summary-line" style="color:#2E7D32;">
+                    <span>Coupon Discount (${escapeWishriteHtml(totals.coupon?.code || '')})</span>
+                    <span>-${formatPrice(discount)}</span>
+                </div>
+                ` : ''}
+
+                <div class="cart-summary-line">
+                    <span>Shipping</span>
+                    <span>${shipping === 0 ? '<strong style="color:#2E7D32;">FREE</strong>' : formatPrice(shipping)}</span>
+                </div>
+
+                ${renderCouponBoxHTML('cart')}
+
+                ${subtotal < (totals.rules?.freeShippingThreshold || FREE_SHIPPING_THRESHOLD) ? `
+                    <div class="free-shipping-progress">
+                        <p style="font-size:0.8rem;color:var(--wr-text-muted);margin:0 0 6px;">Add <strong>${formatPrice((totals.rules?.freeShippingThreshold || FREE_SHIPPING_THRESHOLD) - subtotal)}</strong> more for <strong>FREE Delivery</strong></p>
+                        <div style="background:var(--wr-border);height:4px;border-radius:2px;overflow:hidden;">
+                            <div style="background:var(--wr-primary);width:${Math.min(100, Math.round((subtotal / (totals.rules?.freeShippingThreshold || FREE_SHIPPING_THRESHOLD)) * 100))}%;height:100%;"></div>
+                        </div>
+                    </div>
+                ` : `
+                    <div style="background:#F4EFEB;border:1px solid #E5D9D2;padding:8px 12px;border-radius:var(--radius-sm);margin:12px 0;font-size:0.8rem;color:var(--wr-primary);">
+                        ✓ Congratulations! You have qualified for <strong>FREE Delivery</strong>.
+                    </div>
+                `}
+
+                <!-- Delivery Address PIN Code Verification -->
+                <div class="checkout-pincode-box" style="margin:16px 0;padding:12px;background:var(--wr-bg-card);border:1px solid var(--wr-border);border-radius:var(--radius-md);">
+                    <label style="display:block;font-size:0.85rem;font-weight:600;margin-bottom:6px;">Delivery PIN Code <span style="color:#C62828;">*</span></label>
+                    <div style="display:flex;gap:8px;">
+                        <input 
+                            type="text" 
+                            id="checkout-pincode-input" 
+                            maxlength="6" 
+                            inputmode="numeric" 
+                            value="${savedPin || ''}" 
+                            placeholder="Enter 6-digit PIN" 
+                            style="flex:1;padding:8px 12px;border:1px solid var(--wr-border);border-radius:var(--radius-sm);font-size:0.9rem;"
+                            oninput="this.value=this.value.replace(/\\D/g,'')"
+                        />
+                        <button type="button" class="btn btn-outline btn-sm" onclick="validateCheckoutPincode()">Verify PIN</button>
+                    </div>
+                    <div id="checkout-pincode-msg" style="margin-top:8px;font-size:0.8rem;">
+                        ${savedPin ? `<span style="color:#2E7D32;">✓ Serviceable to PIN code ${savedPin}</span>` : '<span style="color:var(--wr-text-muted);">Please verify your PIN code before checkout.</span>'}
+                    </div>
+                </div>
+
+                <div class="cart-summary-line total" style="border-top:1px solid var(--wr-border);padding-top:12px;margin-top:12px;font-size:1.15rem;font-weight:600;">
+                    <span>Total Amount</span>
+                    <span id="cart-total" style="color:var(--wr-primary);">${formatPrice(total)}</span>
+                </div>
+
+                <button class="btn btn-primary btn-lg" style="width:100%;margin-top:16px;" onclick="proceedToCheckoutOrder()">
+                    Proceed to Checkout
+                </button>
+
+                <div style="margin-top:12px;text-align:center;font-size:0.75rem;color:var(--wr-text-muted);display:flex;align-items:center;justify-content:center;gap:12px;">
+                    <span>🔒 256-Bit SSL Encrypted</span>
+                    <span>💎 925 Hallmark Assured</span>
+                </div>
+            `;
+    }
+}
+
+let checkoutPincodeVerified = false;
+let checkoutPincodeServiceability = null;
+
+async function validateCheckoutPincode() {
+    const input = document.getElementById('checkout-pincode-input');
+    const msg = document.getElementById('checkout-pincode-msg');
+    if (!input || !msg) return false;
+
+    const pin = input.value.trim();
+    if (typeof isValidIndianPincode === 'function' && !isValidIndianPincode(pin)) {
+        msg.innerHTML = `<span style="color:#C62828;">✕ Please enter a valid 6-digit Indian PIN code.</span>`;
+        checkoutPincodeVerified = false;
+        return false;
+    }
+
+    msg.innerHTML = `<span style="color:var(--wr-text-muted);">Verifying delivery serviceability...</span>`;
+
+    try {
+        const res = (typeof checkPincodeServiceability === 'function')
+            ? await checkPincodeServiceability(pin)
+            : { serviceable: true };
+
+        checkoutPincodeServiceability = res;
+
+        if (res.serviceable) {
+            msg.innerHTML = `<span style="color:#2E7D32;">✓ Delivery available to ${pin} (${res.estimatedDeliveryDate || '3-5 business days'}).</span>`;
+            checkoutPincodeVerified = true;
+            if (typeof savePincode === 'function') savePincode(pin);
+            return true;
+        } else {
+            msg.innerHTML = `<span style="color:#C62828;">✕ Delivery is currently unavailable to PIN code ${pin}. Please provide an alternative delivery PIN.</span>`;
+            checkoutPincodeVerified = false;
+            return false;
+        }
+    } catch (e) {
+        msg.innerHTML = `<span style="color:#C62828;">Unable to verify PIN code right now. Please try again.</span>`;
+        checkoutPincodeVerified = false;
+        return false;
+    }
+}
+
+async function proceedToCheckoutOrder() {
+    console.log('[CHECKOUT-DIAG] Proceed to Checkout clicked');
+
+    if (cart.length === 0) {
+        if (typeof showToast === 'function') {
+            showToast('Your cart is empty.', 'error');
+        } else {
+            console.warn('Your cart is empty.');
+        }
+        return;
+    }
+
+    // Check stock again immediately before checkout
+    for (const item of cart) {
+        const product =
+            typeof getProductById === 'function'
+                ? getProductById(item.id)
+                : item;
+
+        if (product && product.stockQuantity <= 0) {
+            if (typeof showToast === 'function') {
+                showToast(
+                    `"${item.name}" is now out of stock. Please remove it from your bag to proceed.`,
+                    'error'
+                );
+            }
+            return;
+        }
+
+        if (
+            product &&
+            Number(item.qty) > Number(product.stockQuantity)
+        ) {
+            if (typeof showToast === 'function') {
+                showToast(
+                    `Only ${product.stockQuantity} item(s) of "${item.name}" are available.`,
+                    'error'
+                );
+            }
+            return;
+        }
+    }
+
+    // Read optional pre-filled delivery PIN if customer already entered one (without blocking modal open)
+    const input = document.getElementById('checkout-pincode-input');
+    const pin = input
+        ? input.value.trim()
+        : (typeof getSavedPincode === 'function' ? getSavedPincode() : null);
+
+    console.log('[CHECKOUT-DIAG] Opening customer details modal');
+    openWishriteCheckoutModal(pin);
+}
+
+/* =========================================================
+   WISHRITE CUSTOMER CHECKOUT MODAL
+   Collects customer information before creating the order.
+   ========================================================= */
+
+function openWishriteCheckoutModal(pin) {
+    console.log('[CHECKOUT-DIAG] openWishriteCheckoutModal started');
+    const existingModal = document.getElementById('wishrite-checkout-modal');
+
+    if (existingModal) {
+        existingModal.remove();
+    }
+
+    const initialTotals = getCheckoutTotals('prepaid');
+    const subtotal = initialTotals.subtotal;
+    const discount = initialTotals.discount;
+    const coupon = initialTotals.coupon;
+    const shipping = initialTotals.shipping;
+    const total = initialTotals.total;
+
+    const modal = document.createElement('div');
+
+    modal.id = 'wishrite-checkout-modal';
+
+    modal.innerHTML = `
+        <div
+            class="wishrite-checkout-overlay"
+            onclick="closeWishriteCheckoutModal(event)"
+        >
+            <div
+                class="wishrite-checkout-modal"
+                onclick="event.stopPropagation()"
+            >
+
+                <div class="wishrite-checkout-header">
+                    <div>
+                        <span class="wishrite-checkout-eyebrow">
+                            WISHRITE
+                        </span>
+
+                        <h2>
+                            Complete Your Order
+                        </h2>
+
+                        <p>
+                            Enter your delivery details to continue securely.
+                        </p>
+                    </div>
+
+                    <button
+                        type="button"
+                        class="wishrite-checkout-close"
+                        onclick="closeWishriteCheckoutModal()"
+                        aria-label="Close checkout"
+                    >
+                        ×
+                    </button>
+                </div>
+
+                <div class="wishrite-checkout-body">
+
+                    <div class="wishrite-checkout-order-summary" id="wishrite-checkout-summary">
+
+                        <div>
+                            <span>Subtotal</span>
+                            <strong id="wishrite-checkout-subtotal">${formatPrice(subtotal)}</strong>
+                        </div>
+
+                        <div id="wishrite-checkout-discount-row" style="${discount > 0 ? 'display:flex;color:#2E7D32;' : 'display:none;'}">
+                            <span id="wishrite-checkout-discount-label">Coupon Discount ${coupon ? `(${escapeWishriteHtml(coupon.code)})` : ''}</span>
+                            <strong id="wishrite-checkout-discount">-${formatPrice(discount)}</strong>
+                        </div>
+
+                        <div>
+                            <span>Shipping</span>
+                            <strong id="wishrite-checkout-shipping">
+                                ${shipping === 0 ? 'FREE' : formatPrice(shipping)}
+                            </strong>
+                        </div>
+
+                        <div id="wishrite-checkout-cod-row" style="display:none;">
+                            <span>COD Charges</span>
+                            <strong id="wishrite-checkout-cod-charge">${formatPrice(COD_CHARGE)}</strong>
+                        </div>
+
+                        <div class="wishrite-checkout-total">
+                            <span>Final Total</span>
+                            <strong id="wishrite-checkout-total">${formatPrice(total)}</strong>
+                        </div>
+
+                    </div>
+
+                    <!-- ═══ COUPON INPUT BOX (Sections 18, 19, 20) ═══ -->
+                    ${renderCouponBoxHTML('checkout')}
+
+                    <div class="wishrite-payment-section" style="margin:20px 0 24px;">
+                        <div class="wishrite-form-section-title" style="margin-bottom:12px;">Payment Method</div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                            <label id="wishrite-prepaid-option" style="display:flex;align-items:center;gap:10px;border:1px solid var(--wr-primary);border-radius:10px;padding:14px;cursor:pointer;background:#faf6f3;">
+                                <input type="radio" name="wishrite-payment-method" value="prepaid" checked onchange="updateWishriteCheckoutTotals('prepaid')">
+                                <span>
+                                    <strong style="display:block;">Online Payment</strong>
+                                    <small style="color:var(--wr-text-muted);">UPI, Cards & Net Banking</small>
+                                </span>
+                            </label>
+                            <label id="wishrite-cod-option" style="display:flex;align-items:center;gap:10px;border:1px solid var(--wr-border);border-radius:10px;padding:14px;cursor:pointer;background:#fff;">
+                                <input type="radio" name="wishrite-payment-method" value="cod" onchange="updateWishriteCheckoutTotals('cod')">
+                                <span>
+                                    <strong style="display:block;">Cash on Delivery</strong>
+                                    <small id="wishrite-cod-subtitle" style="color:var(--wr-text-muted);">${(initialTotals.rules?.codCharge || 0) > 0 ? `+ ${formatPrice(initialTotals.rules.codCharge)} COD charges` : 'FREE Cash on Delivery'}</small>
+                                </span>
+                            </label>
+                        </div>
+                        <div id="wishrite-payment-note" style="margin-top:10px;font-size:0.78rem;color:var(--wr-text-muted);">Secure online payment powered by Razorpay.</div>
+                    </div>
+
+                    <form
+                        id="wishrite-customer-checkout-form"
+                        onsubmit="submitWishriteCustomerCheckout(event)"
+                    >
+
+                        <div class="wishrite-form-section-title">
+                            Contact Information
+                        </div>
+
+                        <div class="wishrite-form-grid">
+
+                            <div class="wishrite-form-field">
+                                <label for="checkout-customer-name">
+                                    Full Name
+                                    <span>*</span>
+                                </label>
+
+                                <input
+                                    id="checkout-customer-name"
+                                    type="text"
+                                    autocomplete="name"
+                                    placeholder="Enter your full name"
+                                    required
+                                    maxlength="100"
+                                >
+                            </div>
+
+                            <div class="wishrite-form-field">
+                                <label for="checkout-customer-phone">
+                                    Mobile Number
+                                    <span>*</span>
+                                </label>
+
+                                <input
+                                    id="checkout-customer-phone"
+                                    type="tel"
+                                    autocomplete="tel"
+                                    inputmode="numeric"
+                                    placeholder="10-digit mobile number"
+                                    maxlength="10"
+                                    required
+                                    oninput="this.value=this.value.replace(/\\D/g,'').slice(0,10)"
+                                >
+                            </div>
+
+                        </div>
+
+                        <div class="wishrite-form-field">
+                            <label for="checkout-customer-email">
+                                Email Address
+                                <span>*</span>
+                            </label>
+
+                            <input
+                                id="checkout-customer-email"
+                                type="email"
+                                autocomplete="email"
+                                placeholder="you@example.com"
+                                maxlength="150"
+                                required
+                            >
+                        </div>
+
+                        <div class="wishrite-form-section-title">
+                            Delivery Address
+                        </div>
+
+                        <div class="wishrite-form-field">
+                            <label for="checkout-customer-address">
+                                Complete Address
+                                <span>*</span>
+                            </label>
+
+                            <textarea
+                                id="checkout-customer-address"
+                                autocomplete="street-address"
+                                placeholder="House / Flat / Building, Street, Area"
+                                rows="3"
+                                maxlength="500"
+                                required
+                            ></textarea>
+                        </div>
+
+                        <div class="wishrite-form-grid">
+
+                            <div class="wishrite-form-field">
+                                <label for="checkout-customer-city">
+                                    City
+                                    <span>*</span>
+                                </label>
+
+                                <input
+                                    id="checkout-customer-city"
+                                    type="text"
+                                    autocomplete="address-level2"
+                                    placeholder="City"
+                                    maxlength="100"
+                                    required
+                                >
+                            </div>
+
+                            <div class="wishrite-form-field">
+                                <label for="checkout-customer-state">
+                                    State
+                                    <span>*</span>
+                                </label>
+
+                                <input
+                                    id="checkout-customer-state"
+                                    type="text"
+                                    autocomplete="address-level1"
+                                    placeholder="State"
+                                    maxlength="100"
+                                    required
+                                >
+                            </div>
+
+                        </div>
+
+                        <div class="wishrite-form-grid">
+
+                            <div class="wishrite-form-field">
+
+                                <label for="checkout-customer-pin">
+                                    PIN Code
+                                    <span>*</span>
+                                </label>
+
+                                <input
+                                    id="checkout-customer-pin"
+                                    type="text"
+                                    inputmode="numeric"
+                                    autocomplete="postal-code"
+                                    placeholder="6-digit PIN"
+                                    value="${pin || ''}"
+                                    maxlength="6"
+                                    required
+                                >
+
+                                <div id="checkout-pin-status" class="wishrite-pin-status" aria-live="polite"></div>
+
+                            </div>
+
+                            <div class="wishrite-form-field">
+
+                                <label for="checkout-customer-country">
+                                    Country
+                                </label>
+
+                                <input
+                                    id="checkout-customer-country"
+                                    type="text"
+                                    value="India"
+                                    readonly
+                                    style="background:#f7f4f1;"
+                                >
+
+                            </div>
+
+                        </div>
+
+                        <div
+                            id="wishrite-checkout-form-error"
+                            class="wishrite-checkout-form-error"
+                            style="display:none;"
+                        ></div>
+
+                        <button
+                            id="wishrite-create-order-button"
+                            type="submit"
+                            class="btn btn-primary btn-lg wishrite-create-order-btn"
+                        >
+                            Continue to Secure Payment
+                        </button>
+
+                        <div class="wishrite-checkout-security">
+                            <span>🔒 Secure Checkout</span>
+                            <span>•</span>
+                            <span>Razorpay</span>
+                            <span>•</span>
+                            <span>925 Silver</span>
+                        </div>
+
+                    </form>
+
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+    console.log('[CHECKOUT-DIAG] Customer details modal rendered successfully');
+
+    document.body.style.overflow = 'hidden';
+
+    // Initialize auto City & State lookup on PIN entry
+    initCheckoutPinLookup(pin);
+    updateWishriteCheckoutTotals('prepaid');
+
+    setTimeout(() => {
+        const nameInput = document.getElementById(
+            'checkout-customer-name'
+        );
+
+        if (nameInput) {
+            nameInput.focus();
+        }
+    }, 100);
+}
+
+
+function updateWishriteCheckoutTotals(paymentMethod) {
+    const method = String(paymentMethod || 'prepaid').toLowerCase() === 'cod' ? 'cod' : 'prepaid';
+    const totals = getCheckoutTotals(method);
+
+    const subtotalEl = document.getElementById('wishrite-checkout-subtotal');
+    const discountRow = document.getElementById('wishrite-checkout-discount-row');
+    const discountLabel = document.getElementById('wishrite-checkout-discount-label');
+    const discountEl = document.getElementById('wishrite-checkout-discount');
+    const shippingEl = document.getElementById('wishrite-checkout-shipping');
+    const codRow = document.getElementById('wishrite-checkout-cod-row');
+    const codChargeEl = document.getElementById('wishrite-checkout-cod-charge');
+    const totalEl = document.getElementById('wishrite-checkout-total');
+    const prepaidOption = document.getElementById('wishrite-prepaid-option');
+    const codOption = document.getElementById('wishrite-cod-option');
+    const noteEl = document.getElementById('wishrite-payment-note');
+
+    if (subtotalEl) subtotalEl.textContent = formatPrice(totals.subtotal);
+    if (discountRow) {
+        if (totals.discount > 0) {
+            discountRow.style.display = 'flex';
+            if (discountLabel) {
+                discountLabel.textContent = `Coupon Discount (${escapeWishriteHtml(totals.coupon?.code || '')})`;
+            }
+            if (discountEl) {
+                discountEl.textContent = `-${formatPrice(totals.discount)}`;
+            }
+        } else {
+            discountRow.style.display = 'none';
+        }
+    }
+
+    if (shippingEl) {
+        shippingEl.innerHTML = totals.shipping === 0
+            ? '<strong style="color:#2E7D32;">FREE</strong>'
+            : formatPrice(totals.shipping);
+    }
+    if (codRow) codRow.style.display = method === 'cod' ? 'flex' : 'none';
+    if (codChargeEl) {
+        codChargeEl.innerHTML = totals.codCharge === 0
+            ? '<strong style="color:#2E7D32;">FREE</strong>'
+            : formatPrice(totals.codCharge);
+    }
+    const codSubtitleEl = document.getElementById('wishrite-cod-subtitle');
+    if (codSubtitleEl) {
+        const fee = totals.rules?.codCharge || 0;
+        codSubtitleEl.textContent = fee > 0 ? `+ ${formatPrice(fee)} COD charges` : 'FREE Cash on Delivery';
+        codSubtitleEl.style.color = fee > 0 ? 'var(--wr-text-muted)' : '#2E7D32';
+    }
+    if (totalEl) totalEl.textContent = formatPrice(totals.total);
+
+    if (prepaidOption) {
+        prepaidOption.style.borderColor = method === 'prepaid' ? 'var(--wr-primary)' : 'var(--wr-border)';
+        prepaidOption.style.background = method === 'prepaid' ? '#faf6f3' : '#fff';
+    }
+    const codAvailable = checkoutPincodeServiceability?.codAvailable !== false;
+    const codRadio = codOption?.querySelector('input[value="cod"]');
+    if (codOption) {
+        codOption.style.borderColor = method === 'cod' ? 'var(--wr-primary)' : 'var(--wr-border)';
+        codOption.style.background = method === 'cod' ? '#faf6f3' : '#fff';
+        codOption.style.opacity = codAvailable ? '1' : '0.5';
+        codOption.style.cursor = codAvailable ? 'pointer' : 'not-allowed';
+    }
+    if (codRadio) {
+        codRadio.disabled = !codAvailable;
+        if (!codAvailable && codRadio.checked) {
+            const prepaidRadio = document.querySelector('input[name="wishrite-payment-method"][value="prepaid"]');
+            if (prepaidRadio) {
+                prepaidRadio.checked = true;
+                return updateWishriteCheckoutTotals('prepaid');
+            }
+        }
+    }
+    if (noteEl) {
+        noteEl.textContent = method === 'cod'
+            ? 'Cash on Delivery includes a ₹50 COD handling charge.'
+            : 'Secure online payment powered by Razorpay.';
+    }
+
+    return totals;
+}
+
+function closeWishriteCheckoutModal(event) {
+    if (
+        event &&
+        event.target &&
+        !event.target.classList.contains('wishrite-checkout-overlay')
+    ) {
+        return;
+    }
+
+    const modal = document.getElementById('wishrite-checkout-modal');
+
+    if (modal) {
+        modal.remove();
+    }
+
+    document.body.style.overflow = '';
+}
+
+/**
+ * Handles automatic City & State population when customer enters a 6-digit PIN code.
+ * Preserves manual edits, protects against race conditions, and caches results per session.
+ */
+function initCheckoutPinLookup(initialPin) {
+    const pinInput = document.getElementById('checkout-customer-pin');
+    const cityInput = document.getElementById('checkout-customer-city');
+    const stateInput = document.getElementById('checkout-customer-state');
+    const statusEl = document.getElementById('checkout-pin-status');
+
+    if (!pinInput || !cityInput || !stateInput) return;
+
+    let pinLookupRequestId = 0;
+    let lastLookupPin = '';
+    let cityAutoFilled = false;
+    let stateAutoFilled = false;
+    let debounceTimer = null;
+
+    // Track customer manual inputs on City and State
+    cityInput.addEventListener('input', () => {
+        cityAutoFilled = false;
+    });
+
+    stateInput.addEventListener('input', () => {
+        stateAutoFilled = false;
+    });
+
+    const setStatus = (type, message) => {
+        if (!statusEl) return;
+        statusEl.className = 'wishrite-pin-status' + (type ? ` ${type}` : '');
+        if (type === 'loading') {
+            statusEl.innerHTML = '<span class="wishrite-pin-spinner"></span> <span>Checking PIN code...</span>';
+        } else if (message) {
+            statusEl.textContent = message;
+        } else {
+            statusEl.textContent = '';
+        }
+    };
+
+    const performLookup = async (rawPin) => {
+        const cleaned = String(rawPin || '').replace(/\D/g, '').slice(0, 6);
+        if (cleaned.length !== 6) return;
+
+        lastLookupPin = cleaned;
+        const currentRequestId = ++pinLookupRequestId;
+        setStatus('loading');
+
+        try {
+            const lookupFn = (typeof lookupPincodeLocation === 'function')
+                ? lookupPincodeLocation
+                : (typeof window !== 'undefined' && typeof window.lookupPincodeLocation === 'function' ? window.lookupPincodeLocation : null);
+
+            let res;
+            if (lookupFn) {
+                res = await lookupFn(cleaned);
+            } else {
+                const resp = await fetch(`https://api.postalpincode.in/pincode/${cleaned}`);
+                const data = await resp.json();
+                if (data?.[0]?.Status === 'Success' && Array.isArray(data[0].PostOffice) && data[0].PostOffice[0]) {
+                    const po = data[0].PostOffice[0];
+                    res = {
+                        success: true,
+                        valid: true,
+                        city: (po.District || po.Division || po.Block || '').trim(),
+                        state: (po.State || '').trim()
+                    };
+                } else {
+                    res = { success: false, invalid: true, error: 'Please enter a valid PIN code.' };
+                }
+            }
+
+            // Stale lookup response protection against race conditions
+            if (currentRequestId !== pinLookupRequestId) return;
+
+            if (res && res.valid && res.success) {
+                const summaryParts = [];
+
+                if (res.city) {
+                    cityInput.value = res.city;
+                    cityAutoFilled = true;
+                    cityInput.classList.remove('wishrite-field-autopopulated');
+                    void cityInput.offsetWidth;
+                    cityInput.classList.add('wishrite-field-autopopulated');
+                    summaryParts.push(res.city);
+                }
+
+                if (res.state) {
+                    stateInput.value = res.state;
+                    stateAutoFilled = true;
+                    stateInput.classList.remove('wishrite-field-autopopulated');
+                    void stateInput.offsetWidth;
+                    stateInput.classList.add('wishrite-field-autopopulated');
+                    summaryParts.push(res.state);
+                }
+
+                const summary = summaryParts.join(', ') || [res.city, res.state].filter(Boolean).join(', ');
+                setStatus('success', `✓ ${summary || 'PIN code verified'}`);
+
+                if (typeof savePincode === 'function') {
+                    savePincode(cleaned);
+                }
+            } else if (res && res.invalid) {
+                setStatus('error', 'Please enter a valid PIN code.');
+            } else {
+                // Non-blocking fallback: lookup service unreachable
+                setStatus('warning', "We couldn't verify this PIN code. Please check your City and State.");
+            }
+        } catch (err) {
+            if (currentRequestId !== pinLookupRequestId) return;
+            setStatus('warning', "We couldn't verify this PIN code. Please check your City and State.");
+        }
+    };
+
+    pinInput.addEventListener('input', (e) => {
+        const cleaned = e.target.value.replace(/\D/g, '').slice(0, 6);
+        e.target.value = cleaned;
+
+        if (debounceTimer) {
+            clearTimeout(debounceTimer);
+            debounceTimer = null;
+        }
+
+        if (cleaned.length < 6) {
+            // When customer changes/deletes the PIN, clear previously auto-filled City/State
+            if (cityAutoFilled) {
+                cityInput.value = '';
+                cityAutoFilled = false;
+            }
+            if (stateAutoFilled) {
+                stateInput.value = '';
+                stateAutoFilled = false;
+            }
+            lastLookupPin = '';
+            setStatus('', '');
+            return;
+        }
+
+        if (cleaned === lastLookupPin) {
+            return;
+        }
+
+        debounceTimer = setTimeout(() => {
+            performLookup(cleaned);
+        }, 300);
+    });
+
+    // Run lookup immediately on modal open if a 6-digit PIN is already provided
+    const initialCleaned = String(initialPin || pinInput.value || '').replace(/\D/g, '').slice(0, 6);
+    if (initialCleaned.length === 6) {
+        performLookup(initialCleaned);
+    }
+}
+
+
+
+function generateOrderNumber() {
+    const now = new Date();
+    const pad = (n, len = 2) => String(n).padStart(len, '0');
+    const yyyy = now.getFullYear();
+    const mm = pad(now.getMonth() + 1);
+    const dd = pad(now.getDate());
+    const hh = pad(now.getHours());
+    const min = pad(now.getMinutes());
+    const ss = pad(now.getSeconds());
+    const ms = pad(now.getMilliseconds(), 3);
+    return `WR-${yyyy}${mm}${dd}${hh}${min}${ss}${ms}`;
+}
+
+let isCreatingRazorpayOrder = false;
+
+function loadRazorpaySdk() {
+    return new Promise((resolve, reject) => {
+        if (typeof window.Razorpay === 'function') {
+            resolve(window.Razorpay);
+            return;
+        }
+
+        const existingScript = document.querySelector('script[src="https://checkout.razorpay.com/v1/checkout.js"]');
+        if (existingScript) {
+            existingScript.addEventListener('load', () => resolve(window.Razorpay));
+            existingScript.addEventListener('error', () => reject(new Error('Failed to load Razorpay Checkout SDK.')));
+            return;
+        }
+
+        const script = document.createElement('script');
+        script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+        script.async = true;
+        script.onload = () => resolve(window.Razorpay);
+        script.onerror = () => reject(new Error('Failed to load Razorpay Checkout SDK. Please check your connection.'));
+        document.head.appendChild(script);
+    });
+}
+
+async function proceedToRazorpayPayment(internalOrderId) {
+    if (isCreatingRazorpayOrder) return;
+
+    if (window.wishritePendingCheckout?.is_completed) {
+        showCheckoutFormError('This order has already been verified and confirmed.', true);
+        return;
+    }
+
+    if (!internalOrderId) {
+        internalOrderId = window.wishritePendingCheckout?.internal_order_id;
+    }
+
+    if (!internalOrderId) {
+        showCheckoutFormError('Order information is missing. Please check your details and try again.');
+        return;
+    }
+
+    const submitButton = document.getElementById('wishrite-create-order-button');
+    const client = window.supabaseClient || (typeof supabaseClient !== 'undefined' ? supabaseClient : null);
+
+    if (!client) {
+        showCheckoutFormError('Supabase client is not available. Please refresh the page and try again.');
+        return;
+    }
+
+    isCreatingRazorpayOrder = true;
+    if (submitButton) {
+        submitButton.disabled = true;
+        submitButton.innerHTML = 'Connecting to Secure Payment…';
+    }
+
+    try {
+        await loadRazorpaySdk();
+
+        console.log('[CHECKOUT-DIAG] Calling create-razorpay-order');
+        const { data: efData, error: efError } = await client.functions.invoke('create-razorpay-order', {
+            body: {
+                order_id: internalOrderId
+            }
+        });
+
+        if (efError) {
+            console.error('create-razorpay-order invocation error:', efError.message || efError);
+            throw new Error(efError.message || 'Unable to initiate payment with payment gateway.');
+        }
+
+        if (!efData || !efData.success || !efData.order_id || !efData.key_id) {
+            console.error('create-razorpay-order invalid response:', efData?.error || 'Missing required payment data.');
+            throw new Error(efData?.error || 'Invalid payment response received from server.');
+        }
+
+        const pending = window.wishritePendingCheckout || {};
+
+        const razorpayOptions = {
+            key: efData.key_id,
+            amount: efData.amount,
+            currency: efData.currency || 'INR',
+            name: 'WishRite',
+            description: 'Premium 925 Silver Jewellery',
+            order_id: efData.order_id,
+            prefill: {
+                name: pending.customer_name || '',
+                email: pending.customer_email || '',
+                contact: pending.customer_phone || ''
+            },
+            theme: {
+                color: '#5E3435'
+            },
+            modal: {
+                ondismiss: function () {
+                    isCreatingRazorpayOrder = false;
+                    if (window.wishritePendingCheckout?.is_completed) {
+                        return;
+                    }
+                    if (submitButton) {
+                        submitButton.disabled = false;
+                        submitButton.innerHTML = 'Continue to Secure Payment';
+                    }
+                    showCheckoutFormError(
+                        'Payment was not completed. You can try again whenever you are ready.',
+                        false
+                    );
+                }
+            },
+            handler: async function (response) {
+                // Prevent duplicate clicks while verification is underway
+                isCreatingRazorpayOrder = true;
+
+                const pending = window.wishritePendingCheckout || {};
+                const orderIdToVerify = pending.internal_order_id || internalOrderId;
+                const orderNumber = pending.order_number || '';
+
+                // Prevent accidental double execution of the success flow
+                if (window.wishritePendingCheckout?.is_completed) {
+                    return;
+                }
+
+                // Safe diagnostic logging (no personal data, secrets, or signatures)
+                console.log('Razorpay payment response received:', {
+                    internal_order_id: orderIdToVerify,
+                    razorpay_order_id: response?.razorpay_order_id
+                });
+
+                // Preserve internal order ID and record payment response identifiers
+                if (window.wishritePendingCheckout) {
+                    window.wishritePendingCheckout.razorpay_payment_id = response.razorpay_payment_id;
+                    window.wishritePendingCheckout.razorpay_order_id = response.razorpay_order_id;
+                    window.wishritePendingCheckout.razorpay_signature = response.razorpay_signature;
+                }
+
+                if (submitButton) {
+                    submitButton.disabled = true;
+                    submitButton.innerHTML = 'Verifying Payment…';
+                }
+
+                showCheckoutFormError(
+                    'Payment received. Verifying transaction with secure server…',
+                    true
+                );
+
+                try {
+                    const { data: verifyData, error: verifyError } = await client.functions.invoke(
+                        'verify-razorpay-payment',
+                        {
+                            body: {
+                                internal_order_id: orderIdToVerify,
+                                razorpay_payment_id: response.razorpay_payment_id,
+                                razorpay_order_id: response.razorpay_order_id,
+                                razorpay_signature: response.razorpay_signature
+                            }
+                        }
+                    );
+
+                    if (verifyError) {
+                        console.error('verify-razorpay-payment invocation failed:', {
+                            internal_order_id: orderIdToVerify,
+                            razorpay_order_id: response?.razorpay_order_id,
+                            error: verifyError.message || verifyError
+                        });
+                        throw new Error(verifyError.message || 'Payment verification failed on the server.');
+                    }
+
+                    // Require: verifyData.success === true AND verifyData.verified === true
+                    if (!verifyData || verifyData.success !== true || verifyData.verified !== true) {
+                        console.error('verify-razorpay-payment rejected payment:', {
+                            internal_order_id: orderIdToVerify,
+                            razorpay_order_id: response?.razorpay_order_id,
+                            error: verifyData?.error || 'Unverified payment response.'
+                        });
+                        throw new Error(verifyData?.error || 'Payment signature verification failed.');
+                    }
+
+                    // Guard against accidental double execution
+                    if (window.wishritePendingCheckout?.is_completed) {
+                        return;
+                    }
+
+                    // Success: payment verified by server and recorded in public.orders
+                    console.log('Payment verified successfully:', {
+                        internal_order_id: orderIdToVerify,
+                        razorpay_order_id: verifyData.razorpay_order_id || response.razorpay_order_id,
+                        payment_status: verifyData.payment_status || 'paid',
+                        order_status: verifyData.order_status || 'processing'
+                    });
+
+                    // Preserve pending checkout info and mark completed
+                    if (window.wishritePendingCheckout) {
+                        window.wishritePendingCheckout.is_completed = true;
+                        window.wishritePendingCheckout.payment_status = verifyData.payment_status || 'paid';
+                        window.wishritePendingCheckout.order_status = verifyData.order_status || 'processing';
+                    }
+
+                    // Clear the shopping cart and applied coupon
+                    clearCart();
+                    if (typeof WishRiteCoupons !== 'undefined') {
+                        WishRiteCoupons.clearAppliedCoupon();
+                    }
+
+                    // Render luxury WishRite Order Confirmation UI immediately after cart is cleared
+                    renderWishriteOrderConfirmation(window.wishritePendingCheckout, verifyData);
+
+                    isCreatingRazorpayOrder = false;
+
+                } catch (verifyErr) {
+                    isCreatingRazorpayOrder = false;
+                    console.error('Payment verification failed:', {
+                        internal_order_id: orderIdToVerify,
+                        error: verifyErr.message || verifyErr
+                    });
+
+                    if (submitButton) {
+                        submitButton.disabled = false;
+                        submitButton.innerHTML = 'Continue to Secure Payment';
+                    }
+
+                    showCheckoutFormError(
+                        verifyErr.message || 'Payment verification failed. Please try again or contact support.',
+                        false
+                    );
+                }
+            }
+        };
+
+        const rzp = new window.Razorpay(razorpayOptions);
+
+        rzp.on('payment.failed', function (failureResponse) {
+            isCreatingRazorpayOrder = false;
+            console.error('Razorpay payment failed:', {
+                code: failureResponse.error?.code,
+                description: failureResponse.error?.description,
+                reason: failureResponse.error?.reason
+            });
+
+            if (submitButton) {
+                submitButton.disabled = false;
+                submitButton.innerHTML = 'Continue to Secure Payment';
+            }
+
+            showCheckoutFormError(
+                failureResponse.error?.description || 'Payment was unsuccessful. Please try again or use another payment method.'
+            );
+        });
+
+        rzp.open();
+
+    } catch (err) {
+        isCreatingRazorpayOrder = false;
+        console.error('Razorpay checkout error:', err.message || err);
+
+        if (submitButton) {
+            submitButton.disabled = false;
+            submitButton.innerHTML = 'Continue to Secure Payment';
+        }
+
+        showCheckoutFormError(err.message || 'Unable to open secure checkout. Please try again.');
+    }
+}
+
+async function submitWishriteCustomerCheckout(event) {
+    if (event) event.preventDefault();
+    console.log('[CHECKOUT-DIAG] Continue to Secure Payment clicked');
+
+    // Prevent duplicate clicks if order creation or Razorpay invocation is in progress
+    if (isCreatingRazorpayOrder) return;
+
+    if (window.wishritePendingCheckout?.is_completed) {
+        showCheckoutFormError('This order has already been verified and confirmed.', true);
+        return;
+    }
+
+    // If order was already created in this checkout session, proceed directly to Razorpay
+    if (window.wishritePendingCheckout?.internal_order_id) {
+        await proceedToRazorpayPayment(window.wishritePendingCheckout.internal_order_id);
+        return;
+    }
+
+    const errorEl = document.getElementById(
+        'wishrite-checkout-form-error'
+    );
+
+    const submitButton = document.getElementById(
+        'wishrite-create-order-button'
+    );
+
+    const name = document
+        .getElementById('checkout-customer-name')
+        ?.value
+        .trim();
+
+    const phone = document
+        .getElementById('checkout-customer-phone')
+        ?.value
+        .trim();
+
+    const email = document
+        .getElementById('checkout-customer-email')
+        ?.value
+        .trim();
+
+    const address = document
+        .getElementById('checkout-customer-address')
+        ?.value
+        .trim();
+
+    const city = document
+        .getElementById('checkout-customer-city')
+        ?.value
+        .trim();
+
+    const state = document
+        .getElementById('checkout-customer-state')
+        ?.value
+        .trim();
+
+    const pin = document
+        .getElementById('checkout-customer-pin')
+        ?.value
+        .trim();
+
+    if (!name || name.length < 2) {
+        showCheckoutFormError('Please enter your full name.');
+        return;
+    }
+
+    if (!/^[6-9]\d{9}$/.test(phone)) {
+        showCheckoutFormError(
+            'Please enter a valid 10-digit Indian mobile number.'
+        );
+        return;
+    }
+
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        showCheckoutFormError(
+            'Please enter a valid email address.'
+        );
+        return;
+    }
+
+    if (!address || address.length < 5) {
+        showCheckoutFormError(
+            'Please enter your complete delivery address.'
+        );
+        return;
+    }
+
+    if (!city) {
+        showCheckoutFormError('Please enter your city.');
+        return;
+    }
+
+    if (!state) {
+        showCheckoutFormError('Please enter your state.');
+        return;
+    }
+
+    console.log('[CHECKOUT-DIAG] Validating delivery PIN');
+    if (!/^\d{6}$/.test(pin)) {
+        showCheckoutFormError(
+            'Please enter a valid 6-digit PIN code.'
+        );
+        return;
+    }
+
+    // Re-check serviceability here because the customer can edit the PIN inside the checkout modal.
+    try {
+        if (typeof checkPincodeServiceability === 'function') {
+            const serviceability = await checkPincodeServiceability(pin);
+            checkoutPincodeServiceability = serviceability;
+            if (!serviceability?.serviceable) {
+                showCheckoutFormError('Delivery is unavailable to this PIN code. Please enter a serviceable delivery PIN.');
+                return;
+            }
+        }
+    } catch (serviceabilityError) {
+        showCheckoutFormError('Unable to verify delivery serviceability right now. Please try again.');
+        return;
+    }
+
+    const paymentMethodInput = document.querySelector('input[name="wishrite-payment-method"]:checked');
+    const paymentMethod = paymentMethodInput?.value === 'cod' ? 'cod' : 'prepaid';
+
+    if (paymentMethod === 'cod' && checkoutPincodeServiceability?.codAvailable === false) {
+        showCheckoutFormError('Cash on Delivery is not available for this PIN code. Please choose online payment.');
+        return;
+    }
+
+    const checkoutTotals = getCheckoutTotals(paymentMethod);
+    const subtotal = checkoutTotals.subtotal;
+    const shipping = checkoutTotals.shipping;
+    const codCharge = checkoutTotals.codCharge;
+    const total = checkoutTotals.total;
+
+    if (!Number.isFinite(total) || total <= 0) {
+        showCheckoutFormError(
+            'Unable to calculate the order total. Please try again.'
+        );
+        return;
+    }
+
+    if (submitButton) {
+        submitButton.disabled = true;
+        submitButton.innerHTML = 'Creating Secure Order…';
+    }
+
+    if (errorEl) {
+        errorEl.style.display = 'none';
+        errorEl.textContent = '';
+    }
+
+    try {
+        const client = window.supabaseClient || (typeof supabaseClient !== 'undefined' ? supabaseClient : null);
+        if (!client) {
+            throw new Error('Supabase client is not available. Please refresh the page and try again.');
+        }
+
+        // Securely re-validate applied coupon immediately before creating order record (Section 29)
+        let couponDiscount = 0;
+        let appliedCoupon = null;
+        if (typeof WishRiteCoupons !== 'undefined' && WishRiteCoupons.getAppliedCoupon) {
+            appliedCoupon = WishRiteCoupons.getAppliedCoupon();
+            if (appliedCoupon) {
+                const validation = await WishRiteCoupons.validateCoupon({
+                    code: appliedCoupon.code,
+                    cartItems: cart,
+                    customer: { name, phone, email },
+                    occasion: typeof window.getActiveOccasion === 'function' ? window.getActiveOccasion() : null,
+                    subtotal: Number(subtotal),
+                    shippingFee: Number(shipping)
+                });
+                if (validation.valid) {
+                    couponDiscount = Number(validation.discountAmount || 0);
+                    appliedCoupon = validation;
+                } else {
+                    WishRiteCoupons.clearAppliedCoupon();
+                    if (submitButton) {
+                        submitButton.disabled = false;
+                        submitButton.innerHTML = 'Continue to Secure Payment';
+                    }
+                    showCheckoutFormError(validation.message || 'The applied coupon is no longer valid for this order.');
+                    updateWishriteCheckoutTotals(paymentMethod);
+                    return;
+                }
+            }
+        }
+
+        const actualCodFee = paymentMethod === 'cod' ? getCodCharge('cod', subtotal, cart) : 0;
+        const finalDiscountedTotal = Math.max(0, Math.round(Number(subtotal) - couponDiscount + Number(shipping) + actualCodFee));
+
+        const internalOrderId = crypto.randomUUID();
+        const orderNumber = generateOrderNumber();
+
+        const orderPayload = {
+            id: internalOrderId,
+            order_number: orderNumber,
+            customer_name: name,
+            customer_phone: phone,
+            customer_email: email,
+            customer_address: address,
+            customer_city: city,
+            customer_state: state,
+            customer_country: 'India',
+            customer_pin: pin,
+            subtotal: Number(subtotal),
+            discount: couponDiscount,
+            shipping_charge: Number(shipping),
+            cod_charge: actualCodFee,
+            tax: 0,
+            grand_total: finalDiscountedTotal,
+            currency: 'INR',
+            payment_method: paymentMethod,
+            payment_status: 'pending',
+            order_status: paymentMethod === 'cod' ? 'confirmed' : 'pending'
+        };
+
+        // Add extended coupon audit fields if coupon was applied
+        if (appliedCoupon && couponDiscount > 0) {
+            orderPayload.coupon_code = appliedCoupon.code;
+            orderPayload.coupon_id = appliedCoupon.couponId || null;
+            orderPayload.discount_type = appliedCoupon.discountType || null;
+            orderPayload.discount_value = appliedCoupon.discountValue || null;
+            orderPayload.coupon_discount_amount = couponDiscount;
+            orderPayload.subtotal_before_discount = Number(subtotal);
+            orderPayload.final_amount = finalDiscountedTotal;
+        }
+
+        // 1. Insert order record into public.orders without SELECT/RETURNING
+        console.log('[CHECKOUT-DIAG] Creating internal order');
+        let { error: orderError } = await client
+            .from('orders')
+            .insert([orderPayload]);
+
+        // Graceful fallback if database schema has not yet been migrated with new columns
+        if (orderError && (orderError.message?.includes('column') || orderError.code === 'PGRST204')) {
+            console.warn('Orders insert retry without extended coupon columns:', orderError.message);
+            const standardPayload = {
+                id: internalOrderId,
+                order_number: orderNumber,
+                customer_name: name,
+                customer_phone: phone,
+                customer_email: email,
+                customer_address: address,
+                customer_city: city,
+                customer_state: state,
+                customer_country: 'India',
+                customer_pin: pin,
+                subtotal: Number(subtotal),
+                discount: couponDiscount,
+                shipping_charge: Number(shipping),
+                tax: 0,
+                grand_total: finalDiscountedTotal,
+                currency: 'INR',
+                payment_method: paymentMethod,
+                payment_status: 'pending',
+                order_status: paymentMethod === 'cod' ? 'confirmed' : 'pending'
+            };
+            const retryRes = await client.from('orders').insert([standardPayload]);
+            orderError = retryRes.error;
+        }
+
+        if (orderError) {
+            console.error('WishRite orders insert error:', orderError.message || orderError);
+            if (submitButton) {
+                submitButton.disabled = false;
+                submitButton.innerHTML = 'Continue to Secure Payment';
+            }
+            showCheckoutFormError(orderError.message || 'Unable to create your order. Please try again.');
+            return;
+        }
+
+        // 2. Prepare and insert order_items for every item in cart
+        const orderItemsPayload = cart.map(item => {
+            const product = (typeof getProductById === 'function') ? getProductById(item.id) : null;
+            const inventoryId = item.inventory_id || item.inventoryId || product?.id || item.id;
+            const quantity = Number(item.qty) || 1;
+            const unitPrice = Number(item.sellingPrice !== undefined ? item.sellingPrice : (item.price || 0));
+            const lineTotal = quantity * unitPrice;
+            const productCode = item.productCode || item.product_code || item.sku || product?.productCode || '';
+            const productName = item.name || product?.name || 'WishRite Jewellery';
+            const size = item.size || product?.size || null;
+
+            return {
+                order_id: internalOrderId,
+                inventory_id: inventoryId,
+                product_code: productCode,
+                product_name: productName,
+                quantity: quantity,
+                unit_price: unitPrice,
+                line_total: lineTotal,
+                size: size
+            };
+        });
+
+        const { error: itemsError } = await client
+            .from('order_items')
+            .insert(orderItemsPayload);
+
+        if (itemsError) {
+            console.error('WishRite order_items insert error:', itemsError.message || itemsError);
+            // Attempt to clean up newly created pending order header so no orphan record remains
+            try {
+                await client.from('orders').delete().eq('id', internalOrderId);
+            } catch (cleanupErr) {
+                console.error('Failed to clean up pending order header:', cleanupErr.message || cleanupErr);
+            }
+
+            if (submitButton) {
+                submitButton.disabled = false;
+                submitButton.innerHTML = 'Continue to Secure Payment';
+            }
+            showCheckoutFormError(itemsError.message || 'Unable to save items for your order. Please try again.');
+            return;
+        }
+
+        // 2.5 Record coupon usage in public.coupon_usages (Section 42)
+        if (appliedCoupon && couponDiscount > 0) {
+            try {
+                await client.from('coupon_usages').insert([{
+                    coupon_id: appliedCoupon.couponId || null,
+                    customer_email: email,
+                    customer_phone: phone,
+                    order_id: internalOrderId,
+                    coupon_code: appliedCoupon.code,
+                    discount_amount: couponDiscount
+                }]);
+            } catch (usageErr) {
+                console.warn('Coupon usage record non-blocking warning:', usageErr);
+            }
+        }
+
+        // 3. Store pending checkout details in window.wishritePendingCheckout
+        const orderItemsWithImages = orderItemsPayload.map((oi, idx) => {
+            const cartItem = cart[idx];
+            const product = (typeof getProductById === 'function') ? getProductById(oi.inventory_id) : null;
+            const img = cartItem?.images?.[0]?.url || cartItem?.image || product?.images?.[0]?.url || product?.image || '';
+            return {
+                ...oi,
+                image: img
+            };
+        });
+
+        window.wishritePendingCheckout = {
+            internal_order_id: internalOrderId,
+            order_number: orderNumber,
+            customer_name: name,
+            customer_phone: phone,
+            customer_email: email,
+            customer_address: address,
+            customer_city: city,
+            customer_state: state,
+            customer_country: 'India',
+            customer_pin: pin,
+            subtotal: Number(subtotal),
+            discount: couponDiscount,
+            coupon_discount_amount: couponDiscount,
+            coupon_code: appliedCoupon ? appliedCoupon.code : null,
+            coupon_id: appliedCoupon ? appliedCoupon.couponId : null,
+            shipping_charge: Number(shipping),
+            cod_charge: Number(codCharge),
+            grand_total: finalDiscountedTotal,
+            payment_method: paymentMethod,
+            currency: 'INR',
+            items: orderItemsWithImages
+        };
+
+        // 4. Online payment goes through Razorpay. COD is confirmed without opening Razorpay.
+        if (paymentMethod === 'cod') {
+            if (window.wishritePendingCheckout) {
+                window.wishritePendingCheckout.is_completed = true;
+                window.wishritePendingCheckout.payment_status = 'pending';
+                window.wishritePendingCheckout.order_status = 'confirmed';
+            }
+
+            if (typeof WishRiteCoupons !== 'undefined') {
+                WishRiteCoupons.clearAppliedCoupon();
+            }
+
+            clearCart();
+            renderWishriteOrderConfirmation(window.wishritePendingCheckout, {
+                success: true,
+                verified: false,
+                order_number: orderNumber,
+                payment_status: 'pending',
+                order_status: 'confirmed',
+                grand_total: finalDiscountedTotal,
+                currency: 'INR'
+            });
+            return;
+        }
+
+        await proceedToRazorpayPayment(internalOrderId);
+
+    } catch (error) {
+        console.error('WishRite checkout error:', error.message || error);
+
+        if (submitButton) {
+            submitButton.disabled = false;
+            submitButton.innerHTML = 'Continue to Secure Payment';
+        }
+
+        showCheckoutFormError(error.message || 'Something went wrong. Please try again.');
+    }
+}
+
+
+function showCheckoutFormError(message, success = false) {
+    const errorEl = document.getElementById(
+        'wishrite-checkout-form-error'
+    );
+
+    if (!errorEl) {
+        if (typeof showToast === 'function') {
+            showToast(
+                message,
+                success ? 'success' : 'error'
+            );
+        } else {
+            console.warn('[Checkout Form Error]', message);
+        }
+        return;
+    }
+
+    errorEl.textContent = message;
+    errorEl.style.display = 'block';
+
+    errorEl.style.color = success
+        ? '#2E7D32'
+        : '#C62828';
+
+    errorEl.style.background = success
+        ? '#F1F8F3'
+        : '#FFF5F5';
+
+    errorEl.style.borderColor = success
+        ? '#B7DDBF'
+        : '#E5B8B8';
+}
+
+
+/**
+ * Helper to escape HTML characters securely
+ */
+function escapeWishriteHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+/**
+ * Ensures the luxury Order Confirmation CSS is injected in document.head
+ * regardless of external stylesheet caching or latency.
+ */
+function ensureWishriteConfirmationStyles() {
+    if (document.getElementById('wishrite-confirmation-styles')) return;
+
+    const styleEl = document.createElement('style');
+    styleEl.id = 'wishrite-confirmation-styles';
+    styleEl.textContent = `
+        .wishrite-checkout-overlay.wishrite-confirm-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 99999;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 36px 16px 60px;
+            background: rgba(18, 12, 12, 0.78);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .wishrite-confirmation-modal {
+            width: 100%;
+            max-width: 1120px;
+            background: #FFFFFF;
+            border-radius: 16px;
+            border: 1px solid rgba(184, 149, 106, 0.32);
+            box-shadow: 0 25px 70px rgba(0, 0, 0, 0.22), 0 10px 25px rgba(94, 52, 53, 0.12);
+            margin: 0 auto;
+            padding: 36px 42px 48px;
+            position: relative;
+            box-sizing: border-box;
+            animation: wrConfirmAppear 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            color: #333333;
+        }
+
+        @keyframes wrConfirmAppear {
+            from {
+                opacity: 0;
+                transform: translateY(18px) scale(0.99);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .wishrite-confirm-header-bar {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: -16px;
+        }
+
+        .wishrite-confirm-close-btn {
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            border: 1px solid #E5DFD9;
+            background: #FAF8F5;
+            color: #5E3435;
+            font-size: 1.3rem;
+            line-height: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .wishrite-confirm-close-btn:hover {
+            background: #5E3435;
+            color: #FFFFFF;
+            border-color: #5E3435;
+        }
+
+        .wishrite-confirm-close-btn:focus-visible {
+            outline: 2px solid #5E3435;
+            outline-offset: 2px;
+        }
+
+        /* Hero Section */
+        .wishrite-confirm-hero {
+            text-align: center;
+            padding: 4px 16px 28px;
+        }
+
+        .wishrite-confirm-badge-wrap {
+            width: 72px;
+            height: 72px;
+            margin: 0 auto 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            box-shadow: 0 8px 24px rgba(94, 52, 53, 0.14);
+        }
+
+        .wishrite-confirm-badge-svg {
+            width: 72px;
+            height: 72px;
+            display: block;
+        }
+
+        .wishrite-confirm-badge-bg {
+            fill: #FAF6F2;
+            stroke: rgba(184, 149, 106, 0.35);
+            stroke-width: 1.2;
+        }
+
+        .wishrite-confirm-badge-ring {
+            fill: none;
+            stroke: #5E3435;
+            stroke-width: 2.4;
+            stroke-dasharray: 202;
+            stroke-dashoffset: 202;
+            transform-origin: center;
+            transform: rotate(-90deg);
+            animation: wrRingDraw 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+        }
+
+        .wishrite-confirm-badge-check {
+            fill: none;
+            stroke: #B8956A;
+            stroke-width: 3.2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            stroke-dasharray: 45;
+            stroke-dashoffset: 45;
+            animation: wrCheckDraw 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) 0.32s forwards;
+        }
+
+        @keyframes wrRingDraw {
+            to { stroke-dashoffset: 0; }
+        }
+
+        @keyframes wrCheckDraw {
+            to { stroke-dashoffset: 0; }
+        }
+
+        .wishrite-confirm-eyebrow {
+            display: block;
+            font-size: 0.72rem;
+            font-weight: 700;
+            letter-spacing: 4px;
+            color: #9A7778;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+
+        .wishrite-confirm-title {
+            font-family: 'Playfair Display', Georgia, serif;
+            font-size: 2.3rem;
+            font-weight: 500;
+            color: #5E3435;
+            margin: 0 0 8px;
+            letter-spacing: -0.01em;
+        }
+
+        .wishrite-confirm-thankyou {
+            font-size: 1.12rem;
+            font-weight: 600;
+            color: #1A1A1A;
+            margin: 0 0 6px;
+        }
+
+        .wishrite-confirm-subtitle {
+            font-size: 0.95rem;
+            color: #6B6B6B;
+            max-width: 540px;
+            margin: 0 auto;
+            line-height: 1.55;
+        }
+
+        /* Horizontal Status Card */
+        .wishrite-confirm-status-card {
+            display: grid;
+            grid-template-columns: 1.3fr 1fr 1fr 0.8fr;
+            background: #FAF8F5;
+            border: 1px solid #ECE4DC;
+            border-radius: 12px;
+            padding: 18px 24px;
+            margin-bottom: 30px;
+            align-items: center;
+            box-shadow: 0 2px 8px rgba(94, 52, 53, 0.03);
+            box-sizing: border-box;
+        }
+
+        .wishrite-status-col {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            padding: 0 14px;
+            border-right: 1px solid #EAE1D9;
+        }
+
+        .wishrite-status-col:first-child {
+            padding-left: 0;
+        }
+
+        .wishrite-status-col:last-child {
+            padding-right: 0;
+            border-right: none;
+        }
+
+        .wishrite-status-label {
+            font-size: 0.72rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: #8C7C75;
+        }
+
+        .wishrite-status-value {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: #1A1A1A;
+        }
+
+        .wishrite-order-number-val {
+            font-family: 'SF Mono', Monaco, Consolas, monospace;
+            font-size: 0.86rem;
+            letter-spacing: 0.2px;
+            color: #5E3435;
+            word-break: break-all;
+        }
+
+        /* Subtle Status Pills */
+        .wishrite-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            width: fit-content;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+        }
+
+        .wishrite-pill-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+        }
+
+        .wishrite-pill-paid {
+            background: #EAF5EE;
+            color: #167946;
+            border: 1px solid #C4E6D0;
+        }
+
+        .wishrite-pill-paid .wishrite-pill-dot {
+            background: #167946;
+        }
+
+        .wishrite-pill-pending {
+            background: #FFF8E1;
+            color: #8A6D1D;
+            border: 1px solid #E8D79A;
+        }
+
+        .wishrite-pill-pending .wishrite-pill-dot {
+            background: #C79A00;
+        }
+
+        .wishrite-pill-processing {
+            background: #FDF7EB;
+            color: #9B6C1A;
+            border: 1px solid #F5E1B5;
+        }
+
+        .wishrite-pill-processing .wishrite-pill-dot {
+            background: #B8956A;
+        }
+
+        /* Two Column Grid */
+        .wishrite-confirm-grid {
+            display: grid;
+            grid-template-columns: 1.55fr 1fr;
+            gap: 28px;
+            align-items: start;
+        }
+
+        .wishrite-confirm-main-col {
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .wishrite-confirm-side-col {
+            position: sticky;
+            top: 24px;
+        }
+
+        /* Cards */
+        .wishrite-card {
+            background: #FAF8F5;
+            border: 1px solid #ECE4DC;
+            border-radius: 14px;
+            padding: 24px 28px;
+            box-shadow: 0 2px 10px rgba(94, 52, 53, 0.03);
+            box-sizing: border-box;
+        }
+
+        .wishrite-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 14px;
+            margin-bottom: 18px;
+            border-bottom: 1px solid #EAE1D9;
+        }
+
+        .wishrite-card-title-group {
+            display: flex;
+            align-items: baseline;
+            gap: 10px;
+        }
+
+        .wishrite-card-title {
+            font-family: 'Playfair Display', Georgia, serif;
+            font-size: 1.22rem;
+            font-weight: 600;
+            color: #5E3435;
+            margin: 0;
+        }
+
+        .wishrite-card-subtitle {
+            font-size: 0.78rem;
+            color: #8C7C75;
+            font-weight: 500;
+        }
+
+        /* Product Card List */
+        .wishrite-products-list {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .wishrite-product-row {
+            display: flex;
+            align-items: center;
+            gap: 18px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid #EDE5DE;
+        }
+
+        .wishrite-product-row:last-child {
+            border-bottom: none;
+            padding-bottom: 0;
+        }
+
+        .wishrite-product-img-wrap {
+            flex: 0 0 84px;
+            width: 84px;
+            height: 84px;
+            border-radius: 10px;
+            overflow: hidden;
+            background: #FFFFFF;
+            border: 1px solid #E5DFD9;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .wishrite-product-img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        .wishrite-product-img-fallback {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 100%;
+            background: #F4EFEB;
+            color: #7A4E4F;
+        }
+
+        .wishrite-product-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .wishrite-product-name {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #1A1A1A;
+            line-height: 1.35;
+            margin: 0 0 6px;
+        }
+
+        .wishrite-product-meta-tags {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.78rem;
+        }
+
+        .wishrite-sku-tag {
+            font-family: 'SF Mono', Monaco, Consolas, monospace;
+            font-size: 0.75rem;
+            background: #F0ECE7;
+            color: #6B6B6B;
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+
+        .wishrite-size-tag {
+            background: rgba(94, 52, 53, 0.08);
+            color: #5E3435;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: 500;
+        }
+
+        .wishrite-qty-tag {
+            color: #6B6B6B;
+            font-weight: 500;
+        }
+
+        .wishrite-product-pricing {
+            text-align: right;
+            flex: 0 0 auto;
+            padding-left: 12px;
+        }
+
+        .wishrite-product-line-total {
+            display: block;
+            font-size: 1.05rem;
+            font-weight: 600;
+            color: #5E3435;
+        }
+
+        .wishrite-product-unit-price {
+            display: block;
+            font-size: 0.76rem;
+            color: #8C7C75;
+            margin-top: 2px;
+        }
+
+        /* Delivery Grid */
+        .wishrite-delivery-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+        }
+
+        .wishrite-delivery-col {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .wishrite-delivery-subhead {
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: #8C7C75;
+            margin-bottom: 4px;
+        }
+
+        .wishrite-delivery-name {
+            font-size: 1.02rem;
+            font-weight: 600;
+            color: #1A1A1A;
+            margin: 0;
+        }
+
+        .wishrite-delivery-contact-line {
+            font-size: 0.88rem;
+            color: #4A3E3E;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .wishrite-delivery-address-line {
+            font-size: 0.9rem;
+            color: #3D3535;
+            line-height: 1.45;
+            margin: 0;
+        }
+
+        /* Price Card */
+        .wishrite-price-card {
+            background: #FAF8F5;
+        }
+
+        .wishrite-price-rows {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .wishrite-price-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.92rem;
+            color: #6B6B6B;
+        }
+
+        .wishrite-price-val {
+            font-weight: 600;
+            color: #1A1A1A;
+        }
+
+        .wishrite-shipping-val {
+            color: #167946;
+        }
+
+        .wishrite-price-divider {
+            height: 1px;
+            background: #E5DFD9;
+            margin: 4px 0;
+        }
+
+        .wishrite-grand-total-row {
+            margin-top: 4px;
+            padding: 16px 18px;
+            background: #F4EFEB;
+            border: 1px solid rgba(184, 149, 106, 0.35);
+            border-radius: 10px;
+        }
+
+        .wishrite-grand-total-labels {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .wishrite-grand-label {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #5E3435;
+        }
+
+        .wishrite-grand-currency {
+            font-size: 0.72rem;
+            color: #8C7C75;
+        }
+
+        .wishrite-grand-val-wrap {
+            text-align: right;
+        }
+
+        .wishrite-grand-total-val {
+            font-size: 1.45rem;
+            font-weight: 700;
+            color: #5E3435;
+            display: block;
+            line-height: 1.1;
+        }
+
+        .wishrite-grand-total-code {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #8C7C75;
+        }
+
+        .wishrite-confirm-actions-wrap {
+            margin-top: 24px;
+        }
+
+        .wishrite-confirm-continue-btn {
+            width: 100%;
+            height: 52px;
+            background: #5E3435;
+            color: #FFFFFF;
+            border: 1px solid #5E3435;
+            border-radius: 10px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            box-shadow: 0 6px 18px rgba(94, 52, 53, 0.22);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .wishrite-confirm-continue-btn:hover {
+            background: #4A2829;
+            border-color: #4A2829;
+            transform: translateY(-1px);
+            box-shadow: 0 8px 24px rgba(94, 52, 53, 0.3);
+        }
+
+        .wishrite-confirm-continue-btn:focus-visible {
+            outline: 2px solid #5E3435;
+            outline-offset: 2px;
+        }
+
+        .wishrite-guarantee-note {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 18px;
+            font-size: 0.76rem;
+            color: #8C7C75;
+            letter-spacing: 0.2px;
+        }
+
+        /* Responsive Styles */
+        @media (max-width: 900px) {
+            .wishrite-confirm-grid {
+                grid-template-columns: 1fr;
+                gap: 24px;
+            }
+
+            .wishrite-confirm-side-col {
+                position: static;
+            }
+
+            .wishrite-confirm-status-card {
+                grid-template-columns: 1fr 1fr;
+                gap: 16px;
+                padding: 16px 18px;
+            }
+
+            .wishrite-status-col {
+                border-right: none;
+                padding: 0;
+            }
+        }
+
+        @media (max-width: 600px) {
+            .wishrite-checkout-overlay.wishrite-confirm-overlay {
+                padding: 12px 8px 30px;
+            }
+
+            .wishrite-confirmation-modal {
+                padding: 22px 18px 32px;
+                border-radius: 12px;
+            }
+
+            .wishrite-confirm-title {
+                font-size: 1.65rem;
+            }
+
+            .wishrite-confirm-thankyou {
+                font-size: 1rem;
+            }
+
+            .wishrite-confirm-status-card {
+                grid-template-columns: 1fr 1fr;
+                gap: 12px;
+                padding: 14px;
+            }
+
+            .wishrite-product-row {
+                gap: 12px;
+                align-items: flex-start;
+            }
+
+            .wishrite-product-img-wrap {
+                flex: 0 0 64px;
+                width: 64px;
+                height: 64px;
+            }
+
+            .wishrite-product-name {
+                font-size: 0.92rem;
+            }
+
+            .wishrite-delivery-grid {
+                grid-template-columns: 1fr;
+                gap: 16px;
+            }
+
+            .wishrite-card {
+                padding: 18px 16px;
+                border-radius: 10px;
+            }
+        }
+    `;
+    document.head.appendChild(styleEl);
+}
+
+/**
+ * Handles the "Continue Shopping" button action after an order is confirmed
+ */
+function handleWishriteContinueShopping() {
+    closeWishriteCheckoutModal();
+    if (typeof navigateTo === 'function') {
+        navigateTo('shop');
+    } else {
+        window.location.hash = '#shop';
+    }
+}
+window.handleWishriteContinueShopping = handleWishriteContinueShopping;
+
+/**
+ * Renders the premium WishRite Order Confirmation UI inside the checkout modal
+ */
+function renderWishriteOrderConfirmation(pendingCheckout, verifyData) {
+    // 1. Ensure luxury styling is immediately injected and active
+    ensureWishriteConfirmationStyles();
+
+    // 2. Ensure container exists
+    let modalContainer = document.getElementById('wishrite-checkout-modal');
+    if (!modalContainer) {
+        modalContainer = document.createElement('div');
+        modalContainer.id = 'wishrite-checkout-modal';
+        document.body.appendChild(modalContainer);
+    }
+
+    const pending = pendingCheckout || window.wishritePendingCheckout || {};
+    const orderNumber = verifyData?.order_number || pending.order_number || 'Confirmed';
+    const paymentStatusRaw = verifyData?.payment_status || pending.payment_status || 'paid';
+    const paymentStatusDisplay = paymentStatusRaw.charAt(0).toUpperCase() + paymentStatusRaw.slice(1);
+    const orderStatusRaw = verifyData?.order_status || pending.order_status || 'processing';
+    const orderStatusDisplay = orderStatusRaw.charAt(0).toUpperCase() + orderStatusRaw.slice(1);
+
+    const currency = verifyData?.currency || pending.currency || 'INR';
+    const grandTotal = verifyData?.grand_total !== undefined ? verifyData.grand_total : (pending.grand_total || 0);
+    const subtotal = pending.subtotal !== undefined ? pending.subtotal : grandTotal;
+    const discount = Number(pending.discount || pending.coupon_discount_amount || 0);
+    const shipping = pending.shipping_charge !== undefined ? pending.shipping_charge : 0;
+    const codCharge = pending.cod_charge !== undefined ? pending.cod_charge : 0;
+    const paymentMethod = String(pending.payment_method || 'razorpay').toLowerCase();
+    const isCod = paymentMethod === 'cod';
+    const items = Array.isArray(pending.items) ? pending.items : [];
+
+    const customerName = pending.customer_name || 'Valued Customer';
+    const customerPhone = pending.customer_phone || '';
+    const customerEmail = pending.customer_email || '';
+    const customerAddress = pending.customer_address || '';
+    const customerCity = pending.customer_city || '';
+    const customerState = pending.customer_state || '';
+    const customerPin = pending.customer_pin || '';
+    const customerCountry = pending.customer_country || 'India';
+
+    const itemsHtml = items.map(item => {
+        const product = (typeof getProductById === 'function') ? getProductById(item.inventory_id) : null;
+        const itemImage = item.image || product?.images?.[0]?.url || product?.image || '';
+        const quantity = Number(item.quantity) || 1;
+        const unitPrice = Number(item.unit_price) || 0;
+        const lineTotal = item.line_total !== undefined ? Number(item.line_total) : (quantity * unitPrice);
+
+        return `
+            <div class="wishrite-product-row">
+                <div class="wishrite-product-img-wrap">
+                    ${itemImage ? `
+                        <img src="${escapeWishriteHtml(itemImage)}" alt="${escapeWishriteHtml(item.product_name || 'Jewellery')}" class="wishrite-product-img" loading="lazy">
+                    ` : `
+                        <div class="wishrite-product-img-fallback" aria-hidden="true">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#5E3435" stroke-width="1.5">
+                                <polygon points="12 2 2 8.5 12 15 22 8.5 12 2"></polygon>
+                                <polygon points="2 8.5 12 22 22 8.5"></polygon>
+                            </svg>
+                        </div>
+                    `}
+                </div>
+                <div class="wishrite-product-info">
+                    <h3 class="wishrite-product-name">${escapeWishriteHtml(item.product_name || 'WishRite Jewellery')}</h3>
+                    <div class="wishrite-product-meta-tags">
+                        ${item.product_code ? `<span class="wishrite-sku-tag">SKU: ${escapeWishriteHtml(item.product_code)}</span>` : ''}
+                        ${item.size ? `<span class="wishrite-size-tag">Size: ${escapeWishriteHtml(item.size)}</span>` : ''}
+                        <span class="wishrite-qty-tag">Qty: ${quantity}</span>
+                    </div>
+                </div>
+                <div class="wishrite-product-pricing">
+                    <span class="wishrite-product-line-total">${formatPrice(lineTotal)}</span>
+                    ${quantity > 1 ? `<span class="wishrite-product-unit-price">${formatPrice(unitPrice)} each</span>` : ''}
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    modalContainer.innerHTML = `
+        <div class="wishrite-checkout-overlay wishrite-confirm-overlay" onclick="closeWishriteCheckoutModal(event)">
+            <div class="wishrite-confirmation-modal" onclick="event.stopPropagation()">
+                <!-- Header Close Action -->
+                <div class="wishrite-confirm-header-bar">
+                    <button
+                        type="button"
+                        class="wishrite-confirm-close-btn"
+                        onclick="handleWishriteContinueShopping()"
+                        aria-label="Close order confirmation"
+                    >
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- Refined Luxury Hero & Short Elegant Animation -->
+                <div class="wishrite-confirm-hero">
+                    <div class="wishrite-confirm-badge-wrap" aria-hidden="true">
+                        <svg class="wishrite-confirm-badge-svg" viewBox="0 0 68 68">
+                            <circle class="wishrite-confirm-badge-bg" cx="34" cy="34" r="31" />
+                            <circle class="wishrite-confirm-badge-ring" cx="34" cy="34" r="31" />
+                            <path class="wishrite-confirm-badge-check" d="M22 34.5L30.5 43L46 25" />
+                        </svg>
+                    </div>
+                    <span class="wishrite-confirm-eyebrow">WISHRITE</span>
+                    <h1 class="wishrite-confirm-title">Order Confirmed</h1>
+                    <p class="wishrite-confirm-thankyou">Thank you for your order.</p>
+                    <p class="wishrite-confirm-subtitle">
+                        ${isCod
+            ? 'Your Cash on Delivery order has been confirmed. Please keep the payable amount ready at delivery.'
+            : 'Your payment has been verified and your order is now being prepared.'}
+                    </p>
+                </div>
+
+                <!-- Horizontal Compact Status Card -->
+                <div class="wishrite-confirm-status-card">
+                    <div class="wishrite-status-col">
+                        <span class="wishrite-status-label">Order Number</span>
+                        <span class="wishrite-status-value wishrite-order-number-val">${escapeWishriteHtml(orderNumber)}</span>
+                    </div>
+                    <div class="wishrite-status-col">
+                        <span class="wishrite-status-label">Payment Status</span>
+                        <span class="wishrite-pill ${isCod ? 'wishrite-pill-pending' : 'wishrite-pill-paid'}">
+                            <span class="wishrite-pill-dot"></span> ${escapeWishriteHtml(paymentStatusDisplay)}
+                        </span>
+                    </div>
+                    <div class="wishrite-status-col">
+                        <span class="wishrite-status-label">Order Status</span>
+                        <span class="wishrite-pill wishrite-pill-processing">
+                            <span class="wishrite-pill-dot"></span> ${escapeWishriteHtml(orderStatusDisplay)}
+                        </span>
+                    </div>
+                    <div class="wishrite-status-col">
+                        <span class="wishrite-status-label">Currency</span>
+                        <span class="wishrite-status-value">${escapeWishriteHtml(currency)}</span>
+                    </div>
+                </div>
+
+                <!-- Two-Column Main Content Layout -->
+                <div class="wishrite-confirm-grid">
+                    <!-- Left Column: Products + Delivery Info -->
+                    <div class="wishrite-confirm-main-col">
+                        <!-- Order Summary Card -->
+                        <div class="wishrite-card">
+                            <div class="wishrite-card-header">
+                                <div class="wishrite-card-title-group">
+                                    <h2 class="wishrite-card-title">Order Summary</h2>
+                                    <span class="wishrite-card-subtitle">${items.length} ${items.length === 1 ? 'item' : 'items'}</span>
+                                </div>
+                            </div>
+                            <div class="wishrite-products-list">
+                                ${itemsHtml || '<p style="color:#6B6B6B;font-size:0.9rem;">Order items recorded.</p>'}
+                            </div>
+                        </div>
+
+                        <!-- Delivery Information Card (Two-Column on Desktop) -->
+                        <div class="wishrite-card">
+                            <div class="wishrite-card-header">
+                                <h2 class="wishrite-card-title">Delivery Information</h2>
+                            </div>
+                            <div class="wishrite-delivery-grid">
+                                <div class="wishrite-delivery-col">
+                                    <span class="wishrite-delivery-subhead">Customer Details</span>
+                                    <p class="wishrite-delivery-name">${escapeWishriteHtml(customerName)}</p>
+                                    <p class="wishrite-delivery-contact-line">
+                                        <span>📞</span> <span>${escapeWishriteHtml(customerPhone)}</span>
+                                    </p>
+                                    ${customerEmail ? `
+                                        <p class="wishrite-delivery-contact-line">
+                                            <span>✉️</span> <span>${escapeWishriteHtml(customerEmail)}</span>
+                                        </p>
+                                    ` : ''}
+                                </div>
+                                <div class="wishrite-delivery-col">
+                                    <span class="wishrite-delivery-subhead">Shipping Destination</span>
+                                    <p class="wishrite-delivery-address-line">${escapeWishriteHtml(customerAddress)}</p>
+                                    <p class="wishrite-delivery-address-line">
+                                        ${escapeWishriteHtml(customerCity)}, ${escapeWishriteHtml(customerState)} – <strong>${escapeWishriteHtml(customerPin)}</strong>
+                                    </p>
+                                    <p class="wishrite-delivery-address-line">${escapeWishriteHtml(customerCountry)}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right Column: Price Summary + Actions -->
+                    <div class="wishrite-confirm-side-col">
+                        <div class="wishrite-card wishrite-price-card">
+                            <div class="wishrite-card-header">
+                                <h2 class="wishrite-card-title">Price Summary</h2>
+                            </div>
+                            <div class="wishrite-price-rows">
+                                <div class="wishrite-price-row">
+                                    <span class="wishrite-price-label">Subtotal</span>
+                                    <span class="wishrite-price-val">${formatPrice(subtotal)}</span>
+                                </div>
+                                ${discount > 0 ? `
+                                <div class="wishrite-price-row" style="color:#2E7D32;">
+                                    <span class="wishrite-price-label">Coupon Discount ${pending.coupon_code ? `(${escapeWishriteHtml(pending.coupon_code)})` : ''}</span>
+                                    <span class="wishrite-price-val">-${formatPrice(discount)}</span>
+                                </div>
+                                ` : ''}
+                                <div class="wishrite-price-row">
+                                    <span class="wishrite-price-label">Shipping</span>
+                                    <span class="wishrite-price-val wishrite-shipping-val">
+                                        ${shipping === 0 ? 'FREE' : formatPrice(shipping)}
+                                    </span>
+                                </div>
+                                ${isCod ? `
+                                <div class="wishrite-price-row">
+                                    <span class="wishrite-price-label">COD Charges</span>
+                                    <span class="wishrite-price-val">${formatPrice(codCharge)}</span>
+                                </div>
+                                ` : ''}
+                                <div class="wishrite-price-row">
+                                    <span class="wishrite-price-label">Payment Method</span>
+                                    <span class="wishrite-price-val">${isCod ? 'Cash on Delivery' : 'Online Payment'}</span>
+                                </div>
+                                <div class="wishrite-price-divider"></div>
+                                <div class="wishrite-price-row wishrite-grand-total-row">
+                                    <div class="wishrite-grand-total-labels">
+                                        <span class="wishrite-grand-label">Grand Total</span>
+                                        <span class="wishrite-grand-currency">Inclusive of all taxes</span>
+                                    </div>
+                                    <div class="wishrite-grand-val-wrap">
+                                        <span class="wishrite-grand-total-val">${formatPrice(grandTotal)}</span>
+                                        <span class="wishrite-grand-total-code">${escapeWishriteHtml(currency)}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="wishrite-confirm-actions-wrap">
+                                <button
+                                    type="button"
+                                    class="wishrite-confirm-continue-btn"
+                                    onclick="handleWishriteContinueShopping()"
+                                >
+                                    Continue Shopping
+                                </button>
+                            </div>
+
+                            <div class="wishrite-guarantee-note">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#B8956A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                                </svg>
+                                <span>Hallmarked 925 Silver • Insured Delivery</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.style.overflow = 'hidden';
+    const overlay = modalContainer.querySelector('.wishrite-confirm-overlay');
+    if (overlay) overlay.scrollTop = 0;
+}
+window.renderWishriteOrderConfirmation = renderWishriteOrderConfirmation;
+
+
