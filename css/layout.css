@@ -89,14 +89,16 @@
     transition: background 0.35s ease, border-color 0.35s ease, box-shadow 0.35s ease;
 }
 
-.header.header-over-hero .header-logo-text {
+.header.header-over-hero .header-logo-text,
+.header.header-over-hero .header-logo-svg {
     color: #ffffff;
-    text-shadow: 0 1px 14px rgba(0, 0, 0, 0.4);
+    filter: drop-shadow(0 1px 12px rgba(0, 0, 0, 0.45));
 }
 
 .header.header-over-hero .header-logo-sub {
-    color: rgba(255, 255, 255, 0.75);
+    color: rgba(255, 255, 255, 0.85);
     letter-spacing: 3.5px;
+    text-shadow: 0 1px 8px rgba(0, 0, 0, 0.35);
 }
 
 .header.header-over-hero .header-nav a {
@@ -158,6 +160,67 @@
     cursor: pointer;
     text-align: center;
     flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    transition: transform var(--duration-fast) var(--ease-out), opacity var(--duration-fast) var(--ease-out);
+}
+
+.header-logo:hover {
+    opacity: 0.92;
+}
+
+.header-logo-brand {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+}
+
+.header-logo-svg {
+    height: 48px;
+    width: auto;
+    max-width: 175px;
+    display: block;
+    color: var(--wr-primary);
+    fill: currentColor;
+    overflow: visible;
+    transition: color 0.35s ease, filter 0.35s ease;
+}
+
+/* Star Heartbeat Breathing Pulse */
+.logo-star {
+    transform-origin: 297.8px 58.3px;
+    transform-box: view-box;
+    animation: starHeartbeat 2.6s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+    will-change: transform;
+}
+
+@keyframes starHeartbeat {
+    0% {
+        transform: scale(1);
+    }
+    14% {
+        transform: scale(1.15);
+    }
+    28% {
+        transform: scale(0.97);
+    }
+    42% {
+        transform: scale(1.18);
+    }
+    65% {
+        transform: scale(1);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+.header-logo:hover .logo-star {
+    animation-duration: 1.8s;
 }
 
 .header-logo-text {
@@ -167,15 +230,18 @@
     letter-spacing: 0.22em;
     color: var(--wr-primary);
     line-height: 1;
+    transition: color 0.35s ease;
 }
 
 .header-logo-sub {
     font-family: var(--font-body);
-    font-size: 8px;
-    letter-spacing: 3px;
+    font-size: 9.5px;
+    letter-spacing: 3.8px;
+    font-weight: 500;
     color: var(--wr-text-light);
     margin-top: 4px;
     text-transform: uppercase;
+    transition: color 0.35s ease, text-shadow 0.35s ease;
 }
 
 /* Desktop Nav */
@@ -565,6 +631,15 @@
     color: var(--wr-white);
     font-size: 1.5rem;
     margin-bottom: var(--space-4);
+}
+
+.footer-brand .header-logo-svg {
+    height: 38px;
+    width: auto;
+    max-width: 155px;
+    color: var(--wr-white);
+    fill: currentColor;
+    margin-bottom: var(--space-2);
 }
 
 .footer-brand p {

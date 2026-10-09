@@ -426,12 +426,17 @@
         letter-spacing: 0.18em;
     }
 
+    .header-logo-svg {
+        height: 38px;
+        max-width: 140px;
+    }
+
     .header-logo-sub {
         display: block;
-        font-size: 0.52rem;
-        letter-spacing: 0.18em;
+        font-size: 0.58rem;
+        letter-spacing: 0.2em;
         font-weight: 600;
-        margin-top: 1px;
+        margin-top: 2px;
         opacity: 0.85;
     }
 
@@ -811,6 +816,11 @@
     .header-logo-text {
         font-size: 1.2rem;
         letter-spacing: 0.15em;
+    }
+
+    .header-logo-svg {
+        height: 32px;
+        max-width: 120px;
     }
 
     .header-actions {
