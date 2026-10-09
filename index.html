@@ -67,8 +67,10 @@
         <nav class="header-nav" aria-label="Main navigation">
             <a onclick="navigateTo('occasion')" id="nav-occasion" class="nav-festive-item"
                 style="display: none;">FESTIVE EDIT</a>
-            <a onclick="navigateToShopWithFilter('category', 'All', 'featured', 'All Jewellery')" id="nav-shop">ALL JEWELLERY</a>
-            <a onclick="navigateToShopWithFilter('audience', 'Men', 'featured', 'Men\'s Jewellery')" id="nav-men">MEN</a>
+            <a onclick="navigateToShopWithFilter('category', 'All', 'featured', 'All Jewellery')" id="nav-shop">ALL
+                JEWELLERY</a>
+            <a onclick="navigateToShopWithFilter('audience', 'Men', 'featured', 'Men\'s Jewellery')"
+                id="nav-men">MEN</a>
             <a onclick="navigateTo('collections')" id="nav-collections">COLLECTIONS</a>
             <a onclick="navigateTo('new-arrivals')" id="nav-new-arrivals">NEW ARRIVALS</a>
             <a onclick="navigateTo('best-sellers')" id="nav-bestsellers">BEST SELLERS</a>
@@ -614,10 +616,10 @@
                     <div class="breadcrumbs" style="margin-bottom:12px;font-size:0.85rem;color:var(--wr-text-muted);">
                         <a onclick="navigateTo('home')" style="cursor:pointer;color:inherit;">Home</a>
                         <span style="margin:0 8px;">/</span>
-                        <span style="color:var(--wr-primary);font-weight:500;">New Arrivals</span>
+                        <span style="color:#5E3435;font-weight:500;">New Arrivals</span>
                     </div>
-                    <h1>New Arrivals</h1>
-                    <p>Discover the latest additions to WishRite.</p>
+                    <h1 style="color: #5E3435;">New Arrivals</h1>
+                    <p style="color: #5E3435; font-weight: bold;">Discover the latest additions to WishRite.</p>
                 </div>
             </div>
             <div class="shop-toolbar">
@@ -639,8 +641,8 @@
                         <span style="margin:0 8px;">/</span>
                         <span style="color:var(--wr-primary);font-weight:500;">Best Sellers</span>
                     </div>
-                    <h1>Best Sellers</h1>
-                    <p>Discover the pieces our customers love.</p>
+                    <h1 style="color: #5E3435;">Best Sellers</h1>
+                    <p style="color: #5E3435; font-weight: bold;">Discover the pieces our customers love.</p>
                 </div>
             </div>
             <div class="shop-toolbar">
@@ -662,23 +664,18 @@
                         <span style="margin:0 8px;">/</span>
                         <span style="color:var(--wr-primary);font-weight:500;">Kids</span>
                     </div>
-                    <h1>Little Moments, Made Special</h1>
-                    <p>Discover adorable jewellery made for little celebrations and treasured memories.</p>
+                    <h1 style="color: #5E3435;">Little Moments, Made Special</h1>
+                    <p style="color: #5E3435; font-weight: bold;">
+                        Discover adorable jewellery made for little celebrations and treasured memories.
+                    </p>
 
                     <div class="kids-gender-panels" role="group" aria-label="Kids jewellery categories">
 
-                        <button
-                            type="button"
-                            class="kids-gender-panel"
-                            data-kids-filter="boys"
-                            aria-label="Shop Boys jewellery"
-                            onclick="setKidsFilter('boys')">
+                        <button type="button" class="kids-gender-panel" data-kids-filter="boys"
+                            aria-label="Shop Boys jewellery" onclick="setKidsFilter('boys')">
 
                             <span class="kids-gender-image">
-                                <img
-                                    src="assets/kids-boys.jpg"
-                                    alt="Boys Jewellery"
-                                    loading="eager"
+                                <img src="assets/kids-boys.jpg" alt="Boys Jewellery" loading="eager"
                                     onerror="this.parentElement.classList.add('image-missing');">
                             </span>
 
@@ -693,18 +690,11 @@
                         </button>
 
 
-                        <button
-                            type="button"
-                            class="kids-gender-panel"
-                            data-kids-filter="girls"
-                            aria-label="Shop Girls jewellery"
-                            onclick="setKidsFilter('girls')">
+                        <button type="button" class="kids-gender-panel" data-kids-filter="girls"
+                            aria-label="Shop Girls jewellery" onclick="setKidsFilter('girls')">
 
                             <span class="kids-gender-image">
-                                <img
-                                    src="assets/kids-girls.jpg"
-                                    alt="Girls Jewellery"
-                                    loading="eager"
+                                <img src="assets/kids-girls.jpg" alt="Girls Jewellery" loading="eager"
                                     onerror="this.parentElement.classList.add('image-missing');">
                             </span>
 
@@ -734,8 +724,10 @@
         <!-- ═══ SHOP VIEW ═══ -->
         <div id="shop-view" style="display: none;">
             <div class="shop-hero all-jewellery-hero">
-                <h1 id="shop-title">All Jewellery</h1>
-                <p>Discover our complete range of premium 925 sterling silver jewellery.</p>
+                <h1 id="shop-title" style="color: #5E3435;">All Jewellery</h1>
+                <p style="color: #5E3435; font-weight: bold;">
+                    Discover our complete range of premium 925 sterling silver jewellery.
+                </p>
             </div>
 
             <div class="shop-toolbar">
@@ -791,7 +783,8 @@
                 <div class="cart-summary" id="cart-summary" style="display: none;">
                     <h3>Subtotal: <span id="cart-total">₹0</span></h3>
                     <p>Shipping and taxes calculated at checkout.</p>
-                    <button class="btn btn-primary btn-lg" onclick="proceedToCheckoutOrder()">Proceed to Checkout</button>
+                    <button class="btn btn-primary btn-lg" onclick="proceedToCheckoutOrder()">Proceed to
+                        Checkout</button>
                 </div>
             </div>
         </div>
@@ -993,7 +986,8 @@
                     <div class="about-policy-header">
                         <span class="sub-label">PRESERVE THE LUSTRE</span>
                         <h2 id="care-header-title">Jewellery Care Guide</h2>
-                        <p id="care-header-desc">Simple daily habits ensure your precious silver keeps its radiant shine for generations.</p>
+                        <p id="care-header-desc">Simple daily habits ensure your precious silver keeps its radiant shine
+                            for generations.</p>
                     </div>
 
                     <div class="care-grid single-mode">
@@ -1097,8 +1091,9 @@
                             </div>
                             <div class="faq-answer">
                                 <p>Yes, Cash on Delivery is available across 26,000+ pin codes in India. For Silver
-                                    Jewellery, a standard ₹50 COD verification charge is applied.<span class="occasion-content-only"> For our active
-                                    Occasion Collection, COD is 100% FREE!</span></p>
+                                    Jewellery, a standard ₹50 COD verification charge is applied.<span
+                                        class="occasion-content-only"> For our active
+                                        Occasion Collection, COD is 100% FREE!</span></p>
                             </div>
                         </div>
 
@@ -1109,8 +1104,9 @@
                             </div>
                             <div class="faq-answer">
                                 <p>Silver Jewellery orders qualify for FREE shipping on order subtotals of ₹2,999 and
-                                    above.<span class="occasion-content-only"> For our Festive &amp; Occasion Collection, FREE shipping unlocks on orders
-                                    starting from just ₹199.</span></p>
+                                    above.<span class="occasion-content-only"> For our Festive &amp; Occasion
+                                        Collection, FREE shipping unlocks on orders
+                                        starting from just ₹199.</span></p>
                             </div>
                         </div>
 
@@ -1123,7 +1119,8 @@
                                 <p>You can enter any valid coupon code in the coupon input box in your shopping bag or
                                     during checkout, then click APPLY. Eligible discounts (percentage, fixed amount, or
                                     free delivery) will automatically deduct from qualifying items in your cart based on
-                                    coupon scope (Jewellery<span class="occasion-content-only">, Occasion,</span> or Storewide).</p>
+                                    coupon scope (Jewellery<span class="occasion-content-only">, Occasion,</span> or
+                                    Storewide).</p>
                             </div>
                         </div>
 
@@ -1193,7 +1190,8 @@
                         <div class="contact-info-card">
                             <h3>WishRite Studio &amp; Concierge</h3>
                             <p style="color:var(--wr-text-muted);line-height:1.6;margin-bottom:20px;">
-                                Thoughtfully designed 925 sterling silver jewellery<span class="occasion-content-only"> and curated festive collections</span>.
+                                Thoughtfully designed 925 sterling silver jewellery<span class="occasion-content-only">
+                                    and curated festive collections</span>.
                             </p>
 
                             <div class="contact-detail-item">

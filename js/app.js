@@ -128,43 +128,43 @@ function navigateTo(viewId, param, pushHistory = true) {
         case 'home':
             renderHomeSections();
             setHomeSEO();
-            if (pushHistory) { try { history.pushState({ view: 'home' }, '', '/'); } catch(e){} }
+            if (pushHistory) { try { history.pushState({ view: 'home' }, '', '/'); } catch (e) { } }
             break;
         case 'occasion':
             if (typeof renderOccasionPage === 'function') renderOccasionPage();
             if (typeof setOccasionSEO === 'function') setOccasionSEO();
-            if (pushHistory) { try { history.pushState({ view: 'occasion' }, '', '/occasion'); } catch(e){} }
+            if (pushHistory) { try { history.pushState({ view: 'occasion' }, '', '/occasion'); } catch (e) { } }
             break;
         case 'shop':
             buildSidebarFilters();
             buildMobileFilters();
             applyFiltersAndSort();
             setShopSEO(currentFilters.category);
-            if (pushHistory) { try { history.pushState({ view: 'shop' }, '', '/shop'); } catch(e){} }
+            if (pushHistory) { try { history.pushState({ view: 'shop' }, '', '/shop'); } catch (e) { } }
             break;
         case 'collections':
             renderCollectionsPage();
             if (typeof setCollectionsSEO === 'function') setCollectionsSEO();
-            if (pushHistory) { try { history.pushState({ view: 'collections' }, '', '/collections'); } catch(e){} }
+            if (pushHistory) { try { history.pushState({ view: 'collections' }, '', '/collections'); } catch (e) { } }
             break;
         case 'collection-detail':
             renderCollectionDetailPage(param);
-            if (pushHistory) { try { history.pushState({ view: 'collection-detail', param: param }, '', `/collections/${param}`); } catch(e){} }
+            if (pushHistory) { try { history.pushState({ view: 'collection-detail', param: param }, '', `/collections/${param}`); } catch (e) { } }
             break;
         case 'new-arrivals':
             renderNewArrivalsPage();
             if (typeof setNewArrivalsSEO === 'function') setNewArrivalsSEO();
-            if (pushHistory) { try { history.pushState({ view: 'new-arrivals' }, '', '/new-arrivals'); } catch(e){} }
+            if (pushHistory) { try { history.pushState({ view: 'new-arrivals' }, '', '/new-arrivals'); } catch (e) { } }
             break;
         case 'best-sellers':
             renderBestSellersPage();
             if (typeof setBestSellersSEO === 'function') setBestSellersSEO();
-            if (pushHistory) { try { history.pushState({ view: 'best-sellers' }, '', '/best-sellers'); } catch(e){} }
+            if (pushHistory) { try { history.pushState({ view: 'best-sellers' }, '', '/best-sellers'); } catch (e) { } }
             break;
         case 'kids':
             renderKidsPage();
             if (typeof setKidsSEO === 'function') setKidsSEO();
-            if (pushHistory) { try { history.pushState({ view: 'kids' }, '', '/kids'); } catch(e){} }
+            if (pushHistory) { try { history.pushState({ view: 'kids' }, '', '/kids'); } catch (e) { } }
             break;
         case 'product':
             handleProductViewNavigation(param, targetView, pushHistory);
@@ -173,7 +173,7 @@ function navigateTo(viewId, param, pushHistory = true) {
             setAboutSEO();
             if (pushHistory) {
                 const targetUrl = param ? `/about#${param}` : '/about';
-                try { history.pushState({ view: 'about', param: param }, '', targetUrl); } catch(e){}
+                try { history.pushState({ view: 'about', param: param }, '', targetUrl); } catch (e) { }
             }
             if (param) {
                 setTimeout(() => scrollToAboutSection(param), 80);
@@ -181,29 +181,29 @@ function navigateTo(viewId, param, pushHistory = true) {
             break;
         case 'wishlist':
             renderWishlist();
-            if (pushHistory) { try { history.pushState({ view: 'wishlist' }, '', '/wishlist'); } catch(e){} }
+            if (pushHistory) { try { history.pushState({ view: 'wishlist' }, '', '/wishlist'); } catch (e) { } }
             break;
         case 'cart':
             renderCart();
-            if (pushHistory) { try { history.pushState({ view: 'cart' }, '', '/cart'); } catch(e){} }
+            if (pushHistory) { try { history.pushState({ view: 'cart' }, '', '/cart'); } catch (e) { } }
             break;
         case 'profile':
             if (typeof renderProfileAccountDetails === 'function') {
                 renderProfileAccountDetails();
             }
-            if (pushHistory) { try { history.pushState({ view: 'profile' }, '', '/account'); } catch(e){} }
+            if (pushHistory) { try { history.pushState({ view: 'profile' }, '', '/account'); } catch (e) { } }
             break;
         case 'login':
-            if (pushHistory) { try { history.pushState({ view: 'login' }, '', '/login'); } catch(e){} }
+            if (pushHistory) { try { history.pushState({ view: 'login' }, '', '/login'); } catch (e) { } }
             break;
         case 'register':
             resetRegistration();
-            if (pushHistory) { try { history.pushState({ view: 'register' }, '', '/register'); } catch(e){} }
+            if (pushHistory) { try { history.pushState({ view: 'register' }, '', '/register'); } catch (e) { } }
             break;
         default:
             renderHomeSections();
             setHomeSEO();
-            if (pushHistory) { try { history.pushState({ view: 'home' }, '', '/'); } catch(e){} }
+            if (pushHistory) { try { history.pushState({ view: 'home' }, '', '/'); } catch (e) { } }
             break;
     }
 
@@ -280,7 +280,7 @@ async function handleProductViewNavigation(param, targetView, pushHistory = true
         if (pushHistory) {
             try {
                 history.pushState({ view: 'product', param: product.slug }, '', `/product/${product.slug}`);
-            } catch (e) {}
+            } catch (e) { }
         }
     } else {
         console.error(
@@ -373,11 +373,11 @@ async function renderHomeSections() {
         }
     }
 
-    const bestsellers = (typeof productsService !== 'undefined') 
-        ? productsService.getBestSellers(10) 
+    const bestsellers = (typeof productsService !== 'undefined')
+        ? productsService.getBestSellers(10)
         : (window.productsDB || productsDB).slice(0, 10);
-    const newArrivals = (typeof productsService !== 'undefined') 
-        ? productsService.getNewArrivals(10) 
+    const newArrivals = (typeof productsService !== 'undefined')
+        ? productsService.getNewArrivals(10)
         : (window.productsDB || productsDB).slice(0, 10);
 
     if (typeof renderProductsToContainer === 'function') {
@@ -414,8 +414,8 @@ function renderCollectionsPage() {
     if (!container) return;
 
     const cardsHTML = COLLECTIONS_CONFIG.map(col => {
-        const count = typeof productsService !== 'undefined' 
-            ? productsService.getProductsByCollection(col.queryCol).length 
+        const count = typeof productsService !== 'undefined'
+            ? productsService.getProductsByCollection(col.queryCol).length
             : 0;
         return `
             <div class="collection-feature-card" onclick="navigateTo('collection-detail', '${col.slug}')" role="link" tabindex="0" onkeydown="if(event.key==='Enter') navigateTo('collection-detail', '${col.slug}')" aria-label="Explore ${col.name}">
@@ -443,10 +443,12 @@ function renderCollectionsPage() {
                 <div class="breadcrumbs" style="margin-bottom:12px;font-size:0.85rem;color:var(--wr-text-muted);">
                     <a onclick="navigateTo('home')" style="cursor:pointer;color:inherit;">Home</a>
                     <span style="margin:0 8px;">/</span>
-                    <span style="color:var(--wr-primary);font-weight:500;">Collections</span>
+                    <span style="color: #5E3435;font-weight:500;">Collections</span>
                 </div>
-                <h1>Collections</h1>
-                <p>Explore thoughtfully curated collections designed for every story, style and occasion.</p>
+                <h1 style="color: #5E3435;">Collections</h1>
+                <p style="color: #5E3435; font-weight: bold;">
+                Explore thoughtfully curated collections designed for every story, style and occasion.
+                </p>
             </div>
         </div>
         <div class="container" style="padding:40px 20px 80px;">
@@ -497,7 +499,7 @@ async function renderCollectionDetailPage(slug) {
         if (typeof productsService !== 'undefined') {
             try {
                 await productsService.ensureLoaded();
-            } catch (e) {}
+            } catch (e) { }
         }
     }
 
@@ -541,7 +543,7 @@ async function renderNewArrivalsPage() {
         if (typeof productsService !== 'undefined') {
             try {
                 await productsService.ensureLoaded();
-            } catch (e) {}
+            } catch (e) { }
         }
     }
 
@@ -584,7 +586,7 @@ async function renderBestSellersPage() {
         if (typeof productsService !== 'undefined') {
             try {
                 await productsService.ensureLoaded();
-            } catch (e) {}
+            } catch (e) { }
         }
     }
 
@@ -672,7 +674,7 @@ function getFilteredKidsProducts(filter = 'all') {
         // Category contains: kids, kid, children, child, baby, toddler, little
         const cat = String(p.category || '').toLowerCase();
         const rawCat = String(p.rawCategory || '').toLowerCase();
-        const isKidsCategory = ['kids', 'kid', 'children', 'child', 'baby', 'toddler', 'little'].some(k => 
+        const isKidsCategory = ['kids', 'kid', 'children', 'child', 'baby', 'toddler', 'little'].some(k =>
             cat.includes(k) || rawCat.includes(k)
         );
         if (isKidsCategory) return true;
@@ -839,7 +841,7 @@ async function renderKidsPage() {
         if (typeof productsService !== 'undefined') {
             try {
                 await productsService.ensureLoaded();
-            } catch (e) {}
+            } catch (e) { }
         }
     }
 
@@ -1005,7 +1007,7 @@ window.addEventListener('hashchange', () => {
     const hash = window.location.hash || '';
     const path = window.location.pathname;
     const policySections = ['shipping', 'returns', 'care', 'faqs', 'privacy', 'contact'];
-    
+
     if (path === '/about' || hash.includes('about') || policySections.some(s => hash === `#${s}`)) {
         const rawHash = hash.replace(/^#about[#/]?/, '').replace(/^#/, '');
         if (policySections.includes(rawHash)) {
@@ -1072,8 +1074,8 @@ function updateOccasionContentVisibility() {
     const careGrid = document.querySelector('.care-grid');
 
     if (careTitle) {
-        careTitle.innerHTML = isOccasionOn 
-            ? 'Jewellery &amp; Fabric Care Guide' 
+        careTitle.innerHTML = isOccasionOn
+            ? 'Jewellery &amp; Fabric Care Guide'
             : 'Jewellery Care Guide';
     }
     if (careDesc) {
