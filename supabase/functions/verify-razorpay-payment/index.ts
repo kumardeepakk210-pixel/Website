@@ -162,6 +162,139 @@ serve(async (req: Request) => {
       razorpay_signature,
     } = body || {};
 
+    const supabaseAdmin = createClient(SUPABASE_URL, supabaseSecretKey);
+
+    // --- WALLET TOP-UP PAYMENT VERIFICATION FLOW ---
+    if (body?.purpose === "wallet_topup" || body?.topup_id) {
+      const topupId = body.topup_id;
+      const rzpPaymentId = body.razorpay_payment_id;
+      const rzpOrderId = body.razorpay_order_id;
+      const rzpSig = body.razorpay_signature;
+
+      if (!topupId || !rzpPaymentId || !rzpOrderId || !rzpSig) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            verified: false,
+            error: "Missing required wallet top-up payment details.",
+          }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+
+      // Verify HMAC-SHA256 signature
+      const payloadToSign = `${rzpOrderId}|${rzpPaymentId}`;
+      const calculatedSignature = await calculateHmacSha256Hex(
+        RAZORPAY_KEY_SECRET,
+        payloadToSign
+      );
+
+      const isSignatureValid = timingSafeCompare(
+        calculatedSignature.toLowerCase(),
+        String(rzpSig).trim().toLowerCase()
+      );
+
+      if (!isSignatureValid) {
+        console.warn("verify-razorpay-payment: Wallet top-up signature verification failed for topup_id:", topupId);
+        return new Response(
+          JSON.stringify({
+            success: false,
+            verified: false,
+            error: "Payment signature verification failed.",
+          }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+
+      // Verify payment with Razorpay API
+      const rzpAuth = btoa(`${RAZORPAY_KEY_ID}:${RAZORPAY_KEY_SECRET}`);
+      const rzpPaymentResponse = await fetch(
+        `https://api.razorpay.com/v1/payments/${encodeURIComponent(rzpPaymentId)}`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Basic ${rzpAuth}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (!rzpPaymentResponse.ok) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            verified: false,
+            error: "Failed to verify transaction with payment gateway.",
+          }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+
+      const payment = await rzpPaymentResponse.json();
+      if (payment.status !== "captured") {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            verified: false,
+            error: `Payment is not captured (status: ${payment.status}).`,
+          }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+
+      // Credit wallet atomically via PostgreSQL RPC
+      const { data: creditResult, error: creditError } = await supabaseAdmin.rpc(
+        "credit_wallet_from_verified_payment",
+        {
+          p_topup_id: topupId,
+          p_razorpay_payment_id: rzpPaymentId,
+          p_razorpay_signature: rzpSig,
+        }
+      );
+
+      if (creditError || (creditResult && creditResult.success === false)) {
+        console.error("verify-razorpay-payment: credit_wallet_from_verified_payment error:", creditError?.message || creditResult?.error);
+        return new Response(
+          JSON.stringify({
+            success: false,
+            verified: true,
+            error: creditError?.message || creditResult?.error || "Failed to credit customer wallet.",
+          }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          verified: true,
+          wallet_credited: true,
+          amount_credited: creditResult?.amount_credited,
+          wallet_balance: creditResult?.wallet_balance,
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+    // --- END WALLET TOP-UP PAYMENT VERIFICATION FLOW ---
+
     // 4. Require: internal_order_id, razorpay_payment_id, razorpay_order_id, razorpay_signature
     if (
       !internal_order_id ||
@@ -181,9 +314,6 @@ serve(async (req: Request) => {
         }
       );
     }
-
-    // 5. Create an admin Supabase client using SUPABASE_URL and privileged secret key
-    const supabaseAdmin = createClient(SUPABASE_URL, supabaseSecretKey);
 
     // 6. Load the order from public.orders by id = internal_order_id
     const { data: order, error: fetchError } = await supabaseAdmin
@@ -610,6 +740,14 @@ serve(async (req: Request) => {
       "order_status:",
       resolvedOrderStatus
     );
+
+    // 14.5 Trigger WishRite Rewards & Referral points processing (idempotent, server-side)
+    try {
+      await supabaseAdmin.rpc("process_order_purchase_reward", { p_order_id: order.id });
+      await supabaseAdmin.rpc("process_referral_reward", { p_order_id: order.id });
+    } catch (rewardErr: any) {
+      console.warn("verify-razorpay-payment: Reward points processing notice:", rewardErr?.message || rewardErr);
+    }
 
     // 15. Return success response
     return new Response(

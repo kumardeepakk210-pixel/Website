@@ -97,10 +97,13 @@ serve(async (req: Request) => {
       );
     }
 
-    // 5. Parse JSON request body & extract order_id
+    // 5. Parse JSON request body & extract order_id or wallet top-up details
     interface OrderRequestBody {
       order_id?: string;
       internal_order_id?: string;
+      purpose?: string;
+      amount?: number;
+      user_id?: string;
     }
 
     let body: OrderRequestBody | null = null;
@@ -118,6 +121,139 @@ serve(async (req: Request) => {
         }
       );
     }
+
+    const supabaseAdmin = createClient(SUPABASE_URL, supabaseSecretKey);
+
+    // --- WALLET TOP-UP FLOW ---
+    if (body?.purpose === "wallet_topup") {
+      const topupAmount = Number(body.amount);
+      if (isNaN(topupAmount) || topupAmount <= 0) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: "A valid positive amount is required for wallet top-up.",
+          }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+
+      // Resolve user_id from auth header or body
+      let userId = body.user_id;
+      const authHeader = req.headers.get("Authorization");
+      if (authHeader) {
+        const token = authHeader.replace(/^Bearer /i, "").trim();
+        const { data: authUser } = await supabaseAdmin.auth.getUser(token);
+        if (authUser?.user?.id) {
+          userId = authUser.user.id;
+        }
+      }
+
+      if (!userId) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: "Authentication required for wallet top-up.",
+          }),
+          {
+            status: 401,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+
+      // Create record in wallet_topup_requests
+      const { data: topupRecord, error: topupInsertError } = await supabaseAdmin
+        .from("wallet_topup_requests")
+        .insert({
+          user_id: userId,
+          amount: topupAmount,
+          currency: "INR",
+          status: "PENDING",
+        })
+        .select()
+        .single();
+
+      if (topupInsertError || !topupRecord) {
+        console.error("create-razorpay-order: Failed to create wallet_topup_request:", topupInsertError?.message);
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: "Unable to initiate wallet top-up request.",
+          }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+
+      const rzpAuth = btoa(`${RAZORPAY_KEY_ID}:${RAZORPAY_KEY_SECRET}`);
+      const razorpayPayload = {
+        amount: Math.round(topupAmount * 100),
+        currency: "INR",
+        receipt: `WLT_${String(topupRecord.id).slice(0, 30)}`,
+        notes: {
+          purpose: "wallet_topup",
+          topup_id: topupRecord.id,
+          user_id: userId,
+        },
+      };
+
+      const rzpResponse = await fetch("https://api.razorpay.com/v1/orders", {
+        method: "POST",
+        headers: {
+          Authorization: `Basic ${rzpAuth}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(razorpayPayload),
+      });
+
+      if (!rzpResponse.ok) {
+        const errText = await rzpResponse.text();
+        console.error("create-razorpay-order: Razorpay top-up order creation failed:", errText);
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: "Payment gateway error initiating wallet top-up.",
+          }),
+          {
+            status: 502,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+
+      const razorpayOrder = await rzpResponse.json();
+
+      // Update top-up record with razorpay_order_id
+      await supabaseAdmin
+        .from("wallet_topup_requests")
+        .update({
+          razorpay_order_id: razorpayOrder.id,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", topupRecord.id);
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          purpose: "wallet_topup",
+          topup_id: topupRecord.id,
+          key_id: RAZORPAY_KEY_ID,
+          order_id: razorpayOrder.id,
+          amount: razorpayOrder.amount,
+          currency: razorpayOrder.currency || "INR",
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+    // --- END WALLET TOP-UP FLOW ---
 
     const orderId = body?.order_id || body?.internal_order_id;
     if (!orderId || typeof orderId !== "string" || !orderId.trim()) {
@@ -138,8 +274,6 @@ serve(async (req: Request) => {
 
     // 6. Query internal order from public.orders using privileged admin client
     // Select at minimum: id, order_number, grand_total, currency, payment_method, payment_status, order_status, razorpay_order_id
-    const supabaseAdmin = createClient(SUPABASE_URL, supabaseSecretKey);
-
     const { data: order, error: fetchError } = await supabaseAdmin
       .from("orders")
       .select("id, order_number, grand_total, currency, payment_method, payment_status, order_status, razorpay_order_id")

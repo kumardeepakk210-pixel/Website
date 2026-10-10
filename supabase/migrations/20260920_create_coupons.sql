@@ -94,3 +94,19 @@ DROP POLICY IF EXISTS "Users can view coupon usage" ON public.coupon_usages;
 CREATE POLICY "Users can view coupon usage" ON public.coupon_usages
     FOR SELECT
     USING (TRUE);
+
+-- 6. Seed Default Standard Coupons
+INSERT INTO public.coupons (
+    code, description, scope, discount_type, discount_value, minimum_order_value, first_order_only, per_customer_limit, is_active
+) VALUES
+    ('WELCOME10', 'Welcome to WishRite! 10% off on your first order.', 'all', 'percentage', 10.00, 0.00, TRUE, 1, TRUE),
+    ('SALE10', '10% off on minimum cart value of ₹3,000 for everyone.', 'all', 'percentage', 10.00, 3000.00, FALSE, 10, TRUE),
+    ('SALE15', '15% off on minimum cart value of ₹5,000 for everyone.', 'all', 'percentage', 15.00, 5000.00, FALSE, 10, TRUE)
+ON CONFLICT (code) DO UPDATE SET
+    description = EXCLUDED.description,
+    discount_type = EXCLUDED.discount_type,
+    discount_value = EXCLUDED.discount_value,
+    minimum_order_value = EXCLUDED.minimum_order_value,
+    first_order_only = EXCLUDED.first_order_only,
+    is_active = EXCLUDED.is_active,
+    updated_at = NOW();

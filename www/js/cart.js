@@ -89,7 +89,7 @@ function getCodCharge(paymentMethod, subtotal = getCartSubtotal(), cartItems = c
     return rules.codCharge;
 }
 
-function getCheckoutTotals(paymentMethod = 'prepaid') {
+function getCheckoutTotals(paymentMethod = 'prepaid', forcedPoints = null, forcedWallet = null) {
     const subtotal = getCartSubtotal();
     const rules = getActiveCommerceRules(cart);
     const appliedCoupon = (typeof WishRiteCoupons !== 'undefined' && WishRiteCoupons.getAppliedCoupon)
@@ -107,7 +107,23 @@ function getCheckoutTotals(paymentMethod = 'prepaid') {
     }
 
     const codCharge = getCodCharge(paymentMethod, subtotal, cart);
-    const payableTotal = Math.max(0, subtotal - discount + shipping + codCharge);
+    const baseTotal = Math.max(0, subtotal - discount + shipping + codCharge);
+
+    // Read points and wallet usage
+    const usePointsCheck = document.getElementById('checkout-use-points-checkbox')?.checked;
+    const pointsInputVal = Number(document.getElementById('checkout-points-input')?.value || 0);
+    const pointsToUse = forcedPoints !== null ? forcedPoints : (usePointsCheck ? pointsInputVal : 0);
+
+    const ptVal = (typeof WishRiteWalletRewards !== 'undefined') ? (WishRiteWalletRewards.state.settings.point_value_inr || 1) : 1;
+    const pointsDiscount = Math.min(baseTotal, Math.max(0, pointsToUse * ptVal));
+    const afterPoints = Math.max(0, baseTotal - pointsDiscount);
+
+    const useWalletCheck = document.getElementById('checkout-use-wallet-checkbox')?.checked;
+    const walletInputVal = Number(document.getElementById('checkout-wallet-input')?.value || 0);
+    const walletToUse = forcedWallet !== null ? forcedWallet : (useWalletCheck ? walletInputVal : 0);
+    const walletDeduction = Math.min(afterPoints, Math.max(0, walletToUse));
+
+    const payableTotal = Math.max(0, Math.round(afterPoints - walletDeduction));
 
     return {
         subtotal,
@@ -115,6 +131,10 @@ function getCheckoutTotals(paymentMethod = 'prepaid') {
         coupon: appliedCoupon,
         shipping,
         codCharge,
+        baseTotal,
+        pointsRedeemed: pointsToUse,
+        pointsDiscount,
+        walletUsed: walletDeduction,
         total: payableTotal,
         cartType: getCartCommerceType(cart),
         rules: rules
@@ -248,7 +268,7 @@ function renderCouponBoxHTML(context = 'checkout') {
             <div class="wishrite-coupon-box" id="${context}-coupon-box">
                 <div class="wishrite-coupon-box-header">
                     <span>Applied Promotion</span>
-                    <button type="button" class="wishrite-available-offers-link" onclick="openWishriteAvailableCouponsModal()">View all offers</button>
+                    <button type="button" class="wishrite-available-offers-link" onclick="openWishriteAvailableCouponsModal('${context}')">View all offers</button>
                 </div>
                 <div class="wishrite-coupon-applied-card">
                     <div class="wishrite-coupon-applied-info">
@@ -269,7 +289,7 @@ function renderCouponBoxHTML(context = 'checkout') {
         <div class="wishrite-coupon-box" id="${context}-coupon-box">
             <div class="wishrite-coupon-box-header">
                 <span>Have a coupon code?</span>
-                <button type="button" class="wishrite-available-offers-link" onclick="openWishriteAvailableCouponsModal()">% View available offers</button>
+                <button type="button" class="wishrite-available-offers-link" onclick="openWishriteAvailableCouponsModal('${context}')">% View available offers</button>
             </div>
             <div class="wishrite-coupon-input-group">
                 <input 
@@ -291,10 +311,14 @@ function renderCouponBoxHTML(context = 'checkout') {
 /**
  * Validates and applies a coupon entered by the customer.
  */
-async function applyWishriteCoupon(context = 'checkout') {
+async function applyWishriteCoupon(context = 'checkout', directCode = null) {
     const input = document.getElementById(`${context}-coupon-input`);
     const msgEl = document.getElementById(`${context}-coupon-msg`);
-    const rawCode = input ? input.value : '';
+    const rawCode = directCode || (input ? input.value : '');
+
+    if (input && directCode) {
+        input.value = directCode;
+    }
 
     if (!rawCode || !rawCode.trim()) {
         if (msgEl) {
@@ -419,8 +443,9 @@ function removeWishriteCoupon(context = 'checkout') {
 
 /**
  * Opens available offers drawer / modal (Section 20).
+ * Displays in front of the checkout address modal with prominent z-index.
  */
-async function openWishriteAvailableCouponsModal() {
+async function openWishriteAvailableCouponsModal(context = 'checkout') {
     const existing = document.getElementById('wishrite-available-offers-modal');
     if (existing) existing.remove();
 
@@ -430,12 +455,13 @@ async function openWishriteAvailableCouponsModal() {
     const modal = document.createElement('div');
     modal.id = 'wishrite-available-offers-modal';
     modal.className = 'wishrite-offers-modal-overlay';
+    modal.style.zIndex = '1000005';
     modal.onclick = function (e) {
         if (e.target === modal) modal.remove();
     };
 
     modal.innerHTML = `
-        <div class="wishrite-offers-modal">
+        <div class="wishrite-offers-modal" style="position:relative;z-index:1000006;">
             <div class="wishrite-offers-modal-header">
                 <h3 class="wishrite-offers-modal-title">Available Offers</h3>
                 <button type="button" class="wishrite-offers-modal-close" onclick="document.getElementById('wishrite-available-offers-modal').remove()">×</button>
@@ -450,9 +476,34 @@ async function openWishriteAvailableCouponsModal() {
 
     document.body.appendChild(modal);
 
+    // Get current customer details if available
+    let customer = null;
+    if (typeof WishRiteAuth !== 'undefined' && typeof WishRiteAuth.getCurrentUser === 'function') {
+        const u = WishRiteAuth.getCurrentUser();
+        if (u) {
+            customer = {
+                name: u.fullName || u.user_metadata?.full_name || '',
+                phone: u.phone || u.user_metadata?.phone || '',
+                email: u.email || ''
+            };
+        }
+    }
+    if (!customer) {
+        const nameInput = document.getElementById('checkout-customer-name');
+        const phoneInput = document.getElementById('checkout-customer-phone');
+        const emailInput = document.getElementById('checkout-customer-email');
+        if (nameInput || phoneInput || emailInput) {
+            customer = {
+                name: nameInput?.value?.trim() || '',
+                phone: phoneInput?.value?.trim() || '',
+                email: emailInput?.value?.trim() || ''
+            };
+        }
+    }
+
     let offers = [];
     if (typeof WishRiteCoupons !== 'undefined') {
-        offers = await WishRiteCoupons.fetchAvailableCoupons(cart, null, activeOccasionSlug);
+        offers = await WishRiteCoupons.fetchAvailableCoupons(cart, customer, activeOccasionSlug);
     }
 
     const listEl = document.getElementById('wishrite-available-offers-list');
@@ -461,8 +512,8 @@ async function openWishriteAvailableCouponsModal() {
     if (offers.length === 0) {
         listEl.innerHTML = `
             <div style="text-align:center;padding:32px 16px;">
-                <p style="font-size:1.05rem;color:var(--wr-text);margin-bottom:8px;">No offers currently available for your cart.</p>
-                <p style="font-size:0.85rem;color:var(--wr-text-muted);">Add eligible festive collection or silver jewellery items to unlock exclusive promotions.</p>
+                <p style="font-size:1.05rem;color:var(--wr-text);margin-bottom:8px;">No offers currently available.</p>
+                <p style="font-size:0.85rem;color:var(--wr-text-muted);">Check back soon for seasonal promotions and festive discounts.</p>
             </div>
         `;
         return;
@@ -471,14 +522,15 @@ async function openWishriteAvailableCouponsModal() {
     const applied = (typeof WishRiteCoupons !== 'undefined') ? WishRiteCoupons.getAppliedCoupon() : null;
 
     listEl.innerHTML = offers.map((offer, idx) => {
-        const isBest = idx === 0 && offers.length > 1;
+        const isEligible = offer.isEligible === true;
+        const isBest = idx === 0 && offers.length > 1 && isEligible;
         const isCurrentlyApplied = applied && applied.code === offer.code;
         const discountText = offer.discount_type === 'percentage'
             ? `${offer.discount_value}% OFF`
             : (offer.discount_type === 'free_shipping' ? 'FREE SHIPPING' : `₹${Number(offer.discount_value).toLocaleString('en-IN')} OFF`);
 
         return `
-            <div class="wishrite-offer-card ${isBest ? 'best-offer' : ''}">
+            <div class="wishrite-offer-card ${isBest ? 'best-offer' : ''}" style="${!isEligible ? 'opacity:0.88;border-style:dashed;' : ''}">
                 <div style="flex:1;">
                     <div class="wishrite-offer-badge-row">
                         <span class="wishrite-offer-badge ${isBest ? 'best' : ''}">
@@ -490,37 +542,46 @@ async function openWishriteAvailableCouponsModal() {
                     <div class="wishrite-offer-terms">
                         ${offer.minimum_order_value > 0 ? `Min. order ₹${Number(offer.minimum_order_value).toLocaleString('en-IN')}` : 'No minimum order'}
                         ${offer.maximum_discount ? ` • Up to ₹${Number(offer.maximum_discount).toLocaleString('en-IN')}` : ''}
+                        ${offer.first_order_only ? ' • First order only' : ''}
                         ${offer.scope === 'jewellery' ? ' • Silver Jewellery only' : (offer.scope === 'occasion' ? ' • Festive Collection only' : '')}
                     </div>
+                    ${!isEligible && offer.ineligibleReason ? `
+                        <div style="font-size:0.8rem;color:#C62828;font-weight:600;margin-top:5px;">
+                            ${escapeWishriteHtml(offer.ineligibleReason)}
+                        </div>
+                    ` : ''}
                 </div>
-                <div>
+                <div style="margin-left:12px;text-align:right;">
                     ${isCurrentlyApplied ? `
-                        <span style="font-size:0.8rem;color:#2E7D32;font-weight:700;">✓ Applied</span>
-                    ` : `
-                        <button type="button" class="btn btn-outline btn-sm wishrite-offer-apply-btn" onclick="applyCouponCodeDirectly('${escapeWishriteHtml(offer.code)}')">
+                        <span style="font-size:0.85rem;color:#2E7D32;font-weight:700;">✓ Applied</span>
+                    ` : (isEligible ? `
+                        <button type="button" class="btn btn-outline btn-sm wishrite-offer-apply-btn" onclick="applyCouponCodeDirectly('${escapeWishriteHtml(offer.code)}', '${context}')">
                             APPLY
                         </button>
-                    `}
+                    ` : `
+                        <button type="button" class="btn btn-outline btn-sm wishrite-offer-apply-btn" style="opacity:0.5;cursor:not-allowed;" title="${escapeWishriteHtml(offer.ineligibleReason || 'Not eligible')}" disabled>
+                            APPLY
+                        </button>
+                    `)}
                 </div>
             </div>
         `;
     }).join('');
 }
 
-function applyCouponCodeDirectly(code) {
+function applyCouponCodeDirectly(code, context = 'checkout') {
     const modal = document.getElementById('wishrite-available-offers-modal');
     if (modal) modal.remove();
 
-    const checkoutInput = document.getElementById('checkout-coupon-input');
-    const cartInput = document.getElementById('cart-coupon-input');
+    const checkoutModal = document.getElementById('wishrite-checkout-modal');
+    const targetContext = (checkoutModal || context === 'checkout') ? 'checkout' : 'cart';
 
-    if (checkoutInput) {
-        checkoutInput.value = code;
-        applyWishriteCoupon('checkout');
-    } else if (cartInput) {
-        cartInput.value = code;
-        applyWishriteCoupon('cart');
+    const input = document.getElementById(`${targetContext}-coupon-input`);
+    if (input) {
+        input.value = code;
     }
+
+    applyWishriteCoupon(targetContext, code);
 }
 
 function renderCart() {
@@ -731,13 +792,43 @@ async function proceedToCheckoutOrder() {
         }
     }
 
-    // Read optional pre-filled delivery PIN if customer already entered one (without blocking modal open)
+    // 1st: Process to checkout will not work without PIN code, ask for pin before going to address page
     const input = document.getElementById('checkout-pincode-input');
+    const msg = document.getElementById('checkout-pincode-msg');
     const pin = input
         ? input.value.trim()
         : (typeof getSavedPincode === 'function' ? getSavedPincode() : null);
 
-    console.log('[CHECKOUT-DIAG] Opening customer details modal');
+    if (!pin || !/^\d{6}$/.test(pin)) {
+        if (msg) {
+            msg.innerHTML = `<span style="color:#C62828;font-weight:600;">✕ Please enter your 6-digit delivery PIN code before proceeding to checkout.</span>`;
+        }
+        if (input) {
+            input.focus();
+            input.style.borderColor = '#C62828';
+            input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        if (typeof showToast === 'function') {
+            showToast('Please enter your 6-digit delivery PIN code to proceed to checkout.', 'error');
+        }
+        return;
+    }
+
+    // Verify serviceability before proceeding
+    const isServiceable = await validateCheckoutPincode();
+    if (!isServiceable) {
+        if (input) {
+            input.focus();
+            input.style.borderColor = '#C62828';
+            input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        if (typeof showToast === 'function') {
+            showToast('Delivery is currently unavailable to this PIN code. Please check your PIN.', 'error');
+        }
+        return;
+    }
+
+    console.log('[CHECKOUT-DIAG] Opening customer details modal with verified PIN:', pin);
     openWishriteCheckoutModal(pin);
 }
 
@@ -760,6 +851,14 @@ function openWishriteCheckoutModal(pin) {
     const coupon = initialTotals.coupon;
     const shipping = initialTotals.shipping;
     const total = initialTotals.total;
+
+    // Issue 2: Pre-display Name, Phone number and Email for logged in users
+    const authProfile = (typeof getWishriteCustomerProfile === 'function') ? getWishriteCustomerProfile() : null;
+    const authUser = (typeof getWishriteAuthUser === 'function') ? getWishriteAuthUser() : (typeof currentUser !== 'undefined' ? currentUser : null);
+
+    const prefillName = authProfile?.name || authUser?.user_metadata?.full_name || '';
+    const prefillPhone = (authProfile?.phone || authUser?.phone || authUser?.user_metadata?.phone || '').replace(/^\+91/, '').trim();
+    const prefillEmail = authProfile?.email || authUser?.email || '';
 
     const modal = document.createElement('div');
 
@@ -826,6 +925,16 @@ function openWishriteCheckoutModal(pin) {
                             <strong id="wishrite-checkout-cod-charge">${formatPrice(COD_CHARGE)}</strong>
                         </div>
 
+                        <div id="wishrite-checkout-points-row" style="display:none;color:#936B36;">
+                            <span>WishRite Points Used</span>
+                            <strong id="wishrite-checkout-points-discount">-₹0</strong>
+                        </div>
+
+                        <div id="wishrite-checkout-wallet-row" style="display:none;color:#2E7D32;">
+                            <span>Wallet Balance Used</span>
+                            <strong id="wishrite-checkout-wallet-used">-₹0</strong>
+                        </div>
+
                         <div class="wishrite-checkout-total">
                             <span>Final Total</span>
                             <strong id="wishrite-checkout-total">${formatPrice(total)}</strong>
@@ -835,6 +944,47 @@ function openWishriteCheckoutModal(pin) {
 
                     <!-- ═══ COUPON INPUT BOX (Sections 18, 19, 20) ═══ -->
                     ${renderCouponBoxHTML('checkout')}
+
+                    <!-- ═══ WISHRITE POINTS & WALLET REDEMPTION (Sections 11 & 12) ═══ -->
+                    <div id="wishrite-checkout-rewards-wrap" style="margin: 18px 0; background: #faf8f5; border: 1px solid var(--wr-border); border-radius: 8px; padding: 14px 16px;">
+                        <!-- WishRite Points Option -->
+                        <div style="margin-bottom: 12px;">
+                            <div style="display:flex; justify-content:space-between; align-items:center;">
+                                <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:600; color:var(--wr-primary); font-size:0.9rem;">
+                                    <input type="checkbox" id="checkout-use-points-checkbox" onchange="toggleWishritePointsUsage(this.checked)">
+                                    <span>Use WishRite Points</span>
+                                </label>
+                                <span style="font-size:0.8rem; color:#8C6A3B; font-weight:600;" id="checkout-avail-points-text">
+                                    Available: ${(typeof WishRiteWalletRewards !== 'undefined' ? WishRiteWalletRewards.formatPoints(WishRiteWalletRewards.state.pointsBalance) : 0)} pts
+                                </span>
+                            </div>
+                            <div id="checkout-points-input-box" style="display:none; margin-top:8px;">
+                                <div style="display:flex; align-items:center; gap:8px;">
+                                    <input type="number" id="checkout-points-input" class="form-input" style="width:120px; padding:6px 10px; font-weight:600;" min="1" max="${(typeof WishRiteWalletRewards !== 'undefined' ? WishRiteWalletRewards.state.pointsBalance : 0)}" value="${(typeof WishRiteWalletRewards !== 'undefined' ? Math.floor(WishRiteWalletRewards.state.pointsBalance) : 0)}" oninput="onWishritePointsInput(this.value)">
+                                    <span style="font-size:0.8rem; color:var(--wr-text-muted);">points (= <strong id="checkout-points-equiv-text">₹0</strong> discount)</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- WishRite Wallet Option -->
+                        <div style="padding-top: 10px; border-top: 1px dashed var(--wr-border);">
+                            <div style="display:flex; justify-content:space-between; align-items:center;">
+                                <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:600; color:var(--wr-primary); font-size:0.9rem;">
+                                    <input type="checkbox" id="checkout-use-wallet-checkbox" onchange="toggleWishriteWalletUsage(this.checked)">
+                                    <span>Use Wallet Balance</span>
+                                </label>
+                                <span style="font-size:0.8rem; color:var(--wr-success); font-weight:600;" id="checkout-avail-wallet-text">
+                                    Balance: ${(typeof WishRiteWalletRewards !== 'undefined' ? WishRiteWalletRewards.formatINR(WishRiteWalletRewards.state.walletBalance) : '₹0')}
+                                </span>
+                            </div>
+                            <div id="checkout-wallet-input-box" style="display:none; margin-top:8px;">
+                                <div style="display:flex; align-items:center; gap:8px;">
+                                    <input type="number" id="checkout-wallet-input" class="form-input" style="width:120px; padding:6px 10px; font-weight:600;" min="1" max="${(typeof WishRiteWalletRewards !== 'undefined' ? WishRiteWalletRewards.state.walletBalance : 0)}" value="${(typeof WishRiteWalletRewards !== 'undefined' ? Math.floor(WishRiteWalletRewards.state.walletBalance) : 0)}" oninput="onWishriteWalletInput(this.value)">
+                                    <span style="font-size:0.8rem; color:var(--wr-text-muted);">will be deducted from wallet</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
                     <div class="wishrite-payment-section" style="margin:20px 0 24px;">
                         <div class="wishrite-form-section-title" style="margin-bottom:12px;">Payment Method</div>
@@ -879,6 +1029,7 @@ function openWishriteCheckoutModal(pin) {
                                     type="text"
                                     autocomplete="name"
                                     placeholder="Enter your full name"
+                                    value="${escapeWishriteHtml(prefillName)}"
                                     required
                                     maxlength="100"
                                 >
@@ -896,6 +1047,7 @@ function openWishriteCheckoutModal(pin) {
                                     autocomplete="tel"
                                     inputmode="numeric"
                                     placeholder="10-digit mobile number"
+                                    value="${escapeWishriteHtml(prefillPhone)}"
                                     maxlength="10"
                                     required
                                     oninput="this.value=this.value.replace(/\\D/g,'').slice(0,10)"
@@ -915,6 +1067,7 @@ function openWishriteCheckoutModal(pin) {
                                 type="email"
                                 autocomplete="email"
                                 placeholder="you@example.com"
+                                value="${escapeWishriteHtml(prefillEmail)}"
                                 maxlength="150"
                                 required
                             >
@@ -1056,17 +1209,86 @@ function openWishriteCheckoutModal(pin) {
     initCheckoutPinLookup(pin);
     updateWishriteCheckoutTotals('prepaid');
 
-    setTimeout(() => {
-        const nameInput = document.getElementById(
-            'checkout-customer-name'
-        );
+    // Ensure pre-filled customer details for logged in user if not already set
+    setTimeout(async () => {
+        const nameInput = document.getElementById('checkout-customer-name');
+        const phoneInput = document.getElementById('checkout-customer-phone');
+        const emailInput = document.getElementById('checkout-customer-email');
 
-        if (nameInput) {
+        const user = (typeof getWishriteAuthUser === 'function') ? getWishriteAuthUser() : null;
+        if (user) {
+            if (nameInput && !nameInput.value && user.user_metadata?.full_name) {
+                nameInput.value = user.user_metadata.full_name;
+            }
+            if (phoneInput && !phoneInput.value) {
+                const p = (user.phone || user.user_metadata?.phone || '').replace(/^\+91/, '').trim();
+                if (p) phoneInput.value = p;
+            }
+            if (emailInput && !emailInput.value && user.email) {
+                emailInput.value = user.email;
+            }
+
+            // Also check public.customers if phone or name is still empty
+            const client = window.supabaseClient || (typeof supabaseClient !== 'undefined' ? supabaseClient : null);
+            if (client && (!nameInput?.value || !phoneInput?.value)) {
+                try {
+                    const { data: custData } = await client
+                        .from('customers')
+                        .select('customer_name, customer_phone, customer_email')
+                        .or(`user_id.eq.${user.id},customer_email.eq.${user.email}`)
+                        .maybeSingle();
+
+                    if (custData) {
+                        if (nameInput && !nameInput.value && custData.customer_name) {
+                            nameInput.value = custData.customer_name;
+                        }
+                        if (phoneInput && !phoneInput.value && custData.customer_phone) {
+                            phoneInput.value = String(custData.customer_phone).replace(/^\+91/, '').trim();
+                        }
+                        if (emailInput && !emailInput.value && custData.customer_email) {
+                            emailInput.value = custData.customer_email;
+                        }
+                    }
+                } catch (cErr) {
+                    console.warn('Customer profile prefill lookup warning:', cErr);
+                }
+            }
+        }
+
+        if (nameInput && !nameInput.value) {
             nameInput.focus();
         }
-    }, 100);
+    }, 50);
 }
 
+
+function toggleWishritePointsUsage(checked) {
+    const box = document.getElementById('checkout-points-input-box');
+    if (box) box.style.display = checked ? 'block' : 'none';
+    const method = document.querySelector('input[name="wishrite-payment-method"]:checked')?.value || 'prepaid';
+    updateWishriteCheckoutTotals(method);
+}
+window.toggleWishritePointsUsage = toggleWishritePointsUsage;
+
+function onWishritePointsInput(val) {
+    const method = document.querySelector('input[name="wishrite-payment-method"]:checked')?.value || 'prepaid';
+    updateWishriteCheckoutTotals(method);
+}
+window.onWishritePointsInput = onWishritePointsInput;
+
+function toggleWishriteWalletUsage(checked) {
+    const box = document.getElementById('checkout-wallet-input-box');
+    if (box) box.style.display = checked ? 'block' : 'none';
+    const method = document.querySelector('input[name="wishrite-payment-method"]:checked')?.value || 'prepaid';
+    updateWishriteCheckoutTotals(method);
+}
+window.toggleWishriteWalletUsage = toggleWishriteWalletUsage;
+
+function onWishriteWalletInput(val) {
+    const method = document.querySelector('input[name="wishrite-payment-method"]:checked')?.value || 'prepaid';
+    updateWishriteCheckoutTotals(method);
+}
+window.onWishriteWalletInput = onWishriteWalletInput;
 
 function updateWishriteCheckoutTotals(paymentMethod) {
     const method = String(paymentMethod || 'prepaid').toLowerCase() === 'cod' ? 'cod' : 'prepaid';
@@ -1079,10 +1301,16 @@ function updateWishriteCheckoutTotals(paymentMethod) {
     const shippingEl = document.getElementById('wishrite-checkout-shipping');
     const codRow = document.getElementById('wishrite-checkout-cod-row');
     const codChargeEl = document.getElementById('wishrite-checkout-cod-charge');
+    const pointsRow = document.getElementById('wishrite-checkout-points-row');
+    const pointsDiscountEl = document.getElementById('wishrite-checkout-points-discount');
+    const pointsEquivText = document.getElementById('checkout-points-equiv-text');
+    const walletRow = document.getElementById('wishrite-checkout-wallet-row');
+    const walletUsedEl = document.getElementById('wishrite-checkout-wallet-used');
     const totalEl = document.getElementById('wishrite-checkout-total');
     const prepaidOption = document.getElementById('wishrite-prepaid-option');
     const codOption = document.getElementById('wishrite-cod-option');
     const noteEl = document.getElementById('wishrite-payment-note');
+    const submitBtn = document.getElementById('wishrite-create-order-button');
 
     if (subtotalEl) subtotalEl.textContent = formatPrice(totals.subtotal);
     if (discountRow) {
@@ -1096,6 +1324,29 @@ function updateWishriteCheckoutTotals(paymentMethod) {
             }
         } else {
             discountRow.style.display = 'none';
+        }
+    }
+
+    // WishRite Points Row
+    if (pointsRow) {
+        if (totals.pointsDiscount > 0) {
+            pointsRow.style.display = 'flex';
+            if (pointsDiscountEl) pointsDiscountEl.textContent = `-${formatPrice(totals.pointsDiscount)}`;
+        } else {
+            pointsRow.style.display = 'none';
+        }
+    }
+    if (pointsEquivText) {
+        pointsEquivText.textContent = formatPrice(totals.pointsDiscount);
+    }
+
+    // WishRite Wallet Row
+    if (walletRow) {
+        if (totals.walletUsed > 0) {
+            walletRow.style.display = 'flex';
+            if (walletUsedEl) walletUsedEl.textContent = `-${formatPrice(totals.walletUsed)}`;
+        } else {
+            walletRow.style.display = 'none';
         }
     }
 
@@ -1118,6 +1369,25 @@ function updateWishriteCheckoutTotals(paymentMethod) {
     }
     if (totalEl) totalEl.textContent = formatPrice(totals.total);
 
+    // If order total is completely covered by points & wallet (₹0 payable):
+    if (totals.total <= 0) {
+        if (submitBtn) {
+            submitBtn.textContent = 'Complete Order (Paid via Wallet & Points)';
+        }
+        if (noteEl) {
+            noteEl.innerHTML = '<strong style="color:#2E7D32;">✓ Order is fully covered by your WishRite Points & Wallet!</strong>';
+        }
+    } else {
+        if (submitBtn) {
+            submitBtn.textContent = method === 'cod' ? 'Confirm Cash on Delivery Order' : 'Continue to Secure Payment';
+        }
+        if (noteEl) {
+            noteEl.textContent = method === 'cod'
+                ? 'Cash on Delivery includes a ₹50 COD handling charge.'
+                : 'Secure online payment powered by Razorpay.';
+        }
+    }
+
     if (prepaidOption) {
         prepaidOption.style.borderColor = method === 'prepaid' ? 'var(--wr-primary)' : 'var(--wr-border)';
         prepaidOption.style.background = method === 'prepaid' ? '#faf6f3' : '#fff';
@@ -1139,11 +1409,6 @@ function updateWishriteCheckoutTotals(paymentMethod) {
                 return updateWishriteCheckoutTotals('prepaid');
             }
         }
-    }
-    if (noteEl) {
-        noteEl.textContent = method === 'cod'
-            ? 'Cash on Delivery includes a ₹50 COD handling charge.'
-            : 'Secure online payment powered by Razorpay.';
     }
 
     return totals;
@@ -1537,6 +1802,9 @@ async function proceedToRazorpayPayment(internalOrderId) {
                     if (typeof WishRiteCoupons !== 'undefined') {
                         WishRiteCoupons.clearAppliedCoupon();
                     }
+                    if (typeof WishRiteWalletRewards !== 'undefined') {
+                        WishRiteWalletRewards.loadUserData();
+                    }
 
                     // Render luxury WishRite Order Confirmation UI immediately after cart is cleared
                     renderWishriteOrderConfirmation(window.wishritePendingCheckout, verifyData);
@@ -1788,12 +2056,32 @@ async function submitWishriteCustomerCheckout(event) {
         const actualCodFee = paymentMethod === 'cod' ? getCodCharge('cod', subtotal, cart) : 0;
         const finalDiscountedTotal = Math.max(0, Math.round(Number(subtotal) - couponDiscount + Number(shipping) + actualCodFee));
 
+        // Get authenticated user ID if logged in (for wallet & rewards)
+        const authUser = (typeof getWishriteAuthUser === 'function') ? getWishriteAuthUser() : null;
+        const currentUserId = authUser?.id || null;
+
+        // Retrieve points and wallet redemption selections
+        let pointsToRedeem = 0;
+        let walletToUse = 0;
+        const pointsCheckbox = document.getElementById('checkout-use-points-checkbox');
+        const pointsInput = document.getElementById('checkout-points-input');
+        if (pointsCheckbox && pointsCheckbox.checked && pointsInput && currentUserId) {
+            pointsToRedeem = Math.max(0, Math.floor(Number(pointsInput.value) || 0));
+        }
+
+        const walletCheckbox = document.getElementById('checkout-use-wallet-checkbox');
+        const walletInput = document.getElementById('checkout-wallet-input');
+        if (walletCheckbox && walletCheckbox.checked && walletInput && currentUserId) {
+            walletToUse = Math.max(0, Number(walletInput.value) || 0);
+        }
+
         const internalOrderId = crypto.randomUUID();
         const orderNumber = generateOrderNumber();
 
         const orderPayload = {
             id: internalOrderId,
             order_number: orderNumber,
+            user_id: currentUserId,
             customer_name: name,
             customer_phone: phone,
             customer_email: email,
@@ -1811,7 +2099,8 @@ async function submitWishriteCustomerCheckout(event) {
             currency: 'INR',
             payment_method: paymentMethod,
             payment_status: 'pending',
-            order_status: paymentMethod === 'cod' ? 'confirmed' : 'pending'
+            order_status: paymentMethod === 'cod' ? 'confirmed' : 'pending',
+            eligible_taxable_subtotal: Math.max(0, Number(subtotal) - couponDiscount)
         };
 
         // Add extended coupon audit fields if coupon was applied
@@ -1833,7 +2122,7 @@ async function submitWishriteCustomerCheckout(event) {
 
         // Graceful fallback if database schema has not yet been migrated with new columns
         if (orderError && (orderError.message?.includes('column') || orderError.code === 'PGRST204')) {
-            console.warn('Orders insert retry without extended coupon columns:', orderError.message);
+            console.warn('Orders insert retry without extended coupon/rewards columns:', orderError.message);
             const standardPayload = {
                 id: internalOrderId,
                 order_number: orderNumber,
@@ -1929,6 +2218,43 @@ async function submitWishriteCustomerCheckout(event) {
             }
         }
 
+        // 2.6 If customer selected points or wallet, invoke atomic apply_wallet_and_points_to_checkout RPC
+        let pointsDiscountApplied = 0;
+        let walletAmountApplied = 0;
+        let isFullyPaidByWalletPoints = false;
+        let remainingAfterDeductions = finalDiscountedTotal;
+
+        if (currentUserId && (pointsToRedeem > 0 || walletToUse > 0)) {
+            try {
+                const { data: applyResult, error: applyError } = await client.rpc('apply_wallet_and_points_to_checkout', {
+                    p_order_id: internalOrderId,
+                    p_user_id: currentUserId,
+                    p_points_to_redeem: pointsToRedeem,
+                    p_wallet_to_use: walletToUse
+                });
+
+                if (applyError) {
+                    console.error('Error applying wallet/points to order:', applyError);
+                    showCheckoutFormError(applyError.message || 'Unable to apply points/wallet to this order.');
+                    if (submitButton) {
+                        submitButton.disabled = false;
+                        submitButton.innerHTML = 'Continue to Secure Payment';
+                    }
+                    return;
+                }
+
+                if (applyResult && applyResult.success) {
+                    pointsToRedeem = Number(applyResult.points_redeemed || 0);
+                    pointsDiscountApplied = Number(applyResult.points_discount || 0);
+                    walletAmountApplied = Number(applyResult.wallet_used || 0);
+                    isFullyPaidByWalletPoints = Boolean(applyResult.is_fully_paid);
+                    remainingAfterDeductions = Number(applyResult.remaining_payable !== undefined ? applyResult.remaining_payable : (finalDiscountedTotal - pointsDiscountApplied - walletAmountApplied));
+                }
+            } catch (rpcErr) {
+                console.error('RPC apply_wallet_and_points_to_checkout failed:', rpcErr);
+            }
+        }
+
         // 3. Store pending checkout details in window.wishritePendingCheckout
         const orderItemsWithImages = orderItemsPayload.map((oi, idx) => {
             const cartItem = cart[idx];
@@ -1943,6 +2269,7 @@ async function submitWishriteCustomerCheckout(event) {
         window.wishritePendingCheckout = {
             internal_order_id: internalOrderId,
             order_number: orderNumber,
+            user_id: currentUserId,
             customer_name: name,
             customer_phone: phone,
             customer_email: email,
@@ -1956,15 +2283,47 @@ async function submitWishriteCustomerCheckout(event) {
             coupon_discount_amount: couponDiscount,
             coupon_code: appliedCoupon ? appliedCoupon.code : null,
             coupon_id: appliedCoupon ? appliedCoupon.couponId : null,
+            points_redeemed: pointsToRedeem,
+            points_discount_amount: pointsDiscountApplied,
+            wallet_amount_used: walletAmountApplied,
             shipping_charge: Number(shipping),
             cod_charge: Number(codCharge),
-            grand_total: finalDiscountedTotal,
-            payment_method: paymentMethod,
+            grand_total: isFullyPaidByWalletPoints ? 0 : Math.max(0, remainingAfterDeductions),
+            payment_method: isFullyPaidByWalletPoints ? 'wallet_points' : paymentMethod,
             currency: 'INR',
             items: orderItemsWithImages
         };
 
-        // 4. Online payment goes through Razorpay. COD is confirmed without opening Razorpay.
+        // 4. If order is 100% paid by Points and/or Wallet, finalize immediately
+        if (isFullyPaidByWalletPoints || remainingAfterDeductions <= 0) {
+            window.wishritePendingCheckout.is_completed = true;
+            window.wishritePendingCheckout.payment_status = 'paid';
+            window.wishritePendingCheckout.order_status = 'processing';
+            window.wishritePendingCheckout.grand_total = 0;
+
+            if (typeof WishRiteCoupons !== 'undefined') {
+                WishRiteCoupons.clearAppliedCoupon();
+            }
+
+            clearCart();
+
+            if (typeof WishRiteWalletRewards !== 'undefined') {
+                WishRiteWalletRewards.loadUserData();
+            }
+
+            renderWishriteOrderConfirmation(window.wishritePendingCheckout, {
+                success: true,
+                verified: true,
+                order_number: orderNumber,
+                payment_status: 'paid',
+                order_status: 'processing',
+                grand_total: 0,
+                currency: 'INR'
+            });
+            return;
+        }
+
+        // 5. Online payment goes through Razorpay. COD is confirmed without opening Razorpay.
         if (paymentMethod === 'cod') {
             if (window.wishritePendingCheckout) {
                 window.wishritePendingCheckout.is_completed = true;
@@ -1977,13 +2336,17 @@ async function submitWishriteCustomerCheckout(event) {
             }
 
             clearCart();
+            if (typeof WishRiteWalletRewards !== 'undefined') {
+                WishRiteWalletRewards.loadUserData();
+            }
+
             renderWishriteOrderConfirmation(window.wishritePendingCheckout, {
                 success: true,
                 verified: false,
                 order_number: orderNumber,
                 payment_status: 'pending',
                 order_status: 'confirmed',
-                grand_total: finalDiscountedTotal,
+                grand_total: remainingAfterDeductions,
                 currency: 'INR'
             });
             return;
@@ -2785,6 +3148,8 @@ function renderWishriteOrderConfirmation(pendingCheckout, verifyData) {
     const grandTotal = verifyData?.grand_total !== undefined ? verifyData.grand_total : (pending.grand_total || 0);
     const subtotal = pending.subtotal !== undefined ? pending.subtotal : grandTotal;
     const discount = Number(pending.discount || pending.coupon_discount_amount || 0);
+    const pointsDiscount = Number(pending.points_discount_amount || 0);
+    const walletUsed = Number(pending.wallet_amount_used || 0);
     const shipping = pending.shipping_charge !== undefined ? pending.shipping_charge : 0;
     const codCharge = pending.cod_charge !== undefined ? pending.cod_charge : 0;
     const paymentMethod = String(pending.payment_method || 'razorpay').toLowerCase();
@@ -2974,9 +3339,21 @@ function renderWishriteOrderConfirmation(pendingCheckout, verifyData) {
                                     <span class="wishrite-price-val">${formatPrice(codCharge)}</span>
                                 </div>
                                 ` : ''}
+                                ${pointsDiscount > 0 ? `
+                                <div class="wishrite-price-row" style="color:var(--wr-gold-dark, #8C6D3F);">
+                                    <span class="wishrite-price-label">Points Redeemed (${pending.points_redeemed || 0} pts)</span>
+                                    <span class="wishrite-price-val">-${formatPrice(pointsDiscount)}</span>
+                                </div>
+                                ` : ''}
+                                ${walletUsed > 0 ? `
+                                <div class="wishrite-price-row" style="color:var(--wr-primary, #5E3435);">
+                                    <span class="wishrite-price-label">Wallet Balance Used</span>
+                                    <span class="wishrite-price-val">-${formatPrice(walletUsed)}</span>
+                                </div>
+                                ` : ''}
                                 <div class="wishrite-price-row">
                                     <span class="wishrite-price-label">Payment Method</span>
-                                    <span class="wishrite-price-val">${isCod ? 'Cash on Delivery' : 'Online Payment'}</span>
+                                    <span class="wishrite-price-val">${isCod ? 'Cash on Delivery' : (paymentMethod === 'wallet_points' ? 'WishRite Wallet & Points' : 'Online Payment')}</span>
                                 </div>
                                 <div class="wishrite-price-divider"></div>
                                 <div class="wishrite-price-row wishrite-grand-total-row">

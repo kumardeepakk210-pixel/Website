@@ -70,7 +70,11 @@
     },
     {
       "source": "/admin",
-      "destination": "/index.html"
+      "destination": "/admin-rewards.html"
+    },
+    {
+      "source": "/admin-rewards",
+      "destination": "/admin-rewards.html"
     }
   ],
   "headers": [

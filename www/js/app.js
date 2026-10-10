@@ -935,12 +935,8 @@ function handleInitialURLRoute(pushHistory = false) {
     } else if (path === '/register' || hash === '#register') {
         navigateTo('register', null, pushHistory);
         return;
-    } else if (path === '/admin') {
-        // Direct administrative users to the separate Inventory Application
-        navigateTo('home', null, false);
-        if (window.history.replaceState) {
-            window.history.replaceState({}, '', '/');
-        }
+    } else if (path === '/admin' || path === '/admin-rewards' || hash === '#admin-rewards') {
+        window.location.href = '/admin-rewards.html';
         return;
     }
 

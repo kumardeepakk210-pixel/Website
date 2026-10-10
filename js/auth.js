@@ -394,6 +394,12 @@ async function handleRegister(e) {
         document.getElementById('register-password')
             ?.value || '';
 
+    const referralCode =
+        document.getElementById('register-referral-code')
+            ?.value
+            ?.trim()
+            ?.toUpperCase() || '';
+
     const submitBtn =
         document.getElementById('register-submit-btn');
 
@@ -566,6 +572,31 @@ async function handleRegister(e) {
          */
         await syncCustomerProfile(currentUser);
 
+        /*
+         * Link referral if code was entered.
+         */
+        if (referralCode && currentUser?.id) {
+            try {
+                const { data: refData, error: refErr } = await supabaseClient.rpc(
+                    'record_customer_referral',
+                    {
+                        p_referred_user_id: currentUser.id,
+                        p_referral_code: referralCode
+                    }
+                );
+                if (refErr) {
+                    console.warn('[Referral Registration] Notice:', refErr.message);
+                } else {
+                    console.log('[Referral Registration] Referral recorded:', refData);
+                }
+            } catch (refEx) {
+                console.warn('[Referral Registration] Exception:', refEx);
+            }
+        }
+
+        if (typeof WishRiteWalletRewards !== 'undefined') {
+            await WishRiteWalletRewards.syncUser(currentUser);
+        }
 
         updateAuthDropdown();
 
@@ -710,6 +741,9 @@ async function syncCustomerProfile(user) {
             .from('customers')
             .upsert(
                 {
+                    user_id:
+                        user.id,
+
                     customer_email:
                         user.email
                             ? user.email.toLowerCase()
@@ -731,6 +765,17 @@ async function syncCustomerProfile(user) {
                         'customer_email'
                 }
             );
+
+        window.currentCustomerProfile = {
+            id: user.id,
+            name: fullName || user.email?.split('@')[0] || '',
+            phone: phone || '',
+            email: user.email || ''
+        };
+
+        if (typeof WishRiteWalletRewards !== 'undefined') {
+            WishRiteWalletRewards.syncUser(user);
+        }
 
     } catch (e) {
 
@@ -838,12 +883,118 @@ function renderProfileAccountDetails() {
 
 
     if (statusText) {
-
         statusText.innerText =
             '✓ Account Active';
 
         statusText.style.color =
             'var(--wr-success)';
+    }
+
+    // Render WishRite Wallet, Points & Referral system
+    if (typeof WishRiteWalletRewards !== 'undefined' && currentUser) {
+        WishRiteWalletRewards.syncUser(currentUser);
+        WishRiteWalletRewards.renderAccountSection();
+    }
+
+    // Render Customer Order History
+    renderCustomerOrderHistory(currentUser);
+}
+
+// ─────────────────────────────────────────────
+// Customer Order History
+// ─────────────────────────────────────────────
+
+async function renderCustomerOrderHistory(user) {
+    const ordersListEl = document.getElementById('account-orders-list');
+    const emptyNotice = document.getElementById('account-orders-empty');
+    if (!ordersListEl) return;
+
+    if (!user || !supabaseClient) {
+        if (emptyNotice) emptyNotice.style.display = 'block';
+        ordersListEl.innerHTML = '';
+        return;
+    }
+
+    try {
+        const emailFilter = user.email ? user.email.toLowerCase() : '';
+        let query = supabaseClient
+            .from('orders')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(20);
+
+        if (user.id && emailFilter) {
+            query = query.or(`user_id.eq.${user.id},customer_email.eq.${emailFilter}`);
+        } else if (user.id) {
+            query = query.eq('user_id', user.id);
+        } else if (emailFilter) {
+            query = query.eq('customer_email', emailFilter);
+        }
+
+        const { data: orders, error } = await query;
+
+        if (error || !orders || !orders.length) {
+            if (emptyNotice) emptyNotice.style.display = 'block';
+            ordersListEl.innerHTML = '';
+            return;
+        }
+
+        if (emptyNotice) emptyNotice.style.display = 'none';
+
+        ordersListEl.innerHTML = orders.map(ord => {
+            const dateStr = new Date(ord.created_at).toLocaleDateString('en-IN', {
+                day: 'numeric', month: 'short', year: 'numeric'
+            });
+            const grandTotal = Number(ord.grand_total || 0).toLocaleString('en-IN');
+            const status = (ord.order_status || 'processing').toUpperCase();
+            const pointsEarned = Number(ord.purchase_points_awarded || 0);
+            const pointsUsed = Number(ord.points_redeemed || 0);
+            const walletUsed = Number(ord.wallet_amount_used || 0);
+
+            return `
+                <div class="account-order-item" style="border:1px solid var(--wr-border); border-radius:8px; padding:16px; margin-bottom:12px; background:#FAF8F5;">
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:8px;">
+                        <div>
+                            <strong style="color:var(--wr-primary); font-size:1.05rem;">Order #${ord.order_number || ord.id.slice(0, 8)}</strong>
+                            <div style="font-size:0.82rem; color:var(--wr-text-muted); margin-top:2px;">Placed on ${dateStr}</div>
+                        </div>
+                        <div style="text-align:right;">
+                            <span class="status-badge" style="background:#FFF; border:1px solid var(--wr-border); font-size:0.75rem; padding:4px 10px;">
+                                ${status}
+                            </span>
+                            <div style="font-family:var(--font-display); font-size:1.15rem; font-weight:700; color:var(--wr-primary); margin-top:4px;">
+                                ₹${grandTotal}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Rewards & Wallet Summary Badges -->
+                    <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; padding-top:10px; border-top:1px dashed var(--wr-border);">
+                        ${pointsEarned > 0 ? `
+                            <span style="font-size:0.78rem; background:rgba(184, 149, 106, 0.15); color:#8C6A3B; padding:3px 8px; border-radius:4px; font-weight:600;">
+                                ✨ +${pointsEarned} Points Earned
+                            </span>
+                        ` : ''}
+                        ${pointsUsed > 0 ? `
+                            <span style="font-size:0.78rem; background:rgba(94, 52, 53, 0.08); color:var(--wr-primary); padding:3px 8px; border-radius:4px; font-weight:600;">
+                                🪙 ${pointsUsed} Points Used (-₹${pointsUsed})
+                            </span>
+                        ` : ''}
+                        ${walletUsed > 0 ? `
+                            <span style="font-size:0.78rem; background:rgba(24, 121, 78, 0.1); color:var(--wr-success); padding:3px 8px; border-radius:4px; font-weight:600;">
+                                💳 ₹${walletUsed} Paid via Wallet
+                            </span>
+                        ` : ''}
+                        <span style="font-size:0.78rem; color:var(--wr-text-muted); margin-left:auto;">
+                            Payment: <strong>${(ord.payment_method || 'online').toUpperCase()}</strong> (${(ord.payment_status || 'pending').toUpperCase()})
+                        </span>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+    } catch (ordErr) {
+        console.warn('Could not render order history:', ordErr.message);
     }
 }
 
@@ -868,6 +1019,9 @@ async function handleLogout() {
         );
     }
 
+    if (typeof WishRiteWalletRewards !== 'undefined') {
+        WishRiteWalletRewards.resetState();
+    }
 
     isLoggedIn = false;
     currentUser = null;
@@ -1014,3 +1168,23 @@ document.addEventListener(
         initAuthSystem();
     }
 );
+
+window.getWishriteAuthUser = function() {
+    return currentUser;
+};
+
+window.getWishriteCustomerProfile = function() {
+    if (window.currentCustomerProfile) {
+        return window.currentCustomerProfile;
+    }
+    if (!currentUser) return null;
+    const email = currentUser.email || '';
+    const phone = (currentUser.phone || currentUser.user_metadata?.phone || '').replace(/^\+91/, '').trim();
+    const fullName = currentUser.user_metadata?.full_name || '';
+    return {
+        id: currentUser.id,
+        name: fullName,
+        phone: phone,
+        email: email
+    };
+};

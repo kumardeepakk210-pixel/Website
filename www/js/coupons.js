@@ -92,101 +92,196 @@
     }
 
     /**
-     * Fetches a coupon by uppercase code from Supabase.
+     * Standard WishRite Promotional Coupons
+     * 1st: WELCOME10 - 10% discount, no minimum value, for first time and one time use only
+     * 2nd: SALE10 - 10% discount, minimum cart value 3K (₹3,000), for everyone
+     * 3rd: SALE15 - 15% discount, minimum cart value 5K (₹5,000), for everyone
+     */
+    const SYSTEM_COUPONS = [
+        {
+            id: 'c1111111-1111-4111-a111-111111111111',
+            code: 'WELCOME10',
+            description: '10% off for first time and one time use only',
+            scope: 'all',
+            discount_type: 'percentage',
+            discount_value: 10,
+            minimum_order_value: 0,
+            maximum_discount: null,
+            first_order_only: true,
+            per_customer_limit: 1,
+            is_active: true
+        },
+        {
+            id: 'c2222222-2222-4222-a222-222222222222',
+            code: 'SALE10',
+            description: '10% off on minimum cart value of ₹3,000 for everyone',
+            scope: 'all',
+            discount_type: 'percentage',
+            discount_value: 10,
+            minimum_order_value: 3000,
+            maximum_discount: null,
+            first_order_only: false,
+            per_customer_limit: 10,
+            is_active: true
+        },
+        {
+            id: 'c3333333-3333-4333-a333-333333333333',
+            code: 'SALE15',
+            description: '15% off on minimum cart value of ₹5,000 for everyone',
+            scope: 'all',
+            discount_type: 'percentage',
+            discount_value: 15,
+            minimum_order_value: 5000,
+            maximum_discount: null,
+            first_order_only: false,
+            per_customer_limit: 10,
+            is_active: true
+        }
+    ];
+
+    /**
+     * Fetches a coupon by uppercase code from Supabase (with fallback to SYSTEM_COUPONS).
      */
     async function fetchCouponFromDB(rawCode) {
         if (!rawCode) return { data: null, error: 'Coupon code is required.' };
         const code = String(rawCode).trim().toUpperCase();
         const client = getSupabaseClient();
 
-        if (!client) {
-            return { data: null, error: 'Database connection unavailable.' };
-        }
+        if (client) {
+            try {
+                const { data, error } = await client
+                    .from('coupons')
+                    .select('*')
+                    .ilike('code', code)
+                    .maybeSingle();
 
-        try {
-            const { data, error } = await client
-                .from('coupons')
-                .select('*')
-                .eq('code', code)
-                .maybeSingle();
-
-            if (error) {
-                // If table doesn't exist yet or other DB error, return graceful error
-                console.warn('WishRite Coupons query error:', error.message || error);
-                return { data: null, error: 'Invalid or expired coupon.' };
+                if (!error && data) {
+                    return { data, error: null };
+                }
+            } catch (err) {
+                console.warn('WishRite Coupons DB query warning:', err);
             }
-
-            return { data, error: null };
-        } catch (err) {
-            console.warn('WishRite Coupons fetch exception:', err);
-            return { data: null, error: 'Invalid or expired coupon.' };
         }
+
+        // Check system built-in coupons
+        const systemCoupon = SYSTEM_COUPONS.find(c => c.code === code);
+        if (systemCoupon) {
+            return { data: systemCoupon, error: null };
+        }
+
+        return { data: null, error: 'Invalid or expired coupon.' };
     }
 
     /**
      * Fetches all active coupons applicable to the current customer cart.
      */
     async function fetchAvailableCoupons(cartItems = [], customer = null, activeOccasionSlug = null) {
-        const client = getSupabaseClient();
-        if (!client) return [];
-
         try {
-            const nowIso = new Date().toISOString();
-            const { data, error } = await client
-                .from('coupons')
-                .select('*')
-                .eq('is_active', true);
+            const client = getSupabaseClient();
+            let allCoupons = [];
 
-            if (error || !Array.isArray(data)) {
-                return [];
+            if (client) {
+                try {
+                    const { data, error } = await client
+                        .from('coupons')
+                        .select('*')
+                        .eq('is_active', true);
+
+                    if (!error && Array.isArray(data) && data.length > 0) {
+                        allCoupons = [...data];
+                    }
+                } catch (err) {
+                    console.warn('WishRite fetchAvailableCoupons DB query warning:', err);
+                }
+            }
+
+            // Merge default system coupons if not already present
+            for (const sc of SYSTEM_COUPONS) {
+                if (!allCoupons.some(c => String(c.code).toUpperCase() === sc.code)) {
+                    allCoupons.push(sc);
+                }
             }
 
             const now = new Date();
             const validCoupons = [];
 
-            for (const c of data) {
+            for (const c of allCoupons) {
+                // Status check
+                if (c.is_active === false) continue;
+
                 // Date check
                 if (c.start_date && new Date(c.start_date) > now) continue;
                 if (c.end_date && new Date(c.end_date) < now) continue;
-                // Usage limit check
-                if (c.usage_limit && c.used_count >= c.usage_limit) continue;
+
+                // Overall usage limit check
+                if (c.usage_limit && Number(c.used_count || 0) >= Number(c.usage_limit)) continue;
 
                 // Scope & Cart Eligibility check
                 const eligibleSubtotal = calculateEligibleSubtotal(cartItems, c.scope, c.occasion_slug || activeOccasionSlug);
 
-                // If cart has no items eligible for this scope, skip
-                if (cartItems.length > 0 && eligibleSubtotal <= 0) continue;
-
                 // If occasion-specific and doesn't match active occasion, skip
                 if (c.scope === 'occasion' && c.occasion_slug && activeOccasionSlug) {
-                    if (c.occasion_slug.toLowerCase() !== activeOccasionSlug.toLowerCase()) {
+                    if (c.occasion_slug.toLowerCase() !== String(activeOccasionSlug).toLowerCase()) {
                         continue;
                     }
                 }
 
-                // Calculate potential discount for ranking
+                const minOrder = Number(c.minimum_order_value || 0);
+                const hasCartItems = Array.isArray(cartItems) && cartItems.length > 0;
+                let isEligible = hasCartItems && (eligibleSubtotal >= minOrder);
+                let diffAmount = (!hasCartItems || eligibleSubtotal < minOrder) ? Math.max(0, Math.round(minOrder - eligibleSubtotal)) : 0;
+                let ineligibleReason = '';
+
+                if (hasCartItems && eligibleSubtotal <= 0 && c.scope !== 'all') {
+                    isEligible = false;
+                    if (c.scope === 'jewellery') ineligibleReason = 'Silver Jewellery items only';
+                    else if (c.scope === 'occasion') ineligibleReason = 'Festive collection items only';
+                } else if (hasCartItems && diffAmount > 0) {
+                    ineligibleReason = `Add ₹${diffAmount.toLocaleString('en-IN')} more to unlock`;
+                } else if (!hasCartItems && minOrder > 0) {
+                    ineligibleReason = `Min. cart value ₹${minOrder.toLocaleString('en-IN')}`;
+                }
+
+                // Calculate potential discount for ranking & display
                 let estimatedDiscount = 0;
+                const baseAmount = eligibleSubtotal > 0 ? eligibleSubtotal : (minOrder > 0 ? minOrder : 1000);
                 if (c.discount_type === 'percentage') {
-                    estimatedDiscount = (eligibleSubtotal * Number(c.discount_value)) / 100;
+                    estimatedDiscount = (baseAmount * Number(c.discount_value)) / 100;
                     if (c.maximum_discount) estimatedDiscount = Math.min(estimatedDiscount, Number(c.maximum_discount));
                 } else if (c.discount_type === 'fixed') {
-                    estimatedDiscount = Math.min(Number(c.discount_value), eligibleSubtotal);
+                    estimatedDiscount = Number(c.discount_value);
+                } else if (c.discount_type === 'free_shipping') {
+                    estimatedDiscount = 99;
                 }
 
                 validCoupons.push({
                     ...c,
                     estimatedDiscount: Math.round(estimatedDiscount),
-                    eligibleSubtotal
+                    eligibleSubtotal,
+                    isEligible,
+                    diffAmount,
+                    ineligibleReason
                 });
             }
 
-            // Sort by estimated discount descending (Best Offer first)
-            validCoupons.sort((a, b) => b.estimatedDiscount - a.estimatedDiscount);
+            // Sort: eligible offers first (by highest discount), then other active offers
+            validCoupons.sort((a, b) => {
+                if (a.isEligible && !b.isEligible) return -1;
+                if (!a.isEligible && b.isEligible) return 1;
+                return b.estimatedDiscount - a.estimatedDiscount;
+            });
 
             return validCoupons;
         } catch (err) {
             console.warn('WishRite fetchAvailableCoupons exception:', err);
-            return [];
+            return SYSTEM_COUPONS.map(sc => ({
+                ...sc,
+                estimatedDiscount: 0,
+                eligibleSubtotal: 0,
+                isEligible: false,
+                diffAmount: sc.minimum_order_value || 0,
+                ineligibleReason: ''
+            }));
         }
     }
 

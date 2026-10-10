@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WishRite Admin — Wallet & Rewards Control Panel</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/variables.css">
+    <link rel="stylesheet" href="/css/components.css">
+    <style>
+        :root {
+            --wr-admin-bg: #FBF9F7;
+            --wr-admin-card: #FFFFFF;
+            --wr-admin-border: #E8DFD8;
+            --wr-admin-maroon: #5E3435;
+            --wr-admin-gold: #B8956A;
+            --wr-admin-gold-light: #F9F5F0;
+        }
+
+        body {
+            font-family: 'Montserrat', sans-serif;
+            background: var(--wr-admin-bg);
+            color: #2C2C2C;
+            margin: 0;
+            padding: 0;
+        }
+
+        .admin-header {
+            background: var(--wr-admin-maroon);
+            color: #FFFFFF;
+            padding: 18px 32px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+        }
+
+        .admin-brand {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .admin-logo {
+            font-family: 'Cinzel', serif;
+            font-size: 1.4rem;
+            letter-spacing: 2px;
+            color: #FFFFFF;
+            font-weight: 700;
+        }
+
+        .admin-badge {
+            background: rgba(184, 149, 106, 0.25);
+            border: 1px solid var(--wr-admin-gold);
+            color: #F5E6D3;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 0.72rem;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        .admin-nav-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .admin-nav-link {
+            color: #EFEBE7;
+            text-decoration: none;
+            font-size: 0.85rem;
+            padding: 8px 14px;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+        }
+        .admin-nav-link:hover {
+            background: rgba(255,255,255,0.1);
+            color: #FFFFFF;
+        }
+
+        .admin-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 32px 24px 60px;
+        }
+
+        .admin-title-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 28px;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .admin-page-title {
+            font-family: 'Cinzel', serif;
+            color: var(--wr-admin-maroon);
+            font-size: 1.8rem;
+            margin: 0;
+            letter-spacing: 1px;
+        }
+
+        .admin-overview-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 20px;
+            margin-bottom: 32px;
+        }
+
+        .admin-stat-card {
+            background: var(--wr-admin-card);
+            border: 1px solid var(--wr-admin-border);
+            border-radius: 12px;
+            padding: 22px 24px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.03);
+            position: relative;
+            overflow: hidden;
+        }
+        .admin-stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--wr-admin-maroon), var(--wr-admin-gold));
+        }
+
+        .stat-label {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: #7A7A7A;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .stat-val {
+            font-family: 'Cinzel', serif;
+            font-size: 1.7rem;
+            color: var(--wr-admin-maroon);
+            font-weight: 700;
+        }
+
+        .stat-sub {
+            font-size: 0.78rem;
+            color: #8C6D3F;
+            margin-top: 6px;
+        }
+
+        .admin-sections-grid {
+            display: grid;
+            grid-template-columns: 1fr 1.2fr;
+            gap: 24px;
+            margin-bottom: 36px;
+        }
+
+        @media (max-width: 960px) {
+            .admin-sections-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .admin-box {
+            background: var(--wr-admin-card);
+            border: 1px solid var(--wr-admin-border);
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.03);
+        }
+
+        .admin-box-title {
+            font-family: 'Cinzel', serif;
+            font-size: 1.2rem;
+            color: var(--wr-admin-maroon);
+            margin: 0 0 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .admin-form-group {
+            margin-bottom: 16px;
+        }
+
+        .admin-form-label {
+            display: block;
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: #4A4A4A;
+            margin-bottom: 6px;
+        }
+
+        .admin-input, .admin-select, .admin-textarea {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 10px 14px;
+            border: 1px solid var(--wr-admin-border);
+            border-radius: 8px;
+            font-family: 'Montserrat', sans-serif;
+            font-size: 0.9rem;
+            background: #FFFFFF;
+            color: #2C2C2C;
+            transition: border-color 0.2s ease;
+        }
+        .admin-input:focus, .admin-select:focus, .admin-textarea:focus {
+            outline: none;
+            border-color: var(--wr-admin-gold);
+            box-shadow: 0 0 0 3px rgba(184, 149, 106, 0.15);
+        }
+
+        .admin-btn {
+            background: var(--wr-admin-maroon);
+            color: #FFFFFF;
+            border: none;
+            padding: 12px 22px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.88rem;
+            cursor: pointer;
+            letter-spacing: 0.5px;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .admin-btn:hover {
+            background: #4A2627;
+            transform: translateY(-1px);
+        }
+        .admin-btn-gold {
+            background: var(--wr-admin-gold);
+            color: #FFFFFF;
+        }
+        .admin-btn-gold:hover {
+            background: #9E7D52;
+        }
+
+        .admin-tabs-nav {
+            display: flex;
+            gap: 8px;
+            border-bottom: 2px solid var(--wr-admin-border);
+            margin-bottom: 20px;
+            overflow-x: auto;
+        }
+
+        .admin-tab-btn {
+            background: transparent;
+            border: none;
+            border-bottom: 3px solid transparent;
+            margin-bottom: -2px;
+            padding: 12px 18px;
+            font-family: 'Montserrat', sans-serif;
+            font-weight: 600;
+            font-size: 0.88rem;
+            color: #6C6C6C;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.2s ease;
+        }
+        .admin-tab-btn:hover {
+            color: var(--wr-admin-maroon);
+        }
+        .admin-tab-btn.active {
+            color: var(--wr-admin-maroon);
+            border-bottom-color: var(--wr-admin-maroon);
+        }
+
+        .admin-table-wrap {
+            overflow-x: auto;
+            border-radius: 8px;
+            border: 1px solid var(--wr-admin-border);
+            background: #FFFFFF;
+        }
+
+        .admin-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+            text-align: left;
+        }
+
+        .admin-table th {
+            background: #F8F4F0;
+            color: var(--wr-admin-maroon);
+            padding: 12px 16px;
+            font-weight: 600;
+            border-bottom: 1px solid var(--wr-admin-border);
+            white-space: nowrap;
+        }
+
+        .admin-table td {
+            padding: 12px 16px;
+            border-bottom: 1px solid #F0EAE4;
+            color: #3C3C3C;
+        }
+
+        .admin-table tr:hover {
+            background: #FAF7F4;
+        }
+
+        .badge-credit {
+            background: #E8F5E9;
+            color: #2E7D32;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-weight: 600;
+            font-size: 0.75rem;
+        }
+
+        .badge-debit {
+            background: #FFEBEE;
+            color: #C62828;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-weight: 600;
+            font-size: 0.75rem;
+        }
+
+        .badge-status {
+            background: #EDE7F6;
+            color: #4527A0;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-weight: 600;
+            font-size: 0.75rem;
+        }
+
+        .admin-alert {
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 0.86rem;
+            margin-bottom: 16px;
+            display: none;
+        }
+        .admin-alert-success {
+            background: #E8F5E9;
+            color: #2E7D32;
+            border: 1px solid #C8E6C9;
+        }
+        .admin-alert-error {
+            background: #FFEBEE;
+            color: #C62828;
+            border: 1px solid #FFCDD2;
+        }
+    </style>
+</head>
+<body>
+
+    <header class="admin-header">
+        <div class="admin-brand">
+            <span class="admin-logo">WISHRITE</span>
+            <span class="admin-badge">Admin & Inventory</span>
+        </div>
+        <div class="admin-nav-actions">
+            <a href="/" class="admin-nav-link">← Return to Website</a>
+        </div>
+    </header>
+
+    <div class="admin-container">
+        <div class="admin-title-row">
+            <div>
+                <h1 class="admin-page-title">Wallet & Rewards Control Center</h1>
+                <p style="color:#7A7A7A;font-size:0.9rem;margin:4px 0 0;">Manage customer balances, reward percentages, referral rewards, and audited adjustments.</p>
+            </div>
+            <div>
+                <button class="admin-btn admin-btn-gold" onclick="loadAllAdminData()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                    Refresh All Data
+                </button>
+            </div>
+        </div>
+
+        <!-- Metric Cards -->
+        <div class="admin-overview-grid">
+            <div class="admin-stat-card">
+                <div class="stat-label">Wallet Balance in Circulation</div>
+                <div class="stat-val" id="stat-total-wallet">₹0.00</div>
+                <div class="stat-sub">Across all customer wallets</div>
+            </div>
+            <div class="admin-stat-card">
+                <div class="stat-label">Total Points Outstanding</div>
+                <div class="stat-val" id="stat-total-points">0 pts</div>
+                <div class="stat-sub" id="stat-points-inr">₹0.00 equivalent value</div>
+            </div>
+            <div class="admin-stat-card">
+                <div class="stat-label">Total Customer Referrals</div>
+                <div class="stat-val" id="stat-total-referrals">0</div>
+                <div class="stat-sub" id="stat-rewarded-referrals">0 rewarded after purchase</div>
+            </div>
+            <div class="admin-stat-card">
+                <div class="stat-label">Active Reward Policy</div>
+                <div class="stat-val" id="stat-policy-summary">1% / 100 Pts</div>
+                <div class="stat-sub">1 Point = ₹1 INR</div>
+            </div>
+        </div>
+
+        <div class="admin-sections-grid">
+            <!-- Box 1: Reward & Referral Settings -->
+            <div class="admin-box">
+                <h2 class="admin-box-title">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5E3435" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                    Reward Settings
+                </h2>
+                <div id="settings-alert" class="admin-alert"></div>
+                <form id="settings-form" onsubmit="handleSaveRewardSettings(event)">
+                    <div class="admin-form-group">
+                        <label class="admin-form-label">Purchase Reward Percentage (%)</label>
+                        <input type="number" step="0.01" min="0" max="100" id="cfg-purchase-pct" class="admin-input" required>
+                        <small style="color:#7A7A7A;font-size:0.75rem;">Calculated on eligible product value excluding GST/tax</small>
+                    </div>
+
+                    <div class="admin-form-group">
+                        <label class="admin-form-label">Referral Reward Points (Points)</label>
+                        <input type="number" step="1" min="0" id="cfg-referral-pts" class="admin-input" required>
+                        <small style="color:#7A7A7A;font-size:0.75rem;">Awarded to referrer on friend's first qualifying order</small>
+                    </div>
+
+                    <div class="admin-form-group">
+                        <label class="admin-form-label">Point Value (INR per Point)</label>
+                        <input type="number" step="0.01" min="0.01" id="cfg-point-val" class="admin-input" required>
+                        <small style="color:#7A7A7A;font-size:0.75rem;">Default is ₹1.00 per WishRite Point</small>
+                    </div>
+
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                        <div class="admin-form-group">
+                            <label class="admin-form-label">Min Points Redemption</label>
+                            <input type="number" step="1" min="0" id="cfg-min-pts" class="admin-input" value="0">
+                        </div>
+                        <div class="admin-form-group">
+                            <label class="admin-form-label">Max Points Per Order</label>
+                            <input type="number" step="1" min="0" id="cfg-max-pts" class="admin-input" placeholder="No limit">
+                        </div>
+                    </div>
+
+                    <button type="submit" id="btn-save-settings" class="admin-btn" style="width:100%;margin-top:10px;">
+                        Save Configuration
+                    </button>
+                </form>
+            </div>
+
+            <!-- Box 2: Audited Manual Adjustment -->
+            <div class="admin-box">
+                <h2 class="admin-box-title">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5E3435" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                    Audited Manual Adjustment
+                </h2>
+                <div id="adj-alert" class="admin-alert"></div>
+                <form id="adj-form" onsubmit="handleManualAdjustment(event)">
+                    <div class="admin-form-group">
+                        <label class="admin-form-label">Select Customer <span style="color:#C62828;">*</span></label>
+                        <select id="adj-target-user" class="admin-select" required>
+                            <option value="">Loading customer directory…</option>
+                        </select>
+                    </div>
+
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                        <div class="admin-form-group">
+                            <label class="admin-form-label">Adjustment Type <span style="color:#C62828;">*</span></label>
+                            <select id="adj-type" class="admin-select" required>
+                                <option value="WALLET_CREDIT">Wallet Credit (+₹ INR)</option>
+                                <option value="WALLET_DEBIT">Wallet Debit (-₹ INR)</option>
+                                <option value="POINTS_CREDIT">Points Credit (+ Points)</option>
+                                <option value="POINTS_DEBIT">Points Debit (- Points)</option>
+                            </select>
+                        </div>
+                        <div class="admin-form-group">
+                            <label class="admin-form-label">Amount / Points <span style="color:#C62828;">*</span></label>
+                            <input type="number" step="0.01" min="0.01" id="adj-amount" class="admin-input" placeholder="e.g. 500" required>
+                        </div>
+                    </div>
+
+                    <div class="admin-form-group">
+                        <label class="admin-form-label">Mandatory Reason / Audit Note <span style="color:#C62828;">*</span></label>
+                        <textarea id="adj-reason" class="admin-textarea" rows="2" placeholder="Required reason (e.g. Goodwill credit for delayed delivery ticket #1024)" required></textarea>
+                    </div>
+
+                    <div class="admin-form-group">
+                        <label class="admin-form-label">Admin Email / Operator ID <span style="color:#C62828;">*</span></label>
+                        <input type="text" id="adj-admin-email" class="admin-input" value="admin@wishrite.com" required>
+                    </div>
+
+                    <button type="submit" id="btn-submit-adj" class="admin-btn admin-btn-gold" style="width:100%;margin-top:10px;">
+                        Apply & Record in Ledger
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Tabbed Ledger Tables -->
+        <div class="admin-box" style="padding:0;overflow:hidden;">
+            <div style="padding:20px 24px 0;">
+                <div class="admin-tabs-nav">
+                    <button class="admin-tab-btn active" onclick="switchAdminTab('customers')">Customers & Balances</button>
+                    <button class="admin-tab-btn" onclick="switchAdminTab('wallet-tx')">Wallet Ledger</button>
+                    <button class="admin-tab-btn" onclick="switchAdminTab('reward-tx')">Reward Ledger</button>
+                    <button class="admin-tab-btn" onclick="switchAdminTab('referrals')">Referrals</button>
+                    <button class="admin-tab-btn" onclick="switchAdminTab('audit-logs')">Admin Audit Trail</button>
+                </div>
+            </div>
+
+            <div style="padding:0 24px 24px;">
+                <!-- Tab 1: Customers -->
+                <div id="tab-customers">
+                    <div style="margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;">
+                        <input type="text" id="customer-search-input" class="admin-input" placeholder="Search customers by name, phone, email, or referral code…" style="max-width:400px;" oninput="filterCustomerTable()">
+                        <span id="customer-count-label" style="font-size:0.82rem;color:#7A7A7A;"></span>
+                    </div>
+                    <div class="admin-table-wrap">
+                        <table class="admin-table">
+                            <thead>
+                                <tr>
+                                    <th>Customer</th>
+                                    <th>Contact</th>
+                                    <th>Referral Code</th>
+                                    <th>Wallet Balance</th>
+                                    <th>Points Balance</th>
+                                    <th>User ID</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbl-customers-body">
+                                <tr><td colspan="7" style="text-align:center;padding:24px;">Loading customers…</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Tab 2: Wallet Transactions -->
+                <div id="tab-wallet-tx" style="display:none;">
+                    <div class="admin-table-wrap">
+                        <table class="admin-table">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>User ID</th>
+                                    <th>Type</th>
+                                    <th>Amount</th>
+                                    <th>Balance After</th>
+                                    <th>Reference</th>
+                                    <th>Description</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbl-wallet-tx-body">
+                                <tr><td colspan="8" style="text-align:center;padding:24px;">Loading wallet ledger…</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Tab 3: Reward Transactions -->
+                <div id="tab-reward-tx" style="display:none;">
+                    <div class="admin-table-wrap">
+                        <table class="admin-table">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>User ID</th>
+                                    <th>Type</th>
+                                    <th>Points</th>
+                                    <th>Balance After</th>
+                                    <th>Reference</th>
+                                    <th>Description</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbl-reward-tx-body">
+                                <tr><td colspan="8" style="text-align:center;padding:24px;">Loading reward ledger…</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Tab 4: Referrals -->
+                <div id="tab-referrals" style="display:none;">
+                    <div class="admin-table-wrap">
+                        <table class="admin-table">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Referrer User ID</th>
+                                    <th>Referred User ID</th>
+                                    <th>Referral Code</th>
+                                    <th>Status</th>
+                                    <th>Reward Points</th>
+                                    <th>First Order ID</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbl-referrals-body">
+                                <tr><td colspan="7" style="text-align:center;padding:24px;">Loading referrals…</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Tab 5: Audit Logs -->
+                <div id="tab-audit-logs" style="display:none;">
+                    <div class="admin-table-wrap">
+                        <table class="admin-table">
+                            <thead>
+                                <tr>
+                                    <th>Timestamp</th>
+                                    <th>Admin</th>
+                                    <th>Target User ID</th>
+                                    <th>Action Type</th>
+                                    <th>Amount / Points</th>
+                                    <th>Mandatory Reason</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbl-audit-logs-body">
+                                <tr><td colspan="6" style="text-align:center;padding:24px;">Loading audit trail…</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="/config.js"></script>
+    <script src="/js/admin-rewards.js"></script>
+</body>
+</html>
