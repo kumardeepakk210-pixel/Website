@@ -56,8 +56,7 @@ function renderSearchResults(query) {
             (p.material && p.material.toLowerCase().includes(lowerQuery)) ||
             (p.description && p.description.toLowerCase().includes(lowerQuery)) ||
             (p.shortDescription && p.shortDescription.toLowerCase().includes(lowerQuery)) ||
-            (p.collection && p.collection.toLowerCase().includes(lowerQuery)) ||
-            (p.shopName && p.shopName.toLowerCase().includes(lowerQuery))
+            (p.collection && p.collection.toLowerCase().includes(lowerQuery))
         )
     );
 

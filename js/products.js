@@ -174,29 +174,37 @@ function determineOccasions(item, category) {
 function mapInventoryToProduct(item, existingSlugs = new Set()) {
     if (!item) return null;
 
+    // Filter out Draft and Archived products from public storefront
+    if (item.status && item.status !== 'Active') {
+        return null;
+    }
+
     const productCode = (item.product_code || item.sku || '').trim();
     const name = (item.product_name || 'Handcrafted Silver Piece').trim();
     const category = normalizeCategory(item.category);
     const rawCategory = (item.category || '').trim();
     const stock = typeof item.stock_quantity === 'number' ? item.stock_quantity : (parseInt(item.stock_quantity, 10) || 0);
     const sellingPrice = Number(item.selling_price) || 0;
-    const purchasePrice = Number(item.purchase_price) || 0;
+    const compareAtPrice = Number(item.compare_at_price) || 0;
     const storageFolder = (item.storage_folder || '').trim() || null;
     const audience = (item.audience || '').trim() || null;
 
-    // Design Group & Generic Variant System (Part 1, 2, 3, 11)
+    // Design Group & Generic Variant System
     const designGroup = (item.design_group || '').trim() || null;
     const variantType = (item.variant_type || '').trim().toLowerCase() || null;
     const variantValue = (item.variant_value || '').trim() || null;
-    const productSlug = (item.product_slug || '').trim() || null;
+    const rawProductSlug = (item.product_slug || '').trim() || null;
 
     if (variantType && !variantValue) {
         console.warn(`WishRite: Product variant configuration incomplete for ${productCode} (variant_type "${variantType}" has no variant_value)`);
     }
 
-    // Approximate MRP based on jewellery standard markup if not explicitly set
-    const mrp = sellingPrice > 0 ? Math.round((sellingPrice * 1.25) / 50) * 50 : sellingPrice;
-    const discount = mrp > sellingPrice ? Math.round(((mrp - sellingPrice) / mrp) * 100) : 0;
+    // Canonical Pricing: selling_price is actual selling price, compare_at_price is MRP
+    // Never calculate MRP using selling_price * 1.25
+    const mrp = compareAtPrice > sellingPrice ? compareAtPrice : sellingPrice;
+    const discount = (compareAtPrice > sellingPrice && compareAtPrice > 0)
+        ? Math.round(((compareAtPrice - sellingPrice) / compareAtPrice) * 100)
+        : 0;
 
     // Formatted weight
     const weightStr = (item.weight !== null && item.weight !== undefined && String(item.weight).trim() !== '')
@@ -208,7 +216,8 @@ function mapInventoryToProduct(item, existingSlugs = new Set()) {
         ? String(item.size).trim()
         : null;
 
-    // Target Audience & Gender mapping from database schema: 'Female', 'Men', 'Kids-Girl', 'Kids-Boy'
+    // Target Audience & Gender mapping supporting canonical DB values: 'Female', 'Male', 'Boys', 'Girls'
+    // along with legacy fallbacks ('Men', 'Kids-Girl', 'Kids-Boy')
     const rawGender = item.gender || item.target_gender || '';
     const rawTargetGender = item.target_gender || item.gender || '';
     const rawAgeGroup = item.age_group || item.target_audience || '';
@@ -220,22 +229,23 @@ function mapInventoryToProduct(item, existingSlugs = new Set()) {
     let targetAudience = rawTargetAudience;
 
     if (!gender && !targetGender) {
-        if (audience === 'Female') {
+        const audClean = (audience || '').trim().toLowerCase();
+        if (audClean === 'female' || audClean === 'women') {
             gender = 'female';
             targetGender = 'female';
             ageGroup = ageGroup || 'adult';
             targetAudience = targetAudience || 'women';
-        } else if (audience === 'Men') {
+        } else if (audClean === 'male' || audClean === 'men') {
             gender = 'men';
             targetGender = 'male';
             ageGroup = ageGroup || 'adult';
             targetAudience = targetAudience || 'men';
-        } else if (audience === 'Kids-Girl') {
+        } else if (audClean === 'girls' || audClean === 'kids-girl') {
             gender = 'girls';
             targetGender = 'female';
             ageGroup = ageGroup || 'kids';
             targetAudience = targetAudience || 'kids';
-        } else if (audience === 'Kids-Boy') {
+        } else if (audClean === 'boys' || audClean === 'kids-boy') {
             gender = 'boys';
             targetGender = 'male';
             ageGroup = ageGroup || 'kids';
@@ -243,10 +253,10 @@ function mapInventoryToProduct(item, existingSlugs = new Set()) {
         }
     }
 
-    // Deterministic slug (Part 11: clean product URLs from product_slug if available, otherwise deterministic fallback)
+    // Canonical slug from product_slug, with deterministic fallback if absent
     let slug = '';
-    if (productSlug) {
-        slug = productSlug.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+    if (rawProductSlug) {
+        slug = rawProductSlug.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
         existingSlugs.add(slug);
     } else {
         slug = generateProductSlug(name, productCode, existingSlugs);
@@ -259,7 +269,7 @@ function mapInventoryToProduct(item, existingSlugs = new Set()) {
     // Sales count from sales table
     const salesCount = productSalesMap.get(productCode) || 0;
 
-    // Stock availability
+    // Stock availability: calculated independently from status
     let availability = 'Currently Unavailable';
     let lowStock = false;
     if (stock > 3) {
@@ -269,29 +279,40 @@ function mapInventoryToProduct(item, existingSlugs = new Set()) {
         lowStock = true;
     }
 
-    // Extended Festive Catalog Support (Backward-compatible with safe defaults)
+    // Extended Festive Catalog Support & Dynamic Attributes from DB
     const catalogType = item.catalog_type || 'silver_jewellery';
     const occasionSlug = item.occasion_slug || '';
-    const color = item.color || '';
-    const fabric = item.fabric || '';
-    const design = item.design || '';
-    const pattern = item.pattern || '';
-    const borderStyle = item.border_style || '';
-    const matchingTags = item.matching_tags || '';
-    const isOccasionFeatured = Boolean(item.is_occasion_featured);
+    const occasionCategory = item.occasion_category || '';
+    const occasionEnabled = item.occasion_enabled !== undefined ? Boolean(item.occasion_enabled) : true;
+    const isOccasionFeatured = Boolean(item.occasion_featured || item.is_occasion_featured);
+    const color = (item.color || '').trim();
+    const fabric = (item.fabric || '').trim();
+    const design = (item.design || '').trim();
+    const pattern = (item.pattern || '').trim();
+    const borderStyle = (item.border_style || '').trim();
+    const matchingTags = (item.matching_tags || '').trim();
+    const rawMaterial = (item.material || '').trim();
+    const rawPurity = (item.purity || '').trim();
+    const rawFinish = (item.finish || '').trim();
+    const shortDesc = (item.short_description || '').trim();
 
-    let material = '925 Sterling Silver';
-    let silverPurity = '92.5%';
-    let finish = 'High-Polish Rhodium';
+    let material = rawMaterial;
+    let silverPurity = rawPurity;
+    let finish = rawFinish;
 
     if (catalogType === 'saree') {
-        material = fabric || 'Traditional Handloom Silk';
+        material = rawMaterial || fabric || 'Traditional Handloom Silk';
         silverPurity = null;
-        finish = 'Authentic Handloom Weave';
+        finish = rawFinish || 'Authentic Handloom Weave';
     } else if (catalogType === 'artificial_jewellery') {
-        material = item.material || 'Heritage Brass with Micron Gold Polish';
+        material = rawMaterial || 'Heritage Brass with Micron Gold Polish';
         silverPurity = null;
-        finish = 'Antique Micron Polish';
+        finish = rawFinish || 'Antique Micron Polish';
+    } else {
+        // Fallback to standard silver defaults ONLY when DB column is empty
+        material = rawMaterial || '925 Sterling Silver';
+        silverPurity = rawPurity || '92.5%';
+        finish = rawFinish || 'High-Polish Rhodium';
     }
 
     const product = {
@@ -302,14 +323,14 @@ function mapInventoryToProduct(item, existingSlugs = new Set()) {
         name: name,
         product_name: name,
         slug: slug,
+        product_slug: slug,
+        productSlug: slug,
         design_group: designGroup,
         designGroup: designGroup,
         variant_type: variantType,
         variantType: variantType,
         variant_value: variantValue,
         variantValue: variantValue,
-        product_slug: productSlug,
-        productSlug: productSlug,
         catalog_type: catalogType,
         audience: audience,
         gender: item.gender || item.target_gender || gender || '',
@@ -318,25 +339,21 @@ function mapInventoryToProduct(item, existingSlugs = new Set()) {
         target_audience: item.target_audience || item.age_group || targetAudience || '',
         storage_folder: storageFolder,
         storageFolder: storageFolder,
-        purchase_price: purchasePrice,
-        purchasePrice: purchasePrice,
-        purchase_date: item.purchase_date || null,
-        purchaseDate: item.purchase_date || null,
-        shop_name: item.shop_name || '',
-        shopName: item.shop_name || '',
-        shop_address: item.shop_address || '',
-        shopAddress: item.shop_address || '',
         occasion_slug: occasionSlug,
+        occasion_category: occasionCategory,
+        occasion_enabled: occasionEnabled,
+        occasion_featured: isOccasionFeatured,
+        is_occasion_featured: isOccasionFeatured,
         color: color,
         fabric: fabric,
         design: design,
         pattern: pattern,
         border_style: borderStyle,
         matching_tags: matchingTags,
-        is_occasion_featured: isOccasionFeatured,
         description: item.product_description || `${name} crafted with fine attention to detail and luxury finishing.`,
         product_description: item.product_description || '',
-        shortDescription: item.product_description || `${material} ${category} crafted for effortless luxury.`,
+        short_description: shortDesc,
+        shortDescription: shortDesc || item.product_description || `${material} ${category} crafted for effortless luxury.`,
         category: category,
         rawCategory: rawCategory,
         collection: collection,
@@ -345,6 +362,8 @@ function mapInventoryToProduct(item, existingSlugs = new Set()) {
         price: sellingPrice,
         sellingPrice: sellingPrice,
         selling_price: sellingPrice,
+        compare_at_price: compareAtPrice,
+        compareAtPrice: compareAtPrice,
         mrp: mrp,
         discount: discount,
         stockQuantity: stock,
@@ -359,11 +378,17 @@ function mapInventoryToProduct(item, existingSlugs = new Set()) {
         material: material,
         silverPurity: silverPurity,
         finish: finish,
-        status: stock > 0 ? 'Active' : 'Currently Unavailable',
+        status: item.status || 'Active',
         createdAt: item.created_at,
         created_at: item.created_at,
         updatedAt: item.updated_at,
         updated_at: item.updated_at,
+        seo_title: (item.seo_title || '').trim() || null,
+        seo_description: (item.seo_description || '').trim() || null,
+        seo_keywords: (item.seo_keywords || '').trim() || null,
+        seoTitle: (item.seo_title || '').trim() || null,
+        seoDescription: (item.seo_description || '').trim() || null,
+        seoKeywords: (item.seo_keywords || '').trim() || null,
         salesCount: salesCount,
         care: catalogType === 'saree'
             ? 'Dry clean only. Store in a breathable muslin or cotton saree bag. Avoid direct perfume or spray on zari motifs.'
@@ -441,8 +466,49 @@ const productsService = {
                     console.info('Sales data notice: using in-stock ranking.', salesErr.message);
                 }
 
-                // 2. Fetch inventory records directly from public.inventory
-                const inventoryUrl = `${WR_SUPABASE_URL}/rest/v1/inventory?select=*&order=created_at.desc`;
+                // 2. Fetch inventory records directly from public.inventory (strictly active products, explicit public fields)
+                const publicFields = [
+                    'id',
+                    'product_code',
+                    'product_name',
+                    'product_slug',
+                    'product_description',
+                    'short_description',
+                    'category',
+                    'catalog_type',
+                    'audience',
+                    'selling_price',
+                    'compare_at_price',
+                    'gst_rate',
+                    'stock_quantity',
+                    'low_stock_threshold',
+                    'status',
+                    'material',
+                    'purity',
+                    'finish',
+                    'weight',
+                    'size',
+                    'design_group',
+                    'variant_type',
+                    'variant_value',
+                    'occasion_slug',
+                    'occasion_category',
+                    'occasion_enabled',
+                    'occasion_featured',
+                    'color',
+                    'fabric',
+                    'design',
+                    'pattern',
+                    'border_style',
+                    'matching_tags',
+                    'seo_title',
+                    'seo_description',
+                    'seo_keywords',
+                    'storage_folder',
+                    'created_at',
+                    'updated_at'
+                ].join(',');
+                const inventoryUrl = `${WR_SUPABASE_URL}/rest/v1/inventory?status=eq.Active&select=${publicFields}&order=created_at.desc`;
                 const invRes = await fetch(inventoryUrl, { headers });
 
                 if (!invRes.ok) {
@@ -1087,6 +1153,7 @@ function renderProductVariantSelector(product) {
 
 /**
  * Filter and retrieve Kids products dynamically from database audience (Parts 15-17)
+ * Supports canonical DB values ('Boys', 'Girls') and legacy values ('Kids-Boy', 'Kids-Girl')
  */
 function getKidsProducts() {
     const db = (typeof window !== 'undefined' && Array.isArray(window.productsDB) && window.productsDB.length > 0)
@@ -1095,8 +1162,8 @@ function getKidsProducts() {
 
     return db.filter(p => {
         if (!p) return false;
-        const aud = (p.audience || '').trim();
-        return aud === 'Kids-Girl' || aud === 'Kids-Boy';
+        const aud = (p.audience || '').trim().toLowerCase();
+        return aud === 'boys' || aud === 'girls' || aud === 'kids-boy' || aud === 'kids-girl' || aud.includes('kid');
     });
 }
 
@@ -1105,11 +1172,20 @@ function getKidsProductsByAudience(audience) {
         ? window.productsDB
         : (Array.isArray(productsDB) ? productsDB : []);
 
-    const aud = (audience || '').trim();
-    if (!aud || aud.toLowerCase() === 'all') {
+    const aud = (audience || '').trim().toLowerCase();
+    if (!aud || aud === 'all') {
         return getKidsProducts();
     }
-    return db.filter(p => (p.audience || '').trim() === aud);
+    return db.filter(p => {
+        const pAud = (p.audience || '').trim().toLowerCase();
+        if (aud === 'boys' || aud === 'kids-boy') {
+            return pAud === 'boys' || pAud === 'kids-boy';
+        }
+        if (aud === 'girls' || aud === 'kids-girl') {
+            return pAud === 'girls' || pAud === 'kids-girl';
+        }
+        return pAud === aud;
+    });
 }
 
 /**
@@ -1403,7 +1479,7 @@ function getPdpLifestyleAndDetails(product) {
 
     // Bullets list
     const bullets = [
-        { ico: '💎', label: 'Material', val: '925 Sterling Silver (Hallmarked)' },
+        { ico: '💎', label: 'Material', val: product?.material || '925 Sterling Silver (Hallmarked)' },
         { ico: '💎', label: 'Stone', val: product?.stone || 'Premium Cubic Zirconia' }
     ];
 
