@@ -1205,12 +1205,27 @@ function createProductCardHTML(product) {
     const discountHTML = product.discount > 0 ? `<span class="price-discount">${product.discount}% OFF</span>` : '';
     const mrpHTML = (product.mrp > product.sellingPrice) ? `<span class="price-original">${formatPrice(product.mrp)}</span>` : '';
 
-    const imgSrc = product.images?.[0]?.url || product.image || (typeof getRelatableImageUrl === 'function' ? getRelatableImageUrl(product) : '');
-    const imgAlt = product.images?.[0]?.alt || product.name;
+    // Canonical Primary Image Selection (01_main_ecommerce, is_primary, or images[0])
+    const primaryImg = (Array.isArray(product.images) && product.images.length > 0)
+        ? (product.images.find(img => img && (img.imageRole === '01_main_ecommerce' || img.image_role === '01_main_ecommerce' || img.isPrimary || img.is_primary)) || product.images[0])
+        : null;
+
+    const imgSrc = primaryImg?.url || product.image || (typeof getRelatableImageUrl === 'function' ? getRelatableImageUrl(product) : '');
+    const imgAlt = primaryImg?.alt || product.images?.[0]?.alt || product.name;
     const prodCode = product.productCode || product.sku || product.code || '';
 
+    // Role-based Hover Image Selection: 03_angle_45 -> 02_premium_hero -> product.images[1]
     let secondImgHTML = '';
-    const secondImg = product.images?.[1];
+    let secondImg = null;
+    if (Array.isArray(product.images) && product.images.length > 1) {
+        secondImg = product.images.find(img => img && (img.imageRole === '03_angle_45' || img.image_role === '03_angle_45'));
+        if (!secondImg) {
+            secondImg = product.images.find(img => img && (img.imageRole === '02_premium_hero' || img.image_role === '02_premium_hero'));
+        }
+        if (!secondImg) {
+            secondImg = product.images[1];
+        }
+    }
     const secondImgSrc = (secondImg?.url || (typeof secondImg === 'string' ? secondImg : '')) || '';
     if (secondImgSrc && !secondImgSrc.startsWith('data:image/svg') && secondImgSrc !== imgSrc) {
         secondImgHTML = `
@@ -1364,6 +1379,18 @@ function getProductModelWearImage(product, customImages) {
 
     // 2. If authentic uploaded images exist for this product in Supabase:
     if (imgs.length > 0) {
+        // Priority 1: Canonical role '06_model_wearing' from public.product_images
+        const roleModel = imgs.find(img => img && (img.imageRole === '06_model_wearing' || img.image_role === '06_model_wearing'));
+        if (roleModel && roleModel.url) {
+            return roleModel.url;
+        }
+
+        // Priority 2: Canonical role '05_luxury_lifestyle' from public.product_images
+        const roleLifestyle = imgs.find(img => img && (img.imageRole === '05_luxury_lifestyle' || img.image_role === '05_luxury_lifestyle'));
+        if (roleLifestyle && roleLifestyle.url) {
+            return roleLifestyle.url;
+        }
+
         // Priority 2a: Explicit model / lifestyle tag
         const explicitModel = imgs.find(img => img.isLifestyle || img.is_lifestyle || img.isModel || img.type === 'model' || img.type === 'lifestyle');
         if (explicitModel && explicitModel.url) {
