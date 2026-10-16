@@ -2,9 +2,9 @@
   <!-- WISHRITE FESTIVE LINE-ART — CHRISTMAS ELEGANT BOTANICAL & HOLIDAY ARTWORK -->
   <defs>
     <linearGradient id="xmasGoldStroke" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#143D28" stop-opacity="0.9"/>
-      <stop offset="50%" stop-color="#D4AF37" stop-opacity="0.8"/>
-      <stop offset="100%" stop-color="#7B1824" stop-opacity="0.7"/>
+      <stop offset="0%" stop-color="#183A38" stop-opacity="0.9"/>
+      <stop offset="50%" stop-color="#BFC0C2" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#28212C" stop-opacity="0.7"/>
     </linearGradient>
   </defs>
 
@@ -12,7 +12,7 @@
     <!-- North Star (Star of Bethlehem) Top Center -->
     <path d="M400 80 L400 170 M355 125 L445 125" stroke-width="2"/>
     <path d="M370 95 L430 155 M370 155 L430 95" stroke-width="1.2"/>
-    <circle cx="400" cy="125" r="4" fill="#D4AF37" fill-opacity="0.5"/>
+    <circle cx="400" cy="125" r="4" fill="#BFC0C2" fill-opacity="0.5"/>
 
     <!-- Minimalist Luxury Pine Tree Silhouette Lines -->
     <!-- Tier 1 -->

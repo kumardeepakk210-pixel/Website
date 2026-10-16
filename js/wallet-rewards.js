@@ -3,10 +3,10 @@
  * Shared between Website & Capacitor Mobile App
  * Single Source of Truth: Supabase
  *
- * Theme Colors:
- * Deep Maroon: #5E3435
- * Gold Accents: #B8956A
- * Warm Background: #FAF8F5
+ * Theme Colors (Moonlit Silver):
+ * Midnight Aubergine: #28212C
+ * Smoked Plum: #554453
+ * Pearl Ivory: #F5F2EC
  */
 
 (function (window) {
@@ -272,7 +272,7 @@
                             WISHRITE WALLET & REWARDS
                         </h3>
                     </div>
-                    <span class="status-badge" style="background: rgba(94, 52, 53, 0.08); color: var(--wr-primary); border: 1px solid rgba(94, 52, 53, 0.2);">
+                    <span class="status-badge" style="background: rgba(40, 33, 44, 0.06); color: var(--wr-midnight); border: 1px solid rgba(40, 33, 44, 0.15);">
                         Premium Member
                     </span>
                 </div>
@@ -286,7 +286,7 @@
                             <span>WALLET BALANCE</span>
                             <span class="wr-gold-badge">100% SECURE</span>
                         </div>
-                        <div class="wr-metric-val" style="color: var(--wr-primary);">
+                        <div class="wr-metric-val" style="color: var(--wr-midnight);">
                             ${this.formatINR(this.state.walletBalance)}
                         </div>
                         <div class="wr-metric-sub">Use seamlessly at checkout or get instant refunds.</div>
@@ -301,7 +301,7 @@
                             <span>WISHRITE POINTS</span>
                             <span class="wr-point-badge">1 pt = ₹1</span>
                         </div>
-                        <div class="wr-metric-val" style="color: #936B36;">
+                        <div class="wr-metric-val" style="color: var(--wr-plum);">
                             ${this.formatPoints(this.state.pointsBalance)} <span style="font-size: 1rem; font-weight: 500;">Points</span>
                         </div>
                         <div class="wr-metric-sub">
@@ -344,7 +344,7 @@
                         <span class="wr-ref-stat-lbl">Successful</span>
                     </div>
                     <div class="wr-ref-stat-item">
-                        <span class="wr-ref-stat-num" style="color: #B8956A;">+${this.formatPoints(earnedPoints)}</span>
+                        <span class="wr-ref-stat-num" style="color: var(--wr-plum);">+${this.formatPoints(earnedPoints)}</span>
                         <span class="wr-ref-stat-lbl">Points Earned</span>
                     </div>
                 </div>
@@ -735,7 +735,7 @@
                         contact: user.phone || user.user_metadata?.phone || ''
                     },
                     theme: {
-                        color: '#5E3435' // WishRite Deep Maroon
+                        color: '#28212C' // WishRite Midnight Aubergine
                     },
                     modal: {
                         ondismiss: function () {

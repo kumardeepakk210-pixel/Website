@@ -570,7 +570,10 @@ async function handleRegister(e) {
         /*
          * Sync customer record.
          */
-        await syncCustomerProfile(currentUser);
+        await syncCustomerProfile(currentUser, {
+            fullName: name,
+            phone: mobileData.phone
+        });
 
         /*
          * Link referral if code was entered.
@@ -712,65 +715,121 @@ async function handleAuthCallback() {
 // Customer Profile Sync
 // ─────────────────────────────────────────────
 
-async function syncCustomerProfile(user) {
-
-    if (
-        !supabaseClient ||
-        !user
-    ) {
+async function syncCustomerProfile(user, extraData = {}) {
+    if (!supabaseClient || !user) {
         return;
     }
 
     try {
-
+        const email = user.email ? user.email.toLowerCase().trim() : null;
         const fullName =
-            user.user_metadata?.full_name || '';
+            extraData.fullName ||
+            user.user_metadata?.full_name ||
+            '';
 
         const phone =
+            extraData.phone ||
             user.phone ||
             user.user_metadata?.phone ||
             '';
 
+        const now = new Date().toISOString();
 
-        /*
-         * Email remains the customer's email.
-         * Mobile remains the customer's phone.
-         */
+        // 1. Check if customer record exists for this user_id
+        let existingCustomer = null;
 
-        await supabaseClient
-            .from('customers')
-            .upsert(
-                {
-                    user_id:
-                        user.id,
+        if (user.id) {
+            const { data: byUserId, error: errUserId } = await supabaseClient
+                .from('customers')
+                .select('id, user_id, customer_email, customer_phone, customer_name')
+                .eq('user_id', user.id)
+                .maybeSingle();
 
-                    customer_email:
-                        user.email
-                            ? user.email.toLowerCase()
-                            : null,
+            if (!errUserId && byUserId) {
+                existingCustomer = byUserId;
+            }
+        }
 
-                    customer_name:
-                        fullName ||
-                        user.email?.split('@')[0] ||
-                        'Valued Customer',
+        // 2. If not found by user_id, check by customer_email (case-insensitive)
+        if (!existingCustomer && email) {
+            const { data: byEmail, error: errEmail } = await supabaseClient
+                .from('customers')
+                .select('id, user_id, customer_email, customer_phone, customer_name')
+                .ilike('customer_email', email)
+                .maybeSingle();
 
-                    customer_phone:
-                        phone,
+            if (!errEmail && byEmail) {
+                existingCustomer = byEmail;
+            }
+        }
 
-                    last_login_at:
-                        new Date().toISOString()
-                },
-                {
-                    onConflict:
-                        'customer_email'
-                }
-            );
+        let savedCustomer = null;
+
+        if (existingCustomer?.id) {
+            // Update existing customer record
+            const updatePayload = {
+                user_id: user.id,
+                last_login_at: now,
+                updated_at: now
+            };
+
+            if (email && (!existingCustomer.customer_email || existingCustomer.customer_email.toLowerCase() !== email)) {
+                updatePayload.customer_email = email;
+            }
+
+            if (fullName && (!existingCustomer.customer_name || existingCustomer.customer_name === 'Valued Customer')) {
+                updatePayload.customer_name = fullName;
+            }
+
+            if (phone && !existingCustomer.customer_phone) {
+                updatePayload.customer_phone = phone;
+            }
+
+            const { data: updated, error: updateErr } = await supabaseClient
+                .from('customers')
+                .update(updatePayload)
+                .eq('id', existingCustomer.id)
+                .select()
+                .maybeSingle();
+
+            if (updateErr) {
+                console.error('[Customer Sync] Update error:', updateErr.message);
+            } else {
+                savedCustomer = updated || existingCustomer;
+                console.log('[Customer Sync] Updated customer profile:', savedCustomer?.id);
+            }
+        } else {
+            // Insert new customer record
+            const insertPayload = {
+                user_id: user.id,
+                customer_email: email,
+                customer_name: fullName || (email ? email.split('@')[0] : 'Valued Customer'),
+                customer_phone: phone || null,
+                last_login_at: now,
+                created_at: now,
+                updated_at: now
+            };
+
+            const { data: inserted, error: insertErr } = await supabaseClient
+                .from('customers')
+                .insert(insertPayload)
+                .select()
+                .maybeSingle();
+
+            if (insertErr) {
+                console.error('[Customer Sync] Insert error:', insertErr.message);
+            } else {
+                savedCustomer = inserted;
+                console.log('[Customer Sync] Created new customer profile:', savedCustomer?.id);
+            }
+        }
 
         window.currentCustomerProfile = {
             id: user.id,
-            name: fullName || user.email?.split('@')[0] || '',
-            phone: phone || '',
-            email: user.email || ''
+            customerId: savedCustomer?.id || existingCustomer?.id || null,
+            name: fullName || savedCustomer?.customer_name || user.email?.split('@')[0] || '',
+            phone: phone || savedCustomer?.customer_phone || '',
+            email: email || ''
         };
 
         if (typeof WishRiteWalletRewards !== 'undefined') {
@@ -778,16 +837,7 @@ async function syncCustomerProfile(user) {
         }
 
     } catch (e) {
-
-        /*
-         * Customer profile sync should never
-         * prevent authentication.
-         */
-
-        console.log(
-            'Customer sync info:',
-            e?.message
-        );
+        console.error('[Customer Sync] Exception:', e);
     }
 }
 
@@ -952,31 +1002,31 @@ async function renderCustomerOrderHistory(user) {
             const walletUsed = Number(ord.wallet_amount_used || 0);
 
             return `
-                <div class="account-order-item" style="border:1px solid var(--wr-border); border-radius:8px; padding:16px; margin-bottom:12px; background:#FAF8F5;">
+                <div class="account-order-item" style="border:1px solid var(--wr-silver-mist); border-radius:var(--radius-lg); padding:16px; margin-bottom:12px; background:var(--wr-white); box-shadow:var(--shadow-xs);">
                     <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:8px;">
                         <div>
-                            <strong style="color:var(--wr-primary); font-size:1.05rem;">Order #${ord.order_number || ord.id.slice(0, 8)}</strong>
+                            <strong style="color:var(--wr-midnight); font-size:1.05rem;">Order #${ord.order_number || ord.id.slice(0, 8)}</strong>
                             <div style="font-size:0.82rem; color:var(--wr-text-muted); margin-top:2px;">Placed on ${dateStr}</div>
                         </div>
                         <div style="text-align:right;">
-                            <span class="status-badge" style="background:#FFF; border:1px solid var(--wr-border); font-size:0.75rem; padding:4px 10px;">
+                            <span class="status-badge" style="background:#FFF; border:1px solid var(--wr-silver-mist); font-size:0.75rem; padding:4px 10px;">
                                 ${status}
                             </span>
-                            <div style="font-family:var(--font-display); font-size:1.15rem; font-weight:700; color:var(--wr-primary); margin-top:4px;">
+                            <div style="font-family:var(--font-display); font-size:1.15rem; font-weight:700; color:var(--wr-midnight); margin-top:4px;">
                                 ₹${grandTotal}
                             </div>
                         </div>
                     </div>
 
                     <!-- Rewards & Wallet Summary Badges -->
-                    <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; padding-top:10px; border-top:1px dashed var(--wr-border);">
+                    <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; padding-top:10px; border-top:1px dashed var(--wr-border-light);">
                         ${pointsEarned > 0 ? `
-                            <span style="font-size:0.78rem; background:rgba(184, 149, 106, 0.15); color:#8C6A3B; padding:3px 8px; border-radius:4px; font-weight:600;">
+                            <span style="font-size:0.78rem; background:rgba(85, 68, 83, 0.1); color:var(--wr-plum); padding:3px 8px; border-radius:4px; font-weight:600;">
                                 ✨ +${pointsEarned} Points Earned
                             </span>
                         ` : ''}
                         ${pointsUsed > 0 ? `
-                            <span style="font-size:0.78rem; background:rgba(94, 52, 53, 0.08); color:var(--wr-primary); padding:3px 8px; border-radius:4px; font-weight:600;">
+                            <span style="font-size:0.78rem; background:rgba(40, 33, 44, 0.06); color:var(--wr-midnight); padding:3px 8px; border-radius:4px; font-weight:600;">
                                 🪙 ${pointsUsed} Points Used (-₹${pointsUsed})
                             </span>
                         ` : ''}

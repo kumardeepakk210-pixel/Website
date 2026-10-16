@@ -240,11 +240,21 @@ function setKidsSEO() {
     });
 }
 
+function setMenSEO() {
+    updateSEO({
+        title: "Men's Silver Jewellery | WishRite",
+        description: 'Explore WishRite refined collection of 925 sterling silver chains, signet rings, cufflinks, and bracelets designed for men.',
+        keywords: ['men silver jewellery', 'mens rings', 'mens silver chains', 'mens silver bracelets', '925 silver for men', 'WishRite men'],
+        canonical: getSiteOrigin() + '/men'
+    });
+}
+
 window.setCollectionsSEO = setCollectionsSEO;
 window.setCollectionDetailSEO = setCollectionDetailSEO;
 window.setNewArrivalsSEO = setNewArrivalsSEO;
 window.setBestSellersSEO = setBestSellersSEO;
 window.setKidsSEO = setKidsSEO;
+window.setMenSEO = setMenSEO;
 window.setOccasionSEO = setOccasionSEO;
 
 

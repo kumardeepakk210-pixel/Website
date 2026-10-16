@@ -12,13 +12,13 @@
     padding: 14px 32px;
     font-family: var(--font-body);
     font-size: var(--text-sm);
-    font-weight: 500;
+    font-weight: 600;
     letter-spacing: var(--tracking-wider);
     text-transform: uppercase;
     text-decoration: none;
-    border: 1px solid transparent;
+    border: 1.5px solid #53374F;
     cursor: pointer;
-    transition: var(--transition-base);
+    transition: all 0.25s ease;
     position: relative;
     overflow: hidden;
     line-height: 1;
@@ -26,14 +26,17 @@
 }
 
 .btn-primary {
-    background: var(--wr-primary);
-    color: var(--wr-white);
-    border-color: var(--wr-primary);
+    background: #53374F;
+    color: #FFFFFF !important;
+    border: 1.5px solid #53374F;
+    border-radius: var(--radius-sm);
+    transition: all 0.25s ease;
 }
 
 .btn-primary:hover {
-    background: var(--wr-primary-dark);
-    border-color: var(--wr-primary-dark);
+    background: #FFFFFF !important;
+    border-color: #53374F !important;
+    color: #53374F !important;
 }
 
 .btn-primary:active {
@@ -47,34 +50,43 @@
 }
 
 .btn-secondary {
-    background: transparent;
-    color: var(--wr-primary);
-    border-color: var(--wr-primary);
+    background: #FFFFFF;
+    color: #53374F !important;
+    border: 1.5px solid #53374F;
+    border-radius: var(--radius-sm);
+    transition: all 0.25s ease;
 }
 
 .btn-secondary:hover {
-    background: var(--wr-primary);
-    color: var(--wr-white);
+    background: #53374F !important;
+    border-color: #53374F !important;
+    color: #FFFFFF !important;
 }
 
 .btn-dark {
-    background: var(--wr-black);
-    color: var(--wr-white);
-    border-color: var(--wr-black);
+    background: #53374F;
+    color: #FFFFFF !important;
+    border: 1.5px solid #53374F;
+    transition: all 0.25s ease;
 }
 
 .btn-dark:hover {
-    background: var(--wr-charcoal);
+    background: #FFFFFF !important;
+    border-color: #53374F !important;
+    color: #53374F !important;
 }
 
 .btn-ghost {
-    background: transparent;
-    color: var(--wr-text);
-    border-color: var(--wr-border);
+    background: #FFFFFF;
+    color: #53374F !important;
+    border: 1.5px solid #53374F;
+    transition: all 0.25s ease;
 }
 
 .btn-ghost:hover {
-    border-color: var(--wr-text);
+    background: #53374F !important;
+    color: #FFFFFF !important;
+    border-color: #53374F !important;
 }
 
 .btn-sm {
@@ -106,6 +118,116 @@
     }
 }
 
+/* ══════════════════════════════════════════════════════════════
+   WISHRITE COMMON IMAGE FRAME SYSTEM (Sections 7, 24, 30, 31, 32)
+   Unified Moonlit Silver Environment & Frames
+   ══════════════════════════════════════════════════════════════ */
+
+.wr-image-frame {
+    position: relative;
+    background: var(--wr-bg-card, #FFFFFF);
+    border: 1px solid var(--wr-border-card, rgba(85, 68, 83, 0.10));
+    border-radius: var(--wr-radius-md, 16px);
+    box-shadow: var(--wr-shadow-soft, 0 8px 30px rgba(40, 33, 44, 0.06));
+    overflow: hidden;
+    transition: transform var(--duration-normal) var(--ease-out), box-shadow var(--duration-normal) var(--ease-out), border-color var(--duration-normal) var(--ease-out);
+}
+
+.wr-product-image {
+    aspect-ratio: var(--product-card-ratio, 4 / 5);
+    background: var(--wr-bg-card, #FFFFFF);
+    border: 1px solid var(--wr-border-card, rgba(85, 68, 83, 0.10));
+    border-radius: var(--wr-radius-md, 16px);
+    box-shadow: var(--wr-shadow-soft, 0 8px 30px rgba(40, 33, 44, 0.06));
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+
+.wr-product-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+    transition: transform 0.8s var(--ease-out), opacity 0.28s ease;
+}
+
+.wr-category-image {
+    aspect-ratio: var(--category-ratio, 3 / 4);
+    background: var(--wr-bg-main, #F5F2EC);
+    border: 1px solid var(--wr-border-soft, rgba(85, 68, 83, 0.12));
+    border-radius: var(--wr-radius-md, 16px);
+    overflow: hidden;
+    position: relative;
+    transition: transform var(--duration-normal) var(--ease-out), border-color var(--duration-normal) var(--ease-out);
+}
+
+.wr-category-image:hover {
+    border-color: var(--wr-primary, #28212C);
+}
+
+.wr-editorial-image {
+    background: var(--wr-bg-main, #F5F2EC);
+    border: 1px solid var(--wr-border-soft, rgba(85, 68, 83, 0.12));
+    border-radius: var(--wr-radius-lg, 22px);
+    overflow: hidden;
+    position: relative;
+}
+
+.wr-hero-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center 25%;
+}
+
+.wr-lifestyle-image {
+    background: var(--wr-bg-main, #F5F2EC);
+    border-radius: var(--wr-radius-md, 16px);
+    overflow: hidden;
+    position: relative;
+}
+
+.wr-packaging-image {
+    background: var(--wr-bg-main, #F5F2EC);
+    border: 1px solid var(--wr-border-soft, rgba(85, 68, 83, 0.12));
+    border-radius: var(--wr-radius-md, 16px);
+    overflow: hidden;
+    position: relative;
+}
+
+/* Subtle Silver Halo — WishRite Signature Motif (Section 24) */
+.wr-silver-halo {
+    position: relative;
+}
+
+.wr-silver-halo::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 90%;
+    height: 90%;
+    transform: translate(-50%, -50%) rotate(-12deg);
+    border: 1px solid var(--wr-silver, #BFC0C2);
+    border-radius: 50%;
+    opacity: 0.35;
+    pointer-events: none;
+    box-shadow: 0 0 16px rgba(169, 155, 175, 0.25);
+    z-index: 1;
+}
+
+/* Subtle Image Gradient Overlay (Section 32) */
+.wr-image-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, rgba(40, 33, 44, 0.45) 0%, rgba(40, 33, 44, 0.05) 100%);
+    pointer-events: none;
+    z-index: 1;
+}
+
 /* ── Product Card ── */
 .product-card {
     cursor: pointer;
@@ -118,8 +240,18 @@
     position: relative;
     aspect-ratio: var(--product-card-ratio);
     overflow: hidden;
-    background-color: var(--wr-bg-cream);
+    background-color: var(--wr-bg-card, #FFFFFF);
+    border: 1px solid var(--wr-border-card, rgba(85, 68, 83, 0.10));
+    border-radius: var(--wr-radius-md, 16px);
+    box-shadow: var(--wr-shadow-soft, 0 8px 30px rgba(40, 33, 44, 0.06));
     margin-bottom: var(--space-4);
+    transition: transform var(--duration-normal) var(--ease-out), box-shadow var(--duration-normal) var(--ease-out), border-color var(--duration-normal) var(--ease-out);
+}
+
+.product-card:hover .product-card-image {
+    transform: translateY(-4px);
+    box-shadow: 0 14px 36px rgba(40, 33, 44, 0.09);
+    border-color: rgba(85, 68, 83, 0.18);
 }
 
 .product-card-image img {
@@ -164,11 +296,13 @@
 }
 
 .product-card-badge.badge-new {
-    background: var(--wr-black);
+    background: var(--wr-midnight, #28212C);
+    color: var(--wr-ivory, #F5F2EC);
 }
 
 .product-card-badge.badge-sale {
-    background: var(--wr-error);
+    background: var(--wr-plum, #554453);
+    color: var(--wr-white, #FFFFFF);
 }
 
 .product-card-wishlist {
@@ -248,29 +382,29 @@
 
 .product-card-price .price-discount {
     font-size: var(--text-xs);
-    color: var(--wr-success);
-    font-weight: 500;
+    color: var(--wr-plum, #554453);
+    font-weight: 600;
 }
 
 .product-card-action {
     margin-top: auto;
     padding: 11px;
-    border: 1px solid var(--wr-border);
-    background: transparent;
-    color: var(--wr-text);
+    border: 1.5px solid #53374F;
+    background: #53374F;
+    color: #FFFFFF;
     cursor: pointer;
     text-transform: uppercase;
     letter-spacing: var(--tracking-wider);
     font-size: var(--text-xs);
-    font-weight: 500;
-    transition: var(--transition-base);
+    font-weight: 600;
+    transition: all 0.25s ease;
     text-align: center;
 }
 
 .product-card-action:hover {
-    background: var(--wr-primary);
-    border-color: var(--wr-primary);
-    color: var(--wr-white);
+    background: #FFFFFF;
+    border-color: #53374F;
+    color: #53374F;
 }
 
 /* Quick Add */
@@ -280,24 +414,30 @@
     left: 0;
     right: 0;
     padding: 12px;
-    background: rgba(94, 52, 53, 0.95);
-    color: var(--wr-white);
+    background: #53374F;
+    color: #FFFFFF;
+    border: 1.5px solid #53374F;
     font-size: var(--text-xs);
-    font-weight: 500;
+    font-weight: 600;
     letter-spacing: var(--tracking-wider);
     text-transform: uppercase;
     text-align: center;
     opacity: 0;
     transform: translateY(100%);
-    transition: var(--transition-base);
+    transition: all 0.25s ease;
     cursor: pointer;
-    border: none;
     width: 100%;
 }
 
 .product-card:hover .product-card-quick {
     opacity: 1;
     transform: translateY(0);
+}
+
+.product-card-quick:hover {
+    background: #FFFFFF !important;
+    color: #53374F !important;
+    border-color: #53374F !important;
 }
 
 /* ── Trust & Service Benefits Strip ── */
@@ -310,12 +450,14 @@
 }
 
 .trust-bar-container {
-    max-width: var(--container-max);
+    width: calc(100% - (var(--page-gutter) * 2));
+    max-width: none;
     margin: 0 auto;
-    padding: 0 var(--container-padding);
+    padding: 0;
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     align-items: center;
+    box-sizing: border-box;
 }
 
 .trust-badge {
@@ -502,6 +644,16 @@ select.form-input {
     overflow: hidden;
     cursor: pointer;
     aspect-ratio: var(--category-ratio);
+    background: var(--wr-bg-main, #F5F2EC);
+    border: 1px solid var(--wr-border-soft, rgba(85, 68, 83, 0.12));
+    border-radius: var(--wr-radius-md, 16px);
+    transition: transform var(--duration-normal) var(--ease-out), border-color var(--duration-normal) var(--ease-out), box-shadow var(--duration-normal) var(--ease-out);
+}
+
+.category-card:hover {
+    transform: translateY(-4px);
+    border-color: var(--wr-primary, #28212C);
+    box-shadow: 0 10px 28px rgba(40, 33, 44, 0.08);
 }
 
 .category-card img {
@@ -530,6 +682,186 @@ select.form-input {
     font-size: var(--text-xl);
     font-weight: 400;
     letter-spacing: var(--tracking-wide);
+}
+
+/* ═══════════════════════════════════════════
+   CATEGORY SHOWCASE BANNER (Reference Design)
+   Premium lavender rounded container with
+   squircles and bold luxury typography
+   ═══════════════════════════════════════════ */
+/* ═══════════════════════════════════════════
+   CATEGORY SHOWCASE BANNER (Reference Design)
+   Horizontal 7-item 925 Silver Showcase
+   ═══════════════════════════════════════════ */
+.section-categories {
+    width: 100%;
+    position: relative;
+    overflow: hidden;
+    background-color: #F5F2EC !important;
+    padding: 26px 0 24px !important;
+    margin: 0 !important;
+}
+
+.categories-showcase-track,
+.categories-circle-grid {
+    display: grid !important;
+    grid-template-columns: repeat(8, minmax(0, 1fr)) !important;
+    gap: clamp(10px, 1.2vw, 18px) !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 20px auto 0 !important;
+    padding: 0 !important;
+    align-items: start;
+    box-sizing: border-box;
+}
+
+.category-showcase-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    cursor: pointer;
+    user-select: none;
+    text-decoration: none;
+    outline: none;
+    width: 100% !important;
+    max-width: 100% !important;
+    transition: transform 0.25s ease;
+}
+
+.category-showcase-item:focus-visible .category-thumb-box,
+.category-showcase-item:focus-visible .category-gift-icon-box {
+    outline: 2px solid var(--wr-midnight);
+    outline-offset: 3px;
+}
+
+/* Category card images - tall rounded arch cards */
+.category-thumb-box,
+.category-gift-icon-box {
+    width: 100% !important;
+    max-width: 112px !important;
+    height: 126px !important;
+    aspect-ratio: auto !important;
+    margin: 0 auto !important;
+    border-radius: 28px 28px 18px 18px !important;
+    overflow: hidden !important;
+    background: #FFFFFF !important;
+    border: 1px solid rgba(40, 33, 44, 0.10) !important;
+    box-shadow: 0 4px 14px rgba(40, 33, 44, 0.06) !important;
+    transition: transform 0.3s cubic-bezier(0.2, 0, 0, 1), box-shadow 0.3s ease, border-color 0.3s ease !important;
+}
+
+.category-thumb-box img,
+.category-gift-icon-box img {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+    border-radius: 0 !important;
+    display: block !important;
+    transition: transform 0.35s ease !important;
+}
+
+.category-showcase-item:hover .category-thumb-box,
+.category-showcase-item:hover .category-gift-icon-box {
+    transform: translateY(-3px) !important;
+    box-shadow: 0 8px 20px rgba(40, 33, 44, 0.10) !important;
+    border-color: rgba(40, 33, 44, 0.22) !important;
+}
+
+.category-showcase-item:hover .category-thumb-box img,
+.category-showcase-item:hover .category-gift-icon-box img {
+    transform: scale(1.04) !important;
+}
+
+/* Category Titles */
+.category-showcase-title {
+    display: block !important;
+    margin-top: 8px !important;
+    font-family: var(--font-body, inherit) !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    letter-spacing: 0.01em !important;
+    text-transform: none !important;
+    color: #242126 !important;
+    line-height: 1.25 !important;
+    text-align: center !important;
+    transition: color 0.2s ease !important;
+}
+
+.category-showcase-item:hover .category-showcase-title {
+    color: #4A1525 !important;
+}
+
+@media (max-width: 1024px) {
+    .categories-showcase-track {
+        display: flex !important;
+        flex-direction: row !important;
+        overflow-x: auto !important;
+        gap: 12px !important;
+        padding-bottom: 8px !important;
+        margin-top: 18px !important;
+        scroll-snap-type: x proximity;
+        scrollbar-width: none;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .categories-showcase-track::-webkit-scrollbar {
+        display: none;
+    }
+
+    .category-showcase-item {
+        flex: 0 0 104px !important;
+        width: 104px !important;
+        min-width: 104px !important;
+    }
+
+    .category-thumb-box,
+    .category-gift-icon-box {
+        max-width: 104px !important;
+        height: 118px !important;
+        border-radius: 26px 26px 16px 16px !important;
+    }
+}
+
+@media (max-width: 767px) {
+    .section-categories {
+        padding: 22px 0 20px !important;
+    }
+
+    .categories-showcase-track {
+        display: flex !important;
+        flex-direction: row !important;
+        overflow-x: auto !important;
+        gap: 10px !important;
+        padding-bottom: 6px !important;
+        margin-top: 16px !important;
+        scroll-snap-type: x mandatory !important;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+    }
+
+    .categories-showcase-track::-webkit-scrollbar {
+        display: none;
+    }
+
+    .category-showcase-item {
+        flex: 0 0 94px !important;
+        width: 94px !important;
+        min-width: 94px !important;
+        scroll-snap-align: start;
+    }
+
+    .category-thumb-box,
+    .category-gift-icon-box {
+        max-width: 94px !important;
+        height: 108px !important;
+        border-radius: 24px 24px 16px 16px !important;
+    }
+
+    .category-showcase-title {
+        font-size: 12px !important;
+        margin-top: 6px !important;
+    }
 }
 
 /* ── Occasion Card ── */
@@ -1002,8 +1334,8 @@ select.form-input {
 
 .collection-feature-card:hover .btn-primary,
 .collection-feature-card:focus-visible .btn-primary {
-    background: var(--wr-primary-dark, #4A2829);
-    border-color: var(--wr-primary-dark, #4A2829);
+    background: var(--wr-primary-dark);
+    border-color: var(--wr-primary-dark);
 }
 
 
@@ -1035,7 +1367,7 @@ select.form-input {
     max-height: calc(100vh - 48px);
     overflow-y: auto;
     background: #fff;
-    border: 1px solid rgba(94, 52, 53, 0.18);
+    border: 1px solid rgba(40, 33, 44, 0.18);
     border-radius: 4px;
     box-shadow: 0 30px 80px rgba(0, 0, 0, 0.28);
     animation: wishriteCheckoutAppear 0.25s ease-out;
@@ -1072,7 +1404,7 @@ select.form-input {
 
 .wishrite-checkout-header h2 {
     margin: 0;
-    color: #5e3435;
+    color: #28212C;
     font-family: var(--wr-font-heading);
     font-size: 1.8rem;
     font-weight: 500;
@@ -1091,7 +1423,7 @@ select.form-input {
     border: 1px solid #e5d9d2;
     border-radius: 50%;
     background: transparent;
-    color: #5e3435;
+    color: #28212C;
     font-size: 1.5rem;
     line-height: 1;
     cursor: pointer;
@@ -1099,7 +1431,7 @@ select.form-input {
 }
 
 .wishrite-checkout-close:hover {
-    background: #5e3435;
+    background: #28212C;
     color: #fff;
 }
 
@@ -1132,18 +1464,18 @@ select.form-input {
     margin-top: 10px;
     padding-top: 13px;
     border-top: 1px solid #e5d9d2;
-    color: #5e3435;
+    color: #28212C;
     font-size: 1.05rem;
 }
 
 .wishrite-checkout-order-summary .wishrite-checkout-total strong {
-    color: #5e3435;
+    color: #28212C;
     font-size: 1.15rem;
 }
 
 .wishrite-form-section-title {
     margin: 24px 0 14px;
-    color: #5e3435;
+    color: #28212C;
     font-family: var(--wr-font-heading);
     font-size: 1.05rem;
     font-weight: 500;
@@ -1205,7 +1537,7 @@ select.form-input {
 .wishrite-form-field input:focus,
 .wishrite-form-field textarea:focus {
     border-color: #8d6263;
-    box-shadow: 0 0 0 3px rgba(94, 52, 53, 0.08);
+    box-shadow: 0 0 0 3px rgba(40, 33, 44, 0.08);
 }
 
 .wishrite-form-field input::placeholder,
@@ -1254,15 +1586,17 @@ select.form-input {
     display: inline-block;
     width: 11px;
     height: 11px;
-    border: 2px solid rgba(94, 52, 53, 0.25);
-    border-top-color: var(--wr-primary, #5E3435);
+    border: 2px solid rgba(40, 33, 44, 0.25);
+    border-top-color: var(--wr-primary);
     border-radius: 50%;
     animation: wrPinSpin 0.7s linear infinite;
     flex-shrink: 0;
 }
 
 @keyframes wrPinSpin {
-    to { transform: rotate(360deg); }
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 .wishrite-field-autopopulated {
@@ -1270,8 +1604,13 @@ select.form-input {
 }
 
 @keyframes wrFieldFlash {
-    0% { background-color: rgba(94, 52, 53, 0.09); }
-    100% { background-color: #fff; }
+    0% {
+        background-color: rgba(40, 33, 44, 0.09);
+    }
+
+    100% {
+        background-color: #fff;
+    }
 }
 
 .wishrite-checkout-form-error {
@@ -1363,7 +1702,7 @@ select.form-input {
     background: #FFFFFF;
     border-radius: 16px;
     border: 1px solid rgba(184, 149, 106, 0.32);
-    box-shadow: 0 25px 70px rgba(0, 0, 0, 0.22), 0 10px 25px rgba(94, 52, 53, 0.12);
+    box-shadow: 0 25px 70px rgba(0, 0, 0, 0.22), 0 10px 25px rgba(40, 33, 44, 0.12);
     margin: 0 auto;
     padding: 36px 42px 48px;
     position: relative;
@@ -1376,6 +1715,7 @@ select.form-input {
         opacity: 0;
         transform: translateY(18px) scale(0.99);
     }
+
     to {
         opacity: 1;
         transform: translateY(0) scale(1);
@@ -1393,8 +1733,8 @@ select.form-input {
     height: 38px;
     border-radius: 50%;
     border: 1px solid #E5DFD9;
-    background: #FAF8F5;
-    color: #5E3435;
+    background: var(--wr-ivory);
+    color: var(--wr-midnight);
     font-size: 1.3rem;
     line-height: 1;
     display: flex;
@@ -1405,13 +1745,13 @@ select.form-input {
 }
 
 .wishrite-confirm-close-btn:hover {
-    background: #5E3435;
+    background: var(--wr-midnight);
     color: #FFFFFF;
-    border-color: #5E3435;
+    border-color: var(--wr-midnight);
 }
 
 .wishrite-confirm-close-btn:focus-visible {
-    outline: 2px solid #5E3435;
+    outline: 2px solid var(--wr-midnight);
     outline-offset: 2px;
 }
 
@@ -1429,7 +1769,7 @@ select.form-input {
     align-items: center;
     justify-content: center;
     border-radius: 50%;
-    box-shadow: 0 8px 24px rgba(94, 52, 53, 0.14);
+    box-shadow: 0 8px 24px rgba(40, 33, 44, 0.14);
 }
 
 .wishrite-confirm-badge-svg {
@@ -1446,7 +1786,7 @@ select.form-input {
 
 .wishrite-confirm-badge-ring {
     fill: none;
-    stroke: #5E3435;
+    stroke: var(--wr-midnight);
     stroke-width: 2.4;
     stroke-dasharray: 202;
     stroke-dashoffset: 202;
@@ -1457,7 +1797,7 @@ select.form-input {
 
 .wishrite-confirm-badge-check {
     fill: none;
-    stroke: #B8956A;
+    stroke: var(--wr-plum);
     stroke-width: 3.2;
     stroke-linecap: round;
     stroke-linejoin: round;
@@ -1492,7 +1832,7 @@ select.form-input {
     font-family: 'Playfair Display', Georgia, serif;
     font-size: 2.3rem;
     font-weight: 500;
-    color: #5E3435;
+    color: var(--wr-midnight);
     margin: 0 0 8px;
     letter-spacing: -0.01em;
 }
@@ -1516,13 +1856,13 @@ select.form-input {
 .wishrite-confirm-status-card {
     display: grid;
     grid-template-columns: 1.3fr 1fr 1fr 0.8fr;
-    background: #FAF8F5;
+    background: var(--wr-ivory);
     border: 1px solid #ECE4DC;
     border-radius: 12px;
     padding: 18px 24px;
     margin-bottom: 30px;
     align-items: center;
-    box-shadow: 0 2px 8px rgba(94, 52, 53, 0.03);
+    box-shadow: 0 2px 8px rgba(40, 33, 44, 0.03);
 }
 
 .wishrite-status-col {
@@ -1560,7 +1900,7 @@ select.form-input {
     font-family: 'SF Mono', Monaco, Consolas, monospace;
     font-size: 0.86rem;
     letter-spacing: 0.2px;
-    color: #5E3435;
+    color: var(--wr-midnight);
     word-break: break-all;
 }
 
@@ -1600,7 +1940,7 @@ select.form-input {
 }
 
 .wishrite-pill-processing .wishrite-pill-dot {
-    background: #B8956A;
+    background: var(--wr-plum);
 }
 
 /* Two Column Grid */
@@ -1624,11 +1964,11 @@ select.form-input {
 
 /* Cards */
 .wishrite-card {
-    background: #FAF8F5;
+    background: var(--wr-ivory);
     border: 1px solid #ECE4DC;
     border-radius: 14px;
     padding: 24px 28px;
-    box-shadow: 0 2px 10px rgba(94, 52, 53, 0.03);
+    box-shadow: 0 2px 10px rgba(40, 33, 44, 0.03);
     box-sizing: border-box;
 }
 
@@ -1651,7 +1991,7 @@ select.form-input {
     font-family: 'Playfair Display', Georgia, serif;
     font-size: 1.22rem;
     font-weight: 600;
-    color: #5E3435;
+    color: var(--wr-midnight);
     margin: 0;
 }
 
@@ -1742,8 +2082,8 @@ select.form-input {
 }
 
 .wishrite-size-tag {
-    background: rgba(94, 52, 53, 0.08);
-    color: #5E3435;
+    background: rgba(40, 33, 44, 0.08);
+    color: var(--wr-midnight);
     padding: 2px 8px;
     border-radius: 4px;
     font-weight: 500;
@@ -1764,7 +2104,7 @@ select.form-input {
     display: block;
     font-size: 1.05rem;
     font-weight: 600;
-    color: #5E3435;
+    color: var(--wr-midnight);
 }
 
 .wishrite-product-unit-price {
@@ -1821,7 +2161,7 @@ select.form-input {
 
 /* Price Card */
 .wishrite-price-card {
-    background: #FAF8F5;
+    background: var(--wr-ivory);
 }
 
 .wishrite-price-rows {
@@ -1870,7 +2210,7 @@ select.form-input {
 .wishrite-grand-label {
     font-size: 1rem;
     font-weight: 600;
-    color: #5E3435;
+    color: var(--wr-midnight);
 }
 
 .wishrite-grand-currency {
@@ -1885,7 +2225,7 @@ select.form-input {
 .wishrite-grand-total-val {
     font-size: 1.45rem;
     font-weight: 700;
-    color: #5E3435;
+    color: var(--wr-midnight);
     display: block;
     line-height: 1.1;
 }
@@ -1903,9 +2243,9 @@ select.form-input {
 .wishrite-confirm-continue-btn {
     width: 100%;
     height: 52px;
-    background: #5E3435;
+    background: var(--wr-midnight);
     color: #FFFFFF;
-    border: 1px solid #5E3435;
+    border: 1px solid var(--wr-midnight);
     border-radius: 10px;
     font-size: 0.9rem;
     font-weight: 600;
@@ -1913,21 +2253,21 @@ select.form-input {
     text-transform: uppercase;
     cursor: pointer;
     transition: all 0.25s ease;
-    box-shadow: 0 6px 18px rgba(94, 52, 53, 0.22);
+    box-shadow: 0 6px 18px rgba(40, 33, 44, 0.22);
     display: flex;
     align-items: center;
     justify-content: center;
 }
 
 .wishrite-confirm-continue-btn:hover {
-    background: #4A2829;
-    border-color: #4A2829;
+    background: var(--wr-primary-dark);
+    border-color: var(--wr-primary-dark);
     transform: translateY(-1px);
-    box-shadow: 0 8px 24px rgba(94, 52, 53, 0.3);
+    box-shadow: 0 8px 24px rgba(40, 33, 44, 0.3);
 }
 
 .wishrite-confirm-continue-btn:focus-visible {
-    outline: 2px solid #5E3435;
+    outline: 2px solid var(--wr-midnight);
     outline-offset: 2px;
 }
 
@@ -2063,7 +2403,7 @@ select.form-input {
 }
 
 .wr-metric-box {
-    background: #FAF8F5;
+    background: var(--wr-ivory);
     border: 1px solid var(--wr-border);
     border-radius: 10px;
     padding: 20px 18px;
@@ -2077,7 +2417,7 @@ select.form-input {
 
 .wr-metric-box:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 14px rgba(94, 52, 53, 0.06);
+    box-shadow: 0 4px 14px rgba(40, 33, 44, 0.06);
 }
 
 .wr-metric-label {
@@ -2091,7 +2431,9 @@ select.form-input {
     color: var(--wr-text-muted);
 }
 
-.wr-gold-badge, .wr-point-badge, .wr-free-badge {
+.wr-gold-badge,
+.wr-point-badge,
+.wr-free-badge {
     font-size: 0.68rem;
     padding: 2px 8px;
     border-radius: 4px;
@@ -2104,7 +2446,7 @@ select.form-input {
 }
 
 .wr-point-badge {
-    background: rgba(94, 52, 53, 0.1);
+    background: rgba(40, 33, 44, 0.1);
     color: var(--wr-primary);
 }
 
@@ -2128,18 +2470,20 @@ select.form-input {
 }
 
 .wr-btn-topup {
-    background: var(--wr-primary);
-    color: #fff;
-    border: none;
+    background: #53374F;
+    color: #FFFFFF;
+    border: 1.5px solid #53374F;
     border-radius: 6px;
     padding: 8px 16px;
     font-weight: 600;
     cursor: pointer;
-    transition: background 0.2s ease;
+    transition: all 0.25s ease;
 }
 
 .wr-btn-topup:hover {
-    background: var(--wr-primary-dark);
+    background: #FFFFFF;
+    color: #53374F;
+    border-color: #53374F;
 }
 
 /* Referral code chip */
@@ -2163,7 +2507,8 @@ select.form-input {
     letter-spacing: 2px;
 }
 
-.wr-btn-icon-copy, .wr-btn-icon-share {
+.wr-btn-icon-copy,
+.wr-btn-icon-share {
     background: #FFF;
     border: 1px solid var(--wr-border);
     padding: 6px 10px;
@@ -2175,7 +2520,8 @@ select.form-input {
     transition: all 0.2s ease;
 }
 
-.wr-btn-icon-copy:hover, .wr-btn-icon-share:hover {
+.wr-btn-icon-copy:hover,
+.wr-btn-icon-share:hover {
     border-color: var(--wr-primary);
     color: var(--wr-primary);
     background: #FAF6F3;
@@ -2255,7 +2601,7 @@ select.form-input {
     justify-content: space-between;
     align-items: center;
     padding: 14px 16px;
-    background: #FAF8F5;
+    background: var(--wr-ivory);
     border: 1px solid var(--wr-border-light);
     border-radius: 8px;
     transition: background 0.15s ease;
@@ -2327,7 +2673,7 @@ select.form-input {
     text-align: center;
     color: var(--wr-text-muted);
     font-size: 0.9rem;
-    background: #FAF8F5;
+    background: var(--wr-ivory);
     border-radius: 8px;
 }
 
@@ -2360,6 +2706,7 @@ select.form-input {
         opacity: 0;
         transform: translateY(12px) scale(0.97);
     }
+
     to {
         opacity: 1;
         transform: translateY(0) scale(1);
@@ -2395,7 +2742,7 @@ select.form-input {
 }
 
 .wr-chip-btn {
-    background: #FAF8F5;
+    background: var(--wr-ivory);
     border: 1.5px solid var(--wr-border);
     padding: 10px 8px;
     border-radius: 8px;
@@ -2420,11 +2767,192 @@ select.form-input {
 .wr-topup-benefits {
     margin-top: 16px;
     padding: 12px 14px;
-    background: #FAF8F5;
+    background: var(--wr-ivory);
     border-radius: 8px;
     font-size: 0.8rem;
     color: var(--wr-text-muted);
     display: flex;
     flex-direction: column;
     gap: 6px;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   WISHRITE UNIVERSAL #53374F & #FFFFFF COLOR & BUTTON REVERSAL SYSTEM
+   ══════════════════════════════════════════════════════════════ */
+
+/* 1. All Primary & Solid Buttons:
+   Base State: #53374F Background, #FFFFFF Text, #53374F Border
+   Hover State: #FFFFFF Background, #53374F Text, #53374F Border (Reversal) */
+.btn-primary,
+.btn-dark,
+.btn-hero-primary,
+.pdp-btn-cart,
+.pdp-pincode-submit,
+.btn-festive-primary,
+.btn-offers-cta,
+.product-card-action,
+.product-card-quick,
+.wr-btn-topup,
+.sticky-cta .btn-primary,
+.sticky-cta .pdp-btn-cart,
+#login-submit-btn,
+#register-submit-btn,
+#notify-submit-btn,
+.wishrite-create-order-btn,
+button[type="submit"].btn-primary,
+button.btn-primary {
+    background-color: #53374F !important;
+    color: #FFFFFF !important;
+    border: 1.5px solid #53374F !important;
+    transition: background-color 0.25s ease, color 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease, transform 0.2s ease !important;
+}
+
+.btn-primary:hover,
+.btn-dark:hover,
+.btn-hero-primary:hover,
+.pdp-btn-cart:hover,
+.pdp-pincode-submit:hover,
+.btn-festive-primary:hover,
+.btn-offers-cta:hover,
+.product-card-action:hover,
+.product-card-quick:hover,
+.wr-btn-topup:hover,
+.sticky-cta .btn-primary:hover,
+.sticky-cta .pdp-btn-cart:hover,
+#login-submit-btn:hover,
+#register-submit-btn:hover,
+#notify-submit-btn:hover,
+.wishrite-create-order-btn:hover,
+button[type="submit"].btn-primary:hover,
+button.btn-primary:hover {
+    background-color: #FFFFFF !important;
+    color: #53374F !important;
+    border-color: #53374F !important;
+}
+
+/* Reverse inner SVG icon stroke/fill on hover for solid buttons */
+.btn-primary:hover svg,
+.btn-dark:hover svg,
+.btn-hero-primary:hover svg,
+.pdp-btn-cart:hover svg,
+.product-card-action:hover svg,
+.product-card-quick:hover svg {
+    stroke: #53374F !important;
+    fill: none !important;
+}
+
+/* 2. All Secondary, Outline & Ghost Buttons:
+   Base State: #FFFFFF Background, #53374F Text, #53374F Border
+   Hover State: #53374F Background, #FFFFFF Text, #53374F Border (Reversal) */
+.btn-secondary,
+.btn-outline,
+.btn-ghost,
+.btn-hero-secondary,
+.pdp-btn-buy,
+.btn-festive-secondary,
+.btn-copy-coupon,
+.sticky-cta .btn-secondary,
+.sticky-cta .pdp-btn-buy,
+.shop-sidebar .btn-clear-filters,
+button.btn-secondary,
+a.btn-secondary {
+    background-color: #FFFFFF !important;
+    color: #53374F !important;
+    border: 1.5px solid #53374F !important;
+    transition: background-color 0.25s ease, color 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease, transform 0.2s ease !important;
+}
+
+.btn-secondary:hover,
+.btn-outline:hover,
+.btn-ghost:hover,
+.btn-hero-secondary:hover,
+.pdp-btn-buy:hover,
+.btn-festive-secondary:hover,
+.btn-copy-coupon:hover,
+.sticky-cta .btn-secondary:hover,
+.sticky-cta .pdp-btn-buy:hover,
+.shop-sidebar .btn-clear-filters:hover,
+button.btn-secondary:hover,
+a.btn-secondary:hover {
+    background-color: #53374F !important;
+    color: #FFFFFF !important;
+    border-color: #53374F !important;
+}
+
+/* Reverse inner SVG icon stroke/fill on hover for secondary buttons */
+.btn-secondary:hover svg,
+.btn-outline:hover svg,
+.btn-ghost:hover svg,
+.btn-hero-secondary:hover svg,
+.pdp-btn-buy:hover svg {
+    stroke: #FFFFFF !important;
+    fill: none !important;
+}
+
+/* 3. Universal Typography Text Colors (#53374F):
+   Ensure all headings, titles, labels, paragraphs, spans, current prices, breadcrumbs, nav links use #53374F on light surfaces */
+h1:not(.collections-hero-heading):not(.site-footer *),
+h2:not(.site-footer *):not(.collections-hero-content *),
+h3:not(.site-footer *),
+h4:not(.site-footer *),
+h5:not(.site-footer *),
+h6:not(.site-footer *),
+.hero-title,
+.hero-title *,
+.hero-subtitle,
+.section-title,
+.pdp-product-title,
+.product-card-name,
+.price-current,
+.pdp-price-current,
+.pdp-metal-subtitle,
+.pdp-spec-txt strong,
+.pdp-rating-score,
+.pdp-purchased-count,
+.pdp-summary-desc,
+.pdp-delivery-label,
+.pdp-usp-title,
+.header-nav a,
+.header-logo-text,
+.header-logo-sub {
+    color: #53374F !important;
+}
+
+/* Header Icons & Brand Logo */
+.header-icon svg {
+    stroke: #53374F !important;
+}
+
+.header-logo-svg {
+    color: #53374F !important;
+}
+
+/* Explicitly preserve high-contrast white & silver text on dark surfaces, hero banners, and footer */
+.announcement-bar,
+.announcement-bar *,
+.collections-hero-heading,
+.collections-hero-desc,
+.collections-hero-eyebrow,
+.site-footer,
+.site-footer h4,
+.site-footer a:hover,
+.product-card-badge,
+.badge-count {
+    color: #FFFFFF !important;
+}
+
+.site-footer a {
+    color: rgba(255, 255, 255, 0.78) !important;
+}
+
+.site-footer .footer-descriptor {
+    color: #D8D5D8 !important;
+}
+
+.site-footer p {
+    color: rgba(255, 255, 255, 0.82) !important;
+}
+
+.site-footer .footer-bottom p {
+    color: rgba(255, 255, 255, 0.62) !important;
 }

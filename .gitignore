@@ -5,3 +5,7 @@ node_modules/
 supabase/.temp/
 .idea/
 *.iml
+scratch/
+*-old.jpg
+assets/categories-ref/
+assets/reference-slices/

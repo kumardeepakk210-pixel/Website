@@ -253,7 +253,7 @@
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
     z-index: 4;
     line-height: 1.1;
-    background: var(--wr-primary, #5e3435);
+    background: #53374F;
     color: #ffffff;
 }
 
@@ -263,10 +263,10 @@
     color: #ffffff;
 }
 
-/* FEW LEFT / GOLD: WishRite dark maroon badge */
+/* FEW LEFT / GOLD: WishRite luxury rosewood badge */
 .product-card-badge.badge-gold,
 .product-card-badge.badge-few-left {
-    background: var(--wr-primary, #5e3435);
+    background: #53374F;
     color: #ffffff;
 }
 
@@ -335,7 +335,7 @@
 .product-card-price .price-current {
     font-size: 15px;
     font-weight: 600;
-    color: var(--wr-primary, #5e3435);
+    color: #53374F;
 }
 
 /* MRP: smaller grey struck-through */
@@ -361,16 +361,16 @@
     bottom: 12px;
     width: calc(100% - 24px);
     border-radius: 10px;
-    background: rgba(255, 255, 255, 0.94);
-    color: var(--wr-primary, #5e3435);
-    border: 1px solid rgba(255, 255, 255, 0.9);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.10);
+    background: #53374F;
+    color: #FFFFFF;
+    border: 1.5px solid #53374F;
+    box-shadow: 0 8px 24px rgba(83, 55, 79, 0.20);
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
     opacity: 0;
     pointer-events: none;
     transform: translateY(10px);
-    transition: opacity 300ms cubic-bezier(.2, .7, .2, 1), transform 300ms cubic-bezier(.2, .7, .2, 1), background 200ms ease, color 200ms ease;
+    transition: opacity 300ms cubic-bezier(.2, .7, .2, 1), transform 300ms cubic-bezier(.2, .7, .2, 1), background 200ms ease, color 200ms ease, border-color 200ms ease;
     z-index: 4;
     cursor: pointer;
     font-size: 11px;
@@ -388,9 +388,9 @@
 }
 
 .product-card-quick:hover {
-    background: var(--wr-primary, #5e3435);
-    color: #ffffff;
-    border-color: var(--wr-primary, #5e3435);
+    background: #FFFFFF !important;
+    color: #53374F !important;
+    border-color: #53374F !important;
 }
 
 /* ── 10. MOBILE PRODUCT CARD & RECOMMENDATION GRID SYSTEM (< 768px) ── */

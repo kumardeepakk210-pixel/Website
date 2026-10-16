@@ -1691,7 +1691,7 @@ async function proceedToRazorpayPayment(internalOrderId) {
                 contact: pending.customer_phone || ''
             },
             theme: {
-                color: '#5E3435'
+                color: '#28212C'
             },
             modal: {
                 ondismiss: function () {
@@ -2445,7 +2445,7 @@ function ensureWishriteConfirmationStyles() {
             background: #FFFFFF;
             border-radius: 16px;
             border: 1px solid rgba(184, 149, 106, 0.32);
-            box-shadow: 0 25px 70px rgba(0, 0, 0, 0.22), 0 10px 25px rgba(94, 52, 53, 0.12);
+            box-shadow: 0 25px 70px rgba(0, 0, 0, 0.22), 0 10px 25px rgba(83, 55, 79, 0.12);
             margin: 0 auto;
             padding: 36px 42px 48px;
             position: relative;
@@ -2477,8 +2477,8 @@ function ensureWishriteConfirmationStyles() {
             height: 38px;
             border-radius: 50%;
             border: 1px solid #E5DFD9;
-            background: #FAF8F5;
-            color: #5E3435;
+            background: #F5F2EC;
+            color: #28212C;
             font-size: 1.3rem;
             line-height: 1;
             display: flex;
@@ -2489,13 +2489,13 @@ function ensureWishriteConfirmationStyles() {
         }
 
         .wishrite-confirm-close-btn:hover {
-            background: #5E3435;
+            background: #28212C;
             color: #FFFFFF;
-            border-color: #5E3435;
+            border-color: #28212C;
         }
 
         .wishrite-confirm-close-btn:focus-visible {
-            outline: 2px solid #5E3435;
+            outline: 2px solid #28212C;
             outline-offset: 2px;
         }
 
@@ -2513,7 +2513,7 @@ function ensureWishriteConfirmationStyles() {
             align-items: center;
             justify-content: center;
             border-radius: 50%;
-            box-shadow: 0 8px 24px rgba(94, 52, 53, 0.14);
+            box-shadow: 0 8px 24px rgba(83, 55, 79, 0.14);
         }
 
         .wishrite-confirm-badge-svg {
@@ -2530,7 +2530,7 @@ function ensureWishriteConfirmationStyles() {
 
         .wishrite-confirm-badge-ring {
             fill: none;
-            stroke: #5E3435;
+            stroke: #28212C;
             stroke-width: 2.4;
             stroke-dasharray: 202;
             stroke-dashoffset: 202;
@@ -2572,7 +2572,7 @@ function ensureWishriteConfirmationStyles() {
             font-family: 'Playfair Display', Georgia, serif;
             font-size: 2.3rem;
             font-weight: 500;
-            color: #5E3435;
+            color: #28212C;
             margin: 0 0 8px;
             letter-spacing: -0.01em;
         }
@@ -2596,13 +2596,13 @@ function ensureWishriteConfirmationStyles() {
         .wishrite-confirm-status-card {
             display: grid;
             grid-template-columns: 1.3fr 1fr 1fr 0.8fr;
-            background: #FAF8F5;
+            background: #F5F2EC;
             border: 1px solid #ECE4DC;
             border-radius: 12px;
             padding: 18px 24px;
             margin-bottom: 30px;
             align-items: center;
-            box-shadow: 0 2px 8px rgba(94, 52, 53, 0.03);
+            box-shadow: 0 2px 8px rgba(83, 55, 79, 0.03);
             box-sizing: border-box;
         }
 
@@ -2641,7 +2641,7 @@ function ensureWishriteConfirmationStyles() {
             font-family: 'SF Mono', Monaco, Consolas, monospace;
             font-size: 0.86rem;
             letter-spacing: 0.2px;
-            color: #5E3435;
+            color: #28212C;
             word-break: break-all;
         }
 
@@ -2715,11 +2715,11 @@ function ensureWishriteConfirmationStyles() {
 
         /* Cards */
         .wishrite-card {
-            background: #FAF8F5;
+            background: #F5F2EC;
             border: 1px solid #ECE4DC;
             border-radius: 14px;
             padding: 24px 28px;
-            box-shadow: 0 2px 10px rgba(94, 52, 53, 0.03);
+            box-shadow: 0 2px 10px rgba(83, 55, 79, 0.03);
             box-sizing: border-box;
         }
 
@@ -2742,7 +2742,7 @@ function ensureWishriteConfirmationStyles() {
             font-family: 'Playfair Display', Georgia, serif;
             font-size: 1.22rem;
             font-weight: 600;
-            color: #5E3435;
+            color: #28212C;
             margin: 0;
         }
 
@@ -2833,8 +2833,8 @@ function ensureWishriteConfirmationStyles() {
         }
 
         .wishrite-size-tag {
-            background: rgba(94, 52, 53, 0.08);
-            color: #5E3435;
+            background: rgba(83, 55, 79, 0.08);
+            color: #28212C;
             padding: 2px 8px;
             border-radius: 4px;
             font-weight: 500;
@@ -2855,7 +2855,7 @@ function ensureWishriteConfirmationStyles() {
             display: block;
             font-size: 1.05rem;
             font-weight: 600;
-            color: #5E3435;
+            color: #28212C;
         }
 
         .wishrite-product-unit-price {
@@ -2912,7 +2912,7 @@ function ensureWishriteConfirmationStyles() {
 
         /* Price Card */
         .wishrite-price-card {
-            background: #FAF8F5;
+            background: #F5F2EC;
         }
 
         .wishrite-price-rows {
@@ -2961,7 +2961,7 @@ function ensureWishriteConfirmationStyles() {
         .wishrite-grand-label {
             font-size: 1rem;
             font-weight: 600;
-            color: #5E3435;
+            color: #28212C;
         }
 
         .wishrite-grand-currency {
@@ -2976,7 +2976,7 @@ function ensureWishriteConfirmationStyles() {
         .wishrite-grand-total-val {
             font-size: 1.45rem;
             font-weight: 700;
-            color: #5E3435;
+            color: #28212C;
             display: block;
             line-height: 1.1;
         }
@@ -2994,9 +2994,9 @@ function ensureWishriteConfirmationStyles() {
         .wishrite-confirm-continue-btn {
             width: 100%;
             height: 52px;
-            background: #5E3435;
+            background: #28212C;
             color: #FFFFFF;
-            border: 1px solid #5E3435;
+            border: 1px solid #28212C;
             border-radius: 10px;
             font-size: 0.9rem;
             font-weight: 600;
@@ -3004,21 +3004,21 @@ function ensureWishriteConfirmationStyles() {
             text-transform: uppercase;
             cursor: pointer;
             transition: all 0.25s ease;
-            box-shadow: 0 6px 18px rgba(94, 52, 53, 0.22);
+            box-shadow: 0 6px 18px rgba(83, 55, 79, 0.22);
             display: flex;
             align-items: center;
             justify-content: center;
         }
 
         .wishrite-confirm-continue-btn:hover {
-            background: #4A2829;
-            border-color: #4A2829;
+            background: #1b161e;
+            border-color: #1b161e;
             transform: translateY(-1px);
-            box-shadow: 0 8px 24px rgba(94, 52, 53, 0.3);
+            box-shadow: 0 8px 24px rgba(83, 55, 79, 0.3);
         }
 
         .wishrite-confirm-continue-btn:focus-visible {
-            outline: 2px solid #5E3435;
+            outline: 2px solid #28212C;
             outline-offset: 2px;
         }
 
@@ -3179,7 +3179,7 @@ function renderWishriteOrderConfirmation(pendingCheckout, verifyData) {
                         <img src="${escapeWishriteHtml(itemImage)}" alt="${escapeWishriteHtml(item.product_name || 'Jewellery')}" class="wishrite-product-img" loading="lazy">
                     ` : `
                         <div class="wishrite-product-img-fallback" aria-hidden="true">
-                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#5E3435" stroke-width="1.5">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#28212C" stroke-width="1.5">
                                 <polygon points="12 2 2 8.5 12 15 22 8.5 12 2"></polygon>
                                 <polygon points="2 8.5 12 22 22 8.5"></polygon>
                             </svg>
@@ -3346,7 +3346,7 @@ function renderWishriteOrderConfirmation(pendingCheckout, verifyData) {
                                 </div>
                                 ` : ''}
                                 ${walletUsed > 0 ? `
-                                <div class="wishrite-price-row" style="color:var(--wr-primary, #5E3435);">
+                                <div class="wishrite-price-row" style="color:var(--wr-primary, #28212C);">
                                     <span class="wishrite-price-label">Wallet Balance Used</span>
                                     <span class="wishrite-price-val">-${formatPrice(walletUsed)}</span>
                                 </div>

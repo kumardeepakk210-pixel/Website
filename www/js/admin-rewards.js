@@ -244,8 +244,8 @@ function renderCustomersTable(customers) {
                     <div>${escapeAdminHtml(c.customer_phone || '—')}</div>
                     <small style="color:#7A7A7A;">${escapeAdminHtml(c.customer_email || '')}</small>
                 </td>
-                <td><code style="background:#F0EAE4;padding:2px 6px;border-radius:4px;font-weight:600;color:#5E3435;">${escapeAdminHtml(c.referral_code || '—')}</code></td>
-                <td><strong style="color:#5E3435;">${formatAdminCurrency(wBal)}</strong></td>
+                <td><code style="background:#F5F2EC;padding:2px 6px;border-radius:4px;font-weight:600;color:#28212C;">${escapeAdminHtml(c.referral_code || '—')}</code></td>
+                <td><strong style="color:#28212C;">${formatAdminCurrency(wBal)}</strong></td>
                 <td><strong style="color:#8C6D3F;">${Number(pBal).toLocaleString('en-IN')} pts</strong></td>
                 <td><small style="color:#888;">${String(uId).slice(0, 8)}…</small></td>
                 <td>

@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="400" height="400" fill="none">
+  <!-- WishRite Luxury Botanical Line Art & Star Motif Pattern -->
+  <defs>
+    <style>
+      .fl-line { stroke: #D8D5D8; stroke-linecap: round; stroke-linejoin: round; }
+    </style>
+  </defs>
+
+  <!-- Botanical Vine & Filigree Curves (Top Left to Center) -->
+  <path class="fl-line" stroke-width="1.2" d="M 0 60 C 60 40, 110 80, 140 130 C 160 170, 150 210, 190 230 C 220 245, 260 220, 280 180" />
+  <path class="fl-line" stroke-width="0.8" stroke-dasharray="3,3" d="M 20 80 C 80 65, 120 100, 145 145" />
+
+  <!-- Botanical Vine & Curves (Bottom Right to Center) -->
+  <path class="fl-line" stroke-width="1.2" d="M 400 340 C 340 360, 290 320, 260 270 C 240 230, 250 190, 210 170 C 180 155, 140 180, 120 220" />
+  <path class="fl-line" stroke-width="0.8" stroke-dasharray="3,3" d="M 380 320 C 320 335, 280 300, 255 255" />
+
+  <!-- Leaf Motifs -->
+  <path class="fl-line" stroke-width="1" fill="none" d="M 140 130 C 130 110, 100 115, 110 135 C 120 150, 135 140, 140 130 Z" />
+  <path class="fl-line" stroke-width="1" fill="none" d="M 190 230 C 185 250, 160 255, 165 235 C 170 220, 185 225, 190 230 Z" />
+  <path class="fl-line" stroke-width="1" fill="none" d="M 260 270 C 270 290, 300 285, 290 265 C 280 250, 265 260, 260 270 Z" />
+  <path class="fl-line" stroke-width="1" fill="none" d="M 210 170 C 215 150, 240 145, 235 165 C 230 180, 215 175, 210 170 Z" />
+
+  <!-- Subtle WishRite Star Flower Motif 1 (Center 200, 200) -->
+  <g transform="translate(200, 200) scale(0.32) translate(-298, -58)" class="fl-line" stroke-width="1.2">
+    <path d="M 298.00 6.47 L 296.83 8.00 L 294.65 16.00 L 291.91 32.00 L 294.63 43.00 L 298.00 51.08 L 302.34 38.00 L 303.61 31.00 L 302.21 22.00 L 298.00 6.47 Z" />
+    <path d="M 274.00 35.66 L 279.33 44.00 L 288.00 49.32 L 288.52 49.00 L 283.00 40.61 L 275.00 35.49 L 274.00 35.66 Z" />
+    <path d="M 320.00 35.68 L 313.00 40.35 L 306.75 49.00 L 307.00 49.49 L 313.00 46.16 L 317.02 43.00 L 321.49 36.00 L 321.00 35.35 L 320.00 35.68 Z" />
+    <path d="M 268.00 52.95 L 260.00 54.31 L 246.60 58.00 L 246.05 59.00 L 247.00 59.48 L 257.00 62.34 L 266.00 64.30 L 271.00 64.48 L 290.24 59.00 L 289.00 57.75 L 279.00 54.72 L 271.00 52.86 L 268.00 52.95 Z" />
+    <path d="M 324.00 52.89 L 306.25 58.00 L 305.84 59.00 L 323.00 64.24 L 328.00 64.44 L 335.00 63.27 L 349.46 59.00 L 348.80 58.00 L 337.00 54.46 L 328.00 52.78 L 324.00 52.89 Z" />
+    <path d="M 298.00 66.19 L 295.62 71.00 L 292.02 85.00 L 293.72 97.00 L 296.65 108.00 L 298.00 110.03 L 302.25 95.00 L 303.63 85.00 L 298.00 66.19 Z" />
+    <path d="M 288.00 67.53 L 279.00 73.36 L 273.85 81.00 L 273.88 82.00 L 283.49 76.00 L 288.15 69.00 L 288.53 68.00 L 288.00 67.53 Z" />
+    <path d="M 307.00 67.40 L 306.73 68.00 L 312.04 76.00 L 321.12 82.00 L 321.52 81.00 L 316.00 73.07 L 307.00 67.40 Z" />
+  </g>
+
+  <!-- Corner Flourish Elements -->
+  <circle cx="50" cy="350" r="2" fill="#D8D5D8" />
+  <circle cx="350" cy="50" r="2" fill="#D8D5D8" />
+  <path class="fl-line" stroke-width="0.8" d="M 30 370 Q 50 350 70 370" />
+  <path class="fl-line" stroke-width="0.8" d="M 330 30 Q 350 50 370 30" />
+</svg>

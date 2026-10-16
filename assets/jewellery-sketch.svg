@@ -2,9 +2,9 @@
   <!-- Handcrafted Silver Filigree Jewellery Pendant Sketch -->
   <defs>
     <linearGradient id="silverStroke" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#5A3D28" stop-opacity="0.9" />
-      <stop offset="50%" stop-color="#8C6D58" stop-opacity="0.75" />
-      <stop offset="100%" stop-color="#5A3D28" stop-opacity="0.9" />
+      <stop offset="0%" stop-color="#28212C" stop-opacity="0.9" />
+      <stop offset="50%" stop-color="#BFC0C2" stop-opacity="0.85" />
+      <stop offset="100%" stop-color="#554453" stop-opacity="0.9" />
     </linearGradient>
   </defs>
 
@@ -14,7 +14,7 @@
 
   <!-- Bail / Loop Ring -->
   <ellipse cx="200" cy="115" rx="7" ry="12" stroke="url(#silverStroke)" stroke-width="2" fill="none"/>
-  <circle cx="200" cy="115" r="3" fill="#5A3D28" fill-opacity="0.4"/>
+  <circle cx="200" cy="115" r="3" fill="#28212C" fill-opacity="0.4"/>
 
   <!-- Main Ornate Pendant Body (Filigree Teardrop Motif) -->
   <path d="M 200 130 C 160 180 130 220 130 260 C 130 305 160 340 200 340 C 240 340 270 305 270 260 C 270 220 240 180 200 130 Z" 
@@ -26,7 +26,7 @@
 
   <!-- Central Lotus & Gemstone Setting -->
   <ellipse cx="200" cy="255" rx="18" ry="24" stroke="url(#silverStroke)" stroke-width="1.8"/>
-  <circle cx="200" cy="255" r="9" stroke="url(#silverStroke)" stroke-width="1.5" fill="#5A3D28" fill-opacity="0.15"/>
+  <circle cx="200" cy="255" r="9" stroke="url(#silverStroke)" stroke-width="1.5" fill="#28212C" fill-opacity="0.15"/>
 
   <!-- Intricate Filigree Spirals (Left Wing) -->
   <path d="M 185 240 C 170 230 155 245 165 260 C 175 275 190 265 185 250" stroke="url(#silverStroke)" stroke-width="1.2" stroke-linecap="round"/>

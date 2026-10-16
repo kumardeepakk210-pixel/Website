@@ -6,7 +6,7 @@
    ============================================ */
 
 // All customer-facing storefront views
-const views = ['home', 'shop', 'collections', 'collection-detail', 'new-arrivals', 'best-sellers', 'kids', 'about', 'login', 'register', 'profile', 'cart', 'wishlist', 'product', 'occasion'];
+const views = ['home', 'shop', 'collections', 'collection-detail', 'new-arrivals', 'best-sellers', 'kids', 'men', 'about', 'login', 'register', 'profile', 'cart', 'wishlist', 'product', 'occasion'];
 
 const COLLECTIONS_CONFIG = [
     {
@@ -117,6 +117,7 @@ function navigateTo(viewId, param, pushHistory = true) {
         'new-arrivals': 'nav-new-arrivals',
         'best-sellers': 'nav-bestsellers',
         kids: 'nav-kids',
+        men: 'nav-men',
         about: 'nav-about',
         occasion: 'nav-occasion'
     };
@@ -136,10 +137,9 @@ function navigateTo(viewId, param, pushHistory = true) {
             if (pushHistory) { try { history.pushState({ view: 'occasion' }, '', '/occasion'); } catch (e) { } }
             break;
         case 'shop':
-            buildSidebarFilters();
-            buildMobileFilters();
-            applyFiltersAndSort();
+            if (typeof renderActivePageProducts === 'function') renderActivePageProducts('shop');
             setShopSEO(currentFilters.category);
+            if (typeof updateActiveCategoryNav === 'function') updateActiveCategoryNav(currentFilters.category || 'All');
             if (pushHistory) { try { history.pushState({ view: 'shop' }, '', '/shop'); } catch (e) { } }
             break;
         case 'collections':
@@ -154,17 +154,26 @@ function navigateTo(viewId, param, pushHistory = true) {
         case 'new-arrivals':
             renderNewArrivalsPage();
             if (typeof setNewArrivalsSEO === 'function') setNewArrivalsSEO();
+            if (typeof updateActiveCategoryNav === 'function') updateActiveCategoryNav('All');
             if (pushHistory) { try { history.pushState({ view: 'new-arrivals' }, '', '/new-arrivals'); } catch (e) { } }
             break;
         case 'best-sellers':
             renderBestSellersPage();
             if (typeof setBestSellersSEO === 'function') setBestSellersSEO();
+            if (typeof updateActiveCategoryNav === 'function') updateActiveCategoryNav('All');
             if (pushHistory) { try { history.pushState({ view: 'best-sellers' }, '', '/best-sellers'); } catch (e) { } }
             break;
         case 'kids':
             renderKidsPage();
             if (typeof setKidsSEO === 'function') setKidsSEO();
+            if (typeof updateActiveCategoryNav === 'function') updateActiveCategoryNav('All');
             if (pushHistory) { try { history.pushState({ view: 'kids' }, '', '/kids'); } catch (e) { } }
+            break;
+        case 'men':
+            renderMenPage();
+            if (typeof setMenSEO === 'function') setMenSEO();
+            if (typeof updateActiveCategoryNav === 'function') updateActiveCategoryNav('All');
+            if (pushHistory) { try { history.pushState({ view: 'men' }, '', '/men'); } catch (e) { } }
             break;
         case 'product':
             handleProductViewNavigation(param, targetView, pushHistory);
@@ -355,14 +364,14 @@ function updateStickyCTA(product) {
 // Render home page sections with live Supabase products or skeletons
 async function renderHomeSections() {
     const bsEl = document.getElementById('bestsellers-container');
-    const naEl = document.getElementById('new-arrivals-container');
+    const naEl = document.getElementById('season-arrivals-container') || document.getElementById('new-arrivals-live-container');
 
     const hasProducts = productsDB && productsDB.length > 0;
 
     if (!hasProducts) {
         if (typeof renderProductLoadingSkeletons === 'function') {
             if (bsEl) renderProductLoadingSkeletons('bestsellers-container', 10);
-            if (naEl) renderProductLoadingSkeletons('new-arrivals-container', 10);
+            if (naEl) renderProductLoadingSkeletons(naEl.id, 6);
         }
         try {
             if (typeof productsService !== 'undefined') {
@@ -377,12 +386,12 @@ async function renderHomeSections() {
         ? productsService.getBestSellers(10)
         : (window.productsDB || productsDB).slice(0, 10);
     const newArrivals = (typeof productsService !== 'undefined')
-        ? productsService.getNewArrivals(10)
-        : (window.productsDB || productsDB).slice(0, 10);
+        ? productsService.getNewArrivals(6)
+        : (window.productsDB || productsDB).slice(0, 6);
 
     if (typeof renderProductsToContainer === 'function') {
         if (bsEl) renderProductsToContainer(bestsellers, 'bestsellers-container');
-        if (naEl) renderProductsToContainer(newArrivals, 'new-arrivals-container');
+        if (naEl) renderProductsToContainer(newArrivals, naEl.id);
     }
 }
 
@@ -409,55 +418,16 @@ window.addEventListener('wishrite:productsLoaded', () => {
 /**
  * Render dedicated Collections Overview Page connected to real product data
  */
-function renderCollectionsPage() {
-    const container = document.getElementById('collections-view');
-    if (!container) return;
-
-    const cardsHTML = COLLECTIONS_CONFIG.map(col => {
-        const count = typeof productsService !== 'undefined'
-            ? productsService.getProductsByCollection(col.queryCol).length
-            : 0;
-        return `
-            <div class="collection-feature-card" onclick="navigateTo('collection-detail', '${col.slug}')" role="link" tabindex="0" onkeydown="if(event.key==='Enter') navigateTo('collection-detail', '${col.slug}')" aria-label="Explore ${col.name}">
-                <div class="collection-feature-image">
-                    <img src="${col.image}" alt="${col.name}" loading="lazy" width="600" height="400">
-                    <span class="collection-badge" style="position:absolute;bottom:12px;right:12px;background:rgba(94,52,53,0.92);color:#fff;font-size:0.75rem;padding:4px 10px;border-radius:2px;letter-spacing:0.5px;font-weight:500;">
-                        ${count} Pieces Available
-                    </span>
-                </div>
-                <div class="collection-feature-body" style="padding:24px;display:flex;flex-direction:column;flex:1;">
-                    <span class="sub-label" style="font-size:0.75rem;letter-spacing:2px;color:var(--wr-primary);text-transform:uppercase;font-weight:600;margin-bottom:6px;">${col.tagline}</span>
-                    <h3 class="collection-feature-title" style="font-family:var(--wr-font-heading);font-size:1.4rem;color:var(--wr-primary);margin-bottom:10px;">${col.name}</h3>
-                    <p class="collection-feature-desc" style="font-size:0.9rem;color:var(--wr-text-muted);line-height:1.6;margin-bottom:20px;flex:1;">${col.description}</p>
-                    <button class="btn btn-primary" onclick="event.stopPropagation(); navigateTo('collection-detail', '${col.slug}')">
-                        Explore Collection
-                    </button>
-                </div>
-            </div>
-        `;
-    }).join('');
-
-    container.innerHTML = `
-        <div class="shop-hero collections-hero">
-            <div class="container" style="max-width:800px;margin:0 auto;text-align:center;">
-                <div class="breadcrumbs" style="margin-bottom:12px;font-size:0.85rem;color:var(--wr-text-muted);">
-                    <a onclick="navigateTo('home')" style="cursor:pointer;color:inherit;">Home</a>
-                    <span style="margin:0 8px;">/</span>
-                    <span style="color: #5E3435;font-weight:500;">Collections</span>
-                </div>
-                <h1 style="color: #5E3435;">Collections</h1>
-                <p style="color: #5E3435; font-weight: bold;">
-                Explore thoughtfully curated collections designed for every story, style and occasion.
-                </p>
-            </div>
-        </div>
-        <div class="container" style="padding:40px 20px 80px;">
-            <div class="collections-grid-layout" style="display:grid;grid-template-columns:repeat(auto-fit, minmax(320px, 1fr));gap:32px;">
-                ${cardsHTML}
-            </div>
-        </div>
-    `;
+async function renderCollectionsPage() {
+    currentFilters.category = 'All';
+    currentFilters.availability = 'All';
+    currentFilters.priceRange = 'All';
+    currentFilters.occasion = 'All';
+    if (typeof renderActivePageProducts === 'function') {
+        await renderActivePageProducts('collections');
+    }
 }
+window.renderCollectionsPage = renderCollectionsPage;
 
 /**
  * Render dedicated Collection Detail Page with real product grid & counts
@@ -527,90 +497,46 @@ async function renderCollectionDetailPage(slug) {
 }
 
 /**
- * Render dedicated New Arrivals Page sorted newest first by created_at descending
+ * Render dedicated New Arrivals Page
  */
 async function renderNewArrivalsPage() {
-    const countEl = document.getElementById('new-arrivals-count');
-    const gridEl = document.getElementById('new-arrivals-grid');
-    if (!gridEl) return;
-
-    const isLoaded = productsDB && productsDB.length > 0;
-    if (!isLoaded) {
-        if (countEl) countEl.textContent = 'Loading products...';
-        if (typeof renderProductLoadingSkeletons === 'function') {
-            renderProductLoadingSkeletons('new-arrivals-grid', 8);
-        }
-        if (typeof productsService !== 'undefined') {
-            try {
-                await productsService.ensureLoaded();
-            } catch (e) { }
-        }
-    }
-
-    const products = typeof productsService !== 'undefined'
-        ? productsService.getNewArrivals(0)
-        : [];
-
-    if (countEl) {
-        countEl.textContent = products.length > 0 ? `Showing ${products.length} Pieces` : '';
-    }
-
-    if (products.length === 0) {
-        gridEl.innerHTML = `
-            <div class="cart-empty" style="grid-column:1/-1;padding:60px 20px;text-align:center;">
-                <p style="font-size:1.1rem;color:var(--wr-primary);font-family:var(--wr-font-heading);margin-bottom:8px;">No products found.</p>
-                <button class="btn btn-primary btn-sm" onclick="navigateTo('shop')">Explore All Jewellery</button>
-            </div>
-        `;
-    } else {
-        if (typeof renderProductsToContainer === 'function') {
-            renderProductsToContainer(products, 'new-arrivals-grid');
-        }
+    currentFilters.category = 'All';
+    currentFilters.availability = 'All';
+    currentFilters.priceRange = 'All';
+    currentFilters.occasion = 'All';
+    if (typeof renderActivePageProducts === 'function') {
+        await renderActivePageProducts('new-arrivals');
     }
 }
+window.renderNewArrivalsPage = renderNewArrivalsPage;
 
 /**
- * Render dedicated Best Sellers Page ranked by real sales data and availability
+ * Render dedicated Best Sellers Page
  */
 async function renderBestSellersPage() {
-    const countEl = document.getElementById('best-sellers-count');
-    const gridEl = document.getElementById('best-sellers-grid');
-    if (!gridEl) return;
-
-    const isLoaded = productsDB && productsDB.length > 0;
-    if (!isLoaded) {
-        if (countEl) countEl.textContent = 'Loading products...';
-        if (typeof renderProductLoadingSkeletons === 'function') {
-            renderProductLoadingSkeletons('best-sellers-grid', 8);
-        }
-        if (typeof productsService !== 'undefined') {
-            try {
-                await productsService.ensureLoaded();
-            } catch (e) { }
-        }
-    }
-
-    const products = typeof productsService !== 'undefined'
-        ? productsService.getBestSellers(0)
-        : [];
-
-    if (countEl) {
-        countEl.textContent = products.length > 0 ? `Showing ${products.length} Pieces` : '';
-    }
-
-    if (products.length === 0) {
-        gridEl.innerHTML = `
-            <div class="cart-empty" style="grid-column:1/-1;padding:60px 20px;text-align:center;">
-                <p style="font-size:1.1rem;color:var(--wr-primary);font-family:var(--wr-font-heading);margin-bottom:8px;">No products found.</p>
-                <button class="btn btn-primary btn-sm" onclick="navigateTo('shop')">Explore All Jewellery</button>
-            </div>
-        `;
-    } else {
-        if (typeof renderProductsToContainer === 'function') {
-            renderProductsToContainer(products, 'best-sellers-grid');
-        }
+    currentFilters.category = 'All';
+    currentFilters.availability = 'All';
+    currentFilters.priceRange = 'All';
+    currentFilters.occasion = 'All';
+    if (typeof renderActivePageProducts === 'function') {
+        await renderActivePageProducts('best-sellers');
     }
 }
+window.renderBestSellersPage = renderBestSellersPage;
+
+/**
+ * Render dedicated Men's Page
+ */
+async function renderMenPage() {
+    currentFilters.category = 'All';
+    currentFilters.availability = 'All';
+    currentFilters.priceRange = 'All';
+    currentFilters.occasion = 'All';
+    if (typeof renderActivePageProducts === 'function') {
+        await renderActivePageProducts('men');
+    }
+}
+window.renderMenPage = renderMenPage;
 
 // ── Centralized configuration for Kids collection & gender mapping (Requirement 7) ──
 const KIDS_PRODUCT_CONFIG = {
@@ -747,7 +673,11 @@ function setKidsFilter(filter) {
         btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
     });
 
-    renderKidsProductsList();
+    if (typeof renderActivePageProducts === 'function') {
+        renderActivePageProducts('kids');
+    } else {
+        renderKidsProductsList();
+    }
 
     // Smoothly scroll to product section with header offset
     if (filter === 'boys' || filter === 'girls') {
@@ -799,7 +729,7 @@ function renderKidsProductsList() {
 
         gridEl.innerHTML = `
             <div class="kids-empty-state" style="grid-column:1/-1;padding:60px 20px;text-align:center;">
-                <div style="width:56px;height:56px;margin:0 auto 16px;border-radius:50%;background:rgba(94,52,53,0.06);display:flex;align-items:center;justify-content:center;color:var(--wr-primary);">
+                <div style="width:56px;height:56px;margin:0 auto 16px;border-radius:50%;background:rgba(83, 55, 79,0.06);display:flex;align-items:center;justify-content:center;color:var(--wr-primary);">
                     <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8L12 2z"/>
                     </svg>
@@ -828,24 +758,16 @@ async function renderKidsPage() {
         btn.setAttribute('aria-pressed', 'false');
     });
 
-    const countEl = document.getElementById('kids-count');
-    const gridEl = document.getElementById('kids-grid');
-    if (!gridEl) return;
+    currentFilters.category = 'All';
+    currentFilters.availability = 'All';
+    currentFilters.priceRange = 'All';
+    currentFilters.occasion = 'All';
 
-    const isLoaded = typeof window !== 'undefined' && Array.isArray(window.productsDB) && window.productsDB.length > 0;
-    if (!isLoaded) {
-        if (countEl) countEl.textContent = 'Loading products...';
-        if (typeof renderProductLoadingSkeletons === 'function') {
-            renderProductLoadingSkeletons('kids-grid', 8);
-        }
-        if (typeof productsService !== 'undefined') {
-            try {
-                await productsService.ensureLoaded();
-            } catch (e) { }
-        }
+    if (typeof renderActivePageProducts === 'function') {
+        await renderActivePageProducts('kids');
+    } else {
+        renderKidsProductsList();
     }
-
-    renderKidsProductsList();
 }
 window.renderKidsPage = renderKidsPage;
 
@@ -917,6 +839,9 @@ function handleInitialURLRoute(pushHistory = false) {
     } else if (path === '/kids' || hash === '#kids') {
         navigateTo('kids', null, pushHistory);
         return;
+    } else if (path === '/men' || hash === '#men') {
+        navigateTo('men', null, pushHistory);
+        return;
     } else if (path === '/shop' || hash === '#shop') {
         navigateTo('shop', null, pushHistory);
         return;
@@ -954,10 +879,29 @@ function scrollToAboutSection(sectionId) {
     const el = document.getElementById(cleanId);
     if (!el) return;
 
+    // Update active state in about-section-nav
+    const navPills = document.querySelectorAll('#about-section-nav .collections-cat-btn');
+    if (navPills.length > 0) {
+        navPills.forEach(btn => {
+            const href = btn.getAttribute('href') || '';
+            if (href === '#' + cleanId) {
+                btn.classList.add('active');
+                try {
+                    btn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+                } catch (e) {}
+            } else {
+                btn.classList.remove('active');
+            }
+        });
+    }
+
     const header = document.querySelector('.header');
-    const headerOffset = header ? header.offsetHeight + 24 : 90;
+    const aboutNav = document.querySelector('.about-nav-bar');
+    const headerHeight = header ? header.offsetHeight : 99;
+    const navHeight = aboutNav ? aboutNav.offsetHeight : 64;
+    const totalOffset = headerHeight + navHeight + 14;
     const elementPosition = el.getBoundingClientRect().top;
-    const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+    const offsetPosition = elementPosition + window.pageYOffset - totalOffset;
 
     window.scrollTo({
         top: Math.max(0, offsetPosition),
@@ -970,6 +914,54 @@ function navigateToAboutSection(sectionId, pushHistory = true) {
     navigateTo('about', sectionId, pushHistory);
 }
 window.navigateToAboutSection = navigateToAboutSection;
+
+/**
+ * ScrollSpy for About sections: keeps active pill synchronized as the user scrolls
+ */
+function initAboutScrollSpy() {
+    const sectionIds = ['story', 'philosophy', 'promise', 'shipping', 'returns', 'care', 'faqs', 'privacy', 'contact'];
+    let ticking = false;
+
+    window.addEventListener('scroll', () => {
+        if (ticking) return;
+        ticking = true;
+        requestAnimationFrame(() => {
+            ticking = false;
+            if (typeof getCurrentView === 'function' && getCurrentView() !== 'about') return;
+
+            const header = document.querySelector('.header');
+            const aboutNav = document.querySelector('.about-nav-bar');
+            const topOffset = (header ? header.offsetHeight : 99) + (aboutNav ? aboutNav.offsetHeight : 64) + 60;
+
+            let currentSection = sectionIds[0];
+            for (const id of sectionIds) {
+                const el = document.getElementById(id);
+                if (el) {
+                    const rect = el.getBoundingClientRect();
+                    if (rect.top <= topOffset) {
+                        currentSection = id;
+                    }
+                }
+            }
+
+            const navPills = document.querySelectorAll('#about-section-nav .collections-cat-btn');
+            navPills.forEach(btn => {
+                const href = btn.getAttribute('href') || '';
+                if (href === '#' + currentSection) {
+                    if (!btn.classList.contains('active')) {
+                        btn.classList.add('active');
+                        try {
+                            btn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+                        } catch (e) {}
+                    }
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+        });
+    }, { passive: true });
+}
+window.initAboutScrollSpy = initAboutScrollSpy;
 
 /**
  * Interactive FAQ accordion toggle (Section 33)
@@ -1116,6 +1108,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderCart();
     initHeaderScroll();
     initScrollReveal();
+    initAboutScrollSpy();
+
+    // Initial route handling (instant view rendering without waiting for async network inventory)
+    handleInitialURLRoute(false);
 
     // Initial occasion visibility check
     updateOccasionContentVisibility();

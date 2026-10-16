@@ -84,16 +84,16 @@ serve(async (req) => {
             <style>
               body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #faf7f5; margin: 0; padding: 40px 20px; color: #2C2A29; }
               .card { max-width: 540px; margin: 0 auto; background: #ffffff; border-radius: 8px; overflow: hidden; border: 1px solid #EBE5E1; box-shadow: 0 4px 20px rgba(0,0,0,0.05); }
-              .header { background: #5E3435; padding: 28px; text-align: center; color: #ffffff; }
+              .header { background: #53374F; padding: 28px; text-align: center; color: #ffffff; }
               .logo { font-size: 22px; letter-spacing: 3px; font-weight: 700; margin: 0; }
               .sub-logo { font-size: 10px; letter-spacing: 2px; color: #d4af37; margin-top: 4px; }
               .body { padding: 36px 28px; text-align: center; }
-              .h1 { font-size: 20px; color: #5E3435; margin-bottom: 12px; }
+              .h1 { font-size: 20px; color: #53374F; margin-bottom: 12px; }
               .p { font-size: 14px; line-height: 1.6; color: #6e6762; margin-bottom: 24px; }
               .img-box { margin: 20px auto; max-width: 260px; aspect-ratio: 4/5; border-radius: 6px; overflow: hidden; border: 1px solid #f0ebe7; }
               .img-box img { width: 100%; height: 100%; object-fit: cover; }
               .code-badge { font-family: monospace; font-size: 12px; color: #8e8e93; margin-top: 8px; }
-              .btn { display: inline-block; background: #5E3435; color: #ffffff !important; text-decoration: none; padding: 14px 32px; border-radius: 4px; font-weight: 600; font-size: 13px; letter-spacing: 1px; margin-top: 16px; }
+              .btn { display: inline-block; background: #53374F; color: #ffffff !important; text-decoration: none; padding: 14px 32px; border-radius: 4px; font-weight: 600; font-size: 13px; letter-spacing: 1px; margin-top: 16px; }
               .footer { background: #F5F1EE; padding: 20px; text-align: center; font-size: 11px; color: #8E8E93; }
             </style>
           </head>

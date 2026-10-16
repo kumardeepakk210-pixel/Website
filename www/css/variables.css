@@ -1,69 +1,117 @@
 /* ============================================
    WISHRITE DESIGN SYSTEM — VARIABLES
-   Premium Silver Jewellery E-Commerce
+   Palette: "Moonlit Silver"
+   International Luxury + Indian Emotional Warmth + 925 Sterling Silver Character
    ============================================ */
 
 :root {
-    /* ── Brand Colors ── */
-    --wr-primary: #5E3435;
-    --wr-primary-dark: #4A2829;
-    --wr-primary-light: #7A4E4F;
-    --wr-primary-subtle: rgba(94, 52, 53, 0.08);
-
-    /* ── Neutrals ── */
-    --wr-black: #1A1A1A;
-    --wr-charcoal: #2D2D2D;
-    --wr-dark-grey: #444444;
-    --wr-text: #333333;
-    --wr-text-muted: #6B6B6B;
-    --wr-text-light: #999999;
-    --wr-border: #E5E1DC;
-    --wr-border-light: #F0ECE7;
-    --wr-bg-warm: #FAF8F5;
-    --wr-bg-cream: #F5F1EC;
-    --wr-off-white: #FDFCFB;
+    /* ── MOONLIT SILVER & LUXURY ROSEWOOD PALETTE ── */
+    --wr-midnight: #53374F;
+    /* Luxury Rosewood Burgundy (Primary / Headers / Primary CTA) */
+    --wr-plum: #53374F;
+    /* Consistent #53374F Theme */
+    --wr-lilac: #84627F;
+    /* Soft Rosewood Bridge */
+    --wr-ivory: #FAF7F5;
+    /* Pearl Ivory Base Background */
+    --wr-silver-mist: #EFE8E8;
+    /* Subtle container / Borders */
     --wr-white: #FFFFFF;
+    /* Pure White (Cards / Surfaces / Contrast) */
+    --wr-charcoal: #53374F;
+    /* Body Typography: #53374F */
+    --wr-silver: #D5C2C3;
+    /* Borders / Silver Accents */
+    --wr-teal: #53374F;
+    /* Controlled luxury micro-accent */
 
-    /* ── Accent (Gold — used very sparingly) ── */
-    --wr-gold: #B8956A;
-    --wr-gold-light: #D4B896;
+    /* ── BRAND MAPPINGS ── */
+    --wr-primary: #53374F;
+    --wr-primary-dark: #3F273C;
+    --wr-primary-light: #6D4D68;
+    --wr-primary-subtle: rgba(83, 55, 79, 0.08);
 
-    /* ── Semantic ── */
-    --wr-success: #18794E;
-    --wr-error: #B42318;
-    --wr-info: #3B7DD8;
-    --wr-heart: #D64545;
+    /* ── NEUTRALS & SURFACES ── */
+    --wr-bg-warm: #FAF7F5;
+    --wr-bg-cream: #FAF7F5;
+    --wr-bg-page: #FAF7F5;
+    --wr-bg-main: #FAF7F5;
+    /* Pearl Ivory */
+    --wr-bg-card: #FFFFFF;
+    /* Pure White */
+    --wr-bg-soft: #F5EFEF;
+    /* Soft Mist */
+    --wr-surface: #FFFFFF;
+    --wr-surface-subtle: #FAF7F5;
+    --wr-border: rgba(83, 55, 79, 0.12);
+    --wr-border-light: rgba(83, 55, 79, 0.08);
+    --wr-border-silver: #EFE8E8;
+    --wr-border-soft: rgba(83, 55, 79, 0.12);
+    --wr-border-card: rgba(83, 55, 79, 0.10);
 
-    /* ── Typography ── */
-    --font-display: 'Playfair Display', 'Georgia', serif;
-    --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    /* ── TYPOGRAPHY TEXT TOKENS ── */
+    --wr-black: #53374F;
+    --wr-text: #53374F;
+    --wr-text-dark: #53374F;
+    --wr-text-muted: #53374F;
+    --wr-text-light: #765671;
+    --wr-off-white: #FFFFFF;
 
-    /* Font Sizes — modular scale */
-    --text-xs: 0.6875rem;     /* 11px */
-    --text-sm: 0.8125rem;     /* 13px */
-    --text-base: 0.9375rem;   /* 15px */
-    --text-md: 1rem;          /* 16px */
-    --text-lg: 1.125rem;      /* 18px */
-    --text-xl: 1.25rem;       /* 20px */
-    --text-2xl: 1.5rem;       /* 24px */
-    --text-3xl: 2rem;         /* 32px */
-    --text-4xl: 2.5rem;       /* 40px */
-    --text-5xl: 3.25rem;      /* 52px */
+    /* ── JEWELLERY ACCENT TOKENS ── */
+    --wr-silver-shine: linear-gradient(135deg, #FFFFFF 0%, #E4E3E1 45%, #BFC0C2 75%, #FFFFFF 100%);
+    --wr-silver-halo: rgba(191, 192, 194, 0.45);
+    --wr-halo-glow: 0 0 24px rgba(169, 155, 175, 0.20);
+    --wr-gold: var(--wr-plum);
+    --wr-gold-light: var(--wr-lilac);
+
+    /* ── SEMANTIC TOKENS ── */
+    --wr-success: #1C5A42;
+    --wr-error: #9E2B2B;
+    --wr-info: #35536B;
+    --wr-heart: #B83B4B;
+
+    /* ── TYPOGRAPHY FAMILIES ── */
+    --font-display: 'Playfair Display', 'Cormorant Garamond', 'Georgia', serif;
+    --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --wr-font-heading: var(--font-display);
+    --wr-font-body: var(--font-body);
+
+    /* Font Sizes — Editorial Scale */
+    --text-xs: 0.6875rem;
+    /* 11px */
+    --text-sm: 0.8125rem;
+    /* 13px */
+    --text-base: 0.9375rem;
+    /* 15px */
+    --text-md: 1rem;
+    /* 16px */
+    --text-lg: 1.125rem;
+    /* 18px */
+    --text-xl: 1.25rem;
+    /* 20px */
+    --text-2xl: 1.5rem;
+    /* 24px */
+    --text-3xl: 2rem;
+    /* 32px */
+    --text-4xl: 2.5rem;
+    /* 40px */
+    --text-5xl: 3.25rem;
+    /* 52px */
 
     /* Line Heights */
-    --leading-tight: 1.1;
-    --leading-snug: 1.25;
-    --leading-normal: 1.5;
-    --leading-relaxed: 1.65;
+    --leading-tight: 1.12;
+    --leading-snug: 1.28;
+    --leading-normal: 1.55;
+    --leading-relaxed: 1.7;
 
     /* Letter Spacing */
-    --tracking-tight: -0.02em;
+    --tracking-tight: -0.025em;
     --tracking-normal: 0;
     --tracking-wide: 0.04em;
     --tracking-wider: 0.08em;
-    --tracking-widest: 0.16em;
+    --tracking-widest: 0.15em;
 
-    /* ── Spacing ── */
+    /* ── SPACING SCALE ── */
     --space-1: 4px;
     --space-2: 8px;
     --space-3: 12px;
@@ -78,34 +126,42 @@
     --space-24: 96px;
     --space-32: 128px;
 
-    /* Container */
-    --container-padding: 5%;
-    --container-max: 1440px;
+    /* Master Container & Global Horizontal Alignment System */
+    --page-max-width: 1680px;
+    --page-gutter: clamp(24px, 2.8vw, 40px);
+    --container-padding: var(--page-gutter);
+    --container-max: var(--page-max-width);
 
-    /* ── Borders & Radius ── */
+    /* ── BORDERS & RADIUS ── */
     --radius-none: 0;
-    --radius-sm: 2px;
-    --radius-md: 4px;
-    --radius-lg: 8px;
+    --radius-sm: 3px;
+    --radius-md: 6px;
+    --radius-lg: 10px;
+    --radius-xl: 16px;
     --radius-full: 9999px;
+    --wr-radius-sm: 10px;
+    --wr-radius-md: 16px;
+    --wr-radius-lg: 22px;
 
-    /* ── Shadows ── */
-    --shadow-xs: 0 1px 2px rgba(0,0,0,0.04);
-    --shadow-sm: 0 2px 8px rgba(0,0,0,0.05);
-    --shadow-md: 0 4px 16px rgba(0,0,0,0.06);
-    --shadow-lg: 0 8px 32px rgba(0,0,0,0.08);
-    --shadow-overlay: 0 16px 48px rgba(0,0,0,0.12);
+    /* ── REFINED LUXURY SHADOWS (Restrained, subtle) ── */
+    --shadow-xs: 0 1px 2px rgba(40, 33, 44, 0.03);
+    --shadow-sm: 0 2px 8px rgba(40, 33, 44, 0.04);
+    --shadow-md: 0 6px 20px rgba(40, 33, 44, 0.06);
+    --shadow-lg: 0 12px 32px rgba(40, 33, 44, 0.08);
+    --shadow-overlay: 0 20px 48px rgba(40, 33, 44, 0.14);
+    --shadow-float: 0 12px 30px -8px rgba(40, 33, 44, 0.09), 0 4px 12px rgba(40, 33, 44, 0.03);
+    --wr-shadow-soft: 0 8px 30px rgba(40, 33, 44, 0.06);
 
-    /* ── Transitions ── */
-    --ease-out: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    /* ── TRANSITIONS ── */
+    --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
     --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
-    --duration-fast: 200ms;
-    --duration-normal: 350ms;
-    --duration-slow: 600ms;
-    --transition-base: all 350ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
-    --transition-fast: all 200ms ease;
+    --duration-fast: 180ms;
+    --duration-normal: 320ms;
+    --duration-slow: 550ms;
+    --transition-base: all 320ms cubic-bezier(0.22, 1, 0.36, 1);
+    --transition-fast: all 180ms ease;
 
-    /* ── Z-Index Layers ── */
+    /* ── Z-INDEX LAYERS ── */
     --z-base: 1;
     --z-dropdown: 50;
     --z-sticky: 100;
@@ -113,8 +169,29 @@
     --z-modal: 300;
     --z-toast: 400;
 
-    /* ── Product Image Ratio ── */
+    /* ── PRODUCT & CATEGORY ASPECT RATIOS ── */
     --product-ratio: 4 / 5;
     --product-card-ratio: 4 / 5;
     --category-ratio: 3 / 4;
+
+    /* ── HEADER & NAVIGATION HEIGHTS ── */
+    --header-height: 99px;
+}
+
+@media (min-width: 1200px) {
+    :root {
+        --page-gutter: 20px;
+    }
+}
+
+@media (min-width: 768px) and (max-width: 1199px) {
+    :root {
+        --page-gutter: 24px;
+    }
+}
+
+@media (max-width: 767px) {
+    :root {
+        --page-gutter: 16px;
+    }
 }

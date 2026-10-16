@@ -14,7 +14,7 @@ html,
 body {
     width: 100%;
     max-width: 100%;
-    overflow-x: hidden;
+    overflow-x: clip;
 }
 
 html {
@@ -25,7 +25,7 @@ html {
 body {
     font-family: var(--font-body);
     color: var(--wr-text);
-    background: var(--wr-white);
+    background: var(--wr-ivory);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     line-height: var(--leading-normal);
@@ -91,22 +91,40 @@ h4 {
 }
 
 p {
-    color: var(--wr-text-muted);
+    color: var(--wr-text);
     line-height: var(--leading-relaxed);
-    font-weight: 300;
+    font-weight: 400;
+}
+
+/* ── Master Page Container System ── */
+.page-container,
+.main-container,
+.section-container {
+    width: min(
+        calc(100% - (var(--page-gutter) * 2)),
+        var(--page-max-width)
+    );
+    margin-inline: auto;
+    box-sizing: border-box;
 }
 
 /* ── Section Spacing ── */
 .section {
-    padding: var(--space-24) var(--container-padding);
+    padding: clamp(32px, 3.5vw, 48px) 0;
 }
 
 .section-compact {
-    padding: var(--space-16) var(--container-padding);
+    padding: clamp(20px, 2.5vw, 32px) 0;
+}
+
+/* Fallback for sections without an explicit .page-container child */
+.section:not(:has(.page-container)) {
+    padding-left: var(--page-gutter);
+    padding-right: var(--page-gutter);
 }
 
 .section-header {
-    margin-bottom: var(--space-12);
+    margin-bottom: clamp(16px, 2vw, 24px);
 }
 
 .section-header .sub-label {
@@ -135,11 +153,13 @@ p {
     align-items: flex-end;
 }
 
-/* ── Container ── */
+/* ── Container (Legacy & Subpage Wrapper) ── */
 .container {
-    max-width: var(--container-max);
-    margin: 0 auto;
-    padding: 0 var(--container-padding);
+    width: calc(100% - (var(--page-gutter) * 2));
+    max-width: none;
+    margin-left: auto;
+    margin-right: auto;
+    box-sizing: border-box;
 }
 
 /* ── View All Link ── */

@@ -2,9 +2,9 @@
   <!-- WISHRITE FESTIVE LINE-ART — VALENTINE'S BOTANICAL ROSE & DELICATE HEART -->
   <defs>
     <linearGradient id="valGoldStroke" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#5C1D2E" stop-opacity="0.9"/>
-      <stop offset="50%" stop-color="#D4AF37" stop-opacity="0.8"/>
-      <stop offset="100%" stop-color="#C44569" stop-opacity="0.7"/>
+      <stop offset="0%" stop-color="#28212C" stop-opacity="0.9"/>
+      <stop offset="50%" stop-color="#BFC0C2" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#554453" stop-opacity="0.75"/>
     </linearGradient>
   </defs>
 

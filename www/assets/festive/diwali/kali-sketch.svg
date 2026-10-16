@@ -2,9 +2,9 @@
   <!-- WISHRITE FESTIVE LINE-ART — MAA KALI ELEGANT SKETCH FOR DIWALI -->
   <defs>
     <linearGradient id="kaliGoldStroke" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#3D1226" stop-opacity="0.9"/>
-      <stop offset="50%" stop-color="#D4AF37" stop-opacity="0.8"/>
-      <stop offset="100%" stop-color="#1A1C3B" stop-opacity="0.7"/>
+      <stop offset="0%" stop-color="#28212C" stop-opacity="0.9"/>
+      <stop offset="50%" stop-color="#BFC0C2" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#554453" stop-opacity="0.7"/>
     </linearGradient>
   </defs>
 
@@ -13,7 +13,7 @@
     <path d="M400 90 L400 40 M400 40 L388 65 L400 40 L412 65 Z" stroke-width="2"/>
     <circle cx="400" cy="30" r="5" stroke-width="1.8"/>
     <!-- Crescent Moon on Crown -->
-    <path d="M380 95 C380 75, 420 75, 420 95 C410 82, 390 82, 380 95 Z" stroke-width="1.6" fill="#D4AF37" fill-opacity="0.3"/>
+    <path d="M380 95 C380 75, 420 75, 420 95 C410 82, 390 82, 380 95 Z" stroke-width="1.6" fill="#BFC0C2" fill-opacity="0.3"/>
 
     <!-- Arching Mukut Filigree -->
     <path d="M340 140 C370 80, 430 80, 460 140" stroke-width="1.8"/>

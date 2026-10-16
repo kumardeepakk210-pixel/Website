@@ -2,9 +2,9 @@
   <!-- WISHRITE FESTIVE LINE-ART — MAA DURGA PROFILE / FRONTAL SKETCH -->
   <defs>
     <linearGradient id="durgaGoldStroke" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#8B1E2D" stop-opacity="0.9"/>
-      <stop offset="50%" stop-color="#D4AF37" stop-opacity="0.8"/>
-      <stop offset="100%" stop-color="#9C2738" stop-opacity="0.6"/>
+      <stop offset="0%" stop-color="#28212C" stop-opacity="0.9"/>
+      <stop offset="50%" stop-color="#BFC0C2" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#554453" stop-opacity="0.6"/>
     </linearGradient>
   </defs>
 
@@ -18,7 +18,7 @@
     
     <!-- Intricate Mukut Filigree & Jewels -->
     <circle cx="400" cy="115" r="8"/>
-    <circle cx="400" cy="115" r="3" fill="#D4AF37" fill-opacity="0.3"/>
+    <circle cx="400" cy="115" r="3" fill="#BFC0C2" fill-opacity="0.3"/>
     <circle cx="365" cy="145" r="5"/>
     <circle cx="435" cy="145" r="5"/>
     <circle cx="335" cy="180" r="5"/>
