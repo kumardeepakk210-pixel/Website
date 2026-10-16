@@ -82,7 +82,12 @@ const HERO_SLIDES_DATA = [
             text: "EXPLORE COLLECTIONS",
             onclick: "navigateTo('collections')"
         },
-
+        editorial: [
+            "JEWELLERY",
+            "FOR LIFE'S",
+            "BEAUTIFUL",
+            "BEGINNINGS"
+        ]
     },
     {
         eyebrow: "FOR EVERY STORY · A SILVER MOMENT",
@@ -165,7 +170,7 @@ function updateHeroContentForSlide(slideIndex) {
             `;
         }
     } else {
-        const slideData = HERO_SLIDES_DATA[slideIndex % HERO_SLIDES_DATA.length];
+        const slideData = HERO_SLIDES_DATA[slideIndex % HERO_SLIDES_DATA.length] || HERO_SLIDES_DATA[0];
         heroContent.classList.remove('hero-content-enter');
         void heroContent.offsetWidth; // trigger reflow for smooth re-animation
 
@@ -191,7 +196,8 @@ function updateHeroContentForSlide(slideIndex) {
         if (heroSideEditorial) {
             heroSideEditorial.classList.remove('hero-content-enter');
             void heroSideEditorial.offsetWidth;
-            heroSideEditorial.innerHTML = slideData.editorial.map(item => `<span>${item}</span>`).join('');
+            const editorialList = Array.isArray(slideData.editorial) ? slideData.editorial : [];
+            heroSideEditorial.innerHTML = editorialList.map(item => `<span>${item}</span>`).join('');
             heroSideEditorial.classList.add('hero-content-enter');
         }
     }
@@ -257,6 +263,40 @@ function initHeroCarousel() {
         }
     }
 
+    // Touch swipe support for mobile
+    const heroEl = document.querySelector('.hero');
+    if (heroEl && !heroEl._sliderEventsBound) {
+        heroEl._sliderEventsBound = true;
+        let startX = 0, startY = 0;
+        heroEl.addEventListener('touchstart', (e) => {
+            if (e.changedTouches && e.changedTouches[0]) {
+                startX = e.changedTouches[0].screenX;
+                startY = e.changedTouches[0].screenY;
+            }
+        }, { passive: true });
+        heroEl.addEventListener('touchend', (e) => {
+            if (e.changedTouches && e.changedTouches[0]) {
+                const diffX = startX - e.changedTouches[0].screenX;
+                const diffY = startY - e.changedTouches[0].screenY;
+                if (Math.abs(diffX) > 40 && Math.abs(diffX) > Math.abs(diffY)) {
+                    if (diffX > 0) {
+                        nextHeroSlide();
+                    } else {
+                        prevHeroSlide();
+                    }
+                }
+            }
+        }, { passive: true });
+
+        // Pause timer on hover
+        heroEl.addEventListener('mouseenter', () => {
+            if (heroSliderTimer) clearInterval(heroSliderTimer);
+        });
+        heroEl.addEventListener('mouseleave', () => {
+            resetHeroSliderTimer();
+        });
+    }
+
     goToHeroSlide(0);
 }
 
@@ -281,6 +321,7 @@ function scrollPastHero() {
 window.goToHeroSlide = goToHeroSlide;
 window.nextHeroSlide = nextHeroSlide;
 window.prevHeroSlide = prevHeroSlide;
+window.initHeroCarousel = initHeroCarousel;
 window.scrollPastHero = scrollPastHero;
 window.updateHeaderState = updateHeaderState;
 

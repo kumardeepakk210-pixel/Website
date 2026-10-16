@@ -212,6 +212,9 @@ function navigateTo(viewId, param, pushHistory = true) {
         default:
             renderHomeSections();
             setHomeSEO();
+            if (typeof initHeroCarousel === 'function') {
+                initHeroCarousel();
+            }
             if (pushHistory) { try { history.pushState({ view: 'home' }, '', '/'); } catch (e) { } }
             break;
     }
