@@ -419,7 +419,7 @@ function buildPageSidebar(scope, baseProducts) {
     const sidebar = document.getElementById(`${scope}-sidebar`);
     if (!sidebar) return;
 
-    const items = (baseProducts || getScopeBaseProducts(scope)).filter(p => Number(p.stockQuantity || 0) > 0);
+    const items = (baseProducts || getScopeBaseProducts(scope)).filter(Boolean);
 
     // Distinct categories for this page
     const catMap = new Map();
@@ -527,8 +527,8 @@ async function renderActivePageProducts(explicitScope) {
     }
 
     const baseProducts = getScopeBaseProducts(scope);
-    // Display in-stock products
-    let filtered = baseProducts.filter(p => Number(p.stockQuantity || 0) > 0);
+    // Display active products (including elegant sold-out discovery states)
+    let filtered = baseProducts.filter(Boolean);
 
     // Category filter
     if (currentFilters.category && currentFilters.category !== 'All') {
@@ -796,7 +796,7 @@ function buildMobileFilters() {
     if (!sheet) return;
 
     const scope = getActiveScope();
-    const baseProducts = (getScopeBaseProducts(scope) || []).filter(p => Number(p.stockQuantity || 0) > 0);
+    const baseProducts = (getScopeBaseProducts(scope) || []).filter(Boolean);
 
     const catMap = new Map();
     baseProducts.forEach(p => {

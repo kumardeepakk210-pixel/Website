@@ -633,9 +633,9 @@ const productsService = {
                     if (cached) {
                         const parsed = JSON.parse(cached);
                         if (Array.isArray(parsed) && parsed.length > 0) {
-                            const inStock = parsed.filter(p => p && Number(p.stockQuantity || 0) > 0);
-                            productsDB = inStock;
-                            window.productsDB = inStock;
+                            const activeProducts = parsed.filter(Boolean);
+                            productsDB = activeProducts;
+                            window.productsDB = activeProducts;
                             productSlugMap.clear();
                             productCodeMap.clear();
                             productsDB.forEach(p => {
@@ -762,32 +762,32 @@ const productsService = {
     },
 
     getProductsByCategory(category) {
-        const inStock = productsDB.filter(p => p && Number(p.stockQuantity || 0) > 0 && isSilverJewelleryProduct(p));
-        if (!category || category === 'All') return inStock;
+        const active = productsDB.filter(p => p && isSilverJewelleryProduct(p));
+        if (!category || category === 'All') return active;
         const norm = normalizeCategory(category).toLowerCase();
-        return inStock.filter(p => normalizeCategory(p.category).toLowerCase() === norm || (p.rawCategory && p.rawCategory.toLowerCase() === norm));
+        return active.filter(p => normalizeCategory(p.category).toLowerCase() === norm || (p.rawCategory && p.rawCategory.toLowerCase() === norm));
     },
 
     getProductsByCollection(collection) {
-        const inStock = productsDB.filter(p => p && Number(p.stockQuantity || 0) > 0 && isSilverJewelleryProduct(p));
-        if (!collection || collection === 'All') return inStock;
-        return inStock.filter(p => p.collection === collection);
+        const active = productsDB.filter(p => p && isSilverJewelleryProduct(p));
+        if (!collection || collection === 'All') return active;
+        return active.filter(p => p.collection === collection);
     },
 
     getProductsByOccasion(occasion) {
-        const inStock = productsDB.filter(p => p && Number(p.stockQuantity || 0) > 0 && isSilverJewelleryProduct(p));
-        if (!occasion || occasion === 'All') return inStock;
-        return inStock.filter(p => p.occasions && p.occasions.includes(occasion));
+        const active = productsDB.filter(p => p && isSilverJewelleryProduct(p));
+        if (!occasion || occasion === 'All') return active;
+        return active.filter(p => p.occasions && p.occasions.includes(occasion));
     },
 
     getNewArrivals(limit = 0) {
-        const sorted = productsDB.filter(p => p && Number(p.stockQuantity || 0) > 0 && isSilverJewelleryProduct(p))
+        const sorted = productsDB.filter(p => p && isSilverJewelleryProduct(p))
             .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
         return (limit && limit > 0) ? sorted.slice(0, limit) : sorted;
     },
 
     getBestSellers(limit = 0) {
-        const sorted = productsDB.filter(p => p && Number(p.stockQuantity || 0) > 0 && isSilverJewelleryProduct(p))
+        const sorted = productsDB.filter(p => p && isSilverJewelleryProduct(p))
             .sort((a, b) => (b.salesCount - a.salesCount) || (b.stockQuantity - a.stockQuantity));
         return (limit && limit > 0) ? sorted.slice(0, limit) : sorted;
     },
@@ -796,7 +796,7 @@ const productsService = {
         if (!query || query.trim().length < 2) return [];
         const q = query.toLowerCase().trim();
         return productsDB.filter(p =>
-            p && Number(p.stockQuantity || 0) > 0 && (
+            p && (
                 (p.name && p.name.toLowerCase().includes(q)) ||
                 (p.productCode && p.productCode.toLowerCase().includes(q)) ||
                 (p.category && p.category.toLowerCase().includes(q)) ||
@@ -1189,20 +1189,23 @@ function getKidsProductsByAudience(audience) {
 }
 
 /**
- * Create a product card HTML (strictly hides out-of-stock items)
+ * Create a product card HTML (supports in-stock and elegant sold-out discovery states)
  */
 function createProductCardHTML(product) {
-    if (!product || Number(product.stockQuantity || 0) <= 0) return '';
+    if (!product) return '';
 
+    const isOutOfStock = Number(product.stockQuantity || 0) <= 0;
     const isWishlisted = typeof wishlist !== 'undefined' && wishlist.has(product.id);
 
     let badgeHTML = '';
-    if (product.tag && product.tag !== 'UNAVAILABLE') {
+    if (isOutOfStock) {
+        badgeHTML = `<span class="product-card-badge badge-out-of-stock">Sold Out</span>`;
+    } else if (product.tag && product.tag !== 'UNAVAILABLE') {
         const badgeClass = product.tag === 'NEW' ? 'badge-new' : (product.tag === 'SALE' ? 'badge-sale' : 'badge-gold');
         badgeHTML = `<span class="product-card-badge ${badgeClass}">${product.tag}</span>`;
     }
 
-    const discountHTML = product.discount > 0 ? `<span class="price-discount">${product.discount}% OFF</span>` : '';
+    const discountHTML = (!isOutOfStock && product.discount > 0) ? `<span class="price-discount">${product.discount}% OFF</span>` : '';
     const mrpHTML = (product.mrp > product.sellingPrice) ? `<span class="price-original">${formatPrice(product.mrp)}</span>` : '';
 
     // Canonical Primary Image Selection (01_main_ecommerce, is_primary, or images[0])
@@ -1241,10 +1244,12 @@ function createProductCardHTML(product) {
         `;
     }
 
-    const actionButtonHTML = `<button class="product-card-quick" onclick="addToCart('${product.id}', event)">Quick Add</button>`;
+    const actionButtonHTML = !isOutOfStock
+        ? `<button class="product-card-quick" onclick="addToCart('${product.id}', event)">Quick Add</button>`
+        : `<button class="product-card-quick product-card-notify out-of-stock-btn" onclick="event.stopPropagation(); openNotifyMeModal('${product.id}')">Notify Me</button>`;
 
     return `
-        <div class="product-card" data-product-code="${prodCode}" onclick="navigateTo('product', '${product.slug}')">
+        <div class="product-card ${isOutOfStock ? 'out-of-stock is-out-of-stock' : ''}" data-product-code="${prodCode}" onclick="navigateTo('product', '${product.slug}')">
             <div class="product-card-image" data-product-code="${prodCode}">
                 <img 
                     src="${imgSrc}" 
@@ -1304,18 +1309,18 @@ function renderProductsToContainer(products, containerId) {
         return;
     }
 
-    // Strictly filter out out-of-stock items so they are never displayed on the website
-    const availableProducts = (products || []).filter(p => p && Number(p.stockQuantity || 0) > 0);
+    // Render all active products (both in-stock and elegant sold-out discovery cards)
+    const displayProducts = (products || []).filter(Boolean);
 
-    if (!availableProducts.length) {
+    if (!displayProducts.length) {
         container.innerHTML = '<p class="cart-empty" style="grid-column:1/-1;">No products found matching your criteria.</p>';
         return;
     }
 
-    container.innerHTML = availableProducts.map(createProductCardHTML).filter(Boolean).join('');
+    container.innerHTML = displayProducts.map(createProductCardHTML).filter(Boolean).join('');
 
     // Pre-attach resolved images if already present in product model
-    availableProducts.forEach(p => {
+    displayProducts.forEach(p => {
         if (p && p.productCode && Array.isArray(p.images) && p.images.length > 0) {
             const cardImages = container.querySelectorAll(`.product-card-image[data-product-code="${p.productCode}"]`);
             cardImages.forEach(el => {
@@ -2178,9 +2183,9 @@ function renderProductDetail(product) {
     specsArr.push(`<tr><td>Finish</td><td>${product.finish || 'High Polish, Anti-Tarnish Rhodium Protective Layer'}</td></tr>`);
     specsArr.push(`<tr><td>Packaging</td><td>Complimentary Velvet Gift Box & Certificate of Authenticity</td></tr>`);
 
-    // In-stock related products
-    const related = productsDB.filter(p => p && Number(p.stockQuantity || 0) > 0 && p.id !== product.id && p.category === product.category).slice(0, 4);
-    const relatedAlt = related.length < 4 ? productsDB.filter(p => p && Number(p.stockQuantity || 0) > 0 && p.id !== product.id).slice(0, 4) : related;
+    // Related products (both in-stock and active sold-out pieces)
+    const related = productsDB.filter(p => p && p.id !== product.id && p.category === product.category).slice(0, 4);
+    const relatedAlt = related.length < 4 ? productsDB.filter(p => p && p.id !== product.id).slice(0, 4) : related;
 
     // Realistic, category-tailored social proof & customer reviews
     const socialProof = getProductSocialProof(product);
@@ -2462,7 +2467,7 @@ function renderProductDetail(product) {
             ` : ''}
 
             <!-- Sticky Action Bar for Mobile -->
-            <div class="sticky-cta active" id="sticky-cta" aria-hidden="false">
+            <div class="sticky-cta" id="sticky-cta" aria-hidden="true">
                 ${product.stockQuantity > 0 ? `
                     <button class="btn btn-primary" onclick="addToCart('${product.id}', event)">ADD TO CART — ${formatPrice(product.sellingPrice)}</button>
                     <button class="btn btn-secondary" onclick="buyNowFromPDP('${product.id}')">BUY NOW</button>
@@ -2582,6 +2587,57 @@ function closeNotifyMeModal() {
     const modal = document.getElementById('notify-me-modal');
     if (modal) modal.style.display = 'none';
 }
+
+window.openNotifyMeModal = openNotifyMeModal;
+window.closeNotifyMeModal = closeNotifyMeModal;
+
+// ════════════════════════════════════════════════════
+// 21. MOBILE PDP STICKY CTA INTERSECTION OBSERVER
+// ════════════════════════════════════════════════════
+let pdpStickyCTAObserver = null;
+
+function initPdpStickyCTAObserver() {
+    if (pdpStickyCTAObserver) {
+        try { pdpStickyCTAObserver.disconnect(); } catch (e) {}
+        pdpStickyCTAObserver = null;
+    }
+
+    const stickyCTA = document.getElementById('sticky-cta');
+    const inlineActions = document.querySelector('.pdp-actions-row');
+    if (!stickyCTA || !inlineActions) return;
+
+    const setVisibility = (isInlineVisible) => {
+        if (isInlineVisible) {
+            stickyCTA.classList.remove('active');
+            stickyCTA.setAttribute('aria-hidden', 'true');
+        } else {
+            stickyCTA.classList.add('active');
+            stickyCTA.setAttribute('aria-hidden', 'false');
+        }
+    };
+
+    if ('IntersectionObserver' in window) {
+        pdpStickyCTAObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                setVisibility(entry.isIntersecting);
+            });
+        }, {
+            root: null,
+            threshold: 0.05
+        });
+        pdpStickyCTAObserver.observe(inlineActions);
+        window.pdpStickyCTAObserver = pdpStickyCTAObserver;
+    } else {
+        const checkVisibility = () => {
+            const rect = inlineActions.getBoundingClientRect();
+            const inView = (rect.top < window.innerHeight && rect.bottom > 0);
+            setVisibility(inView);
+        };
+        checkVisibility();
+        window.addEventListener('scroll', checkVisibility, { passive: true });
+    }
+}
+window.initPdpStickyCTAObserver = initPdpStickyCTAObserver;
 
 async function handleNotifyMeSubmit(event) {
     event.preventDefault();

@@ -42,9 +42,9 @@ function renderSearchResults(query) {
     const lowerQuery = query.toLowerCase();
     const cleanQuery = lowerQuery.replace(/[^a-z0-9]/g, '');
 
-    // Search across live Supabase fields safely (only in-stock products)
+    // Search across live Supabase active products (including clear out-of-stock indicators)
     const productResults = (window.productsDB || productsDB).filter(p =>
-        p && Number(p.stockQuantity || 0) > 0 && (
+        p && (
             (p.name && p.name.toLowerCase().includes(lowerQuery)) ||
             (p.category && p.category.toLowerCase().includes(lowerQuery)) ||
             (p.rawCategory && p.rawCategory.toLowerCase().includes(lowerQuery)) ||
@@ -104,8 +104,10 @@ function renderSearchResults(query) {
         html += `
             <div class="search-results-section">
                 <h3 class="search-results-title">Products</h3>
-                ${productResults.map(p => `
-                    <div class="search-result-item" onclick="closeSearch(); navigateTo('product', '${p.slug}')">
+                ${productResults.map(p => {
+                    const isOutOfStock = Number(p.stockQuantity || 0) <= 0;
+                    return `
+                    <div class="search-result-item ${isOutOfStock ? 'is-out-of-stock' : ''}" onclick="closeSearch(); navigateTo('product', '${p.slug}')">
                         <img 
                             class="search-result-image" 
                             src="${p.images?.[0]?.url || p.image || ''}" 
@@ -113,6 +115,7 @@ function renderSearchResults(query) {
                             loading="lazy" 
                             width="56" 
                             height="56"
+                            style="${isOutOfStock ? 'filter: grayscale(0.25) opacity(0.85);' : ''}"
                             data-product-code="${p.productCode || ''}"
                             data-category="${p.category || 'Jewellery'}"
                             data-fallback-index="0"
@@ -120,10 +123,10 @@ function renderSearchResults(query) {
                         >
                         <div class="search-result-info">
                             <h4>${p.name}</h4>
-                            <span>${formatPrice(p.sellingPrice)} · ${p.material}</span>
+                            <span>${formatPrice(p.sellingPrice)} · ${p.material}${isOutOfStock ? ' · <span class="badge-out-of-stock" style="font-size:0.68rem;padding:2px 6px;border-radius:3px;font-weight:600;display:inline-block;vertical-align:middle;">Out of Stock</span>' : ''}</span>
                         </div>
                     </div>
-                `).join('')}
+                `;}).join('')}
             </div>
         `;
     }

@@ -314,6 +314,10 @@ async function handleProductViewNavigation(param, targetView, pushHistory = true
 
 // Completely unmount and clear sticky product action bar across DOM
 function unmountStickyCTA() {
+    if (typeof window !== 'undefined' && window.pdpStickyCTAObserver) {
+        try { window.pdpStickyCTAObserver.disconnect(); } catch (e) {}
+        window.pdpStickyCTAObserver = null;
+    }
     const ctas = document.querySelectorAll('.sticky-cta, #sticky-cta');
     ctas.forEach(cta => {
         cta.innerHTML = '';
@@ -349,10 +353,13 @@ function renderStickyCTA(product) {
 
     ctas.forEach(cta => {
         cta.innerHTML = innerContent;
-        cta.classList.add('active');
-        cta.style.display = 'flex';
-        cta.setAttribute('aria-hidden', 'false');
     });
+
+    // Phase 5 UX (P2-2): Initialize IntersectionObserver to control mobile sticky CTA visibility
+    // Sticky CTA remains hidden while inline PDP action buttons are visible in viewport
+    if (typeof initPdpStickyCTAObserver === 'function') {
+        initPdpStickyCTAObserver();
+    }
 }
 
 // Backward compatibility helper
@@ -582,9 +589,9 @@ function getFilteredKidsProducts(filter = 'all') {
     const BOY_GENDERS = new Set(['boy', 'boys', 'male', 'little boy', 'little boys']);
     const GIRL_GENDERS = new Set(['girl', 'girls', 'female', 'little girl', 'little girls']);
 
-    // Filter products belonging to Kids (only in-stock products)
+    // Filter products belonging to Kids (all active products)
     const allKids = db.filter(p => {
-        if (!p || Number(p.stockQuantity || 0) <= 0) return false;
+        if (!p) return false;
         if (typeof isSilverJewelleryProduct === 'function' && !isSilverJewelleryProduct(p)) return false;
 
         // Explicit config mappings
