@@ -536,22 +536,76 @@
             const cacheParam = forceRefresh ? `?_t=${Date.now()}` : '';
             let rawData = null;
 
-            // 1. Fetch from same-origin proxy endpoint
+            const WR_SUPABASE_URL = (typeof window !== 'undefined' && window.WISHRITE_CONFIG && window.WISHRITE_CONFIG.supabaseUrl)
+                || 'https://ptpuepejciqiktmcpuon.supabase.co';
+            const WR_SUPABASE_ANON_KEY = (typeof window !== 'undefined' && window.WISHRITE_CONFIG && window.WISHRITE_CONFIG.supabaseAnonKey)
+                || 'sb_publishable_ZHwzEtRBkW9u4T2d_0R2Ag_BX1EeJRX';
+
+            // 1. Primary Source: Direct query to Supabase public.occasion_settings
             try {
-                const proxyRes = await fetch(`/api/occasion-settings${cacheParam}`, {
+                const sbUrl = `${WR_SUPABASE_URL}/rest/v1/occasion_settings?select=id,occasion_slug,occasion_name,page_title,page_description,banner_image,start_date,end_date,is_active,is_selected,updated_at&order=updated_at.desc${forceRefresh ? `&_t=${Date.now()}` : ''}`;
+                const sbRes = await fetch(sbUrl, {
                     method: 'GET',
-                    headers: { 'Accept': 'application/json' },
+                    headers: {
+                        'apikey': WR_SUPABASE_ANON_KEY,
+                        'Authorization': `Bearer ${WR_SUPABASE_ANON_KEY}`,
+                        'Accept': 'application/json'
+                    },
                     cache: forceRefresh ? 'no-store' : 'default'
                 });
-                if (proxyRes.ok) {
-                    rawData = await proxyRes.json();
+                if (sbRes.ok) {
+                    const rows = await sbRes.json();
+                    if (Array.isArray(rows)) {
+                        const activeRow = rows.find(r => r.is_active === true) || null;
+                        const selectedRow = rows.find(r => r.is_selected === true) || rows[0] || null;
+                        const isLive = Boolean(activeRow);
+                        rawData = {
+                            success: true,
+                            settings: {
+                                isLive,
+                                festive_mode_enabled: isLive,
+                                is_active: isLive,
+                                occasion_name: isLive ? (activeRow.occasion_name || activeRow.occasion_slug) : null,
+                                occasion_slug: isLive ? activeRow.occasion_slug : null,
+                                page_title: isLive ? (activeRow.page_title || null) : null,
+                                banner_image: isLive ? (activeRow.banner_image || null) : null,
+                                start_date: isLive ? (activeRow.start_date || null) : null,
+                                end_date: isLive ? (activeRow.end_date || null) : null,
+                                selectedOccasion: selectedRow?.occasion_slug || (isLive ? activeRow.occasion_slug : 'durga-puja'),
+                                selected_occasion_slug: selectedRow?.occasion_slug || (isLive ? activeRow.occasion_slug : 'durga-puja'),
+                                selected_occasion_name: selectedRow?.occasion_name || null,
+                                activeOccasion: isLive ? activeRow.occasion_slug : null,
+                                active_occasion_slug: isLive ? activeRow.occasion_slug : null,
+                                updated_at: activeRow?.updated_at || selectedRow?.updated_at || new Date().toISOString()
+                            }
+                        };
+                    }
                 }
-            } catch (err) {
-                // Local dev / proxy failure, fall through to direct endpoint
+            } catch (sbErr) {
+                console.warn('[WishRite Occasion] Direct Supabase occasion fetch notice:', sbErr.message);
             }
 
-            // 2. Direct fallback to Inventory authoritative endpoint
-            if (!rawData || (!rawData.success && !rawData.settings && !rawData.data)) {
+            // 2. Secondary Fallback: Same-origin proxy endpoint
+            if (!rawData || !rawData.success) {
+                try {
+                    const proxyRes = await fetch(`/api/occasion-settings${cacheParam}`, {
+                        method: 'GET',
+                        headers: { 'Accept': 'application/json' },
+                        cache: forceRefresh ? 'no-store' : 'default'
+                    });
+                    if (proxyRes.ok) {
+                        const parsed = await proxyRes.json();
+                        if (parsed && parsed.success) {
+                            rawData = parsed;
+                        }
+                    }
+                } catch (err) {
+                    // Fall through to upstream direct endpoint
+                }
+            }
+
+            // 3. Tertiary Fallback: Upstream Inventory endpoint
+            if (!rawData || !rawData.success) {
                 try {
                     const directUrl = `https://inventory-mu-lilac.vercel.app/api/settings/occasion${cacheParam}`;
                     const directRes = await fetch(directUrl, {
@@ -560,37 +614,42 @@
                         cache: forceRefresh ? 'no-store' : 'default'
                     });
                     if (directRes.ok) {
-                        rawData = await directRes.json();
+                        const parsed = await directRes.json();
+                        if (parsed && parsed.success) {
+                            rawData = parsed;
+                        }
                     }
                 } catch (err) {
-                    console.warn('[WishRite Occasion] Failed to fetch occasion settings:', err);
+                    console.warn('[WishRite Occasion] Failed to fetch upstream occasion settings:', err);
                 }
             }
 
-            if (!rawData) {
-                resetFestiveModeToOff(null);
-                occasionSettingsLoaded = true;
+            // Differentiate genuine OFF from network/API failure
+            if (!rawData || !rawData.success) {
+                console.warn('[WishRite Occasion] Occasion API error: unable to reach database or endpoints. Maintaining current state.');
                 try {
-                    window.dispatchEvent(new CustomEvent('wishrite:occasion-updated', { detail: FESTIVE_MODE }));
+                    window.dispatchEvent(new CustomEvent('wishrite:occasion-error', { detail: { message: 'Failed to fetch occasion configuration' } }));
                 } catch (e) { }
-                return null;
+                return getActiveOccasion();
             }
 
             const s = rawData.settings || rawData.data || rawData || {};
 
             // Authoritative Festive Mode state
-            // Must evaluate festive_mode_enabled or isLive
+            // Must evaluate is_active, festive_mode_enabled, or isLive
             const isFestiveOn = Boolean(
-                s.festive_mode_enabled !== undefined
-                    ? s.festive_mode_enabled
-                    : (s.isLive !== undefined ? s.isLive : false)
+                s.is_active !== undefined
+                    ? s.is_active
+                    : (s.festive_mode_enabled !== undefined
+                        ? s.festive_mode_enabled
+                        : (s.isLive !== undefined ? s.isLive : false))
             );
 
             const selectedSlugRaw = s.selected_occasion_slug || s.selectedOccasion || null;
             const selectedSlug = normalizeOccasionSlug(selectedSlugRaw);
 
             const activeSlugRaw = isFestiveOn
-                ? (s.active_occasion_slug || s.activeOccasion || selectedSlugRaw)
+                ? (s.occasion_slug || s.active_occasion_slug || s.activeOccasion || selectedSlugRaw)
                 : null;
             const activeSlug = isFestiveOn ? normalizeOccasionSlug(activeSlugRaw) : null;
 
@@ -616,7 +675,7 @@
 
             // Fallback for new festival added in Inventory that isn't yet in static registry
             if (!staticConfig) {
-                const displayName = s.active_occasion_name || s.selected_occasion_name || activeSlug.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+                const displayName = s.occasion_name || s.active_occasion_name || s.selected_occasion_name || activeSlug.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
                 staticConfig = {
                     name: displayName,
                     slug: activeSlug,
@@ -630,7 +689,7 @@
                     ctaText: `Shop ${displayName} collection →`,
                     homepageCtaText: `Shop ${displayName} collection →`,
                     homepageSubtitle: 'Sarees • Statement Jewellery • Silver Pairings',
-                    heroImage: 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=1800&q=85',
+                    heroImage: s.banner_image || 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=1800&q=85',
                     theme: {
                         primary: '#8B1E2D',
                         secondary: '#D4AF37',
@@ -651,10 +710,12 @@
             FESTIVE_MODE.selectedOccasion = selectedSlug;
             FESTIVE_MODE.activeOccasion = activeSlug;
             FESTIVE_MODE.slug = activeSlug;
-            FESTIVE_MODE.name = s.active_occasion_name || s.selected_occasion_name || staticConfig.name || activeSlug;
+            FESTIVE_MODE.name = s.occasion_name || s.active_occasion_name || s.selected_occasion_name || staticConfig.name || activeSlug;
             FESTIVE_MODE.pageTitle = s.page_title || staticConfig.pageTitle || staticConfig.title;
             FESTIVE_MODE.pageDescription = s.page_description || staticConfig.pageDescription || staticConfig.description;
             FESTIVE_MODE.bannerImage = s.banner_image || staticConfig.bannerImage || staticConfig.heroImage;
+            FESTIVE_MODE.startDate = s.start_date || null;
+            FESTIVE_MODE.endDate = s.end_date || null;
 
             occasionSettingsLoaded = true;
             try {

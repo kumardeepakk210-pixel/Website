@@ -314,6 +314,10 @@ async function handleProductViewNavigation(param, targetView, pushHistory = true
 
 // Completely unmount and clear sticky product action bar across DOM
 function unmountStickyCTA() {
+    if (typeof window !== 'undefined' && window.pdpStickyCTAObserver) {
+        try { window.pdpStickyCTAObserver.disconnect(); } catch (e) {}
+        window.pdpStickyCTAObserver = null;
+    }
     const ctas = document.querySelectorAll('.sticky-cta, #sticky-cta');
     ctas.forEach(cta => {
         cta.innerHTML = '';
@@ -335,7 +339,7 @@ function renderStickyCTA(product) {
         return;
     }
 
-    const isOutOfStock = (product.stockQuantity <= 0 || product.status === 'Out of Stock');
+    const isOutOfStock = Number(product.stockQuantity || 0) <= 0;
     const priceFormatted = (typeof formatPrice === 'function')
         ? formatPrice(product.sellingPrice)
         : `₹${Number(product.sellingPrice).toLocaleString('en-IN')}`;
@@ -344,15 +348,18 @@ function renderStickyCTA(product) {
         <button class="btn btn-primary" onclick="addToCart('${product.id}', event)">ADD TO CART — ${priceFormatted}</button>
         <button class="btn btn-secondary" onclick="buyNowFromPDP('${product.id}')">BUY NOW</button>
     ` : `
-        <button class="btn btn-primary btn-disabled" disabled style="width:100%;">OUT OF STOCK</button>
+        <button class="btn btn-primary" onclick="openNotifyMeModal('${product.id}')" style="width:100%;">NOTIFY ME WHEN AVAILABLE</button>
     `;
 
     ctas.forEach(cta => {
         cta.innerHTML = innerContent;
-        cta.classList.add('active');
-        cta.style.display = 'flex';
-        cta.setAttribute('aria-hidden', 'false');
     });
+
+    // Phase 5 UX (P2-2): Initialize IntersectionObserver to control mobile sticky CTA visibility
+    // Sticky CTA remains hidden while inline PDP action buttons are visible in viewport
+    if (typeof initPdpStickyCTAObserver === 'function') {
+        initPdpStickyCTAObserver();
+    }
 }
 
 // Backward compatibility helper
@@ -582,9 +589,9 @@ function getFilteredKidsProducts(filter = 'all') {
     const BOY_GENDERS = new Set(['boy', 'boys', 'male', 'little boy', 'little boys']);
     const GIRL_GENDERS = new Set(['girl', 'girls', 'female', 'little girl', 'little girls']);
 
-    // Filter products belonging to Kids (only in-stock products)
+    // Filter products belonging to Kids (all active products)
     const allKids = db.filter(p => {
-        if (!p || Number(p.stockQuantity || 0) <= 0) return false;
+        if (!p) return false;
         if (typeof isSilverJewelleryProduct === 'function' && !isSilverJewelleryProduct(p)) return false;
 
         // Explicit config mappings
@@ -595,10 +602,9 @@ function getFilteredKidsProducts(filter = 'all') {
             if (Array.isArray(KIDS_PRODUCT_CONFIG.girls) && KIDS_PRODUCT_CONFIG.girls.includes(pCode)) return true;
         }
 
-        // Primary source of truth: database audience
-        const aud = (p.audience || '').trim();
-        if (aud === 'Kids-Girl' || aud === 'Kids-Boy') return true;
-        if (aud.toLowerCase().includes('kid')) return true;
+        // Primary source of truth: database audience (supporting canonical 'Boys', 'Girls' & legacy)
+        const aud = (p.audience || '').trim().toLowerCase();
+        if (aud === 'boys' || aud === 'girls' || aud === 'kids-boy' || aud === 'kids-girl' || aud.includes('kid')) return true;
 
         // Category contains: kids, kid, children, child, baby, toddler, little
         const cat = String(p.category || '').toLowerCase();
@@ -634,8 +640,8 @@ function getFilteredKidsProducts(filter = 'all') {
             if (typeof KIDS_PRODUCT_CONFIG !== 'undefined' && Array.isArray(KIDS_PRODUCT_CONFIG.boys) && KIDS_PRODUCT_CONFIG.boys.includes(pCode)) {
                 return true;
             }
-            const aud = (p.audience || '').trim();
-            if (aud === 'Kids-Boy') return true;
+            const aud = (p.audience || '').trim().toLowerCase();
+            if (aud === 'boys' || aud === 'kids-boy') return true;
 
             const gender = normalizeGender(p.gender || p.target_gender || '');
             const targetGender = normalizeGender(p.target_gender || '');
@@ -649,8 +655,8 @@ function getFilteredKidsProducts(filter = 'all') {
             if (typeof KIDS_PRODUCT_CONFIG !== 'undefined' && Array.isArray(KIDS_PRODUCT_CONFIG.girls) && KIDS_PRODUCT_CONFIG.girls.includes(pCode)) {
                 return true;
             }
-            const aud = (p.audience || '').trim();
-            if (aud === 'Kids-Girl') return true;
+            const aud = (p.audience || '').trim().toLowerCase();
+            if (aud === 'girls' || aud === 'kids-girl') return true;
 
             const gender = normalizeGender(p.gender || p.target_gender || '');
             const targetGender = normalizeGender(p.target_gender || '');

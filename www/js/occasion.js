@@ -500,6 +500,7 @@
 
         // 1. Filter Supabase products flagged with this occasion
         const liveOccasionItems = baseProducts.filter(p => {
+            if (p.occasion_enabled === false) return false;
             const pSlug = (p.occasion_slug || '').toLowerCase();
             const pOccasion = (p.occasion || '').toLowerCase();
             const pTags = (p.matching_tags || '').toLowerCase();
@@ -792,8 +793,8 @@
             return type === 'silver_jewellery' || (!type.includes('saree') && !type.includes('artificial'));
         });
 
-        // Featured products: Only products explicitly marked is_occasion_featured (Section 27)
-        const featured = allOccasionProducts.filter(p => Boolean(p.is_occasion_featured));
+        // Featured products: Only products explicitly marked occasion_featured (Section 27)
+        const featured = allOccasionProducts.filter(p => Boolean(p.occasion_featured || p.is_occasion_featured));
 
         // Filter products according to active filter tab
         let filteredList = allOccasionProducts;
@@ -851,7 +852,7 @@
 
             <!-- ═══ 2. FESTIVE HERO (Section 7, 8) ═══ -->
             <section class="festive-hero" aria-label="${activeOccasion.name} Hero">
-                <div class="festive-hero-bg" style="background-image: url('${activeOccasion.heroImage}');"></div>
+                <div class="festive-hero-bg" style="background-image: url('${activeOccasion.bannerImage || activeOccasion.heroImage}');"></div>
                 <div class="festive-hero-overlay"></div>
                 
                 <div class="festive-hero-container">
@@ -861,12 +862,12 @@
                         <span class="festive-badge-sparkle">✦</span>
                     </div>
 
-                    <h1 class="festive-hero-title festive-bengali-title">${activeOccasion.title}</h1>
+                    <h1 class="festive-hero-title festive-bengali-title">${activeOccasion.pageTitle || activeOccasion.title}</h1>
                     ${activeOccasion.englishTitle ? `
                         <div class="festive-hero-english">${activeOccasion.englishTitle}</div>
                     ` : ''}
                     <div class="festive-hero-divider"></div>
-                    <p class="festive-hero-subtitle">${activeOccasion.description || activeOccasion.subtitle}</p>
+                    <p class="festive-hero-subtitle">${activeOccasion.pageDescription || activeOccasion.description || activeOccasion.subtitle}</p>
 
                     <div class="festive-hero-actions">
                         <a class="btn btn-festive-primary" onclick="scrollPastFestiveHero()">

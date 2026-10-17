@@ -395,6 +395,155 @@
     }
 
     /* ============================================================
+       10B. CANONICAL DATABASE IMAGES (public.product_images)
+       ============================================================ */
+
+    const CANONICAL_IMAGE_ROLES = {
+        MAIN_ECOMMERCE: '01_main_ecommerce',
+        PREMIUM_HERO: '02_premium_hero',
+        ANGLE_45: '03_angle_45',
+        DETAIL_CLOSEUP: '04_detail_closeup',
+        LUXURY_LIFESTYLE: '05_luxury_lifestyle',
+        MODEL_WEARING: '06_model_wearing',
+        GIFT_PRESENTATION: '07_gift_presentation',
+        EXTREME_MACRO: '08_extreme_macro',
+        REVERSE_VIEW: '09_reverse_view',
+        SIZE_REFERENCE: '10_size_reference'
+    };
+
+    /**
+     * Map raw row from public.product_images into unified storefront image record
+     */
+    function mapDatabaseImageRecord(row, productCode, index) {
+        const cleanCode = normalizeProductCode(row.product_code || productCode);
+        const storagePath = String(row.storage_path || '').trim();
+        const fileName = String(row.file_name || (storagePath ? storagePath.split('/').pop() : '') || `image-${index + 1}.webp`).trim();
+
+        // Preferred URL: row.image_url, fallback to getSupabaseStoragePublicUrl(storagePath)
+        let url = String(row.image_url || '').trim();
+        if (!url && storagePath) {
+            url = getSupabaseStoragePublicUrl(storagePath);
+        }
+
+        const role = String(row.image_role || '').trim();
+        const isModel = role === '06_model_wearing';
+        const isLifestyle = role === '05_luxury_lifestyle';
+        const isPrimary = Boolean(row.is_primary || role === '01_main_ecommerce' || index === 0);
+        const sortOrder = typeof row.sort_order === 'number' ? row.sort_order : (parseInt(row.sort_order, 10) || index);
+        const altText = (row.alt_text && String(row.alt_text).trim())
+            ? String(row.alt_text).trim()
+            : `${cleanCode} — WishRite 925 Sterling Silver Jewellery`;
+        const imageType = String(row.image_type || (isModel ? 'model' : (isLifestyle ? 'lifestyle' : 'product'))).trim();
+
+        return {
+            id: row.id || `${cleanCode}-db-${index}`,
+            productCode: cleanCode,
+            product_code: cleanCode,
+            name: fileName,
+            path: storagePath,
+            storagePath: storagePath,
+            url: url,
+            alt: altText,
+            alt_text: altText,
+            type: imageType,
+            image_type: imageType,
+            imageRole: role,
+            image_role: role,
+            isPrimary: isPrimary,
+            is_primary: isPrimary,
+            sortOrder: sortOrder,
+            sort_order: sortOrder,
+            isPlaceholder: false,
+            isLifestyle: isLifestyle,
+            isModel: isModel,
+            isActive: Boolean(row.is_active !== false)
+        };
+    }
+
+    /**
+     * Fetch canonical product images directly from public.product_images table in Supabase
+     */
+    async function fetchProductImagesFromDatabase(productCode) {
+        const cleanCode = normalizeProductCode(productCode);
+        if (!cleanCode) {
+            return [];
+        }
+
+        const fields = [
+            'product_code',
+            'image_url',
+            'storage_path',
+            'file_name',
+            'image_type',
+            'image_role',
+            'sort_order',
+            'alt_text',
+            'is_primary',
+            'is_active'
+        ].join(',');
+
+        let rows = null;
+
+        // 1. Try Supabase JS client
+        try {
+            const client = await waitForSupabaseClient(1000);
+            if (client && typeof client.from === 'function') {
+                const queryRes = await client
+                    .from('product_images')
+                    .select(fields)
+                    .eq('product_code', cleanCode)
+                    .eq('is_active', true)
+                    .order('sort_order', { ascending: true });
+
+                if (!queryRes.error && Array.isArray(queryRes.data)) {
+                    rows = queryRes.data;
+                }
+            }
+        } catch (clientErr) {
+            console.warn('[WishRite Images] Supabase client product_images query notice:', clientErr.message);
+        }
+
+        // 2. Direct REST API fallback if client was not ready or query returned null
+        if (!rows) {
+            try {
+                const restUrl = `${SUPABASE_URL}/rest/v1/product_images?product_code=eq.${encodeURIComponent(cleanCode)}&is_active=eq.true&select=${fields}&order=sort_order.asc`;
+                const res = await fetch(restUrl, {
+                    headers: {
+                        'apikey': SUPABASE_ANON_KEY,
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    if (Array.isArray(data)) {
+                        rows = data;
+                    }
+                }
+            } catch (restErr) {
+                console.warn('[WishRite Images] REST product_images fetch notice for ' + cleanCode, restErr.message);
+            }
+        }
+
+        if (!Array.isArray(rows) || rows.length === 0) {
+            return [];
+        }
+
+        // Map and sort images: primary first, then sort_order ascending
+        const mapped = rows
+            .map((row, idx) => mapDatabaseImageRecord(row, cleanCode, idx))
+            .filter(img => Boolean(img.url));
+
+        mapped.sort((a, b) => {
+            if (a.isPrimary && !b.isPrimary) return -1;
+            if (!a.isPrimary && b.isPrimary) return 1;
+            return a.sortOrder - b.sortOrder;
+        });
+
+        return mapped;
+    }
+
+    /* ============================================================
        11. LIST IMAGES FROM SUPABASE STORAGE
        ============================================================ */
 
@@ -895,6 +1044,28 @@
         const resolutionPromise =
             (async () => {
                 try {
+                    // Tier 1: Canonical Database Query from public.product_images
+                    const dbImages = await fetchProductImagesFromDatabase(cleanCode);
+                    if (Array.isArray(dbImages) && dbImages.length > 0) {
+                        resolvedImageCache.set(cleanCode, dbImages);
+                        updateProductsDatabase(cleanCode, dbImages);
+                        updateRenderedProductCards(cleanCode, dbImages[0].url);
+                        updateCurrentPdp(cleanCode, dbImages);
+                        window.dispatchEvent(
+                            new CustomEvent(
+                                'wishrite:productImagesResolved',
+                                {
+                                    detail: {
+                                        productCode: cleanCode,
+                                        images: dbImages
+                                    }
+                                }
+                            )
+                        );
+                        return dbImages;
+                    }
+
+                    // Tier 2: Existing Supabase Storage listing (unchanged fallback)
                     const storageResult =
                         await listProductImagesFromStorage(
                             cleanCode,
@@ -1743,6 +1914,12 @@
 
     window.generateProductPlaceholder =
         generateProductPlaceholder;
+
+    window.fetchProductImagesFromDatabase =
+        fetchProductImagesFromDatabase;
+
+    window.CANONICAL_IMAGE_ROLES =
+        CANONICAL_IMAGE_ROLES;
 
     window.getResolvedProductImages = function (productCode) {
         const clean = normalizeProductCode(productCode);

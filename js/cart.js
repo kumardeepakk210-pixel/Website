@@ -792,44 +792,20 @@ async function proceedToCheckoutOrder() {
         }
     }
 
-    // 1st: Process to checkout will not work without PIN code, ask for pin before going to address page
+    // Phase 5 UX (P1-2): Proceed to checkout without requiring PIN verification inside the cart drawer.
+    // If a valid 6-digit PIN was already entered or saved, pass it for address prefill;
+    // otherwise pass empty string to let customer enter and verify PIN during the delivery address step.
     const input = document.getElementById('checkout-pincode-input');
-    const msg = document.getElementById('checkout-pincode-msg');
-    const pin = input
+    let pin = input
         ? input.value.trim()
-        : (typeof getSavedPincode === 'function' ? getSavedPincode() : null);
+        : (typeof getSavedPincode === 'function' ? getSavedPincode() : '');
 
-    if (!pin || !/^\d{6}$/.test(pin)) {
-        if (msg) {
-            msg.innerHTML = `<span style="color:#C62828;font-weight:600;">✕ Please enter your 6-digit delivery PIN code before proceeding to checkout.</span>`;
-        }
-        if (input) {
-            input.focus();
-            input.style.borderColor = '#C62828';
-            input.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
-        if (typeof showToast === 'function') {
-            showToast('Please enter your 6-digit delivery PIN code to proceed to checkout.', 'error');
-        }
-        return;
+    if (pin && !/^\d{6}$/.test(pin)) {
+        pin = '';
     }
 
-    // Verify serviceability before proceeding
-    const isServiceable = await validateCheckoutPincode();
-    if (!isServiceable) {
-        if (input) {
-            input.focus();
-            input.style.borderColor = '#C62828';
-            input.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
-        if (typeof showToast === 'function') {
-            showToast('Delivery is currently unavailable to this PIN code. Please check your PIN.', 'error');
-        }
-        return;
-    }
-
-    console.log('[CHECKOUT-DIAG] Opening customer details modal with verified PIN:', pin);
-    openWishriteCheckoutModal(pin);
+    console.log('[CHECKOUT-DIAG] Opening customer details modal with PIN:', pin || '(to be entered at delivery step)');
+    openWishriteCheckoutModal(pin || '');
 }
 
 /* =========================================================

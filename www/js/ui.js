@@ -357,7 +357,7 @@ function getScopeBaseProducts(scope) {
             return db.filter(p => {
                 const aud = ((p.audience || p.target_audience || p.gender || '') + '').trim().toLowerCase();
                 // Strictly exclude female / women / kids audience
-                if (aud === 'female' || aud === 'women' || aud.startsWith('kid') || aud === 'kids-girl' || aud === 'kids-boy') return false;
+                if (aud === 'female' || aud === 'women' || aud === 'girls' || aud === 'kids-girl' || aud === 'boys' || aud === 'kids-boy' || aud.startsWith('kid')) return false;
                 if (aud === 'men' || aud === 'male') return true;
 
                 // Word boundary check for "men" or "mens" or "men's" in title, avoiding "women"
@@ -373,7 +373,7 @@ function getScopeBaseProducts(scope) {
 
                 const cat = (p.category || '').toLowerCase();
                 const name = (p.name || '').toLowerCase();
-                const isKidsAud = aud === 'kids-girl' || aud === 'kids-boy' || aud.includes('kid') || aud.includes('child');
+                const isKidsAud = aud === 'boys' || aud === 'girls' || aud === 'kids-boy' || aud === 'kids-girl' || aud.includes('kid') || aud.includes('child');
                 const isKidsName = /\b(kid|kids|child|children|baby|toddler|nazariya)\b/.test(name);
                 return isKidsAud || cat === 'kids' || isKidsName;
             });
@@ -381,12 +381,12 @@ function getScopeBaseProducts(scope) {
                 if (currentKidsFilter === 'boys') {
                     kids = kids.filter(p => {
                         const aud = ((p.audience || p.target_audience || p.gender || '') + '').trim().toLowerCase();
-                        return aud === 'kids-boy' || /\b(boy|boys)\b/.test((p.name || '').toLowerCase());
+                        return aud === 'boys' || aud === 'kids-boy' || /\b(boy|boys)\b/.test((p.name || '').toLowerCase());
                     });
                 } else if (currentKidsFilter === 'girls') {
                     kids = kids.filter(p => {
                         const aud = ((p.audience || p.target_audience || p.gender || '') + '').trim().toLowerCase();
-                        return aud === 'kids-girl' || /\b(girl|girls)\b/.test((p.name || '').toLowerCase());
+                        return aud === 'girls' || aud === 'kids-girl' || /\b(girl|girls)\b/.test((p.name || '').toLowerCase());
                     });
                 }
             }
@@ -419,7 +419,7 @@ function buildPageSidebar(scope, baseProducts) {
     const sidebar = document.getElementById(`${scope}-sidebar`);
     if (!sidebar) return;
 
-    const items = (baseProducts || getScopeBaseProducts(scope)).filter(p => Number(p.stockQuantity || 0) > 0);
+    const items = (baseProducts || getScopeBaseProducts(scope)).filter(Boolean);
 
     // Distinct categories for this page
     const catMap = new Map();
@@ -527,8 +527,8 @@ async function renderActivePageProducts(explicitScope) {
     }
 
     const baseProducts = getScopeBaseProducts(scope);
-    // Display in-stock products
-    let filtered = baseProducts.filter(p => Number(p.stockQuantity || 0) > 0);
+    // Display active products (including elegant sold-out discovery states)
+    let filtered = baseProducts.filter(Boolean);
 
     // Category filter
     if (currentFilters.category && currentFilters.category !== 'All') {
@@ -796,7 +796,7 @@ function buildMobileFilters() {
     if (!sheet) return;
 
     const scope = getActiveScope();
-    const baseProducts = (getScopeBaseProducts(scope) || []).filter(p => Number(p.stockQuantity || 0) > 0);
+    const baseProducts = (getScopeBaseProducts(scope) || []).filter(Boolean);
 
     const catMap = new Map();
     baseProducts.forEach(p => {

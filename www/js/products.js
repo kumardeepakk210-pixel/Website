@@ -174,29 +174,37 @@ function determineOccasions(item, category) {
 function mapInventoryToProduct(item, existingSlugs = new Set()) {
     if (!item) return null;
 
+    // Filter out Draft and Archived products from public storefront
+    if (item.status && item.status !== 'Active') {
+        return null;
+    }
+
     const productCode = (item.product_code || item.sku || '').trim();
     const name = (item.product_name || 'Handcrafted Silver Piece').trim();
     const category = normalizeCategory(item.category);
     const rawCategory = (item.category || '').trim();
     const stock = typeof item.stock_quantity === 'number' ? item.stock_quantity : (parseInt(item.stock_quantity, 10) || 0);
     const sellingPrice = Number(item.selling_price) || 0;
-    const purchasePrice = Number(item.purchase_price) || 0;
+    const compareAtPrice = Number(item.compare_at_price) || 0;
     const storageFolder = (item.storage_folder || '').trim() || null;
     const audience = (item.audience || '').trim() || null;
 
-    // Design Group & Generic Variant System (Part 1, 2, 3, 11)
+    // Design Group & Generic Variant System
     const designGroup = (item.design_group || '').trim() || null;
     const variantType = (item.variant_type || '').trim().toLowerCase() || null;
     const variantValue = (item.variant_value || '').trim() || null;
-    const productSlug = (item.product_slug || '').trim() || null;
+    const rawProductSlug = (item.product_slug || '').trim() || null;
 
     if (variantType && !variantValue) {
         console.warn(`WishRite: Product variant configuration incomplete for ${productCode} (variant_type "${variantType}" has no variant_value)`);
     }
 
-    // Approximate MRP based on jewellery standard markup if not explicitly set
-    const mrp = sellingPrice > 0 ? Math.round((sellingPrice * 1.25) / 50) * 50 : sellingPrice;
-    const discount = mrp > sellingPrice ? Math.round(((mrp - sellingPrice) / mrp) * 100) : 0;
+    // Canonical Pricing: selling_price is actual selling price, compare_at_price is MRP
+    // Never calculate MRP using selling_price * 1.25
+    const mrp = compareAtPrice > sellingPrice ? compareAtPrice : sellingPrice;
+    const discount = (compareAtPrice > sellingPrice && compareAtPrice > 0)
+        ? Math.round(((compareAtPrice - sellingPrice) / compareAtPrice) * 100)
+        : 0;
 
     // Formatted weight
     const weightStr = (item.weight !== null && item.weight !== undefined && String(item.weight).trim() !== '')
@@ -208,7 +216,8 @@ function mapInventoryToProduct(item, existingSlugs = new Set()) {
         ? String(item.size).trim()
         : null;
 
-    // Target Audience & Gender mapping from database schema: 'Female', 'Men', 'Kids-Girl', 'Kids-Boy'
+    // Target Audience & Gender mapping supporting canonical DB values: 'Female', 'Male', 'Boys', 'Girls'
+    // along with legacy fallbacks ('Men', 'Kids-Girl', 'Kids-Boy')
     const rawGender = item.gender || item.target_gender || '';
     const rawTargetGender = item.target_gender || item.gender || '';
     const rawAgeGroup = item.age_group || item.target_audience || '';
@@ -220,22 +229,23 @@ function mapInventoryToProduct(item, existingSlugs = new Set()) {
     let targetAudience = rawTargetAudience;
 
     if (!gender && !targetGender) {
-        if (audience === 'Female') {
+        const audClean = (audience || '').trim().toLowerCase();
+        if (audClean === 'female' || audClean === 'women') {
             gender = 'female';
             targetGender = 'female';
             ageGroup = ageGroup || 'adult';
             targetAudience = targetAudience || 'women';
-        } else if (audience === 'Men') {
+        } else if (audClean === 'male' || audClean === 'men') {
             gender = 'men';
             targetGender = 'male';
             ageGroup = ageGroup || 'adult';
             targetAudience = targetAudience || 'men';
-        } else if (audience === 'Kids-Girl') {
+        } else if (audClean === 'girls' || audClean === 'kids-girl') {
             gender = 'girls';
             targetGender = 'female';
             ageGroup = ageGroup || 'kids';
             targetAudience = targetAudience || 'kids';
-        } else if (audience === 'Kids-Boy') {
+        } else if (audClean === 'boys' || audClean === 'kids-boy') {
             gender = 'boys';
             targetGender = 'male';
             ageGroup = ageGroup || 'kids';
@@ -243,10 +253,10 @@ function mapInventoryToProduct(item, existingSlugs = new Set()) {
         }
     }
 
-    // Deterministic slug (Part 11: clean product URLs from product_slug if available, otherwise deterministic fallback)
+    // Canonical slug from product_slug, with deterministic fallback if absent
     let slug = '';
-    if (productSlug) {
-        slug = productSlug.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+    if (rawProductSlug) {
+        slug = rawProductSlug.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
         existingSlugs.add(slug);
     } else {
         slug = generateProductSlug(name, productCode, existingSlugs);
@@ -259,7 +269,7 @@ function mapInventoryToProduct(item, existingSlugs = new Set()) {
     // Sales count from sales table
     const salesCount = productSalesMap.get(productCode) || 0;
 
-    // Stock availability
+    // Stock availability: calculated independently from status
     let availability = 'Currently Unavailable';
     let lowStock = false;
     if (stock > 3) {
@@ -269,29 +279,40 @@ function mapInventoryToProduct(item, existingSlugs = new Set()) {
         lowStock = true;
     }
 
-    // Extended Festive Catalog Support (Backward-compatible with safe defaults)
+    // Extended Festive Catalog Support & Dynamic Attributes from DB
     const catalogType = item.catalog_type || 'silver_jewellery';
     const occasionSlug = item.occasion_slug || '';
-    const color = item.color || '';
-    const fabric = item.fabric || '';
-    const design = item.design || '';
-    const pattern = item.pattern || '';
-    const borderStyle = item.border_style || '';
-    const matchingTags = item.matching_tags || '';
-    const isOccasionFeatured = Boolean(item.is_occasion_featured);
+    const occasionCategory = item.occasion_category || '';
+    const occasionEnabled = item.occasion_enabled !== undefined ? Boolean(item.occasion_enabled) : true;
+    const isOccasionFeatured = Boolean(item.occasion_featured || item.is_occasion_featured);
+    const color = (item.color || '').trim();
+    const fabric = (item.fabric || '').trim();
+    const design = (item.design || '').trim();
+    const pattern = (item.pattern || '').trim();
+    const borderStyle = (item.border_style || '').trim();
+    const matchingTags = (item.matching_tags || '').trim();
+    const rawMaterial = (item.material || '').trim();
+    const rawPurity = (item.purity || '').trim();
+    const rawFinish = (item.finish || '').trim();
+    const shortDesc = (item.short_description || '').trim();
 
-    let material = '925 Sterling Silver';
-    let silverPurity = '92.5%';
-    let finish = 'High-Polish Rhodium';
+    let material = rawMaterial;
+    let silverPurity = rawPurity;
+    let finish = rawFinish;
 
     if (catalogType === 'saree') {
-        material = fabric || 'Traditional Handloom Silk';
+        material = rawMaterial || fabric || 'Traditional Handloom Silk';
         silverPurity = null;
-        finish = 'Authentic Handloom Weave';
+        finish = rawFinish || 'Authentic Handloom Weave';
     } else if (catalogType === 'artificial_jewellery') {
-        material = item.material || 'Heritage Brass with Micron Gold Polish';
+        material = rawMaterial || 'Heritage Brass with Micron Gold Polish';
         silverPurity = null;
-        finish = 'Antique Micron Polish';
+        finish = rawFinish || 'Antique Micron Polish';
+    } else {
+        // Fallback to standard silver defaults ONLY when DB column is empty
+        material = rawMaterial || '925 Sterling Silver';
+        silverPurity = rawPurity || '92.5%';
+        finish = rawFinish || 'High-Polish Rhodium';
     }
 
     const product = {
@@ -302,14 +323,14 @@ function mapInventoryToProduct(item, existingSlugs = new Set()) {
         name: name,
         product_name: name,
         slug: slug,
+        product_slug: slug,
+        productSlug: slug,
         design_group: designGroup,
         designGroup: designGroup,
         variant_type: variantType,
         variantType: variantType,
         variant_value: variantValue,
         variantValue: variantValue,
-        product_slug: productSlug,
-        productSlug: productSlug,
         catalog_type: catalogType,
         audience: audience,
         gender: item.gender || item.target_gender || gender || '',
@@ -318,25 +339,21 @@ function mapInventoryToProduct(item, existingSlugs = new Set()) {
         target_audience: item.target_audience || item.age_group || targetAudience || '',
         storage_folder: storageFolder,
         storageFolder: storageFolder,
-        purchase_price: purchasePrice,
-        purchasePrice: purchasePrice,
-        purchase_date: item.purchase_date || null,
-        purchaseDate: item.purchase_date || null,
-        shop_name: item.shop_name || '',
-        shopName: item.shop_name || '',
-        shop_address: item.shop_address || '',
-        shopAddress: item.shop_address || '',
         occasion_slug: occasionSlug,
+        occasion_category: occasionCategory,
+        occasion_enabled: occasionEnabled,
+        occasion_featured: isOccasionFeatured,
+        is_occasion_featured: isOccasionFeatured,
         color: color,
         fabric: fabric,
         design: design,
         pattern: pattern,
         border_style: borderStyle,
         matching_tags: matchingTags,
-        is_occasion_featured: isOccasionFeatured,
         description: item.product_description || `${name} crafted with fine attention to detail and luxury finishing.`,
         product_description: item.product_description || '',
-        shortDescription: item.product_description || `${material} ${category} crafted for effortless luxury.`,
+        short_description: shortDesc,
+        shortDescription: shortDesc || item.product_description || `${material} ${category} crafted for effortless luxury.`,
         category: category,
         rawCategory: rawCategory,
         collection: collection,
@@ -345,6 +362,8 @@ function mapInventoryToProduct(item, existingSlugs = new Set()) {
         price: sellingPrice,
         sellingPrice: sellingPrice,
         selling_price: sellingPrice,
+        compare_at_price: compareAtPrice,
+        compareAtPrice: compareAtPrice,
         mrp: mrp,
         discount: discount,
         stockQuantity: stock,
@@ -359,11 +378,17 @@ function mapInventoryToProduct(item, existingSlugs = new Set()) {
         material: material,
         silverPurity: silverPurity,
         finish: finish,
-        status: stock > 0 ? 'Active' : 'Currently Unavailable',
+        status: item.status || 'Active',
         createdAt: item.created_at,
         created_at: item.created_at,
         updatedAt: item.updated_at,
         updated_at: item.updated_at,
+        seo_title: (item.seo_title || '').trim() || null,
+        seo_description: (item.seo_description || '').trim() || null,
+        seo_keywords: (item.seo_keywords || '').trim() || null,
+        seoTitle: (item.seo_title || '').trim() || null,
+        seoDescription: (item.seo_description || '').trim() || null,
+        seoKeywords: (item.seo_keywords || '').trim() || null,
         salesCount: salesCount,
         care: catalogType === 'saree'
             ? 'Dry clean only. Store in a breathable muslin or cotton saree bag. Avoid direct perfume or spray on zari motifs.'
@@ -441,8 +466,49 @@ const productsService = {
                     console.info('Sales data notice: using in-stock ranking.', salesErr.message);
                 }
 
-                // 2. Fetch inventory records directly from public.inventory
-                const inventoryUrl = `${WR_SUPABASE_URL}/rest/v1/inventory?select=*&order=created_at.desc`;
+                // 2. Fetch inventory records directly from public.inventory (strictly active products, explicit public fields)
+                const publicFields = [
+                    'id',
+                    'product_code',
+                    'product_name',
+                    'product_slug',
+                    'product_description',
+                    'short_description',
+                    'category',
+                    'catalog_type',
+                    'audience',
+                    'selling_price',
+                    'compare_at_price',
+                    'gst_rate',
+                    'stock_quantity',
+                    'low_stock_threshold',
+                    'status',
+                    'material',
+                    'purity',
+                    'finish',
+                    'weight',
+                    'size',
+                    'design_group',
+                    'variant_type',
+                    'variant_value',
+                    'occasion_slug',
+                    'occasion_category',
+                    'occasion_enabled',
+                    'occasion_featured',
+                    'color',
+                    'fabric',
+                    'design',
+                    'pattern',
+                    'border_style',
+                    'matching_tags',
+                    'seo_title',
+                    'seo_description',
+                    'seo_keywords',
+                    'storage_folder',
+                    'created_at',
+                    'updated_at'
+                ].join(',');
+                const inventoryUrl = `${WR_SUPABASE_URL}/rest/v1/inventory?status=eq.Active&select=${publicFields}&order=created_at.desc`;
                 const invRes = await fetch(inventoryUrl, { headers });
 
                 if (!invRes.ok) {
@@ -567,9 +633,9 @@ const productsService = {
                     if (cached) {
                         const parsed = JSON.parse(cached);
                         if (Array.isArray(parsed) && parsed.length > 0) {
-                            const inStock = parsed.filter(p => p && Number(p.stockQuantity || 0) > 0);
-                            productsDB = inStock;
-                            window.productsDB = inStock;
+                            const activeProducts = parsed.filter(Boolean);
+                            productsDB = activeProducts;
+                            window.productsDB = activeProducts;
                             productSlugMap.clear();
                             productCodeMap.clear();
                             productsDB.forEach(p => {
@@ -696,32 +762,32 @@ const productsService = {
     },
 
     getProductsByCategory(category) {
-        const inStock = productsDB.filter(p => p && Number(p.stockQuantity || 0) > 0 && isSilverJewelleryProduct(p));
-        if (!category || category === 'All') return inStock;
+        const active = productsDB.filter(p => p && isSilverJewelleryProduct(p));
+        if (!category || category === 'All') return active;
         const norm = normalizeCategory(category).toLowerCase();
-        return inStock.filter(p => normalizeCategory(p.category).toLowerCase() === norm || (p.rawCategory && p.rawCategory.toLowerCase() === norm));
+        return active.filter(p => normalizeCategory(p.category).toLowerCase() === norm || (p.rawCategory && p.rawCategory.toLowerCase() === norm));
     },
 
     getProductsByCollection(collection) {
-        const inStock = productsDB.filter(p => p && Number(p.stockQuantity || 0) > 0 && isSilverJewelleryProduct(p));
-        if (!collection || collection === 'All') return inStock;
-        return inStock.filter(p => p.collection === collection);
+        const active = productsDB.filter(p => p && isSilverJewelleryProduct(p));
+        if (!collection || collection === 'All') return active;
+        return active.filter(p => p.collection === collection);
     },
 
     getProductsByOccasion(occasion) {
-        const inStock = productsDB.filter(p => p && Number(p.stockQuantity || 0) > 0 && isSilverJewelleryProduct(p));
-        if (!occasion || occasion === 'All') return inStock;
-        return inStock.filter(p => p.occasions && p.occasions.includes(occasion));
+        const active = productsDB.filter(p => p && isSilverJewelleryProduct(p));
+        if (!occasion || occasion === 'All') return active;
+        return active.filter(p => p.occasions && p.occasions.includes(occasion));
     },
 
     getNewArrivals(limit = 0) {
-        const sorted = productsDB.filter(p => p && Number(p.stockQuantity || 0) > 0 && isSilverJewelleryProduct(p))
+        const sorted = productsDB.filter(p => p && isSilverJewelleryProduct(p))
             .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
         return (limit && limit > 0) ? sorted.slice(0, limit) : sorted;
     },
 
     getBestSellers(limit = 0) {
-        const sorted = productsDB.filter(p => p && Number(p.stockQuantity || 0) > 0 && isSilverJewelleryProduct(p))
+        const sorted = productsDB.filter(p => p && isSilverJewelleryProduct(p))
             .sort((a, b) => (b.salesCount - a.salesCount) || (b.stockQuantity - a.stockQuantity));
         return (limit && limit > 0) ? sorted.slice(0, limit) : sorted;
     },
@@ -730,7 +796,7 @@ const productsService = {
         if (!query || query.trim().length < 2) return [];
         const q = query.toLowerCase().trim();
         return productsDB.filter(p =>
-            p && Number(p.stockQuantity || 0) > 0 && (
+            p && (
                 (p.name && p.name.toLowerCase().includes(q)) ||
                 (p.productCode && p.productCode.toLowerCase().includes(q)) ||
                 (p.category && p.category.toLowerCase().includes(q)) ||
@@ -1087,6 +1153,7 @@ function renderProductVariantSelector(product) {
 
 /**
  * Filter and retrieve Kids products dynamically from database audience (Parts 15-17)
+ * Supports canonical DB values ('Boys', 'Girls') and legacy values ('Kids-Boy', 'Kids-Girl')
  */
 function getKidsProducts() {
     const db = (typeof window !== 'undefined' && Array.isArray(window.productsDB) && window.productsDB.length > 0)
@@ -1095,8 +1162,8 @@ function getKidsProducts() {
 
     return db.filter(p => {
         if (!p) return false;
-        const aud = (p.audience || '').trim();
-        return aud === 'Kids-Girl' || aud === 'Kids-Boy';
+        const aud = (p.audience || '').trim().toLowerCase();
+        return aud === 'boys' || aud === 'girls' || aud === 'kids-boy' || aud === 'kids-girl' || aud.includes('kid');
     });
 }
 
@@ -1105,36 +1172,63 @@ function getKidsProductsByAudience(audience) {
         ? window.productsDB
         : (Array.isArray(productsDB) ? productsDB : []);
 
-    const aud = (audience || '').trim();
-    if (!aud || aud.toLowerCase() === 'all') {
+    const aud = (audience || '').trim().toLowerCase();
+    if (!aud || aud === 'all') {
         return getKidsProducts();
     }
-    return db.filter(p => (p.audience || '').trim() === aud);
+    return db.filter(p => {
+        const pAud = (p.audience || '').trim().toLowerCase();
+        if (aud === 'boys' || aud === 'kids-boy') {
+            return pAud === 'boys' || pAud === 'kids-boy';
+        }
+        if (aud === 'girls' || aud === 'kids-girl') {
+            return pAud === 'girls' || pAud === 'kids-girl';
+        }
+        return pAud === aud;
+    });
 }
 
 /**
- * Create a product card HTML (strictly hides out-of-stock items)
+ * Create a product card HTML (supports in-stock and elegant sold-out discovery states)
  */
 function createProductCardHTML(product) {
-    if (!product || Number(product.stockQuantity || 0) <= 0) return '';
+    if (!product) return '';
 
+    const isOutOfStock = Number(product.stockQuantity || 0) <= 0;
     const isWishlisted = typeof wishlist !== 'undefined' && wishlist.has(product.id);
 
     let badgeHTML = '';
-    if (product.tag && product.tag !== 'UNAVAILABLE') {
+    if (isOutOfStock) {
+        badgeHTML = `<span class="product-card-badge badge-out-of-stock">Sold Out</span>`;
+    } else if (product.tag && product.tag !== 'UNAVAILABLE') {
         const badgeClass = product.tag === 'NEW' ? 'badge-new' : (product.tag === 'SALE' ? 'badge-sale' : 'badge-gold');
         badgeHTML = `<span class="product-card-badge ${badgeClass}">${product.tag}</span>`;
     }
 
-    const discountHTML = product.discount > 0 ? `<span class="price-discount">${product.discount}% OFF</span>` : '';
+    const discountHTML = (!isOutOfStock && product.discount > 0) ? `<span class="price-discount">${product.discount}% OFF</span>` : '';
     const mrpHTML = (product.mrp > product.sellingPrice) ? `<span class="price-original">${formatPrice(product.mrp)}</span>` : '';
 
-    const imgSrc = product.images?.[0]?.url || product.image || (typeof getRelatableImageUrl === 'function' ? getRelatableImageUrl(product) : '');
-    const imgAlt = product.images?.[0]?.alt || product.name;
+    // Canonical Primary Image Selection (01_main_ecommerce, is_primary, or images[0])
+    const primaryImg = (Array.isArray(product.images) && product.images.length > 0)
+        ? (product.images.find(img => img && (img.imageRole === '01_main_ecommerce' || img.image_role === '01_main_ecommerce' || img.isPrimary || img.is_primary)) || product.images[0])
+        : null;
+
+    const imgSrc = primaryImg?.url || product.image || (typeof getRelatableImageUrl === 'function' ? getRelatableImageUrl(product) : '');
+    const imgAlt = primaryImg?.alt || product.images?.[0]?.alt || product.name;
     const prodCode = product.productCode || product.sku || product.code || '';
 
+    // Role-based Hover Image Selection: 03_angle_45 -> 02_premium_hero -> product.images[1]
     let secondImgHTML = '';
-    const secondImg = product.images?.[1];
+    let secondImg = null;
+    if (Array.isArray(product.images) && product.images.length > 1) {
+        secondImg = product.images.find(img => img && (img.imageRole === '03_angle_45' || img.image_role === '03_angle_45'));
+        if (!secondImg) {
+            secondImg = product.images.find(img => img && (img.imageRole === '02_premium_hero' || img.image_role === '02_premium_hero'));
+        }
+        if (!secondImg) {
+            secondImg = product.images[1];
+        }
+    }
     const secondImgSrc = (secondImg?.url || (typeof secondImg === 'string' ? secondImg : '')) || '';
     if (secondImgSrc && !secondImgSrc.startsWith('data:image/svg') && secondImgSrc !== imgSrc) {
         secondImgHTML = `
@@ -1150,10 +1244,12 @@ function createProductCardHTML(product) {
         `;
     }
 
-    const actionButtonHTML = `<button class="product-card-quick" onclick="addToCart('${product.id}', event)">Quick Add</button>`;
+    const actionButtonHTML = !isOutOfStock
+        ? `<button class="product-card-quick" onclick="addToCart('${product.id}', event)">Quick Add</button>`
+        : `<button class="product-card-quick product-card-notify out-of-stock-btn" onclick="event.stopPropagation(); openNotifyMeModal('${product.id}')">Notify Me</button>`;
 
     return `
-        <div class="product-card" data-product-code="${prodCode}" onclick="navigateTo('product', '${product.slug}')">
+        <div class="product-card ${isOutOfStock ? 'out-of-stock is-out-of-stock' : ''}" data-product-code="${prodCode}" onclick="navigateTo('product', '${product.slug}')">
             <div class="product-card-image" data-product-code="${prodCode}">
                 <img 
                     src="${imgSrc}" 
@@ -1213,18 +1309,18 @@ function renderProductsToContainer(products, containerId) {
         return;
     }
 
-    // Strictly filter out out-of-stock items so they are never displayed on the website
-    const availableProducts = (products || []).filter(p => p && Number(p.stockQuantity || 0) > 0);
+    // Render all active products (both in-stock and elegant sold-out discovery cards)
+    const displayProducts = (products || []).filter(Boolean);
 
-    if (!availableProducts.length) {
+    if (!displayProducts.length) {
         container.innerHTML = '<p class="cart-empty" style="grid-column:1/-1;">No products found matching your criteria.</p>';
         return;
     }
 
-    container.innerHTML = availableProducts.map(createProductCardHTML).filter(Boolean).join('');
+    container.innerHTML = displayProducts.map(createProductCardHTML).filter(Boolean).join('');
 
     // Pre-attach resolved images if already present in product model
-    availableProducts.forEach(p => {
+    displayProducts.forEach(p => {
         if (p && p.productCode && Array.isArray(p.images) && p.images.length > 0) {
             const cardImages = container.querySelectorAll(`.product-card-image[data-product-code="${p.productCode}"]`);
             cardImages.forEach(el => {
@@ -1288,6 +1384,18 @@ function getProductModelWearImage(product, customImages) {
 
     // 2. If authentic uploaded images exist for this product in Supabase:
     if (imgs.length > 0) {
+        // Priority 1: Canonical role '06_model_wearing' from public.product_images
+        const roleModel = imgs.find(img => img && (img.imageRole === '06_model_wearing' || img.image_role === '06_model_wearing'));
+        if (roleModel && roleModel.url) {
+            return roleModel.url;
+        }
+
+        // Priority 2: Canonical role '05_luxury_lifestyle' from public.product_images
+        const roleLifestyle = imgs.find(img => img && (img.imageRole === '05_luxury_lifestyle' || img.image_role === '05_luxury_lifestyle'));
+        if (roleLifestyle && roleLifestyle.url) {
+            return roleLifestyle.url;
+        }
+
         // Priority 2a: Explicit model / lifestyle tag
         const explicitModel = imgs.find(img => img.isLifestyle || img.is_lifestyle || img.isModel || img.type === 'model' || img.type === 'lifestyle');
         if (explicitModel && explicitModel.url) {
@@ -1403,7 +1511,7 @@ function getPdpLifestyleAndDetails(product) {
 
     // Bullets list
     const bullets = [
-        { ico: '💎', label: 'Material', val: '925 Sterling Silver (Hallmarked)' },
+        { ico: '💎', label: 'Material', val: product?.material || '925 Sterling Silver (Hallmarked)' },
         { ico: '💎', label: 'Stone', val: product?.stone || 'Premium Cubic Zirconia' }
     ];
 
@@ -2075,9 +2183,9 @@ function renderProductDetail(product) {
     specsArr.push(`<tr><td>Finish</td><td>${product.finish || 'High Polish, Anti-Tarnish Rhodium Protective Layer'}</td></tr>`);
     specsArr.push(`<tr><td>Packaging</td><td>Complimentary Velvet Gift Box & Certificate of Authenticity</td></tr>`);
 
-    // In-stock related products
-    const related = productsDB.filter(p => p && Number(p.stockQuantity || 0) > 0 && p.id !== product.id && p.category === product.category).slice(0, 4);
-    const relatedAlt = related.length < 4 ? productsDB.filter(p => p && Number(p.stockQuantity || 0) > 0 && p.id !== product.id).slice(0, 4) : related;
+    // Related products (both in-stock and active sold-out pieces)
+    const related = productsDB.filter(p => p && p.id !== product.id && p.category === product.category).slice(0, 4);
+    const relatedAlt = related.length < 4 ? productsDB.filter(p => p && p.id !== product.id).slice(0, 4) : related;
 
     // Realistic, category-tailored social proof & customer reviews
     const socialProof = getProductSocialProof(product);
@@ -2359,7 +2467,7 @@ function renderProductDetail(product) {
             ` : ''}
 
             <!-- Sticky Action Bar for Mobile -->
-            <div class="sticky-cta active" id="sticky-cta" aria-hidden="false">
+            <div class="sticky-cta" id="sticky-cta" aria-hidden="true">
                 ${product.stockQuantity > 0 ? `
                     <button class="btn btn-primary" onclick="addToCart('${product.id}', event)">ADD TO CART — ${formatPrice(product.sellingPrice)}</button>
                     <button class="btn btn-secondary" onclick="buyNowFromPDP('${product.id}')">BUY NOW</button>
@@ -2479,6 +2587,57 @@ function closeNotifyMeModal() {
     const modal = document.getElementById('notify-me-modal');
     if (modal) modal.style.display = 'none';
 }
+
+window.openNotifyMeModal = openNotifyMeModal;
+window.closeNotifyMeModal = closeNotifyMeModal;
+
+// ════════════════════════════════════════════════════
+// 21. MOBILE PDP STICKY CTA INTERSECTION OBSERVER
+// ════════════════════════════════════════════════════
+let pdpStickyCTAObserver = null;
+
+function initPdpStickyCTAObserver() {
+    if (pdpStickyCTAObserver) {
+        try { pdpStickyCTAObserver.disconnect(); } catch (e) {}
+        pdpStickyCTAObserver = null;
+    }
+
+    const stickyCTA = document.getElementById('sticky-cta');
+    const inlineActions = document.querySelector('.pdp-actions-row');
+    if (!stickyCTA || !inlineActions) return;
+
+    const setVisibility = (isInlineVisible) => {
+        if (isInlineVisible) {
+            stickyCTA.classList.remove('active');
+            stickyCTA.setAttribute('aria-hidden', 'true');
+        } else {
+            stickyCTA.classList.add('active');
+            stickyCTA.setAttribute('aria-hidden', 'false');
+        }
+    };
+
+    if ('IntersectionObserver' in window) {
+        pdpStickyCTAObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                setVisibility(entry.isIntersecting);
+            });
+        }, {
+            root: null,
+            threshold: 0.05
+        });
+        pdpStickyCTAObserver.observe(inlineActions);
+        window.pdpStickyCTAObserver = pdpStickyCTAObserver;
+    } else {
+        const checkVisibility = () => {
+            const rect = inlineActions.getBoundingClientRect();
+            const inView = (rect.top < window.innerHeight && rect.bottom > 0);
+            setVisibility(inView);
+        };
+        checkVisibility();
+        window.addEventListener('scroll', checkVisibility, { passive: true });
+    }
+}
+window.initPdpStickyCTAObserver = initPdpStickyCTAObserver;
 
 async function handleNotifyMeSubmit(event) {
     event.preventDefault();
