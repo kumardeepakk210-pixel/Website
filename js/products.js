@@ -2268,7 +2268,7 @@ function renderProductDetail(product) {
 
                     <!-- Tax & Shipping Notice -->
                     <div class="pdp-tax-notice">
-                        Inclusive of all taxes <span class="pdp-pipe">|</span> Free shipping on orders above ₹1,199
+                        Inclusive of all taxes <span class="pdp-pipe">|</span> Free shipping on orders above ₹2,999
                     </div>
 
                     <!-- Short Description -->
@@ -2305,7 +2305,7 @@ function renderProductDetail(product) {
                                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="1" y="3" width="15" height="13" rx="2"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
                             </div>
                             <div class="pdp-usp-title">Free Shipping</div>
-                            <div class="pdp-usp-sub">Above ₹1,199</div>
+                            <div class="pdp-usp-sub">Above ₹2,999</div>
                         </div>
                     </div>
 
@@ -2409,7 +2409,7 @@ function renderProductDetail(product) {
                     <div id="pdp-tab-shipping" class="pdp-tab-panel" style="display:none;" role="tabpanel">
                         <div class="pdp-info-card">
                             <h3>Express Insured Delivery & Easy Returns</h3>
-                            <p><strong>Free Shipping:</strong> Complimentary door-to-door express shipping on all orders above ₹1,199 across 27,000+ Indian pincodes.</p>
+                            <p><strong>Free Shipping:</strong> Complimentary door-to-door express shipping on all orders above ₹2,999 across 27,000+ Indian pincodes.</p>
                             <p style="margin-top:10px;"><strong>Dispatch & Tracking:</strong> Orders placed before 2 PM IST are dispatched on the same business day. Live GPS tracking links are shared via WhatsApp and Email.</p>
                             <p style="margin-top:10px;"><strong>7-Day Returns & Exchanges:</strong> If your jewellery does not fit or delight you, initiate a 1-click return or exchange within 7 days of delivery. Free reverse courier pickup arranged directly from your doorstep.</p>
                             <p style="margin-top:10px;"><strong>Tamper-Evident Packaging:</strong> Every parcel is sealed in a security barcode envelope to ensure zero tampering.</p>
