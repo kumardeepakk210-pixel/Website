@@ -255,11 +255,18 @@ function initHeroCarousel() {
 
     const activeOccasion = typeof window.getActiveOccasion === 'function' ? window.getActiveOccasion() : null;
     const firstSlideImg = slides[0]?.querySelector('img');
+    const firstSlideSource = slides[0]?.querySelector('source');
     if (firstSlideImg) {
         if (activeOccasion && activeOccasion.enabled && activeOccasion.heroImage) {
             firstSlideImg.src = activeOccasion.heroImage;
+            if (firstSlideSource) {
+                firstSlideSource.srcset = activeOccasion.heroMobileImage || activeOccasion.heroImage;
+            }
         } else {
             firstSlideImg.src = 'assets/hero/model-hero.jpg';
+            if (firstSlideSource) {
+                firstSlideSource.srcset = 'assets/hero/model-hero-mobile.jpg';
+            }
         }
     }
 
@@ -297,7 +304,9 @@ function initHeroCarousel() {
         });
     }
 
-    goToHeroSlide(0);
+    const urlParams = new URLSearchParams(window.location.search);
+    const startSlide = parseInt(urlParams.get('heroSlide') || '0', 10);
+    goToHeroSlide(isNaN(startSlide) ? 0 : startSlide);
 }
 
 function scrollPastHero() {

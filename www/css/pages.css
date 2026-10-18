@@ -59,7 +59,9 @@
 .hero-section img,
 .hero-section picture,
 .hero-background,
+.hero-slide picture,
 .hero-slide img {
+    display: block;
     width: 100%;
     height: 100%;
     object-fit: cover;
