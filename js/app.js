@@ -1095,6 +1095,18 @@ window.updateOccasionContentVisibility = updateOccasionContentVisibility;
 
 window.addEventListener('wishrite:occasion-updated', () => {
     updateOccasionContentVisibility();
+    if (typeof initFestiveNavigation === 'function') {
+        initFestiveNavigation();
+    }
+    if (typeof initHeroCarousel === 'function') {
+        initHeroCarousel();
+    }
+    if (typeof updateHeaderBrandSubtitle === 'function' && typeof getCurrentView === 'function') {
+        updateHeaderBrandSubtitle(getCurrentView());
+    }
+    if (typeof getCurrentView === 'function' && getCurrentView() === 'occasion' && typeof renderOccasionPage === 'function') {
+        renderOccasionPage();
+    }
 });
 
 window.addEventListener('popstate', (e) => {

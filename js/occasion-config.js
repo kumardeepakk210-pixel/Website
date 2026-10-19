@@ -555,7 +555,7 @@
                 });
                 if (sbRes.ok) {
                     const rows = await sbRes.json();
-                    if (Array.isArray(rows)) {
+                    if (Array.isArray(rows) && rows.length > 0) {
                         const activeRow = rows.find(r => r.is_active === true) || null;
                         const selectedRow = rows.find(r => r.is_selected === true) || rows[0] || null;
                         const isLive = Boolean(activeRow);
@@ -579,6 +579,8 @@
                                 updated_at: activeRow?.updated_at || selectedRow?.updated_at || new Date().toISOString()
                             }
                         };
+                    } else {
+                        console.info('[WishRite Occasion] Supabase occasion_settings table contains 0 rows; falling back to API proxy / upstream inventory settings.');
                     }
                 }
             } catch (sbErr) {
@@ -849,5 +851,19 @@
     window.initOccasionRealtimeSync = initOccasionRealtimeSync;
     window.normalizeOccasionSlug = normalizeOccasionSlug;
     window.LIVE_OFFERS = LIVE_OFFERS;
+
+    // Automatic tab visibility & focus sync
+    if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+                loadActiveOccasionSettings(true);
+            }
+        });
+    }
+    if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+        window.addEventListener('focus', () => {
+            loadActiveOccasionSettings(true);
+        });
+    }
 
 })();

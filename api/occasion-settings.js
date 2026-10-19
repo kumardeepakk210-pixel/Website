@@ -46,7 +46,7 @@ module.exports = async function handler(request, response) {
 
         if (dbRes.ok) {
             const rows = await dbRes.json();
-            if (Array.isArray(rows)) {
+            if (Array.isArray(rows) && rows.length > 0) {
                 const activeRow = rows.find(r => r.is_active === true) || null;
                 const selectedRow = rows.find(r => r.is_selected === true) || rows[0] || null;
                 const isLive = Boolean(activeRow);
@@ -74,6 +74,8 @@ module.exports = async function handler(request, response) {
                     settings,
                     data: settings
                 });
+            } else {
+                console.info('[WishRite Occasion API] Supabase occasion_settings table contains 0 rows; falling back to Upstream Inventory API.');
             }
         }
     } catch (dbErr) {
