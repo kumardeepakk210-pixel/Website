@@ -31,6 +31,10 @@
 
     .site-footer {
         padding: 56px 32px 28px;
+        background-image: url('../assets/decorations/footer-floral-bg.jpg');
+        background-repeat: no-repeat;
+        background-position: right bottom;
+        background-size: cover;
     }
 
     .footer-grid {
@@ -454,6 +458,20 @@
     /* Footer Mobile */
     .site-footer {
         padding: 48px 20px 24px;
+        background-image: url('../assets/decorations/footer-floral-bg.jpg');
+        background-repeat: no-repeat;
+        background-position: right bottom;
+        background-size: cover;
+    }
+
+    .site-footer::before {
+        content: '';
+        display: block;
+        position: absolute;
+        inset: 0;
+        background: rgba(67, 44, 64, 0.35);
+        pointer-events: none;
+        z-index: 0;
     }
 
     .footer-grid {
