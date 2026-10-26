@@ -177,30 +177,31 @@ async function getAllInfluencersFromDB() {
             dbRows = rows;
         }
     } catch (err) {
-        console.warn('[Influencers API] Supabase query failed, using local mirror:', err.message);
+        console.warn('[Influencers API] Supabase query notice:', err.message);
     }
 
-    const local = readLocalStore();
-
-    // Merge DB rows and local store
-    const map = new Map();
-    // First put local rows
-    for (const item of (local.influencers || [])) {
-        if (item.id) map.set(item.id, item);
-    }
-    // Then merge with DB rows if present
-    for (const item of dbRows) {
-        if (item.id) {
-            const localItem = map.get(item.id);
-            if (!localItem || new Date(item.updated_at || 0) >= new Date(localItem.updated_at || 0)) {
-                map.set(item.id, item);
+    // Isolated automated testing uses local fixtures
+    if (process.env.NODE_ENV === 'test') {
+        const local = readLocalStore();
+        const map = new Map();
+        for (const item of (local.influencers || [])) {
+            if (item.id) map.set(item.id, item);
+        }
+        for (const item of dbRows) {
+            if (item.id) {
+                const localItem = map.get(item.id);
+                if (!localItem || new Date(item.updated_at || 0) >= new Date(localItem.updated_at || 0)) {
+                    map.set(item.id, item);
+                }
             }
         }
+        const combined = Array.from(map.values());
+        combined.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+        return { data: combined, fromDb: dbRows.length > 0 };
     }
 
-    const combined = Array.from(map.values());
-    combined.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
-    return { data: combined, fromDb: dbRows.length > 0 };
+    // In PRODUCTION: Strictly live Supabase database
+    return { data: dbRows, fromDb: true };
 }
 
 /**
@@ -559,7 +560,7 @@ export async function handleCreateInfluencer(req, res) {
             instagram_url: instagramUrl,
             public_slug: publicSlug,
             public_profile_url: publicProfileUrl,
-            profile_image: profile_image?.trim() || `https://ui-avatars.com/api/?name=${encodeURIComponent(name.trim())}&background=4f46e5&color=fff`,
+            profile_image: profile_image?.trim() || null,
             category: category?.trim() || 'Jewelry & Lifestyle',
             bio: bio?.trim() || null,
             commission_rate: validCommission,
@@ -1425,14 +1426,6 @@ export async function handleGetPublicInfluencerProducts(req, res) {
             if (Array.isArray(rows) && rows.length > 0) activeInventory = rows;
         } catch (e) {}
 
-        if (activeInventory.length === 0) {
-            try {
-                const rawMeta = fs.readFileSync(path.join(DATA_DIR, 'product_meta.json'), 'utf-8');
-                const meta = JSON.parse(rawMeta);
-                activeInventory = Object.values(meta).filter(p => p.status === 'Active' || !p.status);
-            } catch (e) {}
-        }
-
         let curated = [];
         let isFallback = false;
 
@@ -1457,7 +1450,7 @@ export async function handleGetPublicInfluencerProducts(req, res) {
             category: p.category,
             selling_price: Number(p.selling_price) || 0,
             compare_at_price: Number(p.compare_at_price) || 0,
-            image_url: p.image_url || p.product_media_urls?.[0] || 'https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=600&auto=format&fit=crop&q=80',
+            image_url: p.image_url || p.product_media_urls?.[0] || null,
             stock_quantity: Number(p.stock_quantity) || 1,
             audience: p.audience || 'Unassigned',
             material: p.material || '925 Sterling Silver',

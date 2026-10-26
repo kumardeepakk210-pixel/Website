@@ -1545,6 +1545,24 @@ export async function handleCustomerCreatorStatus(req, res) {
             }
         }
 
+        // DB lookup for creator if not matched locally
+        if (!matchedCreator && ident.email) {
+            try {
+                const rows = await dbQuery('influencers', `email=eq.${encodeURIComponent(ident.email)}&limit=1`);
+                if (Array.isArray(rows) && rows.length > 0) {
+                    matchedCreator = rows[0];
+                }
+            } catch (_) {}
+        }
+        if (!matchedCreator && ident.influencerId) {
+            try {
+                const rows = await dbQuery('influencers', `id=eq.${encodeURIComponent(ident.influencerId)}&limit=1`);
+                if (Array.isArray(rows) && rows.length > 0) {
+                    matchedCreator = rows[0];
+                }
+            } catch (_) {}
+        }
+
         if (!matchedCreator) {
             return res.json({
                 success: true,
@@ -1553,7 +1571,16 @@ export async function handleCustomerCreatorStatus(req, res) {
             });
         }
 
-        const stats = (local.stats || []).find(s => s.influencer_id === matchedCreator.id) || {
+        let stats = (local.stats || []).find(s => s.influencer_id === matchedCreator.id);
+        if (!stats) {
+            try {
+                const dbStats = await dbQuery('influencer_stats', `influencer_id=eq.${encodeURIComponent(matchedCreator.id)}&limit=1`);
+                if (Array.isArray(dbStats) && dbStats.length > 0) {
+                    stats = dbStats[0];
+                }
+            } catch (_) {}
+        }
+        stats = stats || {
             total_clicks: 0,
             total_orders: 0,
             total_sales: 0,
@@ -1574,11 +1601,28 @@ export async function handleCustomerCreatorStatus(req, res) {
                 lifetime_earned: Number(foundWallet.lifetime_earned || 0)
             };
         } else {
-            walletData = {
-                available_balance: Number(stats.available_earnings || 0),
-                pending_balance: Number(stats.pending_earnings || 0),
-                lifetime_earned: Number(stats.total_earnings || 0)
-            };
+            try {
+                const dbWallets = await dbQuery('influencer_wallets', `influencer_id=eq.${encodeURIComponent(matchedCreator.id)}&limit=1`);
+                if (Array.isArray(dbWallets) && dbWallets.length > 0) {
+                    walletData = {
+                        available_balance: Number(dbWallets[0].available_balance || dbWallets[0].balance || 0),
+                        pending_balance: Number(dbWallets[0].pending_balance || 0),
+                        lifetime_earned: Number(dbWallets[0].lifetime_earned || 0)
+                    };
+                } else {
+                    walletData = {
+                        available_balance: Number(stats.available_earnings || 0),
+                        pending_balance: Number(stats.pending_earnings || 0),
+                        lifetime_earned: Number(stats.total_earnings || 0)
+                    };
+                }
+            } catch (_) {
+                walletData = {
+                    available_balance: Number(stats.available_earnings || 0),
+                    pending_balance: Number(stats.pending_earnings || 0),
+                    lifetime_earned: Number(stats.total_earnings || 0)
+                };
+            }
         }
 
         let pointsData = { balance: 0 };
@@ -1586,7 +1630,16 @@ export async function handleCustomerCreatorStatus(req, res) {
         if (foundPoints) {
             pointsData = { balance: Number(foundPoints.balance || 0) };
         } else {
-            pointsData = { balance: Number(stats.total_points || 0) };
+            try {
+                const dbPoints = await dbQuery('influencer_points_accounts', `influencer_id=eq.${encodeURIComponent(matchedCreator.id)}&limit=1`);
+                if (Array.isArray(dbPoints) && dbPoints.length > 0) {
+                    pointsData = { balance: Number(dbPoints[0].balance || 0) };
+                } else {
+                    pointsData = { balance: Number(stats.total_points || 0) };
+                }
+            } catch (_) {
+                pointsData = { balance: Number(stats.total_points || 0) };
+            }
         }
 
         let sessionToken = null;

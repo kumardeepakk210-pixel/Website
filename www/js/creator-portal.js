@@ -169,7 +169,10 @@
 
             const c = this.state.creator || {};
             const availBal = this.state.wallet?.available_balance || 0;
-            const avatarUrl = c.profile_image || `https://ui-avatars.com/api/?name=${encodeURIComponent(c.name || 'Creator')}&background=B8956A&color=fff`;
+            const initialChar = (c.name || 'C').charAt(0).toUpperCase();
+            const avatarHtml = c.profile_image
+                ? `<img src="${c.profile_image}" alt="${c.name || 'Creator'}" class="creator-mini-avatar">`
+                : `<div class="creator-mini-avatar" style="display:inline-flex;align-items:center;justify-content:center;background:#B8956A;color:#fff;font-weight:600;font-size:12px;border-radius:50%;">${initialChar}</div>`;
 
             area.innerHTML = `
                 <div class="creator-balance-pill" title="Available for Withdrawal">
@@ -177,7 +180,7 @@
                     <span class="creator-balance-val" id="top-bar-bal">${this.formatINR(availBal)}</span>
                 </div>
                 <div class="creator-profile-snippet" onclick="window.WishRiteCreatorPortal.navigateTo('profile');" title="View Profile">
-                    <img src="${avatarUrl}" alt="${c.name || 'Creator'}" class="creator-mini-avatar">
+                    ${avatarHtml}
                     <span class="creator-top-name">${c.name || 'Ambassador'}</span>
                 </div>
                 <button class="creator-logout-btn" onclick="window.WishRiteCreatorPortal.handleLogout();" title="Sign Out">

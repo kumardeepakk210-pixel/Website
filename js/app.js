@@ -533,7 +533,10 @@ async function renderCreatorStorefront(slug) {
             recommendedProducts = allProducts.filter(p => p && Number(p.stockQuantity || 0) > 0).slice(0, 12);
         }
 
-        const avatarUrl = creator.profile_image || `https://ui-avatars.com/api/?name=${encodeURIComponent(creator.name)}&background=5E3435&color=fff&size=200`;
+        const initialChar = (creator.name || 'C').charAt(0).toUpperCase();
+        const avatarHtml = creator.profile_image
+            ? `<img src="${escapeWishriteHtml(creator.profile_image)}" alt="${escapeWishriteHtml(creator.name)}" class="creator-avatar">`
+            : `<div class="creator-avatar" style="display:flex;align-items:center;justify-content:center;background:#5E3435;color:#fff;font-size:32px;font-weight:600;border-radius:50%;">${initialChar}</div>`;
         const instagramLink = creator.instagram_id
             ? `<a href="https://instagram.com/${creator.instagram_id.replace(/^@/, '')}" target="_blank" rel="noopener" class="creator-social">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>
@@ -575,7 +578,7 @@ async function renderCreatorStorefront(slug) {
                 <div class="creator-hero">
                     <div class="creator-hero-content">
                         <div class="creator-avatar-wrap">
-                            <img src="${avatarUrl}" alt="${creator.name}" class="creator-avatar">
+                            ${avatarHtml}
                             <span class="creator-verified-badge" title="Verified WishRite Ambassador">✓</span>
                         </div>
                         <div class="creator-info">

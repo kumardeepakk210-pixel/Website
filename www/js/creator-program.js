@@ -6,6 +6,54 @@
 
 let currentCreatorData = null;
 let liveProductsCache = [];
+let creatorRealtimeChannel = null;
+
+/**
+ * Initializes Supabase Realtime listener for creator financial & profile updates
+ */
+function initCreatorRealtimeSync(influencerId) {
+    const client = window.supabaseClient || (typeof supabaseClient !== 'undefined' ? supabaseClient : null);
+    if (!client || typeof client.channel !== 'function') return null;
+    if (creatorRealtimeChannel) return creatorRealtimeChannel;
+
+    try {
+        creatorRealtimeChannel = client
+            .channel('wishrite-creator-realtime-sync')
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'influencer_wallets'
+                },
+                (payload) => {
+                    console.log('[WishRite Creator] Realtime update on influencer_wallets:', payload.eventType);
+                    loadCustomerCreatorStatus();
+                }
+            )
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'customers'
+                },
+                (payload) => {
+                    console.log('[WishRite Creator] Realtime update on customers:', payload.eventType);
+                    loadCustomerCreatorStatus();
+                }
+            )
+            .subscribe((status) => {
+                if (status === 'SUBSCRIBED') {
+                    console.log('[WishRite Creator] Subscribed to creator realtime updates.');
+                }
+            });
+    } catch (err) {
+        console.warn('[WishRite Creator] Realtime subscription notice:', err);
+    }
+    return creatorRealtimeChannel;
+}
+window.initCreatorRealtimeSync = initCreatorRealtimeSync;
 
 /**
  * Switches between ACCOUNT and CREATOR tabs in My Account
@@ -151,6 +199,8 @@ async function loadCustomerCreatorStatus() {
             if (data.token) {
                 localStorage.setItem('wishrite_creator_token', data.token);
             }
+
+            initCreatorRealtimeSync(data.creator.id);
 
             if (data.status === 'under_review') {
                 if (reviewState) reviewState.style.display = 'block';
