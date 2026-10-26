@@ -205,7 +205,10 @@ function navigateTo(viewId, param, pushHistory = true) {
             } else if (typeof switchProfileTab === 'function') {
                 switchProfileTab('account');
             }
-            if (pushHistory) { try { history.pushState({ view: 'profile', param }, '', '/account'); } catch (e) { } }
+            if (pushHistory) {
+                const targetUrl = param === 'creator' ? '/account?tab=creator' : '/account';
+                try { history.pushState({ view: 'profile', param }, '', targetUrl); } catch (e) { }
+            }
             break;
         case 'login':
             if (pushHistory) { try { history.pushState({ view: 'login' }, '', '/login'); } catch (e) { } }
@@ -1068,8 +1071,10 @@ function handleInitialURLRoute(pushHistory = false) {
     } else if (path === '/wishlist' || hash === '#wishlist') {
         navigateTo('wishlist', null, pushHistory);
         return;
-    } else if (path === '/account' || path === '/profile' || hash === '#account') {
-        navigateTo('profile', null, pushHistory);
+    } else if (path === '/account' || path === '/profile' || hash === '#account' || hash === '#creator' || path === '/creator') {
+        const urlParams = new URLSearchParams(window.location.search);
+        const tabParam = urlParams.get('tab') || (hash === '#creator' ? 'creator' : (path === '/creator' ? 'creator' : 'account'));
+        navigateTo('profile', tabParam, pushHistory);
         return;
     } else if (path === '/login' || hash === '#login') {
         navigateTo('login', null, pushHistory);

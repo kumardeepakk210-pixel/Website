@@ -1253,8 +1253,16 @@ document.addEventListener(
 );
 
 window.getWishriteAuthUser = function() {
+    window.currentUser = currentUser;
     return currentUser;
 };
+try {
+    Object.defineProperty(window, 'currentUser', {
+        get: () => currentUser,
+        set: (val) => { currentUser = val; },
+        configurable: true
+    });
+} catch (_) {}
 
 window.getWishriteCustomerProfile = function() {
     if (window.currentCustomerProfile) {

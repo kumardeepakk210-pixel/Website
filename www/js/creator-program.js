@@ -27,6 +27,12 @@ function switchProfileTab(tabId) {
         paneAccount.style.display = 'none';
         paneCreator.style.display = 'block';
 
+        try {
+            if (window.location.pathname === '/account' || window.location.pathname === '/profile') {
+                history.replaceState({ view: 'profile', tab: 'creator' }, '', '/account?tab=creator');
+            }
+        } catch (_) {}
+
         loadCustomerCreatorStatus();
         fetchLiveProductsForPicker();
     } else {
@@ -37,9 +43,34 @@ function switchProfileTab(tabId) {
 
         paneCreator.style.display = 'none';
         paneAccount.style.display = 'block';
+
+        try {
+            if (window.location.pathname === '/account' || window.location.pathname === '/profile') {
+                history.replaceState({ view: 'profile', tab: 'account' }, '', '/account');
+            }
+        } catch (_) {}
     }
 }
 window.switchProfileTab = switchProfileTab;
+
+// Bind direct DOM event listeners as backup to inline onclick
+function initCreatorTabListeners() {
+    const btnAccount = document.getElementById('tab-btn-account');
+    const btnCreator = document.getElementById('tab-btn-creator');
+    if (btnAccount && !btnAccount._hasTabListener) {
+        btnAccount._hasTabListener = true;
+        btnAccount.addEventListener('click', () => switchProfileTab('account'));
+    }
+    if (btnCreator && !btnCreator._hasTabListener) {
+        btnCreator._hasTabListener = true;
+        btnCreator.addEventListener('click', () => switchProfileTab('creator'));
+    }
+}
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initCreatorTabListeners);
+} else {
+    initCreatorTabListeners();
+}
 
 /**
  * Returns authorization headers using customer session or creator token
@@ -48,9 +79,10 @@ async function getAuthHeaders() {
     const headers = { 'Content-Type': 'application/json' };
     
     // Check Supabase customer session
-    if (window.supabaseClient && window.supabaseClient.auth) {
+    const client = window.supabaseClient || (typeof supabaseClient !== 'undefined' ? supabaseClient : null);
+    if (client && client.auth) {
         try {
-            const { data } = await window.supabaseClient.auth.getSession();
+            const { data } = await client.auth.getSession();
             if (data?.session?.access_token) {
                 headers['Authorization'] = `Bearer ${data.session.access_token}`;
             }
@@ -71,9 +103,23 @@ async function getAuthHeaders() {
         }
     }
 
-    // Customer email from currentUser in auth.js
-    if (!headers['x-customer-email'] && window.currentUser?.email) {
-        headers['x-customer-email'] = window.currentUser.email;
+    // Customer email & id from getWishriteAuthUser / getWishriteCustomerProfile / window.currentUser
+    const authUser = (typeof window.getWishriteAuthUser === 'function') ? window.getWishriteAuthUser() : (window.currentUser || null);
+    const custProfile = (typeof window.getWishriteCustomerProfile === 'function') ? window.getWishriteCustomerProfile() : null;
+
+    if (!headers['x-customer-email']) {
+        if (authUser?.email) {
+            headers['x-customer-email'] = authUser.email;
+        } else if (custProfile?.email) {
+            headers['x-customer-email'] = custProfile.email;
+        }
+    }
+    if (!headers['x-customer-id']) {
+        if (authUser?.id) {
+            headers['x-customer-id'] = authUser.id;
+        } else if (custProfile?.id) {
+            headers['x-customer-id'] = custProfile.id;
+        }
     }
 
     return headers;
@@ -1611,6 +1657,7 @@ async function handleShareReelSubmit(e) {
             btn.disabled = false;
             btn.innerText = 'SUBMIT REEL FOR REVIEW';
         }
+    }
 }
 window.handleShareReelSubmit = handleShareReelSubmit;
 
