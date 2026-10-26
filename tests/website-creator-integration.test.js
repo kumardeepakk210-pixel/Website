@@ -75,8 +75,13 @@ describe('WishRite Creator Club Website Integration - Full 35-Point Regression',
   let testCreatorToken;
   let testCreatorId;
   let testCreatorSlug = 'WR-INF-000001';
+  const STORE_PATH = path.join(__dirname, '..', 'data', 'influencers_store.json');
+  let backupStoreRaw = null;
 
   before(async () => {
+    if (fs.existsSync(STORE_PATH)) {
+      backupStoreRaw = fs.readFileSync(STORE_PATH, 'utf8');
+    }
     server = require('../server.js');
     await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   });

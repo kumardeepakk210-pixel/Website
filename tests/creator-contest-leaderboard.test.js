@@ -12,7 +12,69 @@ async function fetchJson(url, options = {}) {
     return { status: res.status, headers: res.headers, data };
 }
 
+const STORE_PATH = path.join(process.cwd(), 'data', 'influencers_store.json');
+let backupStoreRaw = null;
+
+function setupTestFixture() {
+    if (!fs.existsSync(STORE_PATH)) return;
+    backupStoreRaw = fs.readFileSync(STORE_PATH, 'utf8');
+    const store = JSON.parse(backupStoreRaw);
+
+    const contestId = 'contest-festive-2026';
+    store.contests = store.contests || [];
+    if (!store.contests.some(c => c.id === contestId)) {
+        store.contests.push({
+            id: contestId,
+            name: 'Festive Sparkle Creator Challenge 2026',
+            description: 'Create standout posts and reels featuring WishRite pure 925 sterling silver jewellery.',
+            start_date: '2026-10-15T00:00:00.000Z',
+            end_date: '2026-11-26T23:59:59.000Z',
+            status: 'active',
+            scoring_rules: { post_points: 50, reel_points: 100, order_points_multiplier: 10, click_points_multiplier: 1 }
+        });
+    }
+
+    const testInf1 = { id: 'test_creator_1', influencer_code: 'WR-TEST-001', name: 'Aarya Sharma', email: 'secret_active@example.com', public_slug: 'aarya-test', status: 'active' };
+    const testInf2 = { id: 'test_creator_2', influencer_code: 'WR-TEST-002', name: 'Rohan Verma', email: 'rohan@example.com', public_slug: 'rohan-test', status: 'active' };
+    const testInf3 = { id: 'test_creator_3', influencer_code: 'WR-TEST-003', name: 'Pooja Hegde', email: 'pooja@example.com', public_slug: 'pooja-test', status: 'active' };
+    const testInf4 = { id: 'test_creator_4', influencer_code: 'WR-TEST-004', name: 'Deepak Kumar', email: 'deepak.kumar@wishrite.in', public_slug: 'deepak-test', status: 'active' };
+
+    store.influencers = store.influencers || [];
+    store.influencers.push(testInf1, testInf2, testInf3, testInf4);
+
+    store.accounts = store.accounts || [];
+    store.accounts.push(
+        { id: 'acct_1', influencer_id: testInf1.id, email: testInf1.email, is_active: true },
+        { id: 'acct_2', influencer_id: testInf2.id, email: testInf2.email, is_active: true },
+        { id: 'acct_3', influencer_id: testInf3.id, email: testInf3.email, is_active: true },
+        { id: 'acct_4', influencer_id: testInf4.id, email: testInf4.email, is_active: true }
+    );
+
+    store.contest_scores = store.contest_scores || [];
+    store.contest_scores.push(
+        { id: 'score_1', contest_id: contestId, influencer_id: testInf1.id, points: 1240, updated_at: '2026-10-20T00:00:00.000Z' },
+        { id: 'score_2', contest_id: contestId, influencer_id: testInf2.id, points: 980, updated_at: '2026-10-21T00:00:00.000Z' },
+        { id: 'score_3', contest_id: contestId, influencer_id: testInf3.id, points: 820, updated_at: '2026-10-22T00:00:00.000Z' },
+        { id: 'score_4', contest_id: contestId, influencer_id: testInf4.id, points: 50, updated_at: '2026-10-23T00:00:00.000Z' }
+    );
+
+    for (let i = 5; i <= 15; i++) {
+        const id = `test_creator_${i}`;
+        store.influencers.push({ id, influencer_code: `WR-TEST-0${i}`, name: `Creator ${i}`, email: `c${i}@test.in`, public_slug: `c${i}-test`, status: 'active' });
+        store.contest_scores.push({ id: `score_${i}`, contest_id: contestId, influencer_id: id, points: 800 - (i * 40), updated_at: '2026-10-24T00:00:00.000Z' });
+    }
+
+    fs.writeFileSync(STORE_PATH, JSON.stringify(store, null, 2), 'utf8');
+}
+
+function teardownTestFixture() {
+    if (backupStoreRaw && fs.existsSync(STORE_PATH)) {
+        fs.writeFileSync(STORE_PATH, backupStoreRaw, 'utf8');
+    }
+}
+
 test('Creator Contest Leaderboard — Comprehensive Validation Suite', async (t) => {
+    setupTestFixture();
 
     await t.test('1. CONTEST SYSTEM & API ENDPOINT', async (st) => {
         await st.test('GET /api/creator/contest returns active contest data', async () => {

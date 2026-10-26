@@ -2400,6 +2400,20 @@ function renderCreatorContest(data) {
                 </div>
             </div>
         `;
+    } else if (current) {
+        html += `
+            <div class="contest-position-card" id="contest-position-card" style="padding:20px; text-align:center;">
+                <div class="contest-position-header" style="justify-content:center; margin-bottom:8px;">
+                    <span class="contest-position-label">Your Contest Standing</span>
+                </div>
+                <div style="font-size:1.15rem; font-weight:700; color:var(--wr-primary, #5E3435); margin-bottom:6px;">
+                    0 Contest Points
+                </div>
+                <div style="font-size:0.82rem; color:var(--wr-text-muted, #71717a); max-width:440px; margin:0 auto;">
+                    No qualifying activity yet. Share your creator links or submit approved Instagram content to earn contest points and rank on the leaderboard!
+                </div>
+            </div>
+        `;
     }
 
     // 3. LEADERBOARD TABLE (TOP 10) (Section 4, 5, 6 & 12)

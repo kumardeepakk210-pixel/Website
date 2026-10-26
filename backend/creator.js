@@ -171,17 +171,16 @@ export function decodeJwtPayload(token) {
 /**
  * Reads local JSON backup store safely
  */
-let memoryStoreCache = null;
+export function clearMemoryStoreCache() {
+    // No-op for direct filesystem reading
+}
 
 function readLocalStore() {
-    if (memoryStoreCache) {
-        return memoryStoreCache;
-    }
     try {
         if (fs.existsSync(INFLUENCERS_STORE_PATH)) {
             const raw = fs.readFileSync(INFLUENCERS_STORE_PATH, 'utf-8');
             const data = JSON.parse(raw);
-            memoryStoreCache = {
+            return {
                 influencers: data.influencers || [],
                 accounts: data.accounts || [],
                 links: data.links || [],
@@ -203,12 +202,11 @@ function readLocalStore() {
                 contest_participants: data.contest_participants || data.creator_contest_participants || [],
                 contest_scores: data.contest_scores || data.creator_contest_scores || []
             };
-            return memoryStoreCache;
         }
     } catch (e) {
         console.warn('[Creator API] Could not read influencers_store.json:', e.message);
     }
-    memoryStoreCache = {
+    return {
         influencers: [],
         accounts: [],
         links: [],
@@ -230,14 +228,12 @@ function readLocalStore() {
         contest_participants: [],
         contest_scores: []
     };
-    return memoryStoreCache;
 }
 
 /**
  * Writes to local JSON backup store safely and atomically
  */
 function writeLocalStore(store) {
-    memoryStoreCache = store;
     try {
         const tempPath = `${INFLUENCERS_STORE_PATH}.tmp.${process.pid}.${Date.now()}`;
         fs.writeFileSync(tempPath, JSON.stringify(store, null, 2), 'utf-8');
@@ -1402,8 +1398,7 @@ export async function handleCreatorPhotoDelete(req, res) {
                     } catch (_) {}
                 }
             }
-            const defaultAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(targetCreator.name || 'WishRite Creator')}&background=5E3435&color=fff`;
-            targetCreator.profile_image = defaultAvatar;
+            targetCreator.profile_image = null;
             targetCreator.updated_at = new Date().toISOString();
             writeLocalStore(local);
         }
@@ -1709,7 +1704,7 @@ export async function handleCustomerCreatorOnboard(req, res) {
             city: sanitizeText(body.city || ''),
             state: sanitizeText(body.state || ''),
             country: sanitizeText(body.country || 'India'),
-            profile_image: (body.profile_image && (isValidHttpUrl(body.profile_image) || body.profile_image.startsWith('/uploads/') || body.profile_image.startsWith('data:'))) ? body.profile_image : `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=5E3435&color=fff`,
+            profile_image: (body.profile_image && (isValidHttpUrl(body.profile_image) || body.profile_image.startsWith('/uploads/') || body.profile_image.startsWith('data:'))) ? body.profile_image : null,
             instagram_id: sanitizeText((body.instagram_username || '').replace('@', '')),
             instagram_url: isValidHttpUrl(body.instagram_url) ? body.instagram_url : (body.instagram_username ? `https://instagram.com/${body.instagram_username.replace('@', '')}` : null),
             youtube_url: isValidHttpUrl(body.youtube_url) ? body.youtube_url : null,
@@ -2045,43 +2040,6 @@ export function ensureDefaultContest(local) {
         };
         local.contests.push(defaultContest);
 
-        // Pre-seed scores for active influencers deterministically based on real store data
-        const influencers = local.influencers || [];
-        const topScores = [1240, 1105, 980, 920, 875, 820, 780, 745, 710, 690, 620, 590, 575, 540, 510, 480, 450, 420, 390, 360, 330, 300, 280, 250, 220, 200, 180, 150, 120, 100, 80, 60, 40, 20, 0];
-
-        influencers.forEach((inf, idx) => {
-            const basePts = idx < topScores.length ? topScores[idx] : Math.max(0, 150 - (idx * 2));
-            
-            // Add activity points from approved content
-            const contentItems = (local.creator_content || []).filter(c => c.influencer_id === inf.id && c.status === 'Approved');
-            let activityPts = 0;
-            contentItems.forEach(c => {
-                activityPts += (c.content_type === 'reel' ? 100 : 50);
-            });
-
-            // Add activity from orders
-            const orders = (local.order_attributions || []).filter(o => o.influencer_id === inf.id && o.status !== 'cancelled');
-            activityPts += (orders.length * 10);
-
-            const totalPts = basePts + activityPts;
-
-            local.contest_scores.push({
-                id: randomUUID(),
-                contest_id: defaultContest.id,
-                influencer_id: inf.id,
-                points: totalPts,
-                updated_at: new Date(Date.now() - (idx * 3600000)).toISOString()
-            });
-
-            local.contest_participants.push({
-                id: randomUUID(),
-                contest_id: defaultContest.id,
-                influencer_id: inf.id,
-                joined_at: defaultContest.start_date,
-                status: 'active'
-            });
-        });
-
         writeLocalStore(local);
     }
 }
@@ -2236,18 +2194,19 @@ export async function calculateContestLeaderboard(contestId = null, currentInflu
         return String(a.influencer_id).localeCompare(String(b.influencer_id));
     });
 
-    // Assign sequential ranks and flag ties
-    participants.forEach((p, idx) => {
+    // Filter and rank only participants with qualifying activity (points > 0)
+    const rankedParticipants = participants.filter(p => p.points > 0);
+    rankedParticipants.forEach((p, idx) => {
         p.rank = idx + 1;
         p.is_current_user = currentInfluencerId ? (p.influencer_id === currentInfluencerId) : false;
-        p.is_tied = (idx > 0 && participants[idx - 1].points === p.points) || 
-                    (idx < participants.length - 1 && participants[idx + 1].points === p.points);
+        p.is_tied = (idx > 0 && rankedParticipants[idx - 1].points === p.points) || 
+                    (idx < rankedParticipants.length - 1 && rankedParticipants[idx + 1].points === p.points);
     });
 
-    const totalParticipants = participants.length;
+    const totalParticipants = rankedParticipants.length;
 
-    // Top 10 Leaders
-    const top10 = participants.slice(0, 10).map(p => ({
+    // Top 10 Leaders (only active qualifying participants)
+    const top10 = rankedParticipants.slice(0, 10).map(p => ({
         rank: p.rank,
         name: p.name,
         profile_image: p.profile_image,
@@ -2261,16 +2220,17 @@ export async function calculateContestLeaderboard(contestId = null, currentInflu
     let nearby = [];
 
     if (currentInfluencerId) {
-        const myIndex = participants.findIndex(p => p.influencer_id === currentInfluencerId);
-        if (myIndex !== -1) {
-            const me = participants[myIndex];
+        const inf = (local.influencers || []).find(i => i.id === currentInfluencerId);
+        const myRankedIndex = rankedParticipants.findIndex(p => p.influencer_id === currentInfluencerId);
+        if (myRankedIndex !== -1) {
+            const me = rankedParticipants[myRankedIndex];
             const isTop10 = me.rank <= 10;
             const isFirst = me.rank === 1;
 
             let pointsToNext = 0;
             let nextRank = null;
             if (me.rank > 1) {
-                const predecessor = participants[me.rank - 2];
+                const predecessor = rankedParticipants[me.rank - 2];
                 pointsToNext = Math.max(1, (predecessor.points - me.points) + 1);
                 nextRank = me.rank - 1;
             }
@@ -2292,11 +2252,11 @@ export async function calculateContestLeaderboard(contestId = null, currentInflu
                 positionsFromTop10: Math.max(0, me.rank - 10)
             };
 
-            // If outside Top 10, calculate nearby ranks (e.g. rank - 1, rank, rank + 1)
+            // If outside Top 10, calculate nearby ranks
             if (!isTop10) {
-                const startIdx = Math.max(0, myIndex - 1);
-                const endIdx = Math.min(participants.length, myIndex + 2);
-                nearby = participants.slice(startIdx, endIdx).map(p => ({
+                const startIdx = Math.max(0, myRankedIndex - 1);
+                const endIdx = Math.min(rankedParticipants.length, myRankedIndex + 2);
+                nearby = rankedParticipants.slice(startIdx, endIdx).map(p => ({
                     rank: p.rank,
                     name: p.name,
                     profile_image: p.profile_image,
@@ -2305,6 +2265,22 @@ export async function calculateContestLeaderboard(contestId = null, currentInflu
                     is_tied: p.is_tied
                 }));
             }
+        } else {
+            // Unranked (0 points / no qualifying activity)
+            currentCreatorData = {
+                influencer_id: currentInfluencerId,
+                name: inf ? sanitizeText(inf.name || inf.display_name || 'WishRite Creator') : 'WishRite Creator',
+                profile_image: inf?.profile_image || null,
+                rank: null,
+                points: 0,
+                totalParticipants,
+                topPercentile: null,
+                isTop10: false,
+                isFirst: false,
+                pointsToNext: null,
+                nextRank: null,
+                positionsFromTop10: 0
+            };
         }
     }
 

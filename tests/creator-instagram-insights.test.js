@@ -1,11 +1,21 @@
 require('dotenv').config();
-const { test, describe, before } = require('node:test');
+const { test, describe, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
 
 const PORT = process.env.PORT || 8085;
+const STORE_PATH = path.join(__dirname, '..', 'data', 'influencers_store.json');
+let backupStoreRaw = null;
+
+before(() => {
+  if (fs.existsSync(STORE_PATH)) {
+    backupStoreRaw = fs.readFileSync(STORE_PATH, 'utf8');
+  }
+});
+
+
 
 function makeRequest(options, bodyData = null) {
   return new Promise((resolve, reject) => {
