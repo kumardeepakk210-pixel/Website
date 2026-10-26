@@ -988,3 +988,301 @@
     border: 1px solid #fed7d7;
 }
 
+/* ═══ YOUR CREATOR LINK CARD ═══ */
+.creator-link-card {
+    background: #FFFFFF;
+    border: 1px solid var(--wr-border, #E4E4E7);
+    border-radius: 8px;
+    padding: 20px 24px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.creator-link-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.creator-link-badge {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    background: rgba(94, 52, 53, 0.08);
+    color: #5E3435;
+    padding: 3px 8px;
+    border-radius: 4px;
+}
+
+.creator-link-box {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.creator-link-box input {
+    flex: 1;
+    min-width: 220px;
+    padding: 10px 14px;
+    font-size: 0.88rem;
+    font-family: monospace;
+    background: #FAFAFA;
+    border: 1px solid var(--wr-border, #E4E4E7);
+    border-radius: 4px;
+    color: #27272A;
+}
+
+.creator-link-box input:focus {
+    outline: none;
+    border-color: #5E3435;
+    background: #FFF;
+}
+
+.creator-link-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.creator-link-actions button {
+    font-size: 0.82rem;
+    padding: 9px 16px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+}
+
+.creator-link-desc {
+    font-size: 0.82rem;
+    color: var(--wr-text-muted, #71717A);
+    margin-top: 10px;
+    line-height: 1.4;
+}
+
+/* ═══ PRODUCT PREVIEW THUMB BOX ═══ */
+.product-preview-thumb-box {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    background: #FAFAFA;
+    border: 1px solid #E4E4E7;
+    border-radius: 6px;
+    margin-top: 8px;
+}
+
+.product-preview-thumb {
+    width: 48px;
+    height: 48px;
+    border-radius: 4px;
+    object-fit: cover;
+    background: #F4F4F5;
+    border: 1px solid #E4E4E7;
+}
+
+.product-preview-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.product-preview-title {
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: #27272A;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.product-preview-code {
+    font-size: 0.78rem;
+    color: var(--wr-text-muted, #71717A);
+    font-family: monospace;
+}
+
+/* ═══ REEL INSIGHTS ═══ */
+.reel-insights-filters {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+}
+
+.reel-filter-btn {
+    background: transparent;
+    border: 1px solid var(--wr-border, #E4E4E7);
+    border-radius: 9999px;
+    padding: 4px 12px;
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: var(--wr-text-muted, #71717A);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.reel-filter-btn:hover,
+.reel-filter-btn.active {
+    background: #5E3435;
+    border-color: #5E3435;
+    color: #FFFFFF;
+}
+
+.reel-insights-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 16px;
+}
+
+.reel-insights-card {
+    background: #FFFFFF;
+    border: 1px solid var(--wr-border, #E4E4E7);
+    border-radius: 8px;
+    padding: 18px 20px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.reel-insights-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(94, 52, 53, 0.08);
+}
+
+.reel-insights-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.reel-insights-card-main {
+    display: flex;
+    gap: 14px;
+    align-items: center;
+}
+
+.reel-insights-thumb {
+    width: 68px;
+    height: 90px;
+    border-radius: 6px;
+    object-fit: cover;
+    background: #27272A;
+    border: 1px solid #E4E4E7;
+    flex-shrink: 0;
+}
+
+.reel-insights-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.reel-insights-title {
+    font-size: 0.92rem;
+    font-weight: 600;
+    color: #27272A;
+    line-height: 1.3;
+}
+
+.reel-insights-sub {
+    font-size: 0.78rem;
+    color: var(--wr-text-muted, #71717A);
+}
+
+.reel-insights-metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    background: #FAFAFA;
+    border: 1px solid #F4F4F5;
+    border-radius: 6px;
+    padding: 10px 12px;
+    text-align: center;
+}
+
+.reel-insights-metric-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.reel-metric-val {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #5E3435;
+}
+
+.reel-metric-label {
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--wr-text-muted, #71717A);
+    margin-top: 2px;
+}
+
+.reel-insights-tracking-box {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: linear-gradient(135deg, rgba(94, 52, 53, 0.04) 0%, rgba(94, 52, 53, 0.08) 100%);
+    border: 1px solid rgba(94, 52, 53, 0.15);
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 0.82rem;
+}
+
+.reel-insights-notice {
+    background: #FFFBEB;
+    border: 1px solid #FDE68A;
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-size: 0.78rem;
+    color: #92400E;
+    line-height: 1.4;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+.reel-insights-empty {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 36px 20px;
+    background: #FAFAFA;
+    border: 1px dashed #E4E4E7;
+    border-radius: 8px;
+    color: var(--wr-text-muted, #71717A);
+}
+
+/* ═══ RESPONSIVE ADJUSTMENTS ═══ */
+@media (max-width: 600px) {
+    .creator-link-box {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .creator-link-box input {
+        width: 100%;
+    }
+    .creator-link-actions {
+        width: 100%;
+    }
+    .creator-link-actions button {
+        flex: 1;
+        justify-content: center;
+    }
+    .reel-insights-container {
+        grid-template-columns: 1fr;
+    }
+}
+

@@ -33,7 +33,7 @@ module.exports = async function handler(req, res) {
         if ((subPath === '/products' || subPath === '/inventory') && method === 'GET') {
             let activeInventory = [];
             try {
-                const rows = await dbQuery('inventory', 'status=eq.Active&order=created_at.desc&limit=50');
+                const rows = await dbQuery('inventory', 'status=eq.Active&order=created_at.desc&limit=500');
                 if (Array.isArray(rows) && rows.length > 0) activeInventory = rows;
             } catch (e) {
                 console.warn('[Public API] Could not query inventory:', e.message);
@@ -41,7 +41,8 @@ module.exports = async function handler(req, res) {
 
             return res.status(200).json({
                 success: true,
-                products: activeInventory
+                products: activeInventory,
+                data: activeInventory
             });
         }
 

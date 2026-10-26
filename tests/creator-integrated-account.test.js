@@ -689,4 +689,180 @@ describe('WishRite — Integrated Creator Program Inside My Account', () => {
       assert.ok(profileRes.data.data.profile_image.includes('ui-avatars.com'));
     });
   });
+
+  describe('Product Category, Creator Link & Reel Insights', () => {
+    let testCreatorToken;
+
+    before(async () => {
+      const uniqueEmail = `creator_cat_${Date.now()}@test.com`;
+      const authHeader = makeCustomerAuthHeader(uniqueEmail, `usr_cat_${Date.now()}`);
+
+      const onboardRes = await makeRequest({
+        path: '/api/creator/onboard',
+        method: 'POST',
+        headers: { 'Authorization': authHeader }
+      }, {
+        name: 'Rohan Sharma Creator',
+        bio: 'Styling WishRite silver jewellery',
+        city: 'Mumbai',
+        state: 'Maharashtra',
+        country: 'India',
+        instagram: '@rohan_silver',
+        preferences: ['Jewellery styling'],
+        agreement_accepted: true
+      });
+
+      assert.equal(onboardRes.statusCode, 200);
+      testCreatorToken = onboardRes.data.token;
+    });
+
+    test('Live product catalog provides canonical categories without hardcoding', async () => {
+      const res = await makeRequest({ path: '/api/public/products', method: 'GET' });
+      assert.equal(res.statusCode, 200);
+      assert.equal(res.data.success, true);
+      const prods = res.data.products || res.data.data || [];
+      assert.ok(Array.isArray(prods));
+
+      // Extract distinct categories dynamically from catalog
+      const categories = [...new Set(prods.map(p => p.category).filter(Boolean))];
+      assert.ok(categories.length > 0, 'Catalog should contain categories from database');
+    });
+
+    test('HTML modals contain Category dropdown, disabled Product dropdown, and preview box', () => {
+      const html = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
+
+      // Post modal structure
+      assert.ok(html.includes('id="share-post-category"'), 'share-post-category select exists');
+      assert.ok(html.includes('id="share-post-product"'), 'share-post-product select exists');
+      assert.ok(html.includes('id="share-post-product-preview"'), 'share-post-product-preview exists');
+      assert.ok(html.includes('Select a category first ▼'), 'Post product selector starts disabled');
+
+      // Reel modal structure
+      assert.ok(html.includes('id="share-reel-category"'), 'share-reel-category select exists');
+      assert.ok(html.includes('id="share-reel-product"'), 'share-reel-product select exists');
+      assert.ok(html.includes('id="share-reel-product-preview"'), 'share-reel-product-preview exists');
+    });
+
+    test('Submit Post with Product Category persists category and product relationship', async () => {
+      const postPayload = {
+        content_type: 'post',
+        platform: 'instagram',
+        url: 'https://www.instagram.com/p/DBxyz123/',
+        caption: 'Styling the Silver Evil Eye Necklace with modern festive outfits',
+        product_category: 'Necklaces',
+        product_code: 'WR-NC-001',
+        product_name: 'Silver Evil Eye Necklace',
+        product_image: 'https://images.wishrite.in/products/WR-NC-001.jpg',
+        tags: ['#wishrite', '#silverjewellery']
+      };
+
+      const res = await makeRequest({
+        path: '/api/creator/content',
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${testCreatorToken}` }
+      }, postPayload);
+
+      assert.equal(res.statusCode, 200);
+      assert.equal(res.data.success, true);
+      assert.equal(res.data.data.product_category, 'Necklaces');
+      assert.equal(res.data.data.product_code, 'WR-NC-001');
+      assert.equal(res.data.data.product_name, 'Silver Evil Eye Necklace');
+    });
+
+    test('Submit Reel with Product Category persists category and product relationship', async () => {
+      const reelPayload = {
+        content_type: 'reel',
+        platform: 'instagram',
+        url: 'https://www.instagram.com/reel/C89abcDEF/',
+        caption: 'Sparkle in 925 Silver Solitaire Studs',
+        product_category: 'Earrings',
+        product_code: 'WR-ER-002',
+        product_name: 'Solitaire Studs',
+        product_image: 'https://images.wishrite.in/products/WR-ER-002.jpg',
+        tags: ['#wishrite', '#reels']
+      };
+
+      const res = await makeRequest({
+        path: '/api/creator/content',
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${testCreatorToken}` }
+      }, reelPayload);
+
+      assert.equal(res.statusCode, 200);
+      assert.equal(res.data.success, true);
+      assert.equal(res.data.data.product_category, 'Earrings');
+      assert.equal(res.data.data.product_code, 'WR-ER-002');
+      assert.equal(res.data.data.product_name, 'Solitaire Studs');
+    });
+
+    test('GET /api/creator/content returns submitted items with product category', async () => {
+      const res = await makeRequest({
+        path: '/api/creator/content',
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${testCreatorToken}` }
+      });
+
+      assert.equal(res.statusCode, 200);
+      assert.equal(res.data.success, true);
+      assert.ok(Array.isArray(res.data.data));
+
+      const postItem = res.data.data.find(c => c.content_type === 'post' && c.product_code === 'WR-NC-001');
+      assert.ok(postItem, 'Submitted post exists');
+      assert.equal(postItem.product_category, 'Necklaces');
+
+      const reelItem = res.data.data.find(c => c.content_type === 'reel' && c.product_code === 'WR-ER-002');
+      assert.ok(reelItem, 'Submitted reel exists');
+      assert.equal(reelItem.product_category, 'Earrings');
+    });
+
+    test('Creator Link Card is positioned below Creator Performance and above Reel Insights', () => {
+      const html = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
+
+      const perfPos = html.indexOf('class="creator-metrics-grid"');
+      const linkCardPos = html.indexOf('id="creator-link-card"');
+      const reelInsightsPos = html.indexOf('id="creator-reel-insights-section"');
+      const contentPos = html.indexOf('id="creator-content-grid"');
+
+      assert.ok(perfPos > 0, 'Performance grid exists');
+      assert.ok(linkCardPos > perfPos, 'Creator Link card is placed after Creator Performance');
+      assert.ok(reelInsightsPos > linkCardPos, 'Reel Insights section is placed after Creator Link card');
+      assert.ok(contentPos > reelInsightsPos, 'My Content is placed after Reel Insights');
+
+      // Verify description text required by prompt item 10
+      assert.ok(html.includes('Share this link with your audience to help them discover WishRite jewellery.'));
+    });
+
+    test('Creator Link Card contains Copy and Share buttons', () => {
+      const html = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
+      assert.ok(html.includes('id="creator-copy-link-btn"'));
+      assert.ok(html.includes('id="creator-share-link-btn"'));
+      assert.ok(html.includes('copyCreatorReferralLink()'));
+      assert.ok(html.includes('shareCreatorLink()'));
+    });
+
+    test('Reel Insights and client logic strictly avoids fake statistics', () => {
+      const js = fs.readFileSync(path.join(__dirname, '../js/creator-program.js'), 'utf8');
+
+      // Verify that notice for unintegrated social platform insights is present
+      assert.ok(js.includes('Performance insights will appear here when social-platform insights are available.'));
+
+      // Verify that random/fake generation functions (e.g. Math.random() for views/likes/comments) are NOT present
+      assert.ok(!js.includes('Math.floor(Math.random() * 1000)'), 'No fake views generation');
+      assert.ok(!js.includes('Math.floor(Math.random() * 100)'), 'No fake likes generation');
+
+      // Verify real WishRite attribution performance is rendered
+      assert.ok(js.includes('WishRite Performance'));
+      assert.ok(js.includes('commission_amount'));
+    });
+
+    test('Responsive CSS contains styles for Creator Link card, product selector preview & Reel Insights', () => {
+      const css = fs.readFileSync(path.join(__dirname, '../css/creator.css'), 'utf8');
+      assert.ok(css.includes('.creator-link-card'));
+      assert.ok(css.includes('.product-preview-thumb-box'));
+      assert.ok(css.includes('.reel-insights-container'));
+      assert.ok(css.includes('.reel-insights-card'));
+      assert.ok(css.includes('.reel-insights-notice'));
+      assert.ok(css.includes('@media (max-width: 600px)'));
+    });
+  });
 });

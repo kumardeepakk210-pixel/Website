@@ -1836,6 +1836,7 @@ export async function handleSubmitCreatorContent(req, res) {
             platform,
             url: contentUrl,
             caption: sanitizeText(body.caption || ''),
+            product_category: sanitizeText(body.product_category || body.category || ''),
             product_code: sanitizeText(body.product_code || ''),
             product_name: sanitizeText(body.product_name || ''),
             product_image: isValidHttpUrl(body.product_image) ? body.product_image : null,

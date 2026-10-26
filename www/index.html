@@ -2410,13 +2410,8 @@
                             </div>
                         </div>
 
-                        <!-- Referral Link Bar -->
-                        <div class="creator-referral-bar" style="margin-top:16px; padding-top:16px; border-top:1px solid rgba(0,0,0,0.06); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
-                            <div style="display:flex; align-items:center; gap:8px; flex:1; min-width:240px;">
-                                <span style="font-size:0.8rem; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; color:var(--wr-text-muted);">Your Creator Link:</span>
-                                <input type="text" id="creator-dash-link-input" readonly style="flex:1; padding:6px 10px; font-size:0.85rem; border:1px solid var(--wr-border-light); border-radius:4px; background:#fafafa; font-family:monospace;">
-                                <button type="button" class="btn btn-secondary" onclick="copyCreatorReferralLink()" style="padding:6px 14px; font-size:0.82rem;">Copy</button>
-                            </div>
+                        <!-- Creator Actions Bar -->
+                        <div class="creator-profile-actions-bar" style="margin-top:16px; padding-top:16px; border-top:1px solid rgba(0,0,0,0.06); display:flex; justify-content:flex-end; align-items:center; flex-wrap:wrap; gap:10px;">
                             <div class="creator-action-btns" style="display:flex; gap:8px;">
                                 <button type="button" class="btn btn-primary" onclick="openSharePostModal()" style="font-size:0.85rem; padding:8px 16px; display:inline-flex; align-items:center; gap:6px;">
                                     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
@@ -2465,6 +2460,50 @@
                             <span class="metric-label">Reward Points</span>
                             <span class="metric-val" id="metric-creator-points">0</span>
                             <button type="button" class="btn btn-ghost" onclick="openCreatorRewardsModal()" style="font-size:0.75rem; padding:2px 8px; margin-top:4px; text-decoration:underline;">REDEEM REWARDS</button>
+                        </div>
+                    </div>
+
+                    <!-- Your Creator Link Card -->
+                    <div class="creator-link-card" id="creator-link-card" style="margin-top:28px;">
+                        <div class="creator-link-card-header">
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--wr-primary);"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                                <h3 style="font-family:var(--wr-font-heading); font-size:1.15rem; color:var(--wr-primary); margin:0; text-transform:uppercase; letter-spacing:0.5px;">YOUR CREATOR LINK</h3>
+                            </div>
+                            <span class="creator-link-badge">Direct Attribution</span>
+                        </div>
+                        <div class="creator-link-box">
+                            <input type="text" id="creator-dash-link-input" readonly value="https://wishrite.in/creator/..." aria-label="Your Creator Link">
+                            <div class="creator-link-actions">
+                                <button type="button" id="creator-copy-link-btn" class="btn btn-primary" onclick="copyCreatorReferralLink()">
+                                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                                    <span id="creator-copy-link-text">COPY LINK</span>
+                                </button>
+                                <button type="button" id="creator-share-link-btn" class="btn btn-secondary creator-share-btn" onclick="shareCreatorLink()">
+                                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                                    <span>SHARE LINK</span>
+                                </button>
+                            </div>
+                        </div>
+                        <p class="creator-link-desc">Share this link with your audience to help them discover WishRite jewellery.</p>
+                    </div>
+
+                    <!-- Reel Insights Section -->
+                    <div class="creator-reel-insights-section" id="creator-reel-insights-section" style="margin-top:28px;">
+                        <div class="creator-section-heading" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+                            <div>
+                                <h3 style="margin:0; text-transform:uppercase; letter-spacing:0.5px;">REEL INSIGHTS</h3>
+                                <span style="font-size:0.8rem; color:var(--wr-text-muted);">Performance insights for your submitted Reels & Shorts</span>
+                            </div>
+                            <div class="reel-insights-filters" style="display:flex; gap:6px;">
+                                <button type="button" class="reel-filter-btn active" onclick="filterReelInsights('all', this)">All</button>
+                                <button type="button" class="reel-filter-btn" onclick="filterReelInsights('recent', this)">Recent</button>
+                                <button type="button" class="reel-filter-btn" onclick="filterReelInsights('approved', this)">Approved</button>
+                                <button type="button" class="reel-filter-btn" onclick="filterReelInsights('pending', this)">Pending</button>
+                            </div>
+                        </div>
+                        <div id="reel-insights-container" class="reel-insights-container" style="margin-top:14px;">
+                            <!-- Dynamically rendered by renderReelInsights() -->
                         </div>
                     </div>
 
@@ -2573,10 +2612,17 @@
                     <input type="url" id="share-post-url" class="form-input" placeholder="https://www.instagram.com/p/..." required style="width:100%;padding:10px 12px;border:1px solid var(--wr-border);border-radius:4px;font-size:0.92rem;">
                 </div>
                 <div class="form-group" style="margin-bottom:14px;">
-                    <label for="share-post-product" class="form-label" style="display:block;font-size:0.85rem;font-weight:500;margin-bottom:6px;">Featured WishRite Product</label>
-                    <select id="share-post-product" class="form-input" style="width:100%;padding:10px 12px;border:1px solid var(--wr-border);border-radius:4px;font-size:0.92rem;">
-                        <option value="">— Select from catalog —</option>
+                    <label for="share-post-category" class="form-label" style="display:block;font-size:0.85rem;font-weight:500;margin-bottom:6px;">Product Category *</label>
+                    <select id="share-post-category" class="form-input" required onchange="handleCategoryChange('post')" style="width:100%;padding:10px 12px;border:1px solid var(--wr-border);border-radius:4px;font-size:0.92rem;">
+                        <option value="">Select Product Category ▼</option>
                     </select>
+                </div>
+                <div class="form-group" style="margin-bottom:14px;">
+                    <label for="share-post-product" class="form-label" style="display:block;font-size:0.85rem;font-weight:500;margin-bottom:6px;">Featured WishRite Product *</label>
+                    <select id="share-post-product" class="form-input" required disabled onchange="handleProductChange('post')" style="width:100%;padding:10px 12px;border:1px solid var(--wr-border);border-radius:4px;font-size:0.92rem;">
+                        <option value="">Select a category first ▼</option>
+                    </select>
+                    <div id="share-post-product-preview" class="product-preview-thumb-box" style="display:none;"></div>
                 </div>
                 <div class="form-group" style="margin-bottom:14px;">
                     <label for="share-post-caption" class="form-label" style="display:block;font-size:0.85rem;font-weight:500;margin-bottom:6px;">Caption / Styling Notes</label>
@@ -2626,10 +2672,17 @@
                     <input type="url" id="share-reel-url" class="form-input" placeholder="https://www.instagram.com/reel/... or https://youtube.com/shorts/..." required style="width:100%;padding:10px 12px;border:1px solid var(--wr-border);border-radius:4px;font-size:0.92rem;">
                 </div>
                 <div class="form-group" style="margin-bottom:14px;">
-                    <label for="share-reel-product" class="form-label" style="display:block;font-size:0.85rem;font-weight:500;margin-bottom:6px;">Featured WishRite Product</label>
-                    <select id="share-reel-product" class="form-input" style="width:100%;padding:10px 12px;border:1px solid var(--wr-border);border-radius:4px;font-size:0.92rem;">
-                        <option value="">— Select from catalog —</option>
+                    <label for="share-reel-category" class="form-label" style="display:block;font-size:0.85rem;font-weight:500;margin-bottom:6px;">Product Category *</label>
+                    <select id="share-reel-category" class="form-input" required onchange="handleCategoryChange('reel')" style="width:100%;padding:10px 12px;border:1px solid var(--wr-border);border-radius:4px;font-size:0.92rem;">
+                        <option value="">Select Product Category ▼</option>
                     </select>
+                </div>
+                <div class="form-group" style="margin-bottom:14px;">
+                    <label for="share-reel-product" class="form-label" style="display:block;font-size:0.85rem;font-weight:500;margin-bottom:6px;">Featured WishRite Product *</label>
+                    <select id="share-reel-product" class="form-input" required disabled onchange="handleProductChange('reel')" style="width:100%;padding:10px 12px;border:1px solid var(--wr-border);border-radius:4px;font-size:0.92rem;">
+                        <option value="">Select a category first ▼</option>
+                    </select>
+                    <div id="share-reel-product-preview" class="product-preview-thumb-box" style="display:none;"></div>
                 </div>
                 <div class="form-group" style="margin-bottom:14px;">
                     <label for="share-reel-caption" class="form-label" style="display:block;font-size:0.85rem;font-weight:500;margin-bottom:6px;">Caption</label>

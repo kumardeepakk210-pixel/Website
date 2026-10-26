@@ -603,20 +603,57 @@ function renderCreatorDashboard(data) {
  */
 function copyCreatorReferralLink() {
     const linkInput = document.getElementById('creator-dash-link-input') || document.getElementById('cd-referral-link-input');
+    const copyBtnText = document.getElementById('creator-copy-link-text');
     if (!linkInput) return;
     linkInput.select();
-    navigator.clipboard.writeText(linkInput.value).then(() => {
+
+    const onCopied = () => {
+        if (copyBtnText) {
+            copyBtnText.innerText = 'Copied!';
+            setTimeout(() => {
+                copyBtnText.innerText = 'COPY LINK';
+            }, 2500);
+        }
         if (typeof showToast === 'function') {
             showToast('Referral link copied to clipboard!', 'success');
         }
-    }).catch(() => {
+    };
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(linkInput.value).then(onCopied).catch(() => {
+            document.execCommand('copy');
+            onCopied();
+        });
+    } else {
         document.execCommand('copy');
-        if (typeof showToast === 'function') {
-            showToast('Referral link copied!', 'success');
-        }
-    });
+        onCopied();
+    }
 }
 window.copyCreatorReferralLink = copyCreatorReferralLink;
+
+async function shareCreatorLink() {
+    const linkInput = document.getElementById('creator-dash-link-input') || document.getElementById('cd-referral-link-input');
+    const url = linkInput ? linkInput.value : window.location.origin;
+
+    if (navigator.share) {
+        try {
+            await navigator.share({
+                title: 'WishRite Jewellery',
+                text: 'Discover fine 925 sterling silver jewellery on WishRite.',
+                url
+            });
+            return;
+        } catch (err) {
+            if (err.name === 'AbortError') return;
+        }
+    }
+
+    copyCreatorReferralLink();
+    if (typeof showToast === 'function') {
+        showToast('Share not available — link copied to clipboard!', 'info');
+    }
+}
+window.shareCreatorLink = shareCreatorLink;
 
 /**
  * Edit Creator Profile Modal Logic
@@ -949,13 +986,121 @@ async function handleEditCreatorProfileSubmit(e) {
 }
 window.handleEditCreatorProfileSubmit = handleEditCreatorProfileSubmit;
 
+// State for content and reel insights
+let currentCreatorContent = [];
+let currentReelsList = [];
+let currentReelFilter = 'all';
+
 /**
- * Fetches and renders the creator's submitted content
+ * Filter and render Reel Insights
+ */
+function filterReelInsights(filter, btn) {
+    currentReelFilter = filter || 'all';
+    document.querySelectorAll('.reel-filter-btn').forEach(b => b.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+    renderReelInsightsGrid();
+}
+window.filterReelInsights = filterReelInsights;
+
+function renderReelInsightsGrid() {
+    const container = document.getElementById('reel-insights-container');
+    if (!container) return;
+
+    let list = [...currentReelsList];
+    if (currentReelFilter === 'approved') {
+        list = list.filter(r => (r.status || '').toLowerCase() === 'approved');
+    } else if (currentReelFilter === 'pending') {
+        list = list.filter(r => (r.status || '').toLowerCase() !== 'approved' && (r.status || '').toLowerCase() !== 'rejected');
+    } else if (currentReelFilter === 'recent') {
+        list = list.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+    } else if (currentReelFilter === 'top') {
+        list = list.sort((a, b) => (Number(b.clicks || 0) + Number(b.orders || 0)) - (Number(a.clicks || 0) + Number(a.orders || 0)));
+    }
+
+    if (list.length === 0) {
+        container.innerHTML = `
+            <div class="reel-insights-empty">
+                <p style="margin:0 0 6px 0; font-weight:500;">No submitted reels found matching '${currentReelFilter}'.</p>
+                <span style="font-size:0.82rem;">Share a Reel featuring WishRite jewellery to see its performance metrics here.</span>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = list.map(reel => {
+        const dateStr = reel.created_at ? new Date(reel.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Recently';
+        const statusClass = (reel.status || '').toLowerCase() === 'approved' ? 'verified' : ((reel.status || '').toLowerCase() === 'rejected' ? 'rejected' : 'pending');
+        const statusLabel = (reel.status || '').toLowerCase() === 'approved' ? '✓ Approved' : ((reel.status || '').toLowerCase() === 'rejected' ? '✕ Rejected' : '⧖ Under Review');
+        const thumbImg = reel.thumbnail_url || reel.product_image || 'https://placehold.co/180x240/5E3435/FFF?text=WishRite+Reel';
+        const platformName = reel.platform === 'youtube' ? 'YouTube Short' : (reel.platform === 'facebook' ? 'Facebook Reel' : 'Instagram Reel');
+
+        // Note: strictly no fabricated or random numbers. Only display social metrics if genuine API data is connected.
+        const hasConnectedSocialApi = typeof reel.views === 'number' && reel.social_likes !== undefined;
+
+        return `
+            <div class="reel-insights-card">
+                <div class="reel-insights-card-header">
+                    <span style="font-size:0.75rem; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; color:#5E3435;">${platformName}</span>
+                    <span class="content-status-badge ${statusClass}">${statusLabel}</span>
+                </div>
+                <div class="reel-insights-card-main">
+                    <img src="${thumbImg}" alt="Reel Thumbnail" class="reel-insights-thumb" onerror="this.src='/images/default-avatar.png'">
+                    <div class="reel-insights-meta">
+                        <span class="reel-insights-title">${reel.caption ? (reel.caption.length > 50 ? reel.caption.slice(0, 50) + '…' : reel.caption) : 'WishRite Jewellery Reel'}</span>
+                        <span class="reel-insights-sub">Submitted: ${dateStr}</span>
+                        ${reel.product_name ? `<span class="reel-insights-sub" style="color:#5E3435; font-weight:500;">Product: ${reel.product_name}</span>` : ''}
+                        ${reel.product_category ? `<span class="reel-insights-sub">Category: ${reel.product_category}</span>` : ''}
+                        <a href="${reel.url}" target="_blank" rel="noopener" style="font-size:0.78rem; color:#5E3435; text-decoration:underline; margin-top:2px;">View Reel ↗</a>
+                    </div>
+                </div>
+
+                ${hasConnectedSocialApi ? `
+                    <div class="reel-insights-metrics-grid">
+                        <div class="reel-insights-metric-item">
+                            <span class="reel-metric-val">${Number(reel.views || 0).toLocaleString()}</span>
+                            <span class="reel-metric-label">Views</span>
+                        </div>
+                        <div class="reel-insights-metric-item">
+                            <span class="reel-metric-val">${Number(reel.social_likes || 0).toLocaleString()}</span>
+                            <span class="reel-metric-label">Likes</span>
+                        </div>
+                        <div class="reel-insights-metric-item">
+                            <span class="reel-metric-val">${Number(reel.social_comments || 0).toLocaleString()}</span>
+                            <span class="reel-metric-label">Comments</span>
+                        </div>
+                    </div>
+                ` : `
+                    <div class="reel-insights-notice">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0; margin-top:1px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                        <span>Performance insights will appear here when social-platform insights are available.</span>
+                    </div>
+                `}
+
+                <!-- Real WishRite Attribution Performance -->
+                <div class="reel-insights-tracking-box">
+                    <div>
+                        <span style="font-size:0.72rem; text-transform:uppercase; letter-spacing:0.5px; color:var(--wr-text-muted); display:block;">WishRite Performance</span>
+                        <span style="font-size:0.85rem; font-weight:600; color:#5E3435;">
+                            ${Number(reel.clicks || 0)} Clicks &bull; ${Number(reel.orders || 0)} Orders
+                        </span>
+                    </div>
+                    <div style="text-align:right;">
+                        <span style="font-size:0.72rem; text-transform:uppercase; letter-spacing:0.5px; color:var(--wr-text-muted); display:block;">Commission</span>
+                        <span style="font-size:0.85rem; font-weight:700; color:#2E7D32;">₹${Number(reel.commission_amount || 0).toLocaleString()}</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+window.renderReelInsightsGrid = renderReelInsightsGrid;
+
+/**
+ * Fetches and renders the creator's submitted content and updates Reel Insights
  */
 async function loadCreatorContent(statusFilter = 'all') {
-    const grid = document.getElementById('creator-my-content-grid');
+    const grid = document.getElementById('creator-content-grid') || document.getElementById('creator-my-content-grid');
     const emptyEl = document.getElementById('creator-content-empty');
-    if (!grid) return;
 
     try {
         const headers = await getAuthHeaders();
@@ -963,17 +1108,31 @@ async function loadCreatorContent(statusFilter = 'all') {
         const json = await res.json();
 
         if (!json.success || !Array.isArray(json.data) || json.data.length === 0) {
-            grid.innerHTML = '';
+            currentCreatorContent = [];
+            currentReelsList = [];
+            if (grid) grid.innerHTML = '';
             if (emptyEl) emptyEl.style.display = 'block';
+            renderReelInsightsGrid();
             return;
         }
 
-        let items = json.data;
-        if (statusFilter !== 'all') {
-            if (statusFilter === 'post' || statusFilter === 'reel') {
-                items = items.filter(i => i.content_type === statusFilter);
-            } else {
-                items = items.filter(i => i.status === statusFilter);
+        currentCreatorContent = json.data;
+        currentReelsList = json.data.filter(i => i.content_type === 'reel');
+        renderReelInsightsGrid();
+
+        if (!grid) return;
+
+        let items = [...json.data];
+        const normFilter = String(statusFilter || 'all').toLowerCase();
+        if (normFilter !== 'all') {
+            if (normFilter === 'post' || normFilter === 'posts') {
+                items = items.filter(i => i.content_type === 'post');
+            } else if (normFilter === 'reel' || normFilter === 'reels') {
+                items = items.filter(i => i.content_type === 'reel');
+            } else if (normFilter === 'pending') {
+                items = items.filter(i => (i.status || '').toLowerCase() !== 'approved' && (i.status || '').toLowerCase() !== 'rejected');
+            } else if (normFilter === 'approved') {
+                items = items.filter(i => (i.status || '').toLowerCase() === 'approved');
             }
         }
 
@@ -987,8 +1146,8 @@ async function loadCreatorContent(statusFilter = 'all') {
 
         grid.innerHTML = items.map(item => {
             const dateStr = item.created_at ? new Date(item.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
-            const statusClass = item.status === 'approved' ? 'verified' : (item.status === 'rejected' ? 'rejected' : 'pending');
-            const statusLabel = item.status === 'approved' ? '✓ Approved' : (item.status === 'rejected' ? '✕ Rejected' : '⧖ Under Review');
+            const statusClass = (item.status || '').toLowerCase() === 'approved' ? 'verified' : ((item.status || '').toLowerCase() === 'rejected' ? 'rejected' : 'pending');
+            const statusLabel = (item.status || '').toLowerCase() === 'approved' ? '✓ Approved' : ((item.status || '').toLowerCase() === 'rejected' ? '✕ Rejected' : '⧖ Under Review');
             const platformIcon = item.platform === 'instagram' ? '📸 Instagram' : (item.platform === 'youtube' ? '▶ YouTube' : (item.platform === 'facebook' ? '👥 Facebook' : '🔗 Web'));
             const typeLabel = item.content_type === 'reel' ? 'Reel' : 'Post';
             const imgUrl = item.thumbnail_url || item.product_image || 'https://placehold.co/400x400/5E3435/FFF?text=WishRite+Jewellery';
@@ -996,12 +1155,17 @@ async function loadCreatorContent(statusFilter = 'all') {
             return `
                 <div class="creator-content-card">
                     <div class="content-thumb-wrap">
-                        <img src="${imgUrl}" alt="${item.caption || 'WishRite Content'}" loading="lazy" />
+                        <img src="${imgUrl}" alt="${item.caption || 'WishRite Content'}" loading="lazy" onerror="this.src='/images/default-avatar.png'" />
                         <span class="content-type-pill">${platformIcon} ${typeLabel}</span>
                         <span class="content-status-badge ${statusClass}">${statusLabel}</span>
                     </div>
                     <div class="content-card-body">
-                        ${item.product_name ? `<div class="content-product-tag">✨ ${item.product_name}</div>` : ''}
+                        ${item.product_name ? `
+                            <div style="margin-bottom:6px;">
+                                <div class="content-product-tag" style="margin-bottom:2px;">✨ Product: ${item.product_name}</div>
+                                ${item.product_category ? `<div style="font-size:0.75rem; color:var(--wr-text-muted); padding-left:4px;">Category: ${item.product_category}</div>` : ''}
+                            </div>
+                        ` : ''}
                         <p class="content-caption">${item.caption || 'Shared WishRite styling piece'}</p>
                         ${item.rejection_reason ? `<div class="content-reject-reason">Feedback: ${item.rejection_reason}</div>` : ''}
                         <div class="content-card-footer">
@@ -1021,42 +1185,166 @@ window.loadCreatorContent = loadCreatorContent;
 /**
  * Filter buttons for My Content
  */
-function setContentFilter(filter, btn) {
+function filterCreatorContent(filter, btn) {
     document.querySelectorAll('.content-filter-btn').forEach(b => b.classList.remove('active'));
     if (btn) btn.classList.add('active');
     loadCreatorContent(filter);
 }
-window.setContentFilter = setContentFilter;
+window.filterCreatorContent = filterCreatorContent;
+window.setContentFilter = filterCreatorContent;
 
 /**
- * Fetches live WishRite products for the product selector
+ * Fetches live WishRite products for the category & product selector
  */
+function getNormalizedCategory(rawCat) {
+    if (typeof window.normalizeCategory === 'function') {
+        return window.normalizeCategory(rawCat);
+    }
+    if (!rawCat) return 'Other';
+    const c = String(rawCat).trim();
+    return c.charAt(0).toUpperCase() + c.slice(1);
+}
+
 async function fetchLiveProductsForPicker() {
-    if (liveProductsCache.length > 0) return;
+    if (liveProductsCache.length > 0) {
+        populateCategoryAndProductPickers();
+        return liveProductsCache;
+    }
+    try {
+        if (window.productLoader && typeof window.productLoader.ensureLoaded === 'function') {
+            const prods = await window.productLoader.ensureLoaded();
+            if (Array.isArray(prods) && prods.length > 0) {
+                liveProductsCache = prods;
+                populateCategoryAndProductPickers();
+                return liveProductsCache;
+            }
+        }
+    } catch (_) {}
+    if (window.productsDB && Array.isArray(window.productsDB) && window.productsDB.length > 0) {
+        liveProductsCache = window.productsDB;
+        populateCategoryAndProductPickers();
+        return liveProductsCache;
+    }
     try {
         const res = await fetch('/api/public/products');
         const json = await res.json();
-        if (json.success && Array.isArray(json.data)) {
-            liveProductsCache = json.data;
-        } else if (Array.isArray(json.products)) {
-            liveProductsCache = json.products;
+        const items = json.products || json.data || [];
+        if (Array.isArray(items) && items.length > 0) {
+            liveProductsCache = items;
+            populateCategoryAndProductPickers();
+            return liveProductsCache;
         }
-        populateProductPickers();
     } catch (_) {}
+    return liveProductsCache;
 }
 
-function populateProductPickers() {
-    const postPicker = document.getElementById('share-post-product') || document.getElementById('share-post-product-select');
-    const reelPicker = document.getElementById('share-reel-product') || document.getElementById('share-reel-product-select');
+function populateCategoryAndProductPickers() {
+    const postCatSelect = document.getElementById('share-post-category');
+    const reelCatSelect = document.getElementById('share-reel-category');
+    const postProdSelect = document.getElementById('share-post-product') || document.getElementById('share-post-product-select');
+    const reelProdSelect = document.getElementById('share-reel-product') || document.getElementById('share-reel-product-select');
 
     if (!liveProductsCache || liveProductsCache.length === 0) return;
 
-    const options = `<option value="">-- Choose a WishRite Product (Optional) --</option>` +
-        liveProductsCache.map(p => `<option value="${p.product_code}" data-name="${p.product_name}" data-img="${p.image_url || ''}">${p.product_name} (${p.product_code})</option>`).join('');
+    // Dynamically extract distinct categories from live inventory catalog
+    const catSet = new Set();
+    liveProductsCache.forEach(p => {
+        const norm = getNormalizedCategory(p.category);
+        if (norm) catSet.add(norm);
+    });
 
-    if (postPicker) postPicker.innerHTML = options;
-    if (reelPicker) reelPicker.innerHTML = options;
+    const sortedCategories = Array.from(catSet).sort();
+    const catOptions = `<option value="">Select Product Category ▼</option>` +
+        sortedCategories.map(c => `<option value="${c}">${c}</option>`).join('');
+
+    if (postCatSelect && (!postCatSelect.options || postCatSelect.options.length <= 1)) {
+        postCatSelect.innerHTML = catOptions;
+    }
+    if (reelCatSelect && (!reelCatSelect.options || reelCatSelect.options.length <= 1)) {
+        reelCatSelect.innerHTML = catOptions;
+    }
+
+    // Initial state: Product dropdowns disabled until a category is selected
+    if (postProdSelect && (!postCatSelect || !postCatSelect.value)) {
+        postProdSelect.innerHTML = `<option value="">Select a category first ▼</option>`;
+        postProdSelect.disabled = true;
+    }
+    if (reelProdSelect && (!reelCatSelect || !reelCatSelect.value)) {
+        reelProdSelect.innerHTML = `<option value="">Select a category first ▼</option>`;
+        reelProdSelect.disabled = true;
+    }
 }
+window.populateCategoryAndProductPickers = populateCategoryAndProductPickers;
+
+function handleCategoryChange(type) {
+    const catSelect = document.getElementById(`share-${type}-category`);
+    const prodSelect = document.getElementById(`share-${type}-product`) || document.getElementById(`share-${type}-product-select`);
+    const previewBox = document.getElementById(`share-${type}-product-preview`);
+
+    if (previewBox) {
+        previewBox.style.display = 'none';
+        previewBox.innerHTML = '';
+    }
+
+    if (!prodSelect) return;
+
+    const selectedCategory = catSelect?.value?.trim() || '';
+    if (!selectedCategory) {
+        prodSelect.innerHTML = `<option value="">Select a category first ▼</option>`;
+        prodSelect.disabled = true;
+        return;
+    }
+
+    // Filter live products belonging strictly to the selected category
+    const matchingProducts = liveProductsCache.filter(p => {
+        const norm = getNormalizedCategory(p.category);
+        return norm.toLowerCase() === selectedCategory.toLowerCase() ||
+               (p.category && String(p.category).toLowerCase() === selectedCategory.toLowerCase());
+    });
+
+    if (matchingProducts.length === 0) {
+        prodSelect.innerHTML = `<option value="">No products are currently available in this category.</option>`;
+        prodSelect.disabled = true;
+        return;
+    }
+
+    prodSelect.disabled = false;
+    prodSelect.innerHTML = `<option value="">Select Product ▼</option>` +
+        matchingProducts.map(p => {
+            const imgUrl = p.image_url || (Array.isArray(p.images) ? p.images[0] : '') || '';
+            const code = p.product_code || '';
+            const name = p.product_name || '';
+            return `<option value="${code}" data-name="${name}" data-img="${imgUrl}" data-category="${selectedCategory}">${name} — ${code}</option>`;
+        }).join('');
+}
+window.handleCategoryChange = handleCategoryChange;
+
+function handleProductChange(type) {
+    const prodSelect = document.getElementById(`share-${type}-product`) || document.getElementById(`share-${type}-product-select`);
+    const previewBox = document.getElementById(`share-${type}-product-preview`);
+    if (!previewBox) return;
+
+    const selectedOption = prodSelect?.selectedOptions?.[0];
+    const code = selectedOption?.value || '';
+    const name = selectedOption?.getAttribute('data-name') || '';
+    const img = selectedOption?.getAttribute('data-img') || '';
+
+    if (!code || !name) {
+        previewBox.style.display = 'none';
+        previewBox.innerHTML = '';
+        return;
+    }
+
+    previewBox.style.display = 'flex';
+    previewBox.innerHTML = `
+        <img src="${img || '/images/default-avatar.png'}" alt="${name}" class="product-preview-thumb" onerror="this.src='/images/default-avatar.png'">
+        <div class="product-preview-info">
+            <span class="product-preview-title">${name}</span>
+            <span class="product-preview-code">Product Code: ${code}</span>
+        </div>
+    `;
+}
+window.handleProductChange = handleProductChange;
 
 /**
  * Open Share Post / Reel Modals
@@ -1064,6 +1352,7 @@ function populateProductPickers() {
 function openSharePostModal() {
     const modal = document.getElementById('modal-share-post');
     if (modal) modal.style.display = 'flex';
+    fetchLiveProductsForPicker();
 }
 window.openSharePostModal = openSharePostModal;
 
@@ -1076,6 +1365,7 @@ window.closeSharePostModal = closeSharePostModal;
 function openShareReelModal() {
     const modal = document.getElementById('modal-share-reel');
     if (modal) modal.style.display = 'flex';
+    fetchLiveProductsForPicker();
 }
 window.openShareReelModal = openShareReelModal;
 
@@ -1093,8 +1383,9 @@ async function handleSharePostSubmit(e) {
 
     const urlInput = document.getElementById('share-post-url');
     const platformSelect = document.getElementById('share-post-platform');
-    const captionInput = document.getElementById('share-post-caption');
+    const catSelect = document.getElementById('share-post-category');
     const productSelect = document.getElementById('share-post-product') || document.getElementById('share-post-product-select');
+    const captionInput = document.getElementById('share-post-caption');
     const imgInput = document.getElementById('share-post-image');
     const tagsInput = document.getElementById('share-post-tags');
     const errorEl = document.getElementById('share-post-error') || document.getElementById('share-post-msg');
@@ -1126,16 +1417,34 @@ async function handleSharePostSubmit(e) {
         return;
     }
 
+    const category = catSelect?.value?.trim() || '';
+    if (!category) {
+        if (errorEl) {
+            errorEl.innerText = 'Please select a Product Category.';
+            errorEl.style.display = 'block';
+        }
+        return;
+    }
+
     const selectedOption = productSelect?.selectedOptions?.[0];
     const productCode = selectedOption?.value || '';
     const productName = selectedOption?.getAttribute('data-name') || '';
     const productImg = selectedOption?.getAttribute('data-img') || '';
+
+    if (!productCode) {
+        if (errorEl) {
+            errorEl.innerText = 'Please select a Featured WishRite Product.';
+            errorEl.style.display = 'block';
+        }
+        return;
+    }
 
     const payload = {
         content_type: 'post',
         platform: (platformSelect?.value || 'instagram').toLowerCase(),
         url,
         caption: captionInput?.value?.trim() || '',
+        product_category: category,
         product_code: productCode,
         product_name: productName,
         product_image: productImg,
@@ -1194,8 +1503,9 @@ async function handleShareReelSubmit(e) {
 
     const urlInput = document.getElementById('share-reel-url');
     const platformSelect = document.getElementById('share-reel-platform');
-    const captionInput = document.getElementById('share-reel-caption');
+    const catSelect = document.getElementById('share-reel-category');
     const productSelect = document.getElementById('share-reel-product') || document.getElementById('share-reel-product-select');
+    const captionInput = document.getElementById('share-reel-caption');
     const imgInput = document.getElementById('share-reel-thumbnail') || document.getElementById('share-reel-image');
     const tagsInput = document.getElementById('share-reel-tags');
     const errorEl = document.getElementById('share-reel-error') || document.getElementById('share-reel-msg');
@@ -1227,16 +1537,34 @@ async function handleShareReelSubmit(e) {
         return;
     }
 
+    const category = catSelect?.value?.trim() || '';
+    if (!category) {
+        if (errorEl) {
+            errorEl.innerText = 'Please select a Product Category.';
+            errorEl.style.display = 'block';
+        }
+        return;
+    }
+
     const selectedOption = productSelect?.selectedOptions?.[0];
     const productCode = selectedOption?.value || '';
     const productName = selectedOption?.getAttribute('data-name') || '';
     const productImg = selectedOption?.getAttribute('data-img') || '';
+
+    if (!productCode) {
+        if (errorEl) {
+            errorEl.innerText = 'Please select a Featured WishRite Product.';
+            errorEl.style.display = 'block';
+        }
+        return;
+    }
 
     const payload = {
         content_type: 'reel',
         platform: (platformSelect?.value || 'instagram').toLowerCase(),
         url,
         caption: captionInput?.value?.trim() || '',
+        product_category: category,
         product_code: productCode,
         product_name: productName,
         product_image: productImg,
@@ -1283,9 +1611,7 @@ async function handleShareReelSubmit(e) {
             btn.disabled = false;
             btn.innerText = 'SUBMIT REEL FOR REVIEW';
         }
-    }
 }
-window.handleShareReelSubmit = handleShareReelSubmit;
 window.handleShareReelSubmit = handleShareReelSubmit;
 
 /**
