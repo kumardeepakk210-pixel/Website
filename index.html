@@ -2488,6 +2488,30 @@
                         <p class="creator-link-desc">Share this link with your audience to help them discover WishRite jewellery.</p>
                     </div>
 
+                    <!-- Contest Leaderboard Section -->
+                    <div class="creator-contest-section" id="creator-contest-section" style="margin-top:28px;">
+                        <div class="creator-section-heading" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+                            <div>
+                                <div style="display:flex; align-items:center; gap:8px;">
+                                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#5E3435" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#5E3435;"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg>
+                                    <h3 style="margin:0; text-transform:uppercase; letter-spacing:0.5px;">CONTEST LEADERBOARD</h3>
+                                </div>
+                                <span style="font-size:0.8rem; color:var(--wr-text-muted);">See your current position and track your progress against other WishRite Creators.</span>
+                            </div>
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <button type="button" class="btn btn-ghost btn-sm creator-contest-refresh-btn" onclick="refreshCreatorContestLeaderboard()" id="btn-refresh-contest" title="Refresh standings" style="display:inline-flex; align-items:center; gap:6px; font-size:0.75rem; padding:4px 10px;">
+                                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" id="icon-refresh-contest"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                                    <span>REFRESH</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Dynamic Content Container -->
+                        <div id="creator-contest-container" class="creator-contest-container" style="margin-top:14px;">
+                            <!-- Dynamically rendered by renderCreatorContest() -->
+                        </div>
+                    </div>
+
                     <!-- Reel Insights Section -->
                     <div class="creator-reel-insights-section" id="creator-reel-insights-section" style="margin-top:28px;">
                         <div class="creator-section-heading" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">

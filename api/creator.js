@@ -203,6 +203,9 @@ module.exports = async function handler(req, res) {
         if (subPath === '/admin/content/moderate' && method === 'POST') {
             return await creator.handleModerateCreatorContent(req, res);
         }
+        if (subPath === '/contest' && method === 'GET') {
+            return await creator.handleGetCreatorContest(req, res);
+        }
 
         // Route Not Found
         res.status(404).json({

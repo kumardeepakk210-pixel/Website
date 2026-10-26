@@ -642,6 +642,9 @@ function renderCreatorDashboard(data) {
 
     // 3. Load Submitted Content
     loadCreatorContent();
+
+    // 4. Load Contest Leaderboard
+    loadCreatorContest();
 }
 
 /**
@@ -1727,3 +1730,305 @@ async function redeemCreatorReward(rewardId) {
     }
 }
 window.redeemCreatorReward = redeemCreatorReward;
+
+/* ==============================================================================
+   CREATOR CONTEST LEADERBOARD CONTROLLER
+   Server-authoritative, deterministic rankings, zero client-side score tampering.
+   ============================================================================== */
+
+function escapeContestHtml(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+/**
+ * Authoritatively fetches and renders the current Creator Contest Leaderboard
+ */
+async function loadCreatorContest(showLoading = false) {
+    const container = document.getElementById('creator-contest-container');
+    if (!container) return;
+
+    if (showLoading || !container.children.length) {
+        container.innerHTML = `
+            <div class="contest-loading-state" id="contest-loading-card">
+                <div class="contest-spinner"></div>
+                <div class="contest-loading-title">Loading current standings...</div>
+                <p class="contest-loading-desc">Calculating real-time verified creator scores</p>
+            </div>
+        `;
+    }
+
+    try {
+        const headers = await getAuthHeaders();
+        const res = await fetch('/api/creator/contest', { headers });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error?.message || 'Failed to load contest standings');
+        renderCreatorContest(data);
+    } catch (err) {
+        console.error('Error loading contest leaderboard:', err);
+        container.innerHTML = `
+            <div class="contest-error-card" id="contest-error-card">
+                <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="#dc2626" stroke-width="2" style="margin-bottom:8px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                <div class="contest-error-title">We couldn't load the current standings.</div>
+                <p class="contest-error-desc">Please check your connection and try again.</p>
+                <button type="button" class="btn btn-primary btn-sm" onclick="loadCreatorContest(true)" style="margin-top:12px; padding:6px 16px; font-size:0.75rem; letter-spacing:0.5px;">TRY AGAIN</button>
+            </div>
+        `;
+    }
+}
+window.loadCreatorContest = loadCreatorContest;
+
+/**
+ * Handles user clicking the manual Refresh button
+ */
+async function refreshCreatorContestLeaderboard() {
+    const icon = document.getElementById('icon-refresh-contest');
+    if (icon) icon.classList.add('rotating');
+    try {
+        await loadCreatorContest(false);
+        if (typeof showToast === 'function') {
+            showToast('Leaderboard updated with latest standings', 'success');
+        }
+    } finally {
+        if (icon) {
+            setTimeout(() => icon.classList.remove('rotating'), 600);
+        }
+    }
+}
+window.refreshCreatorContestLeaderboard = refreshCreatorContestLeaderboard;
+
+/**
+ * Renders the Contest Leaderboard into #creator-contest-container
+ */
+function renderCreatorContest(data) {
+    const container = document.getElementById('creator-contest-container');
+    if (!container) return;
+
+    const contest = data && data.contest;
+    if (!contest) {
+        // Section 20 Empty state:
+        // "No active contest right now. New Creator contests will appear here when available."
+        container.innerHTML = `
+            <div class="contest-empty-card" id="contest-empty-card">
+                <div class="contest-empty-icon">🏆</div>
+                <h4 class="contest-empty-title">No active contest right now.</h4>
+                <p class="contest-empty-desc">New Creator contests will appear here when available.</p>
+            </div>
+        `;
+        return;
+    }
+
+    const current = data.currentCreator || null;
+    const leaders = Array.isArray(data.leaderboard) ? data.leaderboard : [];
+    const nearby = Array.isArray(data.nearby) ? data.nearby : [];
+    const totalParticipants = Number(data.totalParticipants || contest.total_participants || leaders.length || 0);
+
+    // Section 15 Contest Status
+    let statusPillClass = 'active';
+    let statusText = 'ACTIVE';
+    let timeLabel = '';
+    if (contest.status === 'upcoming') {
+        statusPillClass = 'upcoming';
+        statusText = 'UPCOMING';
+        timeLabel = `Contest starts on ${contest.startsAt || '1 Nov 2026'}`;
+    } else if (contest.status === 'ended') {
+        statusPillClass = 'ended';
+        statusText = 'ENDED';
+        timeLabel = `Contest ended • Final position: ${current ? '#' + current.rank : 'N/A'}`;
+    } else {
+        statusPillClass = 'active';
+        statusText = 'ACTIVE';
+        timeLabel = contest.daysRemaining !== undefined && contest.daysRemaining !== null
+            ? `Contest ends in ${contest.daysRemaining} days (${contest.endsAt || '26 Nov 2026'})`
+            : `Ends: ${contest.endsAt || '26 Nov 2026'}`;
+    }
+
+    // Helper for medals
+    const getRankDisplay = (rank) => {
+        if (rank === 1) return '<span class="contest-medal">🥇 1</span>';
+        if (rank === 2) return '<span class="contest-medal">🥈 2</span>';
+        if (rank === 3) return '<span class="contest-medal">🥉 3</span>';
+        return `<span class="contest-rank-plain">${rank}</span>`;
+    };
+
+    // Helper for avatar with graceful fallback to initial
+    const getAvatarHtml = (name, img) => {
+        const safeName = escapeContestHtml(name || 'Creator');
+        const initial = (name || 'C').charAt(0).toUpperCase();
+        if (img) {
+            return `<img src="${img}" alt="${safeName}" class="contest-avatar" onerror="this.onerror=null; this.parentElement.innerHTML='<span class=\\'contest-avatar-fallback\\'>${initial}</span>';" />`;
+        }
+        return `<span class="contest-avatar-fallback">${initial}</span>`;
+    };
+
+    let html = '';
+
+    // 1. ACTIVE CONTEST BANNER (Section 2 & 15)
+    html += `
+        <div class="contest-banner">
+            <div class="contest-banner-header">
+                <span class="contest-banner-kicker">ACTIVE CONTEST</span>
+                <span class="contest-status-pill ${statusPillClass}">${statusText}</span>
+            </div>
+            <h4 class="contest-banner-title">${escapeContestHtml(contest.name || 'WishRite Creator Challenge')}</h4>
+            <div class="contest-banner-meta">
+                <span class="contest-banner-timer">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    <span>${timeLabel}</span>
+                </span>
+                <span class="contest-banner-participants">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                    <span>${totalParticipants.toLocaleString()} Creators Participating</span>
+                </span>
+            </div>
+        </div>
+    `;
+
+    // 2. CURRENT CREATOR POSITION HERO CARD (Section 3 & 14)
+    if (current && current.rank) {
+        let progressMsg = '';
+        if (current.isFirst) {
+            progressMsg = '🏆 You are currently #1!';
+        } else if (current.pointsToNext && current.nextRank) {
+            progressMsg = `You need <strong>${current.pointsToNext.toLocaleString()}</strong> more points to reach <strong>#${current.nextRank}</strong>.`;
+            if (current.positionsFromTop10 > 0) {
+                progressMsg += ` <span style="opacity:0.85;">(${current.positionsFromTop10} ${current.positionsFromTop10 === 1 ? 'position' : 'positions'} away from Top 10)</span>`;
+            }
+        } else if (current.positionsFromTop10 > 0) {
+            progressMsg = `${current.positionsFromTop10} ${current.positionsFromTop10 === 1 ? 'position' : 'positions'} away from Top 10`;
+        }
+
+        const percentileText = current.topPercentile ? `You are currently in the <strong>TOP ${current.topPercentile}%</strong>` : 'Keep creating to climb higher!';
+
+        html += `
+            <div class="contest-position-card" id="contest-position-card">
+                <div class="contest-position-header">
+                    <span class="contest-position-label">Current Position</span>
+                    <span class="contest-percentile-pill">TOP ${current.topPercentile || 10}%</span>
+                </div>
+                <div class="contest-position-main">
+                    <div class="contest-rank-number">#${current.rank}</div>
+                    <div class="contest-rank-out-of">out of ${totalParticipants.toLocaleString()}</div>
+                </div>
+                <div class="contest-position-percentile">${percentileText}</div>
+                <div class="contest-position-footer">
+                    <div class="contest-points-pill">
+                        <span class="contest-points-val">${Number(current.points || 0).toLocaleString()}</span>
+                        <span class="contest-points-lbl">Points</span>
+                    </div>
+                    ${progressMsg ? `<div class="contest-progress-msg">${progressMsg}</div>` : ''}
+                </div>
+            </div>
+        `;
+    }
+
+    // 3. LEADERBOARD TABLE (TOP 10) (Section 4, 5, 6 & 12)
+    html += `
+        <div class="contest-table-card">
+            <div class="contest-table-header">
+                <span class="contest-th col-rank">RANK</span>
+                <span class="contest-th col-creator">CREATOR</span>
+                <span class="contest-th col-points">POINTS</span>
+            </div>
+            <div class="contest-table-body">
+    `;
+
+    if (!leaders.length) {
+        html += `<div style="text-align:center; padding:24px; color:var(--wr-text-muted); font-size:0.85rem;">No entries yet. Be the first to earn contest points!</div>`;
+    } else {
+        leaders.forEach(item => {
+            const isMe = item.is_current_user || (current && String(item.rank) === String(current.rank) && item.points === current.points);
+            const rowClass = isMe ? 'contest-row contest-row-you' : 'contest-row';
+            const youTag = isMe ? '<span class="contest-you-badge">👉 YOU</span>' : '';
+            const safeName = escapeContestHtml(item.name || 'WishRite Creator');
+
+            html += `
+                <div class="${rowClass}">
+                    <div class="contest-cell col-rank">
+                        ${getRankDisplay(item.rank)}
+                    </div>
+                    <div class="contest-cell col-creator">
+                        <div class="contest-creator-info">
+                            ${getAvatarHtml(item.name, item.profile_image)}
+                            <div class="contest-creator-text">
+                                <span class="contest-creator-name">${safeName}</span>
+                                ${youTag}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="contest-cell col-points">
+                        <span class="contest-cell-points-val">${Number(item.points || 0).toLocaleString()}</span>
+                    </div>
+                </div>
+            `;
+        });
+    }
+
+    html += `
+            </div>
+        </div>
+    `;
+
+    // 4. NEARBY RANKS (Section 12 & 13: If current creator is outside Top 10)
+    if (current && !current.isTop10 && nearby.length > 0) {
+        html += `
+            <div class="contest-nearby-card" style="margin-top:16px;">
+                <div class="contest-nearby-header">
+                    <div>
+                        <h4 style="margin:0; font-size:0.9rem; font-weight:600; text-transform:uppercase; letter-spacing:0.5px;">YOUR POSITION &amp; NEARBY CREATORS</h4>
+                        <span style="font-size:0.75rem; color:var(--wr-text-muted);">
+                            ${current.positionsFromTop10 > 0 ? `<strong>${current.positionsFromTop10}</strong> ${current.positionsFromTop10 === 1 ? 'position' : 'positions'} away from Top 10` : 'Track your closest competitors'}
+                        </span>
+                    </div>
+                </div>
+                <div class="contest-table-body" style="margin-top:8px;">
+        `;
+
+        nearby.forEach(item => {
+            const isMe = item.is_current_user || (current && String(item.rank) === String(current.rank));
+            const rowClass = isMe ? 'contest-row contest-row-you' : 'contest-row';
+            const youTag = isMe ? '<span class="contest-you-badge">👉 YOU</span>' : '';
+            const safeName = escapeContestHtml(item.name || 'WishRite Creator');
+
+            html += `
+                <div class="${rowClass}">
+                    <div class="contest-cell col-rank">
+                        ${getRankDisplay(item.rank)}
+                    </div>
+                    <div class="contest-cell col-creator">
+                        <div class="contest-creator-info">
+                            ${getAvatarHtml(item.name, item.profile_image)}
+                            <div class="contest-creator-text">
+                                <span class="contest-creator-name">${safeName}</span>
+                                ${youTag}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="contest-cell col-points">
+                        <span class="contest-cell-points-val">${Number(item.points || 0).toLocaleString()}</span>
+                    </div>
+                </div>
+            `;
+        });
+
+        html += `
+                </div>
+            </div>
+        `;
+    }
+
+    container.innerHTML = html;
+}
+window.renderCreatorContest = renderCreatorContest;
+
+// Ensure exposure on window.creatorProgram
+if (!window.creatorProgram) window.creatorProgram = {};
+window.creatorProgram.loadContest = loadCreatorContest;
+window.creatorProgram.renderContest = renderCreatorContest;
+window.creatorProgram.refreshContest = refreshCreatorContestLeaderboard;

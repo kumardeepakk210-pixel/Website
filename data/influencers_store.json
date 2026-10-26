@@ -3614,6 +3614,720 @@
       "public_profile_url": "https://wishrite.in/influencer/rohan-sharma-creator",
       "created_at": "2026-10-26T11:30:07.281Z",
       "updated_at": "2026-10-26T11:30:07.281Z"
+    },
+    {
+      "id": "d8406bde-87aa-470d-98aa-64d88830cc06",
+      "influencer_code": "WR-CRE-FFB2F9",
+      "name": "Tara Sharma",
+      "email": "creator_test_1793019041702@example.com",
+      "phone": "",
+      "bio": "Jewellery lover and stylist",
+      "city": "Jaipur",
+      "state": "Rajasthan",
+      "country": "India",
+      "profile_image": "https://ui-avatars.com/api/?name=Tara%20Sharma&background=5E3435&color=fff",
+      "instagram_id": "",
+      "instagram_url": null,
+      "youtube_url": null,
+      "facebook_url": null,
+      "other_url": null,
+      "category": "Jewellery styling",
+      "content_preferences": [],
+      "commission_rate": 10,
+      "tier": "starter",
+      "status": "active",
+      "public_slug": "tara-sharma-18",
+      "public_profile_url": "https://wishrite.in/influencer/tara-sharma-18",
+      "created_at": "2026-10-26T12:50:42.629Z",
+      "updated_at": "2026-10-26T12:50:42.629Z"
+    },
+    {
+      "id": "ab9451e9-d62f-45cf-9d56-d2b1b559aa2e",
+      "influencer_code": "WR-CRE-016FB5",
+      "name": "Alias Creator",
+      "email": "activate_alias_1793019043196@example.com",
+      "phone": "",
+      "bio": "",
+      "city": "Bangalore",
+      "state": "Karnataka",
+      "country": "India",
+      "profile_image": "https://ui-avatars.com/api/?name=Alias%20Creator&background=5E3435&color=fff",
+      "instagram_id": "",
+      "instagram_url": null,
+      "youtube_url": null,
+      "facebook_url": null,
+      "other_url": null,
+      "category": "Jewellery styling",
+      "content_preferences": [],
+      "commission_rate": 10,
+      "tier": "starter",
+      "status": "active",
+      "public_slug": "alias-creator-9",
+      "public_profile_url": "https://wishrite.in/influencer/alias-creator-9",
+      "created_at": "2026-10-26T12:50:43.280Z",
+      "updated_at": "2026-10-26T12:50:43.280Z"
+    },
+    {
+      "id": "964f2ec9-f2d4-4a9c-88c0-eb4d7feed729",
+      "influencer_code": "WR-CRE-B0518B",
+      "name": "Rohan Mehta",
+      "email": "content_creator_1793019043855@example.com",
+      "phone": "",
+      "bio": "",
+      "city": "Delhi",
+      "state": "Delhi",
+      "country": "India",
+      "profile_image": "https://ui-avatars.com/api/?name=Rohan%20Mehta&background=5E3435&color=fff",
+      "instagram_id": "",
+      "instagram_url": null,
+      "youtube_url": null,
+      "facebook_url": null,
+      "other_url": null,
+      "category": "Jewellery styling",
+      "content_preferences": [],
+      "commission_rate": 10,
+      "tier": "starter",
+      "status": "active",
+      "public_slug": "rohan-mehta-14",
+      "public_profile_url": "https://wishrite.in/influencer/rohan-mehta-14",
+      "created_at": "2026-10-26T12:50:43.911Z",
+      "updated_at": "2026-10-26T12:50:43.911Z"
+    },
+    {
+      "id": "55c11408-ca6d-4e03-a861-4d63f5a5da56",
+      "influencer_code": "WR-CRE-0DE734",
+      "name": "User A",
+      "email": "usera_1793019045014@example.com",
+      "phone": "",
+      "bio": "",
+      "city": "Delhi",
+      "state": "Delhi",
+      "country": "India",
+      "profile_image": "https://ui-avatars.com/api/?name=User%20A&background=5E3435&color=fff",
+      "instagram_id": "",
+      "instagram_url": null,
+      "youtube_url": null,
+      "facebook_url": null,
+      "other_url": null,
+      "category": "Jewellery styling",
+      "content_preferences": [],
+      "commission_rate": 10,
+      "tier": "starter",
+      "status": "active",
+      "public_slug": "user-a-18",
+      "public_profile_url": "https://wishrite.in/influencer/user-a-18",
+      "created_at": "2026-10-26T12:50:45.072Z",
+      "updated_at": "2026-10-26T12:50:45.072Z"
+    },
+    {
+      "id": "14529c62-e2e5-415d-a450-a7d284b83006",
+      "influencer_code": "WR-CRE-7F1412",
+      "name": "User B",
+      "email": "userb_1793019045014@example.com",
+      "phone": "",
+      "bio": "",
+      "city": "Mumbai",
+      "state": "Maharashtra",
+      "country": "India",
+      "profile_image": "https://ui-avatars.com/api/?name=User%20B&background=5E3435&color=fff",
+      "instagram_id": "",
+      "instagram_url": null,
+      "youtube_url": null,
+      "facebook_url": null,
+      "other_url": null,
+      "category": "Jewellery styling",
+      "content_preferences": [],
+      "commission_rate": 10,
+      "tier": "starter",
+      "status": "active",
+      "public_slug": "user-b-18",
+      "public_profile_url": "https://wishrite.in/influencer/user-b-18",
+      "created_at": "2026-10-26T12:50:45.595Z",
+      "updated_at": "2026-10-26T12:50:45.595Z"
+    },
+    {
+      "id": "486138c3-90d9-4a85-949b-36b9d35d1c92",
+      "influencer_code": "WR-CRE-F723D8",
+      "name": "Self Mod",
+      "email": "selfmod_1793019046109@example.com",
+      "phone": "",
+      "bio": "",
+      "city": "Pune",
+      "state": "MH",
+      "country": "India",
+      "profile_image": "https://ui-avatars.com/api/?name=Self%20Mod&background=5E3435&color=fff",
+      "instagram_id": "",
+      "instagram_url": null,
+      "youtube_url": null,
+      "facebook_url": null,
+      "other_url": null,
+      "category": "Jewellery styling",
+      "content_preferences": [],
+      "commission_rate": 10,
+      "tier": "starter",
+      "status": "active",
+      "public_slug": "self-mod-18",
+      "public_profile_url": "https://wishrite.in/influencer/self-mod-18",
+      "created_at": "2026-10-26T12:50:46.189Z",
+      "updated_at": "2026-10-26T12:50:46.189Z"
+    },
+    {
+      "id": "61c31a97-e6c3-4d8c-bfc2-4ebb1bf9e7e7",
+      "influencer_code": "WR-CRE-A70D26",
+      "name": "Hacker",
+      "email": "hack_1793019047007@example.com",
+      "phone": "",
+      "bio": "",
+      "city": "City",
+      "state": "State",
+      "country": "India",
+      "profile_image": "https://ui-avatars.com/api/?name=Hacker&background=5E3435&color=fff",
+      "instagram_id": "",
+      "instagram_url": null,
+      "youtube_url": null,
+      "facebook_url": null,
+      "other_url": null,
+      "category": "Jewellery styling",
+      "content_preferences": [],
+      "commission_rate": 10,
+      "tier": "starter",
+      "status": "active",
+      "public_slug": "hacker-18",
+      "public_profile_url": "https://wishrite.in/influencer/hacker-18",
+      "created_at": "2026-10-26T12:50:47.062Z",
+      "updated_at": "2026-10-26T12:50:47.062Z"
+    },
+    {
+      "id": "39c20be9-66bb-48c9-9dc3-01b7effa9c8d",
+      "influencer_code": "WR-CRE-93AA86",
+      "name": "Aanya Verma Luxury",
+      "email": "photo_creator_1793019041691@example.com",
+      "phone": "",
+      "bio": "Official 925 sterling silver curator and fashion stylist.",
+      "city": "Mumbai",
+      "state": "Maharashtra",
+      "country": "India",
+      "profile_image": "https://ui-avatars.com/api/?name=Aanya%20Verma%20Luxury&background=5E3435&color=fff",
+      "instagram_id": "aanya_luxury_silver",
+      "instagram_url": null,
+      "youtube_url": "https://youtube.com/@aanyastyle",
+      "facebook_url": "https://facebook.com/aanya.official",
+      "other_url": null,
+      "category": "Jewellery styling",
+      "content_preferences": [
+        "Jewellery styling",
+        "Festive",
+        "Wedding"
+      ],
+      "commission_rate": 10,
+      "tier": "starter",
+      "status": "active",
+      "public_slug": "aanya-verma-6",
+      "public_profile_url": "https://wishrite.in/influencer/aanya-verma-6",
+      "created_at": "2026-10-26T12:50:48.223Z",
+      "updated_at": "2026-10-26T12:50:49.991Z"
+    },
+    {
+      "id": "6fc8cee2-80e4-4a68-b50e-928e9de1564b",
+      "influencer_code": "WR-CRE-ABD521",
+      "name": "Rohan Sharma Creator",
+      "email": "creator_cat_1793019049998@test.com",
+      "phone": "",
+      "bio": "Styling WishRite silver jewellery",
+      "city": "Mumbai",
+      "state": "Maharashtra",
+      "country": "India",
+      "profile_image": "https://ui-avatars.com/api/?name=Rohan%20Sharma%20Creator&background=5E3435&color=fff",
+      "instagram_id": "",
+      "instagram_url": null,
+      "youtube_url": null,
+      "facebook_url": null,
+      "other_url": null,
+      "category": "Jewellery styling",
+      "content_preferences": [],
+      "commission_rate": 10,
+      "tier": "starter",
+      "status": "active",
+      "public_slug": "rohan-sharma-creator-1",
+      "public_profile_url": "https://wishrite.in/influencer/rohan-sharma-creator-1",
+      "created_at": "2026-10-26T12:50:50.051Z",
+      "updated_at": "2026-10-26T12:50:50.051Z"
+    },
+    {
+      "id": "6f7280b2-f807-4712-9774-21a7adc8f7dd",
+      "influencer_code": "WR-CRE-54782B",
+      "name": "Tara Sharma",
+      "email": "creator_test_1793019354080@example.com",
+      "phone": "",
+      "bio": "Jewellery lover and stylist",
+      "city": "Jaipur",
+      "state": "Rajasthan",
+      "country": "India",
+      "profile_image": "https://ui-avatars.com/api/?name=Tara%20Sharma&background=5E3435&color=fff",
+      "instagram_id": "",
+      "instagram_url": null,
+      "youtube_url": null,
+      "facebook_url": null,
+      "other_url": null,
+      "category": "Jewellery styling",
+      "content_preferences": [],
+      "commission_rate": 10,
+      "tier": "starter",
+      "status": "active",
+      "public_slug": "tara-sharma-19",
+      "public_profile_url": "https://wishrite.in/influencer/tara-sharma-19",
+      "created_at": "2026-10-26T12:55:54.710Z",
+      "updated_at": "2026-10-26T12:55:54.710Z"
+    },
+    {
+      "id": "c08829ae-e129-489e-b752-82cb41c92940",
+      "influencer_code": "WR-CRE-B24AF4",
+      "name": "Alias Creator",
+      "email": "activate_alias_1793019355324@example.com",
+      "phone": "",
+      "bio": "",
+      "city": "Bangalore",
+      "state": "Karnataka",
+      "country": "India",
+      "profile_image": "https://ui-avatars.com/api/?name=Alias%20Creator&background=5E3435&color=fff",
+      "instagram_id": "",
+      "instagram_url": null,
+      "youtube_url": null,
+      "facebook_url": null,
+      "other_url": null,
+      "category": "Jewellery styling",
+      "content_preferences": [],
+      "commission_rate": 10,
+      "tier": "starter",
+      "status": "active",
+      "public_slug": "alias-creator-10",
+      "public_profile_url": "https://wishrite.in/influencer/alias-creator-10",
+      "created_at": "2026-10-26T12:55:55.407Z",
+      "updated_at": "2026-10-26T12:55:55.407Z"
+    },
+    {
+      "id": "a8d6e1c4-67a5-4128-9aa2-f687d0904345",
+      "influencer_code": "WR-CRE-05A9D2",
+      "name": "Rohan Mehta",
+      "email": "content_creator_1793019355929@example.com",
+      "phone": "",
+      "bio": "",
+      "city": "Delhi",
+      "state": "Delhi",
+      "country": "India",
+      "profile_image": "https://ui-avatars.com/api/?name=Rohan%20Mehta&background=5E3435&color=fff",
+      "instagram_id": "",
+      "instagram_url": null,
+      "youtube_url": null,
+      "facebook_url": null,
+      "other_url": null,
+      "category": "Jewellery styling",
+      "content_preferences": [],
+      "commission_rate": 10,
+      "tier": "starter",
+      "status": "active",
+      "public_slug": "rohan-mehta-15",
+      "public_profile_url": "https://wishrite.in/influencer/rohan-mehta-15",
+      "created_at": "2026-10-26T12:55:55.993Z",
+      "updated_at": "2026-10-26T12:55:55.993Z"
+    },
+    {
+      "id": "673259cd-5982-4a34-9a8d-d59f11b7be42",
+      "influencer_code": "WR-CRE-4E750E",
+      "name": "User A",
+      "email": "usera_1793019357229@example.com",
+      "phone": "",
+      "bio": "",
+      "city": "Delhi",
+      "state": "Delhi",
+      "country": "India",
+      "profile_image": "https://ui-avatars.com/api/?name=User%20A&background=5E3435&color=fff",
+      "instagram_id": "",
+      "instagram_url": null,
+      "youtube_url": null,
+      "facebook_url": null,
+      "other_url": null,
+      "category": "Jewellery styling",
+      "content_preferences": [],
+      "commission_rate": 10,
+      "tier": "starter",
+      "status": "active",
+      "public_slug": "user-a-19",
+      "public_profile_url": "https://wishrite.in/influencer/user-a-19",
+      "created_at": "2026-10-26T12:55:57.286Z",
+      "updated_at": "2026-10-26T12:55:57.286Z"
+    },
+    {
+      "id": "7fc23edf-8d86-4534-a0a0-7334d57ce9ac",
+      "influencer_code": "WR-CRE-89B0B6",
+      "name": "User B",
+      "email": "userb_1793019357229@example.com",
+      "phone": "",
+      "bio": "",
+      "city": "Mumbai",
+      "state": "Maharashtra",
+      "country": "India",
+      "profile_image": "https://ui-avatars.com/api/?name=User%20B&background=5E3435&color=fff",
+      "instagram_id": "",
+      "instagram_url": null,
+      "youtube_url": null,
+      "facebook_url": null,
+      "other_url": null,
+      "category": "Jewellery styling",
+      "content_preferences": [],
+      "commission_rate": 10,
+      "tier": "starter",
+      "status": "active",
+      "public_slug": "user-b-19",
+      "public_profile_url": "https://wishrite.in/influencer/user-b-19",
+      "created_at": "2026-10-26T12:55:57.865Z",
+      "updated_at": "2026-10-26T12:55:57.865Z"
+    },
+    {
+      "id": "7b9bbc17-3b53-4ca9-a6c6-48398bec416e",
+      "influencer_code": "WR-CRE-E13200",
+      "name": "Self Mod",
+      "email": "selfmod_1793019358326@example.com",
+      "phone": "",
+      "bio": "",
+      "city": "Pune",
+      "state": "MH",
+      "country": "India",
+      "profile_image": "https://ui-avatars.com/api/?name=Self%20Mod&background=5E3435&color=fff",
+      "instagram_id": "",
+      "instagram_url": null,
+      "youtube_url": null,
+      "facebook_url": null,
+      "other_url": null,
+      "category": "Jewellery styling",
+      "content_preferences": [],
+      "commission_rate": 10,
+      "tier": "starter",
+      "status": "active",
+      "public_slug": "self-mod-19",
+      "public_profile_url": "https://wishrite.in/influencer/self-mod-19",
+      "created_at": "2026-10-26T12:55:58.392Z",
+      "updated_at": "2026-10-26T12:55:58.392Z"
+    },
+    {
+      "id": "5d7cca8b-c130-4444-af9d-7f2224050a06",
+      "influencer_code": "WR-CRE-230DA9",
+      "name": "Hacker",
+      "email": "hack_1793019358923@example.com",
+      "phone": "",
+      "bio": "",
+      "city": "City",
+      "state": "State",
+      "country": "India",
+      "profile_image": "https://ui-avatars.com/api/?name=Hacker&background=5E3435&color=fff",
+      "instagram_id": "",
+      "instagram_url": null,
+      "youtube_url": null,
+      "facebook_url": null,
+      "other_url": null,
+      "category": "Jewellery styling",
+      "content_preferences": [],
+      "commission_rate": 10,
+      "tier": "starter",
+      "status": "active",
+      "public_slug": "hacker-19",
+      "public_profile_url": "https://wishrite.in/influencer/hacker-19",
+      "created_at": "2026-10-26T12:55:58.993Z",
+      "updated_at": "2026-10-26T12:55:58.993Z"
+    },
+    {
+      "id": "60c0fbab-0649-467a-b742-34e6bd864261",
+      "influencer_code": "WR-CRE-04A04C",
+      "name": "Aanya Verma Luxury",
+      "email": "photo_creator_1793019354069@example.com",
+      "phone": "",
+      "bio": "Official 925 sterling silver curator and fashion stylist.",
+      "city": "Mumbai",
+      "state": "Maharashtra",
+      "country": "India",
+      "profile_image": "https://ui-avatars.com/api/?name=Aanya%20Verma%20Luxury&background=5E3435&color=fff",
+      "instagram_id": "aanya_luxury_silver",
+      "instagram_url": null,
+      "youtube_url": "https://youtube.com/@aanyastyle",
+      "facebook_url": "https://facebook.com/aanya.official",
+      "other_url": null,
+      "category": "Jewellery styling",
+      "content_preferences": [
+        "Jewellery styling",
+        "Festive",
+        "Wedding"
+      ],
+      "commission_rate": 10,
+      "tier": "starter",
+      "status": "active",
+      "public_slug": "aanya-verma-7",
+      "public_profile_url": "https://wishrite.in/influencer/aanya-verma-7",
+      "created_at": "2026-10-26T12:56:00.228Z",
+      "updated_at": "2026-10-26T12:56:02.420Z"
+    },
+    {
+      "id": "5a65b0a5-7e2b-45b3-8788-649b5b728ab9",
+      "influencer_code": "WR-CRE-25F89B",
+      "name": "Rohan Sharma Creator",
+      "email": "creator_cat_1793019362428@test.com",
+      "phone": "",
+      "bio": "Styling WishRite silver jewellery",
+      "city": "Mumbai",
+      "state": "Maharashtra",
+      "country": "India",
+      "profile_image": "https://ui-avatars.com/api/?name=Rohan%20Sharma%20Creator&background=5E3435&color=fff",
+      "instagram_id": "",
+      "instagram_url": null,
+      "youtube_url": null,
+      "facebook_url": null,
+      "other_url": null,
+      "category": "Jewellery styling",
+      "content_preferences": [],
+      "commission_rate": 10,
+      "tier": "starter",
+      "status": "active",
+      "public_slug": "rohan-sharma-creator-2",
+      "public_profile_url": "https://wishrite.in/influencer/rohan-sharma-creator-2",
+      "created_at": "2026-10-26T12:56:02.501Z",
+      "updated_at": "2026-10-26T12:56:02.501Z"
+    },
+    {
+      "id": "87fe2e10-a7bb-4236-8037-6dcf993ba97f",
+      "influencer_code": "WR-CRE-2C0931",
+      "name": "Tara Sharma",
+      "email": "creator_test_1793019506173@example.com",
+      "phone": "",
+      "bio": "Jewellery lover and stylist",
+      "city": "Jaipur",
+      "state": "Rajasthan",
+      "country": "India",
+      "profile_image": "https://ui-avatars.com/api/?name=Tara%20Sharma&background=5E3435&color=fff",
+      "instagram_id": "",
+      "instagram_url": null,
+      "youtube_url": null,
+      "facebook_url": null,
+      "other_url": null,
+      "category": "Jewellery styling",
+      "content_preferences": [],
+      "commission_rate": 10,
+      "tier": "starter",
+      "status": "active",
+      "public_slug": "tara-sharma-20",
+      "public_profile_url": "https://wishrite.in/influencer/tara-sharma-20",
+      "created_at": "2026-10-26T12:58:26.564Z",
+      "updated_at": "2026-10-26T12:58:26.564Z"
+    },
+    {
+      "id": "ec7fbe82-dc0b-4035-b79e-cc084fc2fbaa",
+      "influencer_code": "WR-CRE-2342E0",
+      "name": "Alias Creator",
+      "email": "activate_alias_1793019507278@example.com",
+      "phone": "",
+      "bio": "",
+      "city": "Bangalore",
+      "state": "Karnataka",
+      "country": "India",
+      "profile_image": "https://ui-avatars.com/api/?name=Alias%20Creator&background=5E3435&color=fff",
+      "instagram_id": "",
+      "instagram_url": null,
+      "youtube_url": null,
+      "facebook_url": null,
+      "other_url": null,
+      "category": "Jewellery styling",
+      "content_preferences": [],
+      "commission_rate": 10,
+      "tier": "starter",
+      "status": "active",
+      "public_slug": "alias-creator-11",
+      "public_profile_url": "https://wishrite.in/influencer/alias-creator-11",
+      "created_at": "2026-10-26T12:58:27.357Z",
+      "updated_at": "2026-10-26T12:58:27.357Z"
+    },
+    {
+      "id": "f5c26442-23b8-4972-88d4-f14300fc5535",
+      "influencer_code": "WR-CRE-A9D9D3",
+      "name": "Rohan Mehta",
+      "email": "content_creator_1793019507886@example.com",
+      "phone": "",
+      "bio": "",
+      "city": "Delhi",
+      "state": "Delhi",
+      "country": "India",
+      "profile_image": "https://ui-avatars.com/api/?name=Rohan%20Mehta&background=5E3435&color=fff",
+      "instagram_id": "",
+      "instagram_url": null,
+      "youtube_url": null,
+      "facebook_url": null,
+      "other_url": null,
+      "category": "Jewellery styling",
+      "content_preferences": [],
+      "commission_rate": 10,
+      "tier": "starter",
+      "status": "active",
+      "public_slug": "rohan-mehta-16",
+      "public_profile_url": "https://wishrite.in/influencer/rohan-mehta-16",
+      "created_at": "2026-10-26T12:58:27.969Z",
+      "updated_at": "2026-10-26T12:58:27.969Z"
+    },
+    {
+      "id": "d978728f-58ff-452c-a04d-cdef030f1953",
+      "influencer_code": "WR-CRE-B30A7A",
+      "name": "User A",
+      "email": "usera_1793019509111@example.com",
+      "phone": "",
+      "bio": "",
+      "city": "Delhi",
+      "state": "Delhi",
+      "country": "India",
+      "profile_image": "https://ui-avatars.com/api/?name=User%20A&background=5E3435&color=fff",
+      "instagram_id": "",
+      "instagram_url": null,
+      "youtube_url": null,
+      "facebook_url": null,
+      "other_url": null,
+      "category": "Jewellery styling",
+      "content_preferences": [],
+      "commission_rate": 10,
+      "tier": "starter",
+      "status": "active",
+      "public_slug": "user-a-20",
+      "public_profile_url": "https://wishrite.in/influencer/user-a-20",
+      "created_at": "2026-10-26T12:58:29.195Z",
+      "updated_at": "2026-10-26T12:58:29.195Z"
+    },
+    {
+      "id": "7fb54fec-47c2-4505-8231-9e9be979112c",
+      "influencer_code": "WR-CRE-1E3A26",
+      "name": "User B",
+      "email": "userb_1793019509112@example.com",
+      "phone": "",
+      "bio": "",
+      "city": "Mumbai",
+      "state": "Maharashtra",
+      "country": "India",
+      "profile_image": "https://ui-avatars.com/api/?name=User%20B&background=5E3435&color=fff",
+      "instagram_id": "",
+      "instagram_url": null,
+      "youtube_url": null,
+      "facebook_url": null,
+      "other_url": null,
+      "category": "Jewellery styling",
+      "content_preferences": [],
+      "commission_rate": 10,
+      "tier": "starter",
+      "status": "active",
+      "public_slug": "user-b-20",
+      "public_profile_url": "https://wishrite.in/influencer/user-b-20",
+      "created_at": "2026-10-26T12:58:29.740Z",
+      "updated_at": "2026-10-26T12:58:29.741Z"
+    },
+    {
+      "id": "d52d77d2-56f7-4dbd-814c-aaa571c72add",
+      "influencer_code": "WR-CRE-B8D705",
+      "name": "Self Mod",
+      "email": "selfmod_1793019510181@example.com",
+      "phone": "",
+      "bio": "",
+      "city": "Pune",
+      "state": "MH",
+      "country": "India",
+      "profile_image": "https://ui-avatars.com/api/?name=Self%20Mod&background=5E3435&color=fff",
+      "instagram_id": "",
+      "instagram_url": null,
+      "youtube_url": null,
+      "facebook_url": null,
+      "other_url": null,
+      "category": "Jewellery styling",
+      "content_preferences": [],
+      "commission_rate": 10,
+      "tier": "starter",
+      "status": "active",
+      "public_slug": "self-mod-20",
+      "public_profile_url": "https://wishrite.in/influencer/self-mod-20",
+      "created_at": "2026-10-26T12:58:30.248Z",
+      "updated_at": "2026-10-26T12:58:30.248Z"
+    },
+    {
+      "id": "28056ec8-d071-407b-a4d5-a1867d529b8d",
+      "influencer_code": "WR-CRE-98A045",
+      "name": "Hacker",
+      "email": "hack_1793019510857@example.com",
+      "phone": "",
+      "bio": "",
+      "city": "City",
+      "state": "State",
+      "country": "India",
+      "profile_image": "https://ui-avatars.com/api/?name=Hacker&background=5E3435&color=fff",
+      "instagram_id": "",
+      "instagram_url": null,
+      "youtube_url": null,
+      "facebook_url": null,
+      "other_url": null,
+      "category": "Jewellery styling",
+      "content_preferences": [],
+      "commission_rate": 10,
+      "tier": "starter",
+      "status": "active",
+      "public_slug": "hacker-20",
+      "public_profile_url": "https://wishrite.in/influencer/hacker-20",
+      "created_at": "2026-10-26T12:58:30.923Z",
+      "updated_at": "2026-10-26T12:58:30.923Z"
+    },
+    {
+      "id": "23ae0f30-d190-4b3d-be66-75ce034800f9",
+      "influencer_code": "WR-CRE-BC494A",
+      "name": "Aanya Verma Luxury",
+      "email": "photo_creator_1793019506161@example.com",
+      "phone": "",
+      "bio": "Official 925 sterling silver curator and fashion stylist.",
+      "city": "Mumbai",
+      "state": "Maharashtra",
+      "country": "India",
+      "profile_image": "https://ui-avatars.com/api/?name=Aanya%20Verma%20Luxury&background=5E3435&color=fff",
+      "instagram_id": "aanya_luxury_silver",
+      "instagram_url": null,
+      "youtube_url": "https://youtube.com/@aanyastyle",
+      "facebook_url": "https://facebook.com/aanya.official",
+      "other_url": null,
+      "category": "Jewellery styling",
+      "content_preferences": [
+        "Jewellery styling",
+        "Festive",
+        "Wedding"
+      ],
+      "commission_rate": 10,
+      "tier": "starter",
+      "status": "active",
+      "public_slug": "aanya-verma-8",
+      "public_profile_url": "https://wishrite.in/influencer/aanya-verma-8",
+      "created_at": "2026-10-26T12:58:32.044Z",
+      "updated_at": "2026-10-26T12:58:33.928Z"
+    },
+    {
+      "id": "3445f223-968a-4812-bc77-8f5fb79093dc",
+      "influencer_code": "WR-CRE-E4E176",
+      "name": "Rohan Sharma Creator",
+      "email": "creator_cat_1793019513934@test.com",
+      "phone": "",
+      "bio": "Styling WishRite silver jewellery",
+      "city": "Mumbai",
+      "state": "Maharashtra",
+      "country": "India",
+      "profile_image": "https://ui-avatars.com/api/?name=Rohan%20Sharma%20Creator&background=5E3435&color=fff",
+      "instagram_id": "",
+      "instagram_url": null,
+      "youtube_url": null,
+      "facebook_url": null,
+      "other_url": null,
+      "category": "Jewellery styling",
+      "content_preferences": [],
+      "commission_rate": 10,
+      "tier": "starter",
+      "status": "active",
+      "public_slug": "rohan-sharma-creator-3",
+      "public_profile_url": "https://wishrite.in/influencer/rohan-sharma-creator-3",
+      "created_at": "2026-10-26T12:58:33.994Z",
+      "updated_at": "2026-10-26T12:58:33.994Z"
     }
   ],
   "accounts": [
@@ -5156,6 +5870,303 @@
       "last_login_at": "2026-10-26T11:30:07.295Z",
       "created_at": "2026-10-26T11:30:07.295Z",
       "updated_at": "2026-10-26T11:30:07.295Z"
+    },
+    {
+      "id": "47ed495a-e763-4e9d-91c8-74e78116651d",
+      "influencer_id": "d8406bde-87aa-470d-98aa-64d88830cc06",
+      "auth_user_id": "usr_1793019041702",
+      "email": "creator_test_1793019041702@example.com",
+      "password_hash": "pbkdf2:100000:7e3e2e2435c962a2c917a81e22e3b97a:b6be39cb214462c6e332fbc0cb9e7d7ce667ee3970e7f4acf024b3e2234503d7",
+      "is_active": true,
+      "last_login_at": "2026-10-26T12:50:42.649Z",
+      "created_at": "2026-10-26T12:50:42.649Z",
+      "updated_at": "2026-10-26T12:50:42.649Z"
+    },
+    {
+      "id": "c1f35a0c-714f-4a28-9938-826e1f0d35af",
+      "influencer_id": "ab9451e9-d62f-45cf-9d56-d2b1b559aa2e",
+      "auth_user_id": "usr_alias_1793019043196",
+      "email": "activate_alias_1793019043196@example.com",
+      "password_hash": "pbkdf2:100000:7eb9e3c3d333263344bd0480ef29558f:a6e01684888d98c8def344501232a906e6556820cadc919c45e2c021f1b8c193",
+      "is_active": true,
+      "last_login_at": "2026-10-26T12:50:43.297Z",
+      "created_at": "2026-10-26T12:50:43.297Z",
+      "updated_at": "2026-10-26T12:50:43.297Z"
+    },
+    {
+      "id": "1fb6d930-9d25-473f-bb6c-a7c54a2c2a6d",
+      "influencer_id": "964f2ec9-f2d4-4a9c-88c0-eb4d7feed729",
+      "auth_user_id": "usr_content_1793019043855",
+      "email": "content_creator_1793019043855@example.com",
+      "password_hash": "pbkdf2:100000:de85696160e21bd2d2e3468025110b4a:bc341e56ab31fc2abfbe69da751731017f5a1fb2d7adaaa1947959c4da4f1c68",
+      "is_active": true,
+      "last_login_at": "2026-10-26T12:50:43.923Z",
+      "created_at": "2026-10-26T12:50:43.923Z",
+      "updated_at": "2026-10-26T12:50:43.923Z"
+    },
+    {
+      "id": "9ac8a0cd-a13c-4e90-975b-76284f3ed68f",
+      "influencer_id": "55c11408-ca6d-4e03-a861-4d63f5a5da56",
+      "auth_user_id": "userA_1793019045014",
+      "email": "usera_1793019045014@example.com",
+      "password_hash": "pbkdf2:100000:0477c2091ccdeb87e5c3d6cb1de1ad3d:a3ff959f7be840d2c9197223678f870eb4808ae5217b9f42933c8c98ea2fc074",
+      "is_active": true,
+      "last_login_at": "2026-10-26T12:50:45.091Z",
+      "created_at": "2026-10-26T12:50:45.091Z",
+      "updated_at": "2026-10-26T12:50:45.091Z"
+    },
+    {
+      "id": "5651e761-ec17-4500-a3cf-8ddd7c5eb2c0",
+      "influencer_id": "14529c62-e2e5-415d-a450-a7d284b83006",
+      "auth_user_id": "userB_1793019045014",
+      "email": "userb_1793019045014@example.com",
+      "password_hash": "pbkdf2:100000:4e1f2427fa063d1bb5145a5d7f0c0474:33d7a2cb972636075a8b7568095b52f64082db2b8febab27c37e39e076e81fb4",
+      "is_active": true,
+      "last_login_at": "2026-10-26T12:50:45.615Z",
+      "created_at": "2026-10-26T12:50:45.615Z",
+      "updated_at": "2026-10-26T12:50:45.615Z"
+    },
+    {
+      "id": "744e1409-e8fc-4515-b093-ecbfe043f575",
+      "influencer_id": "486138c3-90d9-4a85-949b-36b9d35d1c92",
+      "auth_user_id": "usr_1793019046109",
+      "email": "selfmod_1793019046109@example.com",
+      "password_hash": "pbkdf2:100000:36fe11886e6844b3aaa2778a75f25034:462786463e546309e4c8c3266658622b86be893a7c9aa6adc33fea10e4b7a53f",
+      "is_active": true,
+      "last_login_at": "2026-10-26T12:50:46.212Z",
+      "created_at": "2026-10-26T12:50:46.212Z",
+      "updated_at": "2026-10-26T12:50:46.212Z"
+    },
+    {
+      "id": "c66ded04-51d6-475b-be5d-f409d67d4a9b",
+      "influencer_id": "61c31a97-e6c3-4d8c-bfc2-4ebb1bf9e7e7",
+      "auth_user_id": "usr_hack_1793019047007",
+      "email": "hack_1793019047007@example.com",
+      "password_hash": "pbkdf2:100000:a3cb21a289c76f7d5af4c2c3da6f146d:57be01a0ae4d31e5aa4651a7177a84168592d72915e209e86ffddaf1a0b72ee7",
+      "is_active": true,
+      "last_login_at": "2026-10-26T12:50:47.082Z",
+      "created_at": "2026-10-26T12:50:47.082Z",
+      "updated_at": "2026-10-26T12:50:47.082Z"
+    },
+    {
+      "id": "66b7b710-6b81-4f10-b81c-402da4a91176",
+      "influencer_id": "39c20be9-66bb-48c9-9dc3-01b7effa9c8d",
+      "auth_user_id": "usr_photo_1793019041691",
+      "email": "photo_creator_1793019041691@example.com",
+      "password_hash": "pbkdf2:100000:96da2fd3873eb913d2bd38567b3b7113:2bf14e47fa6493894402ddbf1939f753090cb8bae42166cc69281e0f7dc1699b",
+      "is_active": true,
+      "last_login_at": "2026-10-26T12:50:48.238Z",
+      "created_at": "2026-10-26T12:50:48.238Z",
+      "updated_at": "2026-10-26T12:50:48.238Z"
+    },
+    {
+      "id": "c589f5c1-7b8f-4664-934e-a59c312a66fd",
+      "influencer_id": "6fc8cee2-80e4-4a68-b50e-928e9de1564b",
+      "auth_user_id": "usr_cat_1793019049998",
+      "email": "creator_cat_1793019049998@test.com",
+      "password_hash": "pbkdf2:100000:43a4f4b0c16075fd8cfe46787560c668:3706ce6c017a7bc69aad8ae07c77601b620d9579f9225141f0f81142766129d9",
+      "is_active": true,
+      "last_login_at": "2026-10-26T12:50:50.066Z",
+      "created_at": "2026-10-26T12:50:50.066Z",
+      "updated_at": "2026-10-26T12:50:50.066Z"
+    },
+    {
+      "id": "3900e418-64e9-4e23-a5e9-ddded7425257",
+      "influencer_id": "6f7280b2-f807-4712-9774-21a7adc8f7dd",
+      "auth_user_id": "usr_1793019354080",
+      "email": "creator_test_1793019354080@example.com",
+      "password_hash": "pbkdf2:100000:673a6ccfa54c68d59ba605bca910d1e5:ba443185d798e84b8805dfff45fd4d037db74da588547462d4ea8790316c9710",
+      "is_active": true,
+      "last_login_at": "2026-10-26T12:55:54.731Z",
+      "created_at": "2026-10-26T12:55:54.731Z",
+      "updated_at": "2026-10-26T12:55:54.731Z"
+    },
+    {
+      "id": "5840e268-ffb9-46d1-baa2-329da59535e3",
+      "influencer_id": "c08829ae-e129-489e-b752-82cb41c92940",
+      "auth_user_id": "usr_alias_1793019355324",
+      "email": "activate_alias_1793019355324@example.com",
+      "password_hash": "pbkdf2:100000:be09d277babba37d49548a39b46fd612:c02330d8f547f5742905a716146f7356973ee45725b5de86ee348812c908832e",
+      "is_active": true,
+      "last_login_at": "2026-10-26T12:55:55.421Z",
+      "created_at": "2026-10-26T12:55:55.421Z",
+      "updated_at": "2026-10-26T12:55:55.421Z"
+    },
+    {
+      "id": "2b13dab5-b962-44df-b17e-7702429ec408",
+      "influencer_id": "a8d6e1c4-67a5-4128-9aa2-f687d0904345",
+      "auth_user_id": "usr_content_1793019355929",
+      "email": "content_creator_1793019355929@example.com",
+      "password_hash": "pbkdf2:100000:9f57cfcb8611102ecf601ed0c3106a38:3610a2021a39a5b827e9f91c6c66ae096b84a2ce18b1ce5e80673660da9e0e5a",
+      "is_active": true,
+      "last_login_at": "2026-10-26T12:55:56.007Z",
+      "created_at": "2026-10-26T12:55:56.007Z",
+      "updated_at": "2026-10-26T12:55:56.007Z"
+    },
+    {
+      "id": "84ddc3b9-079a-4db7-8603-58c37c5b834c",
+      "influencer_id": "673259cd-5982-4a34-9a8d-d59f11b7be42",
+      "auth_user_id": "userA_1793019357229",
+      "email": "usera_1793019357229@example.com",
+      "password_hash": "pbkdf2:100000:1d2164e9903aec2be3a79f0f7318222b:d52570b3d9c8a69152488d8226042770d34282be39d257610d05310364ecf23b",
+      "is_active": true,
+      "last_login_at": "2026-10-26T12:55:57.303Z",
+      "created_at": "2026-10-26T12:55:57.303Z",
+      "updated_at": "2026-10-26T12:55:57.303Z"
+    },
+    {
+      "id": "e539022c-4cfb-48df-830c-fdde202f3f7e",
+      "influencer_id": "7fc23edf-8d86-4534-a0a0-7334d57ce9ac",
+      "auth_user_id": "userB_1793019357229",
+      "email": "userb_1793019357229@example.com",
+      "password_hash": "pbkdf2:100000:2b2d36f89509750d1e0f8ad1d96fbbf7:54d4974729b7bfb748fa741150d0c5d157a9632e9f7cbf1e3a14b762dad134a3",
+      "is_active": true,
+      "last_login_at": "2026-10-26T12:55:57.891Z",
+      "created_at": "2026-10-26T12:55:57.891Z",
+      "updated_at": "2026-10-26T12:55:57.891Z"
+    },
+    {
+      "id": "5d36d612-08fb-4d64-9bf2-d639c2b099b0",
+      "influencer_id": "7b9bbc17-3b53-4ca9-a6c6-48398bec416e",
+      "auth_user_id": "usr_1793019358326",
+      "email": "selfmod_1793019358326@example.com",
+      "password_hash": "pbkdf2:100000:58ba6a83794eee5f35f965848da79954:01cf3a16b6d6922b8ee5e49ace33255b8deb585beed001a4ed03c2c0041eed0a",
+      "is_active": true,
+      "last_login_at": "2026-10-26T12:55:58.406Z",
+      "created_at": "2026-10-26T12:55:58.406Z",
+      "updated_at": "2026-10-26T12:55:58.406Z"
+    },
+    {
+      "id": "62f0d4a7-c417-4994-8a41-da76e89daba9",
+      "influencer_id": "5d7cca8b-c130-4444-af9d-7f2224050a06",
+      "auth_user_id": "usr_hack_1793019358923",
+      "email": "hack_1793019358923@example.com",
+      "password_hash": "pbkdf2:100000:fe582d78a0d58f2ef0bbd8b050fe31e7:e45564e9ddeb8bdc17f1dbf89aa8f6e02858f128ff81b531629b86926b679494",
+      "is_active": true,
+      "last_login_at": "2026-10-26T12:55:59.013Z",
+      "created_at": "2026-10-26T12:55:59.013Z",
+      "updated_at": "2026-10-26T12:55:59.013Z"
+    },
+    {
+      "id": "6e475b9b-9eb8-40ae-a03f-271ba3ce6e5e",
+      "influencer_id": "60c0fbab-0649-467a-b742-34e6bd864261",
+      "auth_user_id": "usr_photo_1793019354069",
+      "email": "photo_creator_1793019354069@example.com",
+      "password_hash": "pbkdf2:100000:680106b8d4ce8677ec0c355521aa3217:710f6f2ce4fcbd26add14e09c7d7288dbd949d0940d5cdbd60dbb4c90d5f859f",
+      "is_active": true,
+      "last_login_at": "2026-10-26T12:56:00.245Z",
+      "created_at": "2026-10-26T12:56:00.245Z",
+      "updated_at": "2026-10-26T12:56:00.245Z"
+    },
+    {
+      "id": "c8173091-eb80-4769-a868-974307df45f6",
+      "influencer_id": "5a65b0a5-7e2b-45b3-8788-649b5b728ab9",
+      "auth_user_id": "usr_cat_1793019362428",
+      "email": "creator_cat_1793019362428@test.com",
+      "password_hash": "pbkdf2:100000:cedfe8f5b734fdd4775fbb5f8bab4752:eec85e9ef7c9fcd75dc4ff288f27e2e98f195c6de5450e32d66b6c694467fa11",
+      "is_active": true,
+      "last_login_at": "2026-10-26T12:56:02.515Z",
+      "created_at": "2026-10-26T12:56:02.515Z",
+      "updated_at": "2026-10-26T12:56:02.515Z"
+    },
+    {
+      "id": "7ff22b47-dcab-4c04-9ceb-33e8b43d310a",
+      "influencer_id": "87fe2e10-a7bb-4236-8037-6dcf993ba97f",
+      "auth_user_id": "usr_1793019506173",
+      "email": "creator_test_1793019506173@example.com",
+      "password_hash": "pbkdf2:100000:2a9a262d95588a66aba33c22fab3bb3c:ec7ce44e27633c1b83b49fe193bd31a7b13bd3aadc0e6e12c2619d8d8804396b",
+      "is_active": true,
+      "last_login_at": "2026-10-26T12:58:26.585Z",
+      "created_at": "2026-10-26T12:58:26.585Z",
+      "updated_at": "2026-10-26T12:58:26.585Z"
+    },
+    {
+      "id": "5e644af1-7c1f-48a2-8268-f5bf674f9062",
+      "influencer_id": "ec7fbe82-dc0b-4035-b79e-cc084fc2fbaa",
+      "auth_user_id": "usr_alias_1793019507278",
+      "email": "activate_alias_1793019507278@example.com",
+      "password_hash": "pbkdf2:100000:244b92527abc08344867e1b2448ac55e:9b3c942fc7b0f43f277633332459e0e6e25f88a9111609d47df1632492a09fa9",
+      "is_active": true,
+      "last_login_at": "2026-10-26T12:58:27.375Z",
+      "created_at": "2026-10-26T12:58:27.375Z",
+      "updated_at": "2026-10-26T12:58:27.375Z"
+    },
+    {
+      "id": "d71a7898-50d2-4504-afee-331ecdce3e48",
+      "influencer_id": "f5c26442-23b8-4972-88d4-f14300fc5535",
+      "auth_user_id": "usr_content_1793019507886",
+      "email": "content_creator_1793019507886@example.com",
+      "password_hash": "pbkdf2:100000:39786117c5f0cc690a394aca1f7c7754:1faba28741a4257b2688a564fdfa444bd1baf4159fdb9d46eb704b3e236541ad",
+      "is_active": true,
+      "last_login_at": "2026-10-26T12:58:27.983Z",
+      "created_at": "2026-10-26T12:58:27.983Z",
+      "updated_at": "2026-10-26T12:58:27.983Z"
+    },
+    {
+      "id": "56becc90-1fc7-44cf-b27e-46222173bc9f",
+      "influencer_id": "d978728f-58ff-452c-a04d-cdef030f1953",
+      "auth_user_id": "userA_1793019509112",
+      "email": "usera_1793019509111@example.com",
+      "password_hash": "pbkdf2:100000:f312988000a8fbb9a2eee5f9616d2df1:26d8407ae8418289eb302fe3f500a3282b21791c4f1582713a9c2bbcbf3d53a2",
+      "is_active": true,
+      "last_login_at": "2026-10-26T12:58:29.211Z",
+      "created_at": "2026-10-26T12:58:29.211Z",
+      "updated_at": "2026-10-26T12:58:29.211Z"
+    },
+    {
+      "id": "aa9a3198-95c3-4bc2-a46e-3a7c8de20e05",
+      "influencer_id": "7fb54fec-47c2-4505-8231-9e9be979112c",
+      "auth_user_id": "userB_1793019509112",
+      "email": "userb_1793019509112@example.com",
+      "password_hash": "pbkdf2:100000:5afebe374485538abbe4a656e08aebf0:72ed95b799571d131934d5c245cf7449a264404d5060ccfd9e1678ec0012e15c",
+      "is_active": true,
+      "last_login_at": "2026-10-26T12:58:29.755Z",
+      "created_at": "2026-10-26T12:58:29.755Z",
+      "updated_at": "2026-10-26T12:58:29.755Z"
+    },
+    {
+      "id": "7fee8716-68ae-474d-b708-c6ef20b4929b",
+      "influencer_id": "d52d77d2-56f7-4dbd-814c-aaa571c72add",
+      "auth_user_id": "usr_1793019510181",
+      "email": "selfmod_1793019510181@example.com",
+      "password_hash": "pbkdf2:100000:27aaafd6090f341f8f7f49d681bc88b5:6b5876d4653ddaca46372d4328d401bdf0e718e434c584b893179b81a48b49ca",
+      "is_active": true,
+      "last_login_at": "2026-10-26T12:58:30.265Z",
+      "created_at": "2026-10-26T12:58:30.265Z",
+      "updated_at": "2026-10-26T12:58:30.265Z"
+    },
+    {
+      "id": "c78bf636-5229-404a-840c-86d879a176ab",
+      "influencer_id": "28056ec8-d071-407b-a4d5-a1867d529b8d",
+      "auth_user_id": "usr_hack_1793019510857",
+      "email": "hack_1793019510857@example.com",
+      "password_hash": "pbkdf2:100000:2ca5af2d84acd788360244a147be56bf:68ff93394ea9d3f7132db512a2a65e1cdd0892c1959ad46daa3db0f89a758e59",
+      "is_active": true,
+      "last_login_at": "2026-10-26T12:58:30.940Z",
+      "created_at": "2026-10-26T12:58:30.940Z",
+      "updated_at": "2026-10-26T12:58:30.940Z"
+    },
+    {
+      "id": "f616c2c0-be6f-4403-bfed-c66a5cf605a4",
+      "influencer_id": "23ae0f30-d190-4b3d-be66-75ce034800f9",
+      "auth_user_id": "usr_photo_1793019506161",
+      "email": "photo_creator_1793019506161@example.com",
+      "password_hash": "pbkdf2:100000:84430a98f8827bf048f1d5b75487d8cc:b29f9093030618bf5ecc5325c25cde41b4fe228b92756342ff82e5f3277dd3f2",
+      "is_active": true,
+      "last_login_at": "2026-10-26T12:58:32.060Z",
+      "created_at": "2026-10-26T12:58:32.060Z",
+      "updated_at": "2026-10-26T12:58:32.060Z"
+    },
+    {
+      "id": "3a0451c3-3d70-4be9-bd07-0ead9191919c",
+      "influencer_id": "3445f223-968a-4812-bc77-8f5fb79093dc",
+      "auth_user_id": "usr_cat_1793019513934",
+      "email": "creator_cat_1793019513934@test.com",
+      "password_hash": "pbkdf2:100000:624c0623ed9ca724acd231598402b499:d2a9b490aabecf0fe90a6d643e0a8835569e88a437ce4a8fe35910a4c1c64039",
+      "is_active": true,
+      "last_login_at": "2026-10-26T12:58:34.006Z",
+      "created_at": "2026-10-26T12:58:34.006Z",
+      "updated_at": "2026-10-26T12:58:34.006Z"
     }
   ],
   "links": [
@@ -6483,6 +7494,249 @@
       "is_default": true,
       "campaign_id": "default",
       "created_at": "2026-10-26T11:30:07.295Z"
+    },
+    {
+      "id": "8c0c987d-4d13-4ce9-845e-2b78dd6a3909",
+      "influencer_id": "d8406bde-87aa-470d-98aa-64d88830cc06",
+      "link_type": "storefront",
+      "url": "https://wishrite.in/creator/tara-sharma-18",
+      "is_default": true,
+      "campaign_id": "default",
+      "created_at": "2026-10-26T12:50:42.649Z"
+    },
+    {
+      "id": "6fe557ac-d87b-4501-9102-84cb045754f5",
+      "influencer_id": "ab9451e9-d62f-45cf-9d56-d2b1b559aa2e",
+      "link_type": "storefront",
+      "url": "https://wishrite.in/creator/alias-creator-9",
+      "is_default": true,
+      "campaign_id": "default",
+      "created_at": "2026-10-26T12:50:43.297Z"
+    },
+    {
+      "id": "66bf3596-dba9-4b93-9653-b82b5f8a153f",
+      "influencer_id": "964f2ec9-f2d4-4a9c-88c0-eb4d7feed729",
+      "link_type": "storefront",
+      "url": "https://wishrite.in/creator/rohan-mehta-14",
+      "is_default": true,
+      "campaign_id": "default",
+      "created_at": "2026-10-26T12:50:43.923Z"
+    },
+    {
+      "id": "922cd57b-812a-4cd3-971d-47df83ded2e5",
+      "influencer_id": "55c11408-ca6d-4e03-a861-4d63f5a5da56",
+      "link_type": "storefront",
+      "url": "https://wishrite.in/creator/user-a-18",
+      "is_default": true,
+      "campaign_id": "default",
+      "created_at": "2026-10-26T12:50:45.091Z"
+    },
+    {
+      "id": "d9adb147-af50-4b9b-99a6-f612fa4ca167",
+      "influencer_id": "14529c62-e2e5-415d-a450-a7d284b83006",
+      "link_type": "storefront",
+      "url": "https://wishrite.in/creator/user-b-18",
+      "is_default": true,
+      "campaign_id": "default",
+      "created_at": "2026-10-26T12:50:45.615Z"
+    },
+    {
+      "id": "b28a6868-c392-4e50-9c0e-38cbdac5fc85",
+      "influencer_id": "486138c3-90d9-4a85-949b-36b9d35d1c92",
+      "link_type": "storefront",
+      "url": "https://wishrite.in/creator/self-mod-18",
+      "is_default": true,
+      "campaign_id": "default",
+      "created_at": "2026-10-26T12:50:46.212Z"
+    },
+    {
+      "id": "5d7cbf47-9291-4159-bc1f-80c7d9071115",
+      "influencer_id": "61c31a97-e6c3-4d8c-bfc2-4ebb1bf9e7e7",
+      "link_type": "storefront",
+      "url": "https://wishrite.in/creator/hacker-18",
+      "is_default": true,
+      "campaign_id": "default",
+      "created_at": "2026-10-26T12:50:47.082Z"
+    },
+    {
+      "id": "2306735f-5fd4-45d4-9254-a80d624c149d",
+      "influencer_id": "39c20be9-66bb-48c9-9dc3-01b7effa9c8d",
+      "link_type": "storefront",
+      "url": "https://wishrite.in/creator/aanya-verma-6",
+      "is_default": true,
+      "campaign_id": "default",
+      "created_at": "2026-10-26T12:50:48.238Z"
+    },
+    {
+      "id": "38964ccd-afe3-4f60-b290-187b83ecb5ad",
+      "influencer_id": "6fc8cee2-80e4-4a68-b50e-928e9de1564b",
+      "link_type": "storefront",
+      "url": "https://wishrite.in/creator/rohan-sharma-creator-1",
+      "is_default": true,
+      "campaign_id": "default",
+      "created_at": "2026-10-26T12:50:50.066Z"
+    },
+    {
+      "id": "12363978-5add-482d-89e1-ebc1f8a37cf5",
+      "influencer_id": "6f7280b2-f807-4712-9774-21a7adc8f7dd",
+      "link_type": "storefront",
+      "url": "https://wishrite.in/creator/tara-sharma-19",
+      "is_default": true,
+      "campaign_id": "default",
+      "created_at": "2026-10-26T12:55:54.731Z"
+    },
+    {
+      "id": "89f3a677-2f96-45a8-a6b6-880a02f4238a",
+      "influencer_id": "c08829ae-e129-489e-b752-82cb41c92940",
+      "link_type": "storefront",
+      "url": "https://wishrite.in/creator/alias-creator-10",
+      "is_default": true,
+      "campaign_id": "default",
+      "created_at": "2026-10-26T12:55:55.421Z"
+    },
+    {
+      "id": "648b2308-d4a3-42da-8b17-f929c1d45e8f",
+      "influencer_id": "a8d6e1c4-67a5-4128-9aa2-f687d0904345",
+      "link_type": "storefront",
+      "url": "https://wishrite.in/creator/rohan-mehta-15",
+      "is_default": true,
+      "campaign_id": "default",
+      "created_at": "2026-10-26T12:55:56.007Z"
+    },
+    {
+      "id": "3d576212-87c1-4e65-af1d-6ddaf424be55",
+      "influencer_id": "673259cd-5982-4a34-9a8d-d59f11b7be42",
+      "link_type": "storefront",
+      "url": "https://wishrite.in/creator/user-a-19",
+      "is_default": true,
+      "campaign_id": "default",
+      "created_at": "2026-10-26T12:55:57.303Z"
+    },
+    {
+      "id": "8b230bd6-758d-4927-9ebd-211c41c83c5a",
+      "influencer_id": "7fc23edf-8d86-4534-a0a0-7334d57ce9ac",
+      "link_type": "storefront",
+      "url": "https://wishrite.in/creator/user-b-19",
+      "is_default": true,
+      "campaign_id": "default",
+      "created_at": "2026-10-26T12:55:57.891Z"
+    },
+    {
+      "id": "c6b10777-487b-4821-bb4e-95c15b3c4cc7",
+      "influencer_id": "7b9bbc17-3b53-4ca9-a6c6-48398bec416e",
+      "link_type": "storefront",
+      "url": "https://wishrite.in/creator/self-mod-19",
+      "is_default": true,
+      "campaign_id": "default",
+      "created_at": "2026-10-26T12:55:58.406Z"
+    },
+    {
+      "id": "e471b30e-c7ce-476f-828d-10793a3ab8ca",
+      "influencer_id": "5d7cca8b-c130-4444-af9d-7f2224050a06",
+      "link_type": "storefront",
+      "url": "https://wishrite.in/creator/hacker-19",
+      "is_default": true,
+      "campaign_id": "default",
+      "created_at": "2026-10-26T12:55:59.013Z"
+    },
+    {
+      "id": "cc51adaf-9c98-49cf-863f-3865371228b8",
+      "influencer_id": "60c0fbab-0649-467a-b742-34e6bd864261",
+      "link_type": "storefront",
+      "url": "https://wishrite.in/creator/aanya-verma-7",
+      "is_default": true,
+      "campaign_id": "default",
+      "created_at": "2026-10-26T12:56:00.245Z"
+    },
+    {
+      "id": "1e3d4e6a-a75c-46f5-ab63-2c96cfdbf51f",
+      "influencer_id": "5a65b0a5-7e2b-45b3-8788-649b5b728ab9",
+      "link_type": "storefront",
+      "url": "https://wishrite.in/creator/rohan-sharma-creator-2",
+      "is_default": true,
+      "campaign_id": "default",
+      "created_at": "2026-10-26T12:56:02.515Z"
+    },
+    {
+      "id": "3dee10c0-3ce3-40a3-a60f-8c42d52af036",
+      "influencer_id": "87fe2e10-a7bb-4236-8037-6dcf993ba97f",
+      "link_type": "storefront",
+      "url": "https://wishrite.in/creator/tara-sharma-20",
+      "is_default": true,
+      "campaign_id": "default",
+      "created_at": "2026-10-26T12:58:26.585Z"
+    },
+    {
+      "id": "b951c7dc-bca2-42ec-a022-cd1c291553d9",
+      "influencer_id": "ec7fbe82-dc0b-4035-b79e-cc084fc2fbaa",
+      "link_type": "storefront",
+      "url": "https://wishrite.in/creator/alias-creator-11",
+      "is_default": true,
+      "campaign_id": "default",
+      "created_at": "2026-10-26T12:58:27.376Z"
+    },
+    {
+      "id": "bee172d2-11a7-4f27-a85c-f246c7652cca",
+      "influencer_id": "f5c26442-23b8-4972-88d4-f14300fc5535",
+      "link_type": "storefront",
+      "url": "https://wishrite.in/creator/rohan-mehta-16",
+      "is_default": true,
+      "campaign_id": "default",
+      "created_at": "2026-10-26T12:58:27.983Z"
+    },
+    {
+      "id": "ebf31620-0070-4f25-8bf6-423437786522",
+      "influencer_id": "d978728f-58ff-452c-a04d-cdef030f1953",
+      "link_type": "storefront",
+      "url": "https://wishrite.in/creator/user-a-20",
+      "is_default": true,
+      "campaign_id": "default",
+      "created_at": "2026-10-26T12:58:29.211Z"
+    },
+    {
+      "id": "572aa663-bba6-4b0b-b0f1-54e0299fc940",
+      "influencer_id": "7fb54fec-47c2-4505-8231-9e9be979112c",
+      "link_type": "storefront",
+      "url": "https://wishrite.in/creator/user-b-20",
+      "is_default": true,
+      "campaign_id": "default",
+      "created_at": "2026-10-26T12:58:29.755Z"
+    },
+    {
+      "id": "8f00f7ca-4c2b-4eb6-ae04-b653d2aeeda1",
+      "influencer_id": "d52d77d2-56f7-4dbd-814c-aaa571c72add",
+      "link_type": "storefront",
+      "url": "https://wishrite.in/creator/self-mod-20",
+      "is_default": true,
+      "campaign_id": "default",
+      "created_at": "2026-10-26T12:58:30.265Z"
+    },
+    {
+      "id": "24e39b2e-05cf-472d-a601-f26423bf540c",
+      "influencer_id": "28056ec8-d071-407b-a4d5-a1867d529b8d",
+      "link_type": "storefront",
+      "url": "https://wishrite.in/creator/hacker-20",
+      "is_default": true,
+      "campaign_id": "default",
+      "created_at": "2026-10-26T12:58:30.940Z"
+    },
+    {
+      "id": "3499dd26-f15b-4e6d-adcd-e4e6997e3307",
+      "influencer_id": "23ae0f30-d190-4b3d-be66-75ce034800f9",
+      "link_type": "storefront",
+      "url": "https://wishrite.in/creator/aanya-verma-8",
+      "is_default": true,
+      "campaign_id": "default",
+      "created_at": "2026-10-26T12:58:32.060Z"
+    },
+    {
+      "id": "a42966fd-2c5e-4f73-bca2-d7e7dcfbf32b",
+      "influencer_id": "3445f223-968a-4812-bc77-8f5fb79093dc",
+      "link_type": "storefront",
+      "url": "https://wishrite.in/creator/rohan-sharma-creator-3",
+      "is_default": true,
+      "campaign_id": "default",
+      "created_at": "2026-10-26T12:58:34.006Z"
     }
   ],
   "stats": [
@@ -8357,6 +9611,357 @@
       "pending_earnings": 0,
       "total_points": 0,
       "updated_at": "2026-10-26T11:30:07.295Z"
+    },
+    {
+      "id": "ce6aeeec-9a2d-4a0a-abc1-9989dd22dbd1",
+      "influencer_id": "d8406bde-87aa-470d-98aa-64d88830cc06",
+      "total_clicks": 0,
+      "total_orders": 0,
+      "total_sales": 0,
+      "total_views": 0,
+      "total_earnings": 0,
+      "available_earnings": 0,
+      "pending_earnings": 0,
+      "total_points": 0,
+      "updated_at": "2026-10-26T12:50:42.649Z"
+    },
+    {
+      "id": "8e160c6a-1d2f-4091-b480-d2663ab67351",
+      "influencer_id": "ab9451e9-d62f-45cf-9d56-d2b1b559aa2e",
+      "total_clicks": 0,
+      "total_orders": 0,
+      "total_sales": 0,
+      "total_views": 0,
+      "total_earnings": 0,
+      "available_earnings": 0,
+      "pending_earnings": 0,
+      "total_points": 0,
+      "updated_at": "2026-10-26T12:50:43.297Z"
+    },
+    {
+      "id": "1aec5777-977e-48f9-bc4a-3a3601ea29f0",
+      "influencer_id": "964f2ec9-f2d4-4a9c-88c0-eb4d7feed729",
+      "total_clicks": 0,
+      "total_orders": 0,
+      "total_sales": 0,
+      "total_views": 0,
+      "total_earnings": 0,
+      "available_earnings": 0,
+      "pending_earnings": 0,
+      "total_points": 0,
+      "updated_at": "2026-10-26T12:50:43.923Z"
+    },
+    {
+      "id": "2b01bd68-737a-4e45-a214-63c076bf5513",
+      "influencer_id": "55c11408-ca6d-4e03-a861-4d63f5a5da56",
+      "total_clicks": 0,
+      "total_orders": 0,
+      "total_sales": 0,
+      "total_views": 0,
+      "total_earnings": 0,
+      "available_earnings": 0,
+      "pending_earnings": 0,
+      "total_points": 0,
+      "updated_at": "2026-10-26T12:50:45.091Z"
+    },
+    {
+      "id": "541c7689-769e-44e4-9028-91ac708cfb8d",
+      "influencer_id": "14529c62-e2e5-415d-a450-a7d284b83006",
+      "total_clicks": 0,
+      "total_orders": 0,
+      "total_sales": 0,
+      "total_views": 0,
+      "total_earnings": 0,
+      "available_earnings": 0,
+      "pending_earnings": 0,
+      "total_points": 0,
+      "updated_at": "2026-10-26T12:50:45.615Z"
+    },
+    {
+      "id": "0dc39a3c-9d97-43eb-b469-a436633d399d",
+      "influencer_id": "486138c3-90d9-4a85-949b-36b9d35d1c92",
+      "total_clicks": 0,
+      "total_orders": 0,
+      "total_sales": 0,
+      "total_views": 0,
+      "total_earnings": 0,
+      "available_earnings": 0,
+      "pending_earnings": 0,
+      "total_points": 0,
+      "updated_at": "2026-10-26T12:50:46.212Z"
+    },
+    {
+      "id": "aeae3616-40a3-4ebd-a05d-51337dd83600",
+      "influencer_id": "61c31a97-e6c3-4d8c-bfc2-4ebb1bf9e7e7",
+      "total_clicks": 0,
+      "total_orders": 0,
+      "total_sales": 0,
+      "total_views": 0,
+      "total_earnings": 0,
+      "available_earnings": 0,
+      "pending_earnings": 0,
+      "total_points": 0,
+      "updated_at": "2026-10-26T12:50:47.082Z"
+    },
+    {
+      "id": "0a90e3df-9555-43a6-871a-78a855de36fd",
+      "influencer_id": "39c20be9-66bb-48c9-9dc3-01b7effa9c8d",
+      "total_clicks": 0,
+      "total_orders": 0,
+      "total_sales": 0,
+      "total_views": 0,
+      "total_earnings": 0,
+      "available_earnings": 0,
+      "pending_earnings": 0,
+      "total_points": 0,
+      "updated_at": "2026-10-26T12:50:48.238Z"
+    },
+    {
+      "id": "cac90ac6-7ae2-4f8a-89e8-7c423ac44a8d",
+      "influencer_id": "6fc8cee2-80e4-4a68-b50e-928e9de1564b",
+      "total_clicks": 0,
+      "total_orders": 0,
+      "total_sales": 0,
+      "total_views": 0,
+      "total_earnings": 0,
+      "available_earnings": 0,
+      "pending_earnings": 0,
+      "total_points": 0,
+      "updated_at": "2026-10-26T12:50:50.066Z"
+    },
+    {
+      "id": "83ac0ce4-8865-4499-8b3b-7d19acae4df7",
+      "influencer_id": "6f7280b2-f807-4712-9774-21a7adc8f7dd",
+      "total_clicks": 0,
+      "total_orders": 0,
+      "total_sales": 0,
+      "total_views": 0,
+      "total_earnings": 0,
+      "available_earnings": 0,
+      "pending_earnings": 0,
+      "total_points": 0,
+      "updated_at": "2026-10-26T12:55:54.731Z"
+    },
+    {
+      "id": "7c1f22a7-10c4-4406-a5e2-5e9d15d64d0c",
+      "influencer_id": "c08829ae-e129-489e-b752-82cb41c92940",
+      "total_clicks": 0,
+      "total_orders": 0,
+      "total_sales": 0,
+      "total_views": 0,
+      "total_earnings": 0,
+      "available_earnings": 0,
+      "pending_earnings": 0,
+      "total_points": 0,
+      "updated_at": "2026-10-26T12:55:55.421Z"
+    },
+    {
+      "id": "d65adf25-74c0-4587-80c8-f7267c152209",
+      "influencer_id": "a8d6e1c4-67a5-4128-9aa2-f687d0904345",
+      "total_clicks": 0,
+      "total_orders": 0,
+      "total_sales": 0,
+      "total_views": 0,
+      "total_earnings": 0,
+      "available_earnings": 0,
+      "pending_earnings": 0,
+      "total_points": 0,
+      "updated_at": "2026-10-26T12:55:56.007Z"
+    },
+    {
+      "id": "aef23168-f07d-49da-b167-cc73b3bc4789",
+      "influencer_id": "673259cd-5982-4a34-9a8d-d59f11b7be42",
+      "total_clicks": 0,
+      "total_orders": 0,
+      "total_sales": 0,
+      "total_views": 0,
+      "total_earnings": 0,
+      "available_earnings": 0,
+      "pending_earnings": 0,
+      "total_points": 0,
+      "updated_at": "2026-10-26T12:55:57.303Z"
+    },
+    {
+      "id": "1be50d0a-041a-41c4-8632-f54f58edb3a4",
+      "influencer_id": "7fc23edf-8d86-4534-a0a0-7334d57ce9ac",
+      "total_clicks": 0,
+      "total_orders": 0,
+      "total_sales": 0,
+      "total_views": 0,
+      "total_earnings": 0,
+      "available_earnings": 0,
+      "pending_earnings": 0,
+      "total_points": 0,
+      "updated_at": "2026-10-26T12:55:57.891Z"
+    },
+    {
+      "id": "119ea5f4-b732-43c4-9c9c-a745c5983bf8",
+      "influencer_id": "7b9bbc17-3b53-4ca9-a6c6-48398bec416e",
+      "total_clicks": 0,
+      "total_orders": 0,
+      "total_sales": 0,
+      "total_views": 0,
+      "total_earnings": 0,
+      "available_earnings": 0,
+      "pending_earnings": 0,
+      "total_points": 0,
+      "updated_at": "2026-10-26T12:55:58.406Z"
+    },
+    {
+      "id": "964200bc-99e1-4d26-afd7-1661454ac1b0",
+      "influencer_id": "5d7cca8b-c130-4444-af9d-7f2224050a06",
+      "total_clicks": 0,
+      "total_orders": 0,
+      "total_sales": 0,
+      "total_views": 0,
+      "total_earnings": 0,
+      "available_earnings": 0,
+      "pending_earnings": 0,
+      "total_points": 0,
+      "updated_at": "2026-10-26T12:55:59.013Z"
+    },
+    {
+      "id": "bc6ae8c4-3106-4486-8b64-d97668ab674d",
+      "influencer_id": "60c0fbab-0649-467a-b742-34e6bd864261",
+      "total_clicks": 0,
+      "total_orders": 0,
+      "total_sales": 0,
+      "total_views": 0,
+      "total_earnings": 0,
+      "available_earnings": 0,
+      "pending_earnings": 0,
+      "total_points": 0,
+      "updated_at": "2026-10-26T12:56:00.245Z"
+    },
+    {
+      "id": "26c09464-42ae-4a76-8752-9418c0bbb8c2",
+      "influencer_id": "5a65b0a5-7e2b-45b3-8788-649b5b728ab9",
+      "total_clicks": 0,
+      "total_orders": 0,
+      "total_sales": 0,
+      "total_views": 0,
+      "total_earnings": 0,
+      "available_earnings": 0,
+      "pending_earnings": 0,
+      "total_points": 0,
+      "updated_at": "2026-10-26T12:56:02.515Z"
+    },
+    {
+      "id": "e92e7670-9375-4be4-8bce-bdde4fca0e3a",
+      "influencer_id": "87fe2e10-a7bb-4236-8037-6dcf993ba97f",
+      "total_clicks": 0,
+      "total_orders": 0,
+      "total_sales": 0,
+      "total_views": 0,
+      "total_earnings": 0,
+      "available_earnings": 0,
+      "pending_earnings": 0,
+      "total_points": 0,
+      "updated_at": "2026-10-26T12:58:26.585Z"
+    },
+    {
+      "id": "8da17765-c293-41b9-9aed-83725b93c678",
+      "influencer_id": "ec7fbe82-dc0b-4035-b79e-cc084fc2fbaa",
+      "total_clicks": 0,
+      "total_orders": 0,
+      "total_sales": 0,
+      "total_views": 0,
+      "total_earnings": 0,
+      "available_earnings": 0,
+      "pending_earnings": 0,
+      "total_points": 0,
+      "updated_at": "2026-10-26T12:58:27.376Z"
+    },
+    {
+      "id": "4f21115b-0234-4860-b89f-c1e59414c284",
+      "influencer_id": "f5c26442-23b8-4972-88d4-f14300fc5535",
+      "total_clicks": 0,
+      "total_orders": 0,
+      "total_sales": 0,
+      "total_views": 0,
+      "total_earnings": 0,
+      "available_earnings": 0,
+      "pending_earnings": 0,
+      "total_points": 0,
+      "updated_at": "2026-10-26T12:58:27.983Z"
+    },
+    {
+      "id": "c5e88343-0151-4d6b-9262-57b5bd8b1a31",
+      "influencer_id": "d978728f-58ff-452c-a04d-cdef030f1953",
+      "total_clicks": 0,
+      "total_orders": 0,
+      "total_sales": 0,
+      "total_views": 0,
+      "total_earnings": 0,
+      "available_earnings": 0,
+      "pending_earnings": 0,
+      "total_points": 0,
+      "updated_at": "2026-10-26T12:58:29.211Z"
+    },
+    {
+      "id": "08bc4c2e-1506-42d5-ae0a-2c1723a7a89c",
+      "influencer_id": "7fb54fec-47c2-4505-8231-9e9be979112c",
+      "total_clicks": 0,
+      "total_orders": 0,
+      "total_sales": 0,
+      "total_views": 0,
+      "total_earnings": 0,
+      "available_earnings": 0,
+      "pending_earnings": 0,
+      "total_points": 0,
+      "updated_at": "2026-10-26T12:58:29.755Z"
+    },
+    {
+      "id": "992e99ab-19e9-45a5-9dc8-76141147d024",
+      "influencer_id": "d52d77d2-56f7-4dbd-814c-aaa571c72add",
+      "total_clicks": 0,
+      "total_orders": 0,
+      "total_sales": 0,
+      "total_views": 0,
+      "total_earnings": 0,
+      "available_earnings": 0,
+      "pending_earnings": 0,
+      "total_points": 0,
+      "updated_at": "2026-10-26T12:58:30.265Z"
+    },
+    {
+      "id": "c2dc3148-b558-4a1b-ac24-11e90d8b7eb1",
+      "influencer_id": "28056ec8-d071-407b-a4d5-a1867d529b8d",
+      "total_clicks": 0,
+      "total_orders": 0,
+      "total_sales": 0,
+      "total_views": 0,
+      "total_earnings": 0,
+      "available_earnings": 0,
+      "pending_earnings": 0,
+      "total_points": 0,
+      "updated_at": "2026-10-26T12:58:30.940Z"
+    },
+    {
+      "id": "2e288b39-69fc-47fb-a3fc-134873974f10",
+      "influencer_id": "23ae0f30-d190-4b3d-be66-75ce034800f9",
+      "total_clicks": 0,
+      "total_orders": 0,
+      "total_sales": 0,
+      "total_views": 0,
+      "total_earnings": 0,
+      "available_earnings": 0,
+      "pending_earnings": 0,
+      "total_points": 0,
+      "updated_at": "2026-10-26T12:58:32.060Z"
+    },
+    {
+      "id": "7afc0842-2503-461b-bfa8-ff0f80880aeb",
+      "influencer_id": "3445f223-968a-4812-bc77-8f5fb79093dc",
+      "total_clicks": 0,
+      "total_orders": 0,
+      "total_sales": 0,
+      "total_views": 0,
+      "total_earnings": 0,
+      "available_earnings": 0,
+      "pending_earnings": 0,
+      "total_points": 0,
+      "updated_at": "2026-10-26T12:58:34.006Z"
     }
   ],
   "clicks": [
@@ -10100,6 +11705,612 @@
   "reward_redemptions": [],
   "payout_webhooks": [],
   "creator_content": [
+    {
+      "id": "0d3aee03-58ba-42d8-ac4c-c66ded8006a1",
+      "influencer_id": "3445f223-968a-4812-bc77-8f5fb79093dc",
+      "creator_name": "Rohan Sharma Creator",
+      "creator_email": "creator_cat_1793019513934@test.com",
+      "content_type": "reel",
+      "platform": "instagram",
+      "url": "https://www.instagram.com/reel/C89abcDEF/",
+      "caption": "Sparkle in 925 Silver Solitaire Studs",
+      "product_category": "Earrings",
+      "product_code": "WR-ER-002",
+      "product_name": "Solitaire Studs",
+      "product_image": "https://images.wishrite.in/products/WR-ER-002.jpg",
+      "thumbnail_url": "https://images.wishrite.in/products/WR-ER-002.jpg",
+      "tags": [
+        "#wishrite",
+        "#reels"
+      ],
+      "status": "Submitted",
+      "rejection_reason": null,
+      "views": 0,
+      "clicks": 0,
+      "orders": 0,
+      "commission_amount": 0,
+      "created_at": "2026-10-26T12:58:34.511Z",
+      "updated_at": "2026-10-26T12:58:34.511Z"
+    },
+    {
+      "id": "158aa250-9be6-4ad0-91d5-bd3a8cf4ed28",
+      "influencer_id": "3445f223-968a-4812-bc77-8f5fb79093dc",
+      "creator_name": "Rohan Sharma Creator",
+      "creator_email": "creator_cat_1793019513934@test.com",
+      "content_type": "post",
+      "platform": "instagram",
+      "url": "https://www.instagram.com/p/DBxyz123/",
+      "caption": "Styling the Silver Evil Eye Necklace with modern festive outfits",
+      "product_category": "Necklaces",
+      "product_code": "WR-NC-001",
+      "product_name": "Silver Evil Eye Necklace",
+      "product_image": "https://images.wishrite.in/products/WR-NC-001.jpg",
+      "thumbnail_url": "https://images.wishrite.in/products/WR-NC-001.jpg",
+      "tags": [
+        "#wishrite",
+        "#silverjewellery"
+      ],
+      "status": "Submitted",
+      "rejection_reason": null,
+      "views": 0,
+      "clicks": 0,
+      "orders": 0,
+      "commission_amount": 0,
+      "created_at": "2026-10-26T12:58:34.436Z",
+      "updated_at": "2026-10-26T12:58:34.436Z"
+    },
+    {
+      "id": "536b3b7c-4a77-4637-b9d6-0e924ef4ba77",
+      "influencer_id": "d52d77d2-56f7-4dbd-814c-aaa571c72add",
+      "creator_name": "Self Mod",
+      "creator_email": "selfmod_1793019510181@example.com",
+      "content_type": "post",
+      "platform": "instagram",
+      "url": "https://instagram.com/p/self_mod_test/",
+      "caption": "Testing self mod",
+      "product_category": "",
+      "product_code": "",
+      "product_name": "",
+      "product_image": null,
+      "thumbnail_url": null,
+      "tags": [],
+      "status": "Submitted",
+      "rejection_reason": null,
+      "views": 0,
+      "clicks": 0,
+      "orders": 0,
+      "commission_amount": 0,
+      "created_at": "2026-10-26T12:58:30.721Z",
+      "updated_at": "2026-10-26T12:58:30.721Z"
+    },
+    {
+      "id": "78b85339-a822-43e5-9410-605a85efc42b",
+      "influencer_id": "d978728f-58ff-452c-a04d-cdef030f1953",
+      "creator_name": "User A",
+      "creator_email": "usera_1793019509111@example.com",
+      "content_type": "post",
+      "platform": "instagram",
+      "url": "https://instagram.com/p/user_a_post/",
+      "caption": "User A private styling",
+      "product_category": "",
+      "product_code": "",
+      "product_name": "",
+      "product_image": null,
+      "thumbnail_url": null,
+      "tags": [],
+      "status": "Submitted",
+      "rejection_reason": null,
+      "views": 0,
+      "clicks": 0,
+      "orders": 0,
+      "commission_amount": 0,
+      "created_at": "2026-10-26T12:58:29.627Z",
+      "updated_at": "2026-10-26T12:58:29.627Z"
+    },
+    {
+      "id": "9d14eb7c-bed4-4c30-9d0b-5f83b95caa71",
+      "influencer_id": "f5c26442-23b8-4972-88d4-f14300fc5535",
+      "creator_name": "Rohan Mehta",
+      "creator_email": "content_creator_1793019507886@example.com",
+      "content_type": "reel",
+      "platform": "instagram",
+      "url": "https://www.instagram.com/reel/mod_test_item/",
+      "caption": "Moderation target",
+      "product_category": "",
+      "product_code": "",
+      "product_name": "",
+      "product_image": null,
+      "thumbnail_url": null,
+      "tags": [],
+      "status": "Approved",
+      "rejection_reason": null,
+      "views": 0,
+      "clicks": 0,
+      "orders": 0,
+      "commission_amount": 0,
+      "created_at": "2026-10-26T12:58:28.944Z",
+      "updated_at": "2026-10-26T12:58:29.023Z"
+    },
+    {
+      "id": "8d146008-ae42-4e93-a844-7aea80bea7a2",
+      "influencer_id": "f5c26442-23b8-4972-88d4-f14300fc5535",
+      "creator_name": "Rohan Mehta",
+      "creator_email": "content_creator_1793019507886@example.com",
+      "content_type": "post",
+      "platform": "instagram",
+      "url": "https://www.instagram.com/p/view_own_submission_test/",
+      "caption": "Self view test",
+      "product_category": "",
+      "product_code": "",
+      "product_name": "",
+      "product_image": null,
+      "thumbnail_url": null,
+      "tags": [],
+      "status": "Submitted",
+      "rejection_reason": null,
+      "views": 0,
+      "clicks": 0,
+      "orders": 0,
+      "commission_amount": 0,
+      "created_at": "2026-10-26T12:58:28.738Z",
+      "updated_at": "2026-10-26T12:58:28.738Z"
+    },
+    {
+      "id": "a883876e-10f1-40cd-ad41-b68b489243aa",
+      "influencer_id": "f5c26442-23b8-4972-88d4-f14300fc5535",
+      "creator_name": "Rohan Mehta",
+      "creator_email": "content_creator_1793019507886@example.com",
+      "content_type": "reel",
+      "platform": "instagram",
+      "url": "https://www.instagram.com/reel/DC987654321/",
+      "caption": "Unboxing the 925 Sterling Silver Ring ✨",
+      "product_category": "",
+      "product_code": "WR-RNG-002",
+      "product_name": "Solitaire Silver Ring",
+      "product_image": null,
+      "thumbnail_url": null,
+      "tags": [
+        "#reels, #unboxing"
+      ],
+      "status": "Submitted",
+      "rejection_reason": null,
+      "views": 0,
+      "clicks": 0,
+      "orders": 0,
+      "commission_amount": 0,
+      "created_at": "2026-10-26T12:58:28.542Z",
+      "updated_at": "2026-10-26T12:58:28.542Z"
+    },
+    {
+      "id": "eaa859ad-c07b-461b-bf91-3cdc930f1be9",
+      "influencer_id": "f5c26442-23b8-4972-88d4-f14300fc5535",
+      "creator_name": "Rohan Mehta",
+      "creator_email": "content_creator_1793019507886@example.com",
+      "content_type": "post",
+      "platform": "instagram",
+      "url": "https://www.instagram.com/p/DB123456789/",
+      "caption": "Styling the WishRite Silver Pendant for Diwali festivities!",
+      "product_category": "",
+      "product_code": "WR-JWL-001",
+      "product_name": "Silver Celestial Pendant",
+      "product_image": null,
+      "thumbnail_url": null,
+      "tags": [
+        "#wishrite, #silverpendant"
+      ],
+      "status": "Submitted",
+      "rejection_reason": null,
+      "views": 0,
+      "clicks": 0,
+      "orders": 0,
+      "commission_amount": 0,
+      "created_at": "2026-10-26T12:58:28.421Z",
+      "updated_at": "2026-10-26T12:58:28.421Z"
+    },
+    {
+      "id": "2ea9b831-ddd9-4b21-9619-3669d887ec64",
+      "influencer_id": "5a65b0a5-7e2b-45b3-8788-649b5b728ab9",
+      "creator_name": "Rohan Sharma Creator",
+      "creator_email": "creator_cat_1793019362428@test.com",
+      "content_type": "reel",
+      "platform": "instagram",
+      "url": "https://www.instagram.com/reel/C89abcDEF/",
+      "caption": "Sparkle in 925 Silver Solitaire Studs",
+      "product_category": "Earrings",
+      "product_code": "WR-ER-002",
+      "product_name": "Solitaire Studs",
+      "product_image": "https://images.wishrite.in/products/WR-ER-002.jpg",
+      "thumbnail_url": "https://images.wishrite.in/products/WR-ER-002.jpg",
+      "tags": [
+        "#wishrite",
+        "#reels"
+      ],
+      "status": "Submitted",
+      "rejection_reason": null,
+      "views": 0,
+      "clicks": 0,
+      "orders": 0,
+      "commission_amount": 0,
+      "created_at": "2026-10-26T12:56:03.012Z",
+      "updated_at": "2026-10-26T12:56:03.012Z"
+    },
+    {
+      "id": "1ad1a198-abe8-4f8e-aac5-3f633bcced35",
+      "influencer_id": "5a65b0a5-7e2b-45b3-8788-649b5b728ab9",
+      "creator_name": "Rohan Sharma Creator",
+      "creator_email": "creator_cat_1793019362428@test.com",
+      "content_type": "post",
+      "platform": "instagram",
+      "url": "https://www.instagram.com/p/DBxyz123/",
+      "caption": "Styling the Silver Evil Eye Necklace with modern festive outfits",
+      "product_category": "Necklaces",
+      "product_code": "WR-NC-001",
+      "product_name": "Silver Evil Eye Necklace",
+      "product_image": "https://images.wishrite.in/products/WR-NC-001.jpg",
+      "thumbnail_url": "https://images.wishrite.in/products/WR-NC-001.jpg",
+      "tags": [
+        "#wishrite",
+        "#silverjewellery"
+      ],
+      "status": "Submitted",
+      "rejection_reason": null,
+      "views": 0,
+      "clicks": 0,
+      "orders": 0,
+      "commission_amount": 0,
+      "created_at": "2026-10-26T12:56:02.944Z",
+      "updated_at": "2026-10-26T12:56:02.944Z"
+    },
+    {
+      "id": "90f18285-e208-4d8d-8510-fa319506dcfc",
+      "influencer_id": "7b9bbc17-3b53-4ca9-a6c6-48398bec416e",
+      "creator_name": "Self Mod",
+      "creator_email": "selfmod_1793019358326@example.com",
+      "content_type": "post",
+      "platform": "instagram",
+      "url": "https://instagram.com/p/self_mod_test/",
+      "caption": "Testing self mod",
+      "product_category": "",
+      "product_code": "",
+      "product_name": "",
+      "product_image": null,
+      "thumbnail_url": null,
+      "tags": [],
+      "status": "Submitted",
+      "rejection_reason": null,
+      "views": 0,
+      "clicks": 0,
+      "orders": 0,
+      "commission_amount": 0,
+      "created_at": "2026-10-26T12:55:58.783Z",
+      "updated_at": "2026-10-26T12:55:58.783Z"
+    },
+    {
+      "id": "626d0e79-4668-41e3-bd1c-d1b7ffc275ef",
+      "influencer_id": "673259cd-5982-4a34-9a8d-d59f11b7be42",
+      "creator_name": "User A",
+      "creator_email": "usera_1793019357229@example.com",
+      "content_type": "post",
+      "platform": "instagram",
+      "url": "https://instagram.com/p/user_a_post/",
+      "caption": "User A private styling",
+      "product_category": "",
+      "product_code": "",
+      "product_name": "",
+      "product_image": null,
+      "thumbnail_url": null,
+      "tags": [],
+      "status": "Submitted",
+      "rejection_reason": null,
+      "views": 0,
+      "clicks": 0,
+      "orders": 0,
+      "commission_amount": 0,
+      "created_at": "2026-10-26T12:55:57.713Z",
+      "updated_at": "2026-10-26T12:55:57.713Z"
+    },
+    {
+      "id": "47a515f1-3138-4dcf-9024-2d4c27028450",
+      "influencer_id": "a8d6e1c4-67a5-4128-9aa2-f687d0904345",
+      "creator_name": "Rohan Mehta",
+      "creator_email": "content_creator_1793019355929@example.com",
+      "content_type": "reel",
+      "platform": "instagram",
+      "url": "https://www.instagram.com/reel/mod_test_item/",
+      "caption": "Moderation target",
+      "product_category": "",
+      "product_code": "",
+      "product_name": "",
+      "product_image": null,
+      "thumbnail_url": null,
+      "tags": [],
+      "status": "Approved",
+      "rejection_reason": null,
+      "views": 0,
+      "clicks": 0,
+      "orders": 0,
+      "commission_amount": 0,
+      "created_at": "2026-10-26T12:55:57.042Z",
+      "updated_at": "2026-10-26T12:55:57.137Z"
+    },
+    {
+      "id": "741fda58-4a25-45df-a926-85c65c276a19",
+      "influencer_id": "a8d6e1c4-67a5-4128-9aa2-f687d0904345",
+      "creator_name": "Rohan Mehta",
+      "creator_email": "content_creator_1793019355929@example.com",
+      "content_type": "post",
+      "platform": "instagram",
+      "url": "https://www.instagram.com/p/view_own_submission_test/",
+      "caption": "Self view test",
+      "product_category": "",
+      "product_code": "",
+      "product_name": "",
+      "product_image": null,
+      "thumbnail_url": null,
+      "tags": [],
+      "status": "Submitted",
+      "rejection_reason": null,
+      "views": 0,
+      "clicks": 0,
+      "orders": 0,
+      "commission_amount": 0,
+      "created_at": "2026-10-26T12:55:56.854Z",
+      "updated_at": "2026-10-26T12:55:56.854Z"
+    },
+    {
+      "id": "d5707e56-51de-4f30-830a-654a0289e179",
+      "influencer_id": "a8d6e1c4-67a5-4128-9aa2-f687d0904345",
+      "creator_name": "Rohan Mehta",
+      "creator_email": "content_creator_1793019355929@example.com",
+      "content_type": "reel",
+      "platform": "instagram",
+      "url": "https://www.instagram.com/reel/DC987654321/",
+      "caption": "Unboxing the 925 Sterling Silver Ring ✨",
+      "product_category": "",
+      "product_code": "WR-RNG-002",
+      "product_name": "Solitaire Silver Ring",
+      "product_image": null,
+      "thumbnail_url": null,
+      "tags": [
+        "#reels, #unboxing"
+      ],
+      "status": "Submitted",
+      "rejection_reason": null,
+      "views": 0,
+      "clicks": 0,
+      "orders": 0,
+      "commission_amount": 0,
+      "created_at": "2026-10-26T12:55:56.646Z",
+      "updated_at": "2026-10-26T12:55:56.647Z"
+    },
+    {
+      "id": "d4190226-f5e6-4259-8d91-8ae070e012df",
+      "influencer_id": "a8d6e1c4-67a5-4128-9aa2-f687d0904345",
+      "creator_name": "Rohan Mehta",
+      "creator_email": "content_creator_1793019355929@example.com",
+      "content_type": "post",
+      "platform": "instagram",
+      "url": "https://www.instagram.com/p/DB123456789/",
+      "caption": "Styling the WishRite Silver Pendant for Diwali festivities!",
+      "product_category": "",
+      "product_code": "WR-JWL-001",
+      "product_name": "Silver Celestial Pendant",
+      "product_image": null,
+      "thumbnail_url": null,
+      "tags": [
+        "#wishrite, #silverpendant"
+      ],
+      "status": "Submitted",
+      "rejection_reason": null,
+      "views": 0,
+      "clicks": 0,
+      "orders": 0,
+      "commission_amount": 0,
+      "created_at": "2026-10-26T12:55:56.490Z",
+      "updated_at": "2026-10-26T12:55:56.490Z"
+    },
+    {
+      "id": "c379d53c-563d-4693-a22f-6f142144d37c",
+      "influencer_id": "6fc8cee2-80e4-4a68-b50e-928e9de1564b",
+      "creator_name": "Rohan Sharma Creator",
+      "creator_email": "creator_cat_1793019049998@test.com",
+      "content_type": "reel",
+      "platform": "instagram",
+      "url": "https://www.instagram.com/reel/C89abcDEF/",
+      "caption": "Sparkle in 925 Silver Solitaire Studs",
+      "product_category": "Earrings",
+      "product_code": "WR-ER-002",
+      "product_name": "Solitaire Studs",
+      "product_image": "https://images.wishrite.in/products/WR-ER-002.jpg",
+      "thumbnail_url": "https://images.wishrite.in/products/WR-ER-002.jpg",
+      "tags": [
+        "#wishrite",
+        "#reels"
+      ],
+      "status": "Submitted",
+      "rejection_reason": null,
+      "views": 0,
+      "clicks": 0,
+      "orders": 0,
+      "commission_amount": 0,
+      "created_at": "2026-10-26T12:50:50.520Z",
+      "updated_at": "2026-10-26T12:50:50.520Z"
+    },
+    {
+      "id": "a007ab6e-3365-48fc-a785-f2bd3d58f58b",
+      "influencer_id": "6fc8cee2-80e4-4a68-b50e-928e9de1564b",
+      "creator_name": "Rohan Sharma Creator",
+      "creator_email": "creator_cat_1793019049998@test.com",
+      "content_type": "post",
+      "platform": "instagram",
+      "url": "https://www.instagram.com/p/DBxyz123/",
+      "caption": "Styling the Silver Evil Eye Necklace with modern festive outfits",
+      "product_category": "Necklaces",
+      "product_code": "WR-NC-001",
+      "product_name": "Silver Evil Eye Necklace",
+      "product_image": "https://images.wishrite.in/products/WR-NC-001.jpg",
+      "thumbnail_url": "https://images.wishrite.in/products/WR-NC-001.jpg",
+      "tags": [
+        "#wishrite",
+        "#silverjewellery"
+      ],
+      "status": "Submitted",
+      "rejection_reason": null,
+      "views": 0,
+      "clicks": 0,
+      "orders": 0,
+      "commission_amount": 0,
+      "created_at": "2026-10-26T12:50:50.460Z",
+      "updated_at": "2026-10-26T12:50:50.460Z"
+    },
+    {
+      "id": "8245537c-dc32-4193-a27b-f82e31216c5a",
+      "influencer_id": "486138c3-90d9-4a85-949b-36b9d35d1c92",
+      "creator_name": "Self Mod",
+      "creator_email": "selfmod_1793019046109@example.com",
+      "content_type": "post",
+      "platform": "instagram",
+      "url": "https://instagram.com/p/self_mod_test/",
+      "caption": "Testing self mod",
+      "product_category": "",
+      "product_code": "",
+      "product_name": "",
+      "product_image": null,
+      "thumbnail_url": null,
+      "tags": [],
+      "status": "Submitted",
+      "rejection_reason": null,
+      "views": 0,
+      "clicks": 0,
+      "orders": 0,
+      "commission_amount": 0,
+      "created_at": "2026-10-26T12:50:46.878Z",
+      "updated_at": "2026-10-26T12:50:46.878Z"
+    },
+    {
+      "id": "f34e9f03-05cf-4efe-8e0e-d2d612a9468f",
+      "influencer_id": "55c11408-ca6d-4e03-a861-4d63f5a5da56",
+      "creator_name": "User A",
+      "creator_email": "usera_1793019045014@example.com",
+      "content_type": "post",
+      "platform": "instagram",
+      "url": "https://instagram.com/p/user_a_post/",
+      "caption": "User A private styling",
+      "product_category": "",
+      "product_code": "",
+      "product_name": "",
+      "product_image": null,
+      "thumbnail_url": null,
+      "tags": [],
+      "status": "Submitted",
+      "rejection_reason": null,
+      "views": 0,
+      "clicks": 0,
+      "orders": 0,
+      "commission_amount": 0,
+      "created_at": "2026-10-26T12:50:45.469Z",
+      "updated_at": "2026-10-26T12:50:45.469Z"
+    },
+    {
+      "id": "f9382653-e040-4948-8036-89f02699dd20",
+      "influencer_id": "964f2ec9-f2d4-4a9c-88c0-eb4d7feed729",
+      "creator_name": "Rohan Mehta",
+      "creator_email": "content_creator_1793019043855@example.com",
+      "content_type": "reel",
+      "platform": "instagram",
+      "url": "https://www.instagram.com/reel/mod_test_item/",
+      "caption": "Moderation target",
+      "product_category": "",
+      "product_code": "",
+      "product_name": "",
+      "product_image": null,
+      "thumbnail_url": null,
+      "tags": [],
+      "status": "Approved",
+      "rejection_reason": null,
+      "views": 0,
+      "clicks": 0,
+      "orders": 0,
+      "commission_amount": 0,
+      "created_at": "2026-10-26T12:50:44.868Z",
+      "updated_at": "2026-10-26T12:50:44.946Z"
+    },
+    {
+      "id": "487b1671-1779-4ade-9096-a61cd9eaf077",
+      "influencer_id": "964f2ec9-f2d4-4a9c-88c0-eb4d7feed729",
+      "creator_name": "Rohan Mehta",
+      "creator_email": "content_creator_1793019043855@example.com",
+      "content_type": "post",
+      "platform": "instagram",
+      "url": "https://www.instagram.com/p/view_own_submission_test/",
+      "caption": "Self view test",
+      "product_category": "",
+      "product_code": "",
+      "product_name": "",
+      "product_image": null,
+      "thumbnail_url": null,
+      "tags": [],
+      "status": "Submitted",
+      "rejection_reason": null,
+      "views": 0,
+      "clicks": 0,
+      "orders": 0,
+      "commission_amount": 0,
+      "created_at": "2026-10-26T12:50:44.680Z",
+      "updated_at": "2026-10-26T12:50:44.680Z"
+    },
+    {
+      "id": "17de3825-198c-4041-b9cc-56f2169d655e",
+      "influencer_id": "964f2ec9-f2d4-4a9c-88c0-eb4d7feed729",
+      "creator_name": "Rohan Mehta",
+      "creator_email": "content_creator_1793019043855@example.com",
+      "content_type": "reel",
+      "platform": "instagram",
+      "url": "https://www.instagram.com/reel/DC987654321/",
+      "caption": "Unboxing the 925 Sterling Silver Ring ✨",
+      "product_category": "",
+      "product_code": "WR-RNG-002",
+      "product_name": "Solitaire Silver Ring",
+      "product_image": null,
+      "thumbnail_url": null,
+      "tags": [
+        "#reels, #unboxing"
+      ],
+      "status": "Submitted",
+      "rejection_reason": null,
+      "views": 0,
+      "clicks": 0,
+      "orders": 0,
+      "commission_amount": 0,
+      "created_at": "2026-10-26T12:50:44.456Z",
+      "updated_at": "2026-10-26T12:50:44.456Z"
+    },
+    {
+      "id": "a2800d4a-e1f9-4fee-b7a5-948e6855626b",
+      "influencer_id": "964f2ec9-f2d4-4a9c-88c0-eb4d7feed729",
+      "creator_name": "Rohan Mehta",
+      "creator_email": "content_creator_1793019043855@example.com",
+      "content_type": "post",
+      "platform": "instagram",
+      "url": "https://www.instagram.com/p/DB123456789/",
+      "caption": "Styling the WishRite Silver Pendant for Diwali festivities!",
+      "product_category": "",
+      "product_code": "WR-JWL-001",
+      "product_name": "Silver Celestial Pendant",
+      "product_image": null,
+      "thumbnail_url": null,
+      "tags": [
+        "#wishrite, #silverpendant"
+      ],
+      "status": "Submitted",
+      "rejection_reason": null,
+      "views": 0,
+      "clicks": 0,
+      "orders": 0,
+      "commission_amount": 0,
+      "created_at": "2026-10-26T12:50:44.320Z",
+      "updated_at": "2026-10-26T12:50:44.320Z"
+    },
     {
       "id": "55f51b9e-73f0-4655-a280-2964adaa71fd",
       "influencer_id": "c2b8c7b8-8f9a-4ea5-81f8-eb82793a9108",
@@ -12130,6 +14341,2086 @@
       "commission_amount": 0,
       "created_at": "2026-10-26T08:59:01.743Z",
       "updated_at": "2026-10-26T08:59:01.743Z"
+    }
+  ],
+  "contests": [
+    {
+      "id": "contest-festive-2026",
+      "name": "Festive Sparkle Creator Challenge 2026",
+      "description": "Create standout posts and reels featuring WishRite pure 925 sterling silver jewellery and inspire style lovers across India.",
+      "start_date": "2026-10-15T00:00:00.000Z",
+      "end_date": "2026-11-26T23:59:59.000Z",
+      "status": "active",
+      "scoring_rules": {
+        "post_points": 50,
+        "reel_points": 100,
+        "order_points_multiplier": 10,
+        "click_points_multiplier": 1
+      },
+      "created_at": "2026-10-15T00:00:00.000Z",
+      "updated_at": "2026-10-15T00:00:00.000Z"
+    }
+  ],
+  "contest_participants": [
+    {
+      "id": "c0ac1dc9-e86c-448b-b01f-6715e35e01af",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "39f00b98-edc5-4622-b0d1-60130c842ed6",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "ac73000c-5df4-4136-98c0-945b94fca4ad",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "eac1c560-f0d3-473e-ad8f-ec37711d42e5",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "4ddc14f7-b2a6-43e0-8e82-8cd8c4a8fe6f",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "263afa14-5d55-4799-8814-7be2192eb031",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "ed1a0e5a-a66f-4c1d-9e0f-43dbbb9b35ed",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "b6f2a9f3-26f7-4f25-adff-04c505a804bb",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "d520c4bf-258c-4bb2-b8d2-a265ce8edf26",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "75ae8644-3508-4a63-b6b5-3fbbb1d21c98",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "3f3bc774-3c9e-4431-9d3c-5702d27a451d",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "d4a7c9cb-5ba1-4bc9-9011-a6894860fdf3",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "e68684e1-d6dc-4c7f-bbee-c7677b3d0748",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "30fc4434-7b59-4993-97fa-bbecde4d3d6c",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "713774d1-0eda-48b4-8fdd-231837dbad64",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "deeb577b-bd85-482c-9376-7ca212424dbd",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "5139c9a3-aaf3-4832-9635-9cce38bde8cd",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "d979ef03-3baa-4e67-addc-6cdeaf2a5b94",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "117f8990-ba62-42ec-8267-e95b40723b3c",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "038b7706-7958-4cd3-9c03-d61dab4be97c",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "159ae8d6-b275-491b-911e-67529268637a",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "12a11e54-91a9-4d04-8f3d-811c11cafc44",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "4e4156c5-9b26-4f6d-89fc-06754894f774",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "d2f0daba-fe26-461d-8f8f-59950ec87dcb",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "c12027b2-7d07-4e8a-887d-73f8f1ccec92",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "0bfbb0f9-10aa-43d3-8305-10039eda4079",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "36027a59-877a-4c4b-8805-60319e371976",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "547e1064-f817-4d32-9905-80fbf0ad0a34",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "b31241d2-0b94-4c39-8b5a-aa1901963e2c",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "de82a35a-0dad-4ad4-ad5a-66d690616e16",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "bc9dca48-1b8f-4ad8-98ff-fce495889198",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "aeb1f28e-d783-4d24-9627-8f49f1abaa2f",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "df334ef1-26b9-48ad-8fd9-cb26433fc62c",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "a1154343-3367-4815-ba25-3a53ac76b2c5",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "032df2ff-e14b-4484-ab92-c6a813309004",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "dbb59945-b79e-4529-a99f-6cfe58e6add1",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "e057a854-e16f-4522-8d1d-ee9f25cc0ca6",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "34b48278-655e-449d-836d-69a80263529a",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "df09a2e2-94a0-4d27-a583-66379bf7b67d",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "f1e317cc-5361-466e-9536-591c66ed4118",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "65b36779-044d-446c-a57b-adcd6560b6cf",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "ab3b2094-36fe-4219-870d-179fb18c8899",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "0d8e7b6a-be95-4670-8b64-b56e7051006f",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "c1d36810-979c-4364-b5c7-11db13d56919",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "15df2af2-9347-4ee4-951f-191056bbee4b",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "1ec25680-53e3-4126-be7e-162702ce89c8",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "f609a4b8-2d2e-4370-b64f-ee6b96ae9c81",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "bc69f835-520c-43e6-a571-1e7b4f546e01",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "1fcb6d8f-75d5-4ad4-bfda-fb7c315f0d71",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "c800f4c3-5bff-42aa-8407-c47808676948",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "732f7359-c96d-44d6-907d-a5c3c6045eab",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "1d25d3ca-0498-4c41-864c-816ce16bde78",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "cb4ec3df-418b-4808-8552-eee21cae6f51",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "4153db1a-2094-4894-8b6f-da2fa77e3467",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "f07bce63-9ce7-4ebf-b3d3-90fdb4a1396f",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "b9a07189-ddb6-4b0d-bf2a-15cf1994eb94",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "6afd0985-b585-402d-a19a-d3c01254ed8c",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "9412f11a-ce12-449a-a338-b2406826fc6f",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "393c6c26-2198-4cf9-be30-ce8b94615cb7",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "eab08d29-ea48-4844-ae1a-64562ae806eb",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "a98cd3fd-1d08-4ba3-b4c3-92014803d939",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "55ac3da0-7c2f-46f7-8c77-c46b33434e69",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "74b8df35-4ebd-4941-b44c-2e1e30191756",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "e0b4bf15-d35b-4449-9687-86cf60b46ef3",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "7ddd93f5-84e5-4add-a8b8-9488820efb9d",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "b619bf6e-70e6-4b34-8a9c-2417650cf055",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "a8d7a198-5212-41b7-a10b-26e171454d39",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "5a55ac46-f868-4c4c-87bf-88e1e2525a0d",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "d22a0da3-ea75-4fee-a091-a5eea9888a5e",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "f6266d24-179f-4695-a3b3-ac2b1b1d7782",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "914f7b0c-cbed-4944-9a99-9bb5270ee4a0",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "e80aa5e4-461c-41f7-b3ca-b4745097504d",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "aaf25c54-7633-44ff-9ce1-747f7f82748b",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "3a62bc4d-9015-4f97-9671-38490514cbfb",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "3f9371e6-1674-4c88-863d-79fae67c1afb",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "3aa6bb13-bc20-4e60-a033-8abc685dac75",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "4544784e-be16-4eb0-a759-4f0b105f6d36",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "36ae5e96-3d0b-4ad1-a91d-3d56d0ac93dc",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "d4709bf2-bf11-468e-b8cc-c7c9eff620d0",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "48c531f3-6027-4cf8-83cd-e9b281441fd2",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "0c771ac1-907a-4caf-bcb7-d0e87c5353ba",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "e87698da-03ed-4198-9f6e-ff5df24f554e",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "9200806e-4adc-4cdc-acf6-5af6659ca4d2",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "058faf97-bfa4-4a3a-a433-b068dddd1af3",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "084fb38a-97ff-468d-8225-107567df1b5c",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "263c9097-97af-4fdb-89b4-0cc085144b85",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "e269b20f-2853-4e00-9ee6-015078283861",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "fa40e47f-921e-49c1-a32e-35aa11c60da1",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "6a2c3307-4f20-478f-8045-fc2215db346b",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "408f0672-5c41-4d14-b05e-04f10088bc91",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "460ccdc4-96ec-4806-a555-ea44ccd1c122",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "dc80b164-6b39-4c8f-a551-702a491cabd3",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "6b5f752a-9c8a-4dc9-a4b6-e1538c4afe2b",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "de485ba5-5221-4f16-9ab2-b8a1ecf12523",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "5fe4bca4-13ce-4ac1-b9fa-af60a2496ef9",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "65eb1dde-9767-46ce-b844-6bd25b60db47",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "f22db65e-cc42-4ae3-b654-72d4114bbf9a",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "6f7f2db5-f488-4d5b-ae46-3b9a741a9d1a",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "ffa7f9cf-565c-4a26-b65b-e86db6bbf0df",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "9a76fafa-bfae-47e9-a7f5-4d6820926843",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "aee09a42-65b4-446b-bca4-6306411c2e25",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "2fba3a27-a37b-4fe9-a060-9fe2f9370c8b",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "121be246-7c4e-4206-95ca-d145d73b2383",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "c2fb6e22-95f1-46e2-ac76-3ff94360ced1",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "3bc201eb-47b7-4522-a413-f3ad09bf1aa4",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "8bc32ab2-409a-496f-b6b8-a5eed6048018",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "15211fe3-ce84-4f51-8fb2-a122deab2426",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "2a7fecef-de05-4da0-bc6b-47eb4da8583d",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "ae8ead06-23e0-428e-b740-088ed07e8a80",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "528ec338-d513-400f-9a88-a73c92539e93",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "f881bf0c-3ba7-471d-be09-125c762c100b",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "6230d5f4-289b-4d69-ad07-029af2364320",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "e58af87b-48b4-4eb7-a540-e43a7bc2fe7e",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "7220077f-b348-486a-ad9e-9febb97c64f9",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "c5d2a5e9-05c0-49d4-8545-35d2cc3d8f56",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "f52ae48c-c61f-4e9c-b7a8-5ed01c37ad16",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "e435a0b4-cb03-4056-9804-2b3ffed799dc",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "eb7e2dc2-dc1e-4fee-8e45-b72c2aa88e5b",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "d4d507f4-906b-45d0-9d35-4514cda53fd2",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "9dcc715a-e8a5-4e95-afd7-9c722e69fd6b",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "85c348d8-0e6b-4642-9ac1-864c97ebfd9a",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "61c80005-3685-4c03-b86a-93d507514bd4",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "52506181-0647-4e4c-af5f-5fa39bebbf41",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "6dcaa60f-1054-424c-9d56-b15c1f3c07a2",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "9d27e2eb-914f-43d5-b4c5-c78d38964d30",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "3349fa86-5a4a-4b07-b12d-f0bf9033843d",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "965b39f8-9387-437d-bf8f-1fc2fe87aa4b",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "251275ad-59b2-4e45-9a2e-590f59117618",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "ec9acc70-4572-46b4-9f39-dab94c5d7448",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "3650c9ef-a697-4726-8427-c1dc92e06940",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "035a3a3b-f389-4cd9-9c77-3a259fcc5d5a",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "3d909352-915c-497a-b93b-916ba7c8925b",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "82da76dc-d4e4-43d3-94a0-5f21945077fd",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "0e96c6c6-a4af-4685-bba0-3ad6a03ef9cf",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "17e0afa6-1a8b-45e8-a079-256f5deca6fc",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "7d169647-4d13-47c8-836d-d399e479de38",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "4d88e46e-b886-4736-8faf-e1b92304e6ce",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "8819b81a-1e93-4334-a524-136ba6608dd7",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "9e215d3c-2d67-49af-a936-bbb81e45f5ae",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "1ade2f18-019d-4750-be59-39971db5c2de",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "843e6f94-423d-4541-b543-f5f2d4cf7619",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "cdf909ac-b469-4af5-8423-dece84124159",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "e6fe5d06-3e1f-4049-9a25-09720e03cbac",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "2d0f5a4b-c0dc-42aa-adf3-d7a5fef8f919",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "aae36fe3-502d-4790-824a-2203d238d5ef",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "5386738f-a7dc-4b70-be32-e0363f9cedff",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "0ebf7b71-9cd4-4932-be60-b2333478bac9",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "83f399b8-f56d-4ff3-85b0-3c38441c6512",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "0d13ca89-e607-4c4d-bc5b-4ee6f66d9dac",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "b184b971-8b97-45c4-adb1-56ae20797114",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "574a9f42-1ab6-4434-9009-9e543f9f3384",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "e1100ceb-d908-4f0f-88c2-967622ea7996",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "fab241dd-239f-475c-a68f-ed81a5541cf8",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "d68e5aef-fdb9-45ed-87f9-b08b7d88b3d7",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "a4593a9b-129a-43aa-a4de-414b93404325",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "65d58356-73be-489f-8e7b-fd836f620e6b",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "aee8e464-106e-4237-80ce-9131c3b006db",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "a3dea4c2-dc93-4cd6-a34a-6493b81d6706",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "8336d71e-6eb4-4c90-a135-aab83da0d341",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "2b5bf842-eeb4-46ed-b66e-5bf6a2458095",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "5fb211a7-c491-43ae-99ac-9f90c95251b9",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "0d2b428d-15a2-4211-8e79-79cb09ada73a",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "4b2f39e8-bf55-48d8-b74e-ab3fdb1768d2",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "7b79ffda-85f5-4cc8-baf2-d5f4ddacdbbf",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "a39c6ab7-95d3-406c-a753-75b141c93dec",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "62b1b7ce-8006-45eb-948b-5cd9ceb879cd",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "253d4129-3d2c-4ae0-bf52-aeea1637453c",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "f61e9458-2fdb-43bb-a1b2-8173f0933075",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "10aa8c22-7dee-4277-8e11-5f19e7b2d6db",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "1a539c77-fb7d-43eb-9b62-524477da6bf0",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "b5438c1c-ec4b-4fe4-a4f9-cc3db5e56cd9",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "39ff2231-4b3c-484e-9619-a2b667aa53bb",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "99f261d4-1a9b-47bb-b935-bf698b7d3661",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "3699c959-601e-43a4-874a-aa42c9ab8710",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "228f707f-75d3-450d-9f26-39816127b7be",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "ddf8c921-586e-43a7-96fe-c288d2f0d1ab",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "b7f7d244-14e9-49c2-a5d4-7c2f679da9e8",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "318a7002-dcfd-48af-8399-038f56a2122c",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "22f01089-0a41-4660-acd2-13f64416dec5",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "56048f08-79e4-40c6-b43e-e37453b4e14f",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "dcd28269-b9ed-4589-aa42-5424080c98e1",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "34e723a0-3c23-4261-b2da-5134dda4bd13",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "92bc34e9-5bdc-43b6-b8d5-d4382bf0a0da",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "40073e85-6df5-4c6f-b49e-cca56193d98d",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "ceb2b8a4-68ea-4f81-a385-63010acd51ca",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "2b7a437f-c6d3-42f1-af90-0d2c93206b16",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "1e67a1b9-8a08-493a-8a05-634600595c7f",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "1809fa83-c75b-4f18-bf3d-b585441f795b",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "f2ca5433-8f56-452c-9242-5da392970b2d",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "85c1657c-baf0-438f-81a9-df7dfa17e754",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "71bcebf6-10eb-4e40-a074-27d981d893d1",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "32d6f436-3fa8-4a1b-b924-f776ce5c847b",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "0edcd6be-79a4-4c54-86ee-6456b2d77e85",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "4ff26ec4-1445-4060-9d37-ad9264e95775",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "cc22c0d7-da64-4927-952d-7fc3d7e02874",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "e0a9bd8b-b316-4c86-85f9-4843a3958677",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "64258155-0021-4d4d-85d4-9008007417d8",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "cf1fbfa0-e407-4e0c-8164-01b9c0380d91",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "a916dac5-6419-4a8b-bbb2-d6dea565e39f",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "e033895f-c789-434a-87ea-f34e0a93cb68",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "a78c0993-039b-4659-b7db-47db01877590",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "4176a17d-9e0d-42c8-8814-bbcd6a552ffd",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "36e4e90e-d3f9-457e-90d9-0004bd096f1e",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "06aa64a3-5c30-4bf4-89d7-a024b781c9c3",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "1300b0d8-3c62-4b2f-95e2-e9ec121f5d29",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "53a0a99e-d54c-4f96-a272-36f6911aef88",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "2796637e-315e-4771-99b6-5e2749c06417",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "43ec79f5-6d0c-496c-bb45-7799e1ef5aab",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "0919afb1-0441-4a60-bf92-039574c04c54",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "a862d992-6171-4908-9708-e854c4ce92de",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "9e821aa1-0c1b-4c12-8a66-f54efe7d87e7",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "12a3e79c-9ef9-4625-a926-82f60287c048",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "ec9fd8dc-dbe5-4f28-a15a-15115ea2100e",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "362b2e24-8a50-4c8d-a5e0-653966c2d867",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "7c2f33ef-860a-4ef0-b05a-4565dafeedc7",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "30c38c64-0dd4-4773-8ad3-76fba891944a",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "12a69014-d1d3-4e48-aa2a-11c9786285fa",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "7bcabf10-95a9-441c-b51c-c721d9187f74",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "b854f936-ab6a-4906-997f-e7515d79f44c",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "bbd223fc-34bc-4c01-9e3a-11b8a1c9d6f8",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "883a99d2-38d3-420d-bfc5-e38f52130005",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "a1ab42d2-d37e-4a47-a415-418e1147318e",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "35624752-e7c6-46cf-b00d-4085cb35ae84",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "14aa29b9-4587-4a64-9e6f-a2712cc61a50",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "03d771a5-b225-45ac-af68-df8cd8856272",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "6d267c6b-dcf5-43ba-a24f-7c3b4f8265b6",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "1669eb01-bbd9-43be-804a-f5635dcde161",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "aff1418a-9253-49a9-96e5-13fb6666f006",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "1ccd7412-400d-4dfb-9c11-ff834accca89",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "4f13d80d-128f-443d-85b2-499ca0bc620e",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "72f9a352-5c79-4e62-87c2-86f6444a36c4",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "eab84773-867e-4e69-a520-582bcafdb5cd",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "f292090f-56a1-43ac-bcd4-88dd29e28b43",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "72ac9bec-4a1b-4382-af81-df809a609927",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "d4da147f-86a9-4b08-afb4-3227fb5ce848",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "388588bd-8476-40bb-8d10-d8b1fa6f0c79",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "fe1b2f99-5c68-4280-8383-ef1acba343d9",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "ed16f543-c03d-42f9-92b1-9218168409b4",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "7882c9b3-73e6-470b-addb-a0eb712419d7",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "bce4c5d8-5353-42ed-874c-4abfeaa1303a",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "77a952d4-c08c-487d-afb0-4bd6a3ec4ec7",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "268723db-738a-4c1a-b800-ca06ecee2d10",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "afa1de85-7f4a-425e-b768-f86cd1c2b7b0",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "eff0ceae-7f22-4803-a235-1b9108694b71",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "8060c963-5780-4fbc-867e-c370fe223ecc",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "86f0d578-1147-495a-97cc-50c2e6b3086e",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "9ad4be2e-f3b4-482e-b80e-9e21aae68386",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "81f59c40-e329-46e1-bf7a-eab5f6dae166",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "683dcb90-2240-408e-b4f1-9dfa7caf47c8",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "b870ceba-f342-4934-af25-67c0d42b1cff",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "e9b9abc5-af9c-409d-a9aa-289e218580e8",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "608cfb0f-cad9-4186-a0e9-59f4d57994c0",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "aa966a67-3460-46b9-8bcb-54c16f11f0ea",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "fbe200f9-49aa-4f89-9047-63151dc53f59",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "2a03340a-2572-46dd-8a7b-781b5cfe65d9",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "2d71fb05-d267-4e6e-b602-59ae7aa57716",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "1113fb95-1362-4c97-8f0f-206e6f4805eb",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "b1963894-fd40-47ad-9ca0-e46c792f0b1d",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "3c10b9c2-3213-404c-a4c1-3785f2b9f79b",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "7993906a-02c0-47b1-94b3-0ff950396fd6",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "b0b26ba4-3aaf-4064-86ec-6176e31cbf15",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "70d3fb92-f35e-479d-bd73-47e294cfae01",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "10e1e2e7-49d4-4633-a48e-e3f0ab0218a0",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "b460276d-6f70-4e85-9a6c-f6cb97f53893",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "3e801298-697d-4be2-a0bd-8af469f86918",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "b43584b7-b6e0-423c-8ead-810218527923",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "ec312237-26c4-47f0-bb60-04dd77577a7c",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "830eb8dd-b429-4cdf-a185-492b65fe0301",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "b87ef59f-7b7f-4862-a5d1-fe6e09740950",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "717c2f7a-940f-4192-9da3-7e3755361571",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "2b74dfd5-db7f-480d-8fdb-5d0188218ec1",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "3f0adf86-b420-42d8-a02e-68f2bdbfb4a6",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "30b3f641-05d6-4d91-b09f-a64683207d92",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "007b8bc6-2150-40de-9796-16c99f8dd4f9",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "ca357cfb-8d99-4e65-9f67-8474907cd579",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "e324e9f5-f036-408d-b8b5-c90c44b6a6fc",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "10a3e102-c78a-4968-80e2-d3e7fdbb25d9",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "26f2e511-1456-4e91-a70e-2cb362b626ed",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "d2bdc6d9-65f4-4ee8-9152-1503d83cc5b5",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "cafb9d7a-4c08-4fd8-8f2d-fa2ad8f289b1",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "40b77e71-5546-4174-8846-104dd84c730c",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "be4cea31-e0b8-4626-9352-63bf2bfe1f1d",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "21ae2406-4386-4fc0-8e5f-3ac2f86d0e02",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "7faee348-ebf1-406e-a5db-9dcff2a603b9",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "a647597f-4d37-45a0-9199-133d83182b8e",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "6f42be77-51c9-4f9b-b164-97cfa665561e",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "3bc3ddc4-8751-4684-9643-e7626a53f0a5",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "c2b8c7b8-8f9a-4ea5-81f8-eb82793a9108",
+      "joined_at": "2026-10-15T00:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "305c41bf-e760-4c38-92cc-6d429248c7ab",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "964f2ec9-f2d4-4a9c-88c0-eb4d7feed729",
+      "joined_at": "2026-10-26T12:50:45.004Z",
+      "status": "active"
+    },
+    {
+      "id": "6ae4e1ed-7f74-4dad-87f8-a483c5db96ad",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "a8d6e1c4-67a5-4128-9aa2-f687d0904345",
+      "joined_at": "2026-10-26T12:55:57.223Z",
+      "status": "active"
+    },
+    {
+      "id": "8879cc8f-edd7-4519-af8b-10d90d7d2da1",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "f5c26442-23b8-4972-88d4-f14300fc5535",
+      "joined_at": "2026-10-26T12:58:29.103Z",
+      "status": "active"
+    }
+  ],
+  "contest_scores": [
+    {
+      "id": "9fbaaf56-d250-4b50-a755-1846f78acaa2",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "39f00b98-edc5-4622-b0d1-60130c842ed6",
+      "points": 1260,
+      "updated_at": "2026-10-26T12:39:12.193Z"
+    },
+    {
+      "id": "9a2ea351-e768-413a-a9d4-270e195b7365",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "eac1c560-f0d3-473e-ad8f-ec37711d42e5",
+      "points": 1175,
+      "updated_at": "2026-10-26T11:39:12.199Z"
+    },
+    {
+      "id": "3c5ea626-350a-4537-8b99-bbdb0ba44968",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "263afa14-5d55-4799-8814-7be2192eb031",
+      "points": 980,
+      "updated_at": "2026-10-26T10:39:12.199Z"
+    },
+    {
+      "id": "101f6996-3b1f-4ee6-af2e-6dec30a939a1",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "b6f2a9f3-26f7-4f25-adff-04c505a804bb",
+      "points": 920,
+      "updated_at": "2026-10-26T09:39:12.199Z"
+    },
+    {
+      "id": "e3f20b34-7e77-42a2-bf43-f3a1bc5462f4",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "75ae8644-3508-4a63-b6b5-3fbbb1d21c98",
+      "points": 875,
+      "updated_at": "2026-10-26T08:39:12.199Z"
+    },
+    {
+      "id": "823a4c54-d828-42c3-b8a3-0804086c961e",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "d4a7c9cb-5ba1-4bc9-9011-a6894860fdf3",
+      "points": 830,
+      "updated_at": "2026-10-26T07:39:12.199Z"
+    },
+    {
+      "id": "8884b61b-0eec-4ccc-8cc5-3cbc32397165",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "30fc4434-7b59-4993-97fa-bbecde4d3d6c",
+      "points": 790,
+      "updated_at": "2026-10-26T06:39:12.199Z"
+    },
+    {
+      "id": "4359c600-8726-4421-b569-cd255fdf01a9",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "deeb577b-bd85-482c-9376-7ca212424dbd",
+      "points": 775,
+      "updated_at": "2026-10-26T05:39:12.199Z"
+    },
+    {
+      "id": "0d8138ef-badc-4890-a275-a8f229217228",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "d979ef03-3baa-4e67-addc-6cdeaf2a5b94",
+      "points": 710,
+      "updated_at": "2026-10-26T04:39:12.199Z"
+    },
+    {
+      "id": "049981fe-51ef-4e48-b500-a6ad59da8be0",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "038b7706-7958-4cd3-9c03-d61dab4be97c",
+      "points": 720,
+      "updated_at": "2026-10-26T03:39:12.199Z"
+    },
+    {
+      "id": "15ff834b-67ea-4bc0-85a3-f971fb4c0fc0",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "12a11e54-91a9-4d04-8f3d-811c11cafc44",
+      "points": 630,
+      "updated_at": "2026-10-26T02:39:12.199Z"
+    },
+    {
+      "id": "c084847d-d1b5-416f-a045-c0b42b51c168",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "d2f0daba-fe26-461d-8f8f-59950ec87dcb",
+      "points": 610,
+      "updated_at": "2026-10-26T01:39:12.199Z"
+    },
+    {
+      "id": "e3e99509-6de3-4b3b-9b34-f1a69a8a59b1",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "0bfbb0f9-10aa-43d3-8305-10039eda4079",
+      "points": 575,
+      "updated_at": "2026-10-26T00:39:12.199Z"
+    },
+    {
+      "id": "bcea749b-3ff9-4572-9cab-0f74a23503f2",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "547e1064-f817-4d32-9905-80fbf0ad0a34",
+      "points": 600,
+      "updated_at": "2026-10-25T23:39:12.199Z"
+    },
+    {
+      "id": "4dacba52-a87f-4940-a196-287b20c51705",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "de82a35a-0dad-4ad4-ad5a-66d690616e16",
+      "points": 540,
+      "updated_at": "2026-10-25T22:39:12.199Z"
+    },
+    {
+      "id": "076e2fff-688d-492f-b463-ab262df19595",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "aeb1f28e-d783-4d24-9627-8f49f1abaa2f",
+      "points": 480,
+      "updated_at": "2026-10-25T21:39:12.199Z"
+    },
+    {
+      "id": "1b6ee824-8b27-4c27-9746-bbed2e5d9b30",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "a1154343-3367-4815-ba25-3a53ac76b2c5",
+      "points": 460,
+      "updated_at": "2026-10-25T20:39:12.199Z"
+    },
+    {
+      "id": "18142980-200a-448d-b6f3-a37443ee4923",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "dbb59945-b79e-4529-a99f-6cfe58e6add1",
+      "points": 420,
+      "updated_at": "2026-10-25T19:39:12.199Z"
+    },
+    {
+      "id": "96b96554-0fd4-48d3-9f40-d1930c5ec820",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "34b48278-655e-449d-836d-69a80263529a",
+      "points": 400,
+      "updated_at": "2026-10-25T18:39:12.199Z"
+    },
+    {
+      "id": "bf1351e8-0390-4648-8335-36504d4801e0",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "f1e317cc-5361-466e-9536-591c66ed4118",
+      "points": 370,
+      "updated_at": "2026-10-25T17:39:12.199Z"
+    },
+    {
+      "id": "8576e951-e801-4b46-8678-b6bc66302bb5",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "ab3b2094-36fe-4219-870d-179fb18c8899",
+      "points": 340,
+      "updated_at": "2026-10-25T16:39:12.199Z"
+    },
+    {
+      "id": "350b46b3-2304-4721-a141-e912c6ac1a10",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "c1d36810-979c-4364-b5c7-11db13d56919",
+      "points": 310,
+      "updated_at": "2026-10-25T15:39:12.199Z"
+    },
+    {
+      "id": "fbeeb238-5de1-4a38-a41f-dd71da1c8a37",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "1ec25680-53e3-4126-be7e-162702ce89c8",
+      "points": 280,
+      "updated_at": "2026-10-25T14:39:12.199Z"
+    },
+    {
+      "id": "846d9b66-53b9-4095-9d34-df0c33655ad7",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "bc69f835-520c-43e6-a571-1e7b4f546e01",
+      "points": 250,
+      "updated_at": "2026-10-25T13:39:12.199Z"
+    },
+    {
+      "id": "969f8c5a-0b2f-4539-9d78-2bad31c32959",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "c800f4c3-5bff-42aa-8407-c47808676948",
+      "points": 220,
+      "updated_at": "2026-10-25T12:39:12.199Z"
+    },
+    {
+      "id": "86ea7ac0-f769-421c-8246-94737a800d77",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "1d25d3ca-0498-4c41-864c-816ce16bde78",
+      "points": 200,
+      "updated_at": "2026-10-25T11:39:12.199Z"
+    },
+    {
+      "id": "807b80b0-82ea-4cd7-94dc-3a22da9ecb82",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "4153db1a-2094-4894-8b6f-da2fa77e3467",
+      "points": 180,
+      "updated_at": "2026-10-25T10:39:12.199Z"
+    },
+    {
+      "id": "9b428494-d68f-43f3-b0a1-9577ef89d141",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "b9a07189-ddb6-4b0d-bf2a-15cf1994eb94",
+      "points": 150,
+      "updated_at": "2026-10-25T09:39:12.199Z"
+    },
+    {
+      "id": "70872f0b-3a04-4071-8a0b-f95227d30298",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "9412f11a-ce12-449a-a338-b2406826fc6f",
+      "points": 120,
+      "updated_at": "2026-10-25T08:39:12.199Z"
+    },
+    {
+      "id": "3ea3f62a-5920-4319-848e-786fbed71d5a",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "eab08d29-ea48-4844-ae1a-64562ae806eb",
+      "points": 100,
+      "updated_at": "2026-10-25T07:39:12.199Z"
+    },
+    {
+      "id": "3281d8c0-5fbf-4276-8bfa-d6ffb7e17d1b",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "55ac3da0-7c2f-46f7-8c77-c46b33434e69",
+      "points": 80,
+      "updated_at": "2026-10-25T06:39:12.199Z"
+    },
+    {
+      "id": "f63130fa-ca4c-437b-b244-9bfbb8bca1ce",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "e0b4bf15-d35b-4449-9687-86cf60b46ef3",
+      "points": 110,
+      "updated_at": "2026-10-25T05:39:12.199Z"
+    },
+    {
+      "id": "71ecfdb8-bdef-42c2-bcd1-481b53b4d183",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "b619bf6e-70e6-4b34-8a9c-2417650cf055",
+      "points": 40,
+      "updated_at": "2026-10-25T04:39:12.199Z"
+    },
+    {
+      "id": "58749847-6f83-486b-aa69-cf44918ba122",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "5a55ac46-f868-4c4c-87bf-88e1e2525a0d",
+      "points": 20,
+      "updated_at": "2026-10-25T03:39:12.199Z"
+    },
+    {
+      "id": "15368ec6-7f11-4f88-9f3f-10d46a725472",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "f6266d24-179f-4695-a3b3-ac2b1b1d7782",
+      "points": 0,
+      "updated_at": "2026-10-25T02:39:12.199Z"
+    },
+    {
+      "id": "cdf25191-ce81-4595-b9ce-06aaa114c35d",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "e80aa5e4-461c-41f7-b3ca-b4745097504d",
+      "points": 80,
+      "updated_at": "2026-10-25T01:39:12.199Z"
+    },
+    {
+      "id": "7df2a77d-026f-414b-9314-f2c466dd3c58",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "3a62bc4d-9015-4f97-9671-38490514cbfb",
+      "points": 78,
+      "updated_at": "2026-10-25T00:39:12.199Z"
+    },
+    {
+      "id": "f2f5486c-0bd5-4b6f-bf7e-1b95a7cb3b22",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "3aa6bb13-bc20-4e60-a033-8abc685dac75",
+      "points": 76,
+      "updated_at": "2026-10-24T23:39:12.199Z"
+    },
+    {
+      "id": "06e2b9b7-0a6e-487c-ac2a-31d35ab22c7c",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "36ae5e96-3d0b-4ad1-a91d-3d56d0ac93dc",
+      "points": 74,
+      "updated_at": "2026-10-24T22:39:12.199Z"
+    },
+    {
+      "id": "21eee342-9571-4a0e-ac8d-27be2134cd5c",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "48c531f3-6027-4cf8-83cd-e9b281441fd2",
+      "points": 72,
+      "updated_at": "2026-10-24T21:39:12.199Z"
+    },
+    {
+      "id": "830129d3-e16b-44dc-83b5-ba1d87b6075b",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "e87698da-03ed-4198-9f6e-ff5df24f554e",
+      "points": 170,
+      "updated_at": "2026-10-24T20:39:12.199Z"
+    },
+    {
+      "id": "fbd2096a-f06f-4af5-8cf6-da8c5691bc49",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "058faf97-bfa4-4a3a-a433-b068dddd1af3",
+      "points": 68,
+      "updated_at": "2026-10-24T19:39:12.199Z"
+    },
+    {
+      "id": "fcde7bc6-9426-4e94-9edd-2bafb40e0747",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "263c9097-97af-4fdb-89b4-0cc085144b85",
+      "points": 66,
+      "updated_at": "2026-10-24T18:39:12.199Z"
+    },
+    {
+      "id": "4f2cc124-ea38-4bfe-9a4c-7ab832c2dbb6",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "fa40e47f-921e-49c1-a32e-35aa11c60da1",
+      "points": 114,
+      "updated_at": "2026-10-24T17:39:12.199Z"
+    },
+    {
+      "id": "463a5835-e132-471c-8e93-9e5f4d4dc12d",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "408f0672-5c41-4d14-b05e-04f10088bc91",
+      "points": 62,
+      "updated_at": "2026-10-24T16:39:12.199Z"
+    },
+    {
+      "id": "85f0d65c-5ea6-483e-b93f-96773f606231",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "dc80b164-6b39-4c8f-a551-702a491cabd3",
+      "points": 60,
+      "updated_at": "2026-10-24T15:39:12.199Z"
+    },
+    {
+      "id": "7061f0aa-7e8e-4657-8e7b-23141b429038",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "de485ba5-5221-4f16-9ab2-b8a1ecf12523",
+      "points": 58,
+      "updated_at": "2026-10-24T14:39:12.199Z"
+    },
+    {
+      "id": "e0fb4580-f2e4-4dcb-baa7-f6853779d6f4",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "65eb1dde-9767-46ce-b844-6bd25b60db47",
+      "points": 56,
+      "updated_at": "2026-10-24T13:39:12.199Z"
+    },
+    {
+      "id": "e6d0157c-fc1e-46a3-804a-09b7762a0ca3",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "6f7f2db5-f488-4d5b-ae46-3b9a741a9d1a",
+      "points": 54,
+      "updated_at": "2026-10-24T12:39:12.199Z"
+    },
+    {
+      "id": "9db175a5-fa75-4a36-b50b-cdd846b0516f",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "9a76fafa-bfae-47e9-a7f5-4d6820926843",
+      "points": 52,
+      "updated_at": "2026-10-24T11:39:12.199Z"
+    },
+    {
+      "id": "bc5a4290-58da-4be8-8d0a-c6270874fe63",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "2fba3a27-a37b-4fe9-a060-9fe2f9370c8b",
+      "points": 50,
+      "updated_at": "2026-10-24T10:39:12.199Z"
+    },
+    {
+      "id": "a1cbb930-f1ae-4d3c-a64c-61b2b4f89706",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "c2fb6e22-95f1-46e2-ac76-3ff94360ced1",
+      "points": 148,
+      "updated_at": "2026-10-24T09:39:12.199Z"
+    },
+    {
+      "id": "67a151ca-a1ff-42db-bb39-389c4270698a",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "8bc32ab2-409a-496f-b6b8-a5eed6048018",
+      "points": 46,
+      "updated_at": "2026-10-24T08:39:12.199Z"
+    },
+    {
+      "id": "521d9e67-2655-4a51-8709-14c4e70811ed",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "2a7fecef-de05-4da0-bc6b-47eb4da8583d",
+      "points": 44,
+      "updated_at": "2026-10-24T07:39:12.199Z"
+    },
+    {
+      "id": "9df76e26-b3a4-4f48-b864-cfb3613c4e51",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "528ec338-d513-400f-9a88-a73c92539e93",
+      "points": 92,
+      "updated_at": "2026-10-24T06:39:12.199Z"
+    },
+    {
+      "id": "3c9190ae-76b7-42f8-a4f5-9d78e5b1a7c0",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "6230d5f4-289b-4d69-ad07-029af2364320",
+      "points": 40,
+      "updated_at": "2026-10-24T05:39:12.199Z"
+    },
+    {
+      "id": "8a98a80f-d258-4fea-872b-c38b80196c66",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "7220077f-b348-486a-ad9e-9febb97c64f9",
+      "points": 38,
+      "updated_at": "2026-10-24T04:39:12.199Z"
+    },
+    {
+      "id": "79688a30-c962-44fc-b03b-95cc1b5435a8",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "f52ae48c-c61f-4e9c-b7a8-5ed01c37ad16",
+      "points": 36,
+      "updated_at": "2026-10-24T03:39:12.199Z"
+    },
+    {
+      "id": "f2deb163-af0e-47fb-847a-9848f15a06dc",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "eb7e2dc2-dc1e-4fee-8e45-b72c2aa88e5b",
+      "points": 34,
+      "updated_at": "2026-10-24T02:39:12.199Z"
+    },
+    {
+      "id": "3349f882-7707-4fc6-b6c9-baddacfdc401",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "9dcc715a-e8a5-4e95-afd7-9c722e69fd6b",
+      "points": 32,
+      "updated_at": "2026-10-24T01:39:12.199Z"
+    },
+    {
+      "id": "ecd8b0c5-df82-4700-8b9a-c24e4c1605cd",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "61c80005-3685-4c03-b86a-93d507514bd4",
+      "points": 30,
+      "updated_at": "2026-10-24T00:39:12.199Z"
+    },
+    {
+      "id": "d7bbc88e-9310-470c-9769-aff9c886c3fe",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "6dcaa60f-1054-424c-9d56-b15c1f3c07a2",
+      "points": 28,
+      "updated_at": "2026-10-23T23:39:12.199Z"
+    },
+    {
+      "id": "2be3e361-b824-49c7-aca5-b2147ff03c9e",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "3349fa86-5a4a-4b07-b12d-f0bf9033843d",
+      "points": 26,
+      "updated_at": "2026-10-23T22:39:12.199Z"
+    },
+    {
+      "id": "4d3302d1-699c-4372-92f8-76c97a21b3d3",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "251275ad-59b2-4e45-9a2e-590f59117618",
+      "points": 124,
+      "updated_at": "2026-10-23T21:39:12.199Z"
+    },
+    {
+      "id": "6f5b070d-4d2f-42f5-b960-9540ce7d33be",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "3650c9ef-a697-4726-8427-c1dc92e06940",
+      "points": 22,
+      "updated_at": "2026-10-23T20:39:12.199Z"
+    },
+    {
+      "id": "4e6e31a8-1a8f-42a4-bb12-b4e1498aca61",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "3d909352-915c-497a-b93b-916ba7c8925b",
+      "points": 20,
+      "updated_at": "2026-10-23T19:39:12.199Z"
+    },
+    {
+      "id": "64d2cd1f-80db-4f10-aec9-04c341b4e71d",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "0e96c6c6-a4af-4685-bba0-3ad6a03ef9cf",
+      "points": 18,
+      "updated_at": "2026-10-23T18:39:12.199Z"
+    },
+    {
+      "id": "ba83a2ba-3363-4000-9eff-b2ab0ea81f39",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "7d169647-4d13-47c8-836d-d399e479de38",
+      "points": 16,
+      "updated_at": "2026-10-23T17:39:12.199Z"
+    },
+    {
+      "id": "20f4bd67-44de-42a4-8857-54836a70a536",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "8819b81a-1e93-4334-a524-136ba6608dd7",
+      "points": 14,
+      "updated_at": "2026-10-23T16:39:12.199Z"
+    },
+    {
+      "id": "d1218dfc-8d36-415b-b19a-8e658e8928ae",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "1ade2f18-019d-4750-be59-39971db5c2de",
+      "points": 112,
+      "updated_at": "2026-10-23T15:39:12.199Z"
+    },
+    {
+      "id": "d4d65991-56aa-4fe5-9979-da9c7ecc9995",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "cdf909ac-b469-4af5-8423-dece84124159",
+      "points": 10,
+      "updated_at": "2026-10-23T14:39:12.199Z"
+    },
+    {
+      "id": "1ce1f418-2640-4575-9304-3a124d465282",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "2d0f5a4b-c0dc-42aa-adf3-d7a5fef8f919",
+      "points": 8,
+      "updated_at": "2026-10-23T13:39:12.199Z"
+    },
+    {
+      "id": "43d02c26-fb55-4a62-87a5-fc8653ae3f4d",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "5386738f-a7dc-4b70-be32-e0363f9cedff",
+      "points": 56,
+      "updated_at": "2026-10-23T12:39:12.199Z"
+    },
+    {
+      "id": "696f34af-26dc-4ef3-b645-fa50ebde9edd",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "83f399b8-f56d-4ff3-85b0-3c38441c6512",
+      "points": 4,
+      "updated_at": "2026-10-23T11:39:12.199Z"
+    },
+    {
+      "id": "24f15870-7970-4e43-8f05-b5885daf466e",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "b184b971-8b97-45c4-adb1-56ae20797114",
+      "points": 2,
+      "updated_at": "2026-10-23T10:39:12.199Z"
+    },
+    {
+      "id": "dd8237e0-06c6-4069-8c99-cb086d69262e",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "e1100ceb-d908-4f0f-88c2-967622ea7996",
+      "points": 0,
+      "updated_at": "2026-10-23T09:39:12.199Z"
+    },
+    {
+      "id": "de543182-79af-446d-bc2e-032a1bd25643",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "d68e5aef-fdb9-45ed-87f9-b08b7d88b3d7",
+      "points": 0,
+      "updated_at": "2026-10-23T08:39:12.199Z"
+    },
+    {
+      "id": "d8301885-1920-49bf-b3dc-f1e43315e7e4",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "65d58356-73be-489f-8e7b-fd836f620e6b",
+      "points": 0,
+      "updated_at": "2026-10-23T07:39:12.199Z"
+    },
+    {
+      "id": "4efe5665-4c8f-4e62-bd24-3e1d204715e2",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "a3dea4c2-dc93-4cd6-a34a-6493b81d6706",
+      "points": 0,
+      "updated_at": "2026-10-23T06:39:12.199Z"
+    },
+    {
+      "id": "c75a96a2-03b4-44ed-abca-8cc6c9f62be9",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "2b5bf842-eeb4-46ed-b66e-5bf6a2458095",
+      "points": 0,
+      "updated_at": "2026-10-23T05:39:12.199Z"
+    },
+    {
+      "id": "c09b546a-658b-45ee-8365-144a6a7268e5",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "0d2b428d-15a2-4211-8e79-79cb09ada73a",
+      "points": 0,
+      "updated_at": "2026-10-23T04:39:12.199Z"
+    },
+    {
+      "id": "2cd78049-2564-433c-b79f-dc29561de868",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "7b79ffda-85f5-4cc8-baf2-d5f4ddacdbbf",
+      "points": 0,
+      "updated_at": "2026-10-23T03:39:12.199Z"
+    },
+    {
+      "id": "aeb99d8d-a032-467a-a13e-bb56d5232aed",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "62b1b7ce-8006-45eb-948b-5cd9ceb879cd",
+      "points": 100,
+      "updated_at": "2026-10-23T02:39:12.199Z"
+    },
+    {
+      "id": "3dac6af8-3c14-4382-874e-058c4679a605",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "f61e9458-2fdb-43bb-a1b2-8173f0933075",
+      "points": 0,
+      "updated_at": "2026-10-23T01:39:12.199Z"
+    },
+    {
+      "id": "e5d02c45-f81c-46ae-b175-1ac3a3fb4b8c",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "1a539c77-fb7d-43eb-9b62-524477da6bf0",
+      "points": 0,
+      "updated_at": "2026-10-23T00:39:12.199Z"
+    },
+    {
+      "id": "991c2e98-c40a-4d0d-bb06-7171e477913a",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "39ff2231-4b3c-484e-9619-a2b667aa53bb",
+      "points": 0,
+      "updated_at": "2026-10-22T23:39:12.199Z"
+    },
+    {
+      "id": "1975646a-f064-471c-bbad-360cc22ac5ba",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "3699c959-601e-43a4-874a-aa42c9ab8710",
+      "points": 0,
+      "updated_at": "2026-10-22T22:39:12.199Z"
+    },
+    {
+      "id": "86a91c6c-22b6-4d74-b660-a2ce96d594f5",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "ddf8c921-586e-43a7-96fe-c288d2f0d1ab",
+      "points": 0,
+      "updated_at": "2026-10-22T21:39:12.199Z"
+    },
+    {
+      "id": "c50fd93e-0bff-4162-9087-280ad309434b",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "318a7002-dcfd-48af-8399-038f56a2122c",
+      "points": 0,
+      "updated_at": "2026-10-22T20:39:12.199Z"
+    },
+    {
+      "id": "e1378c1e-d77b-4451-8397-d2957adf402a",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "56048f08-79e4-40c6-b43e-e37453b4e14f",
+      "points": 0,
+      "updated_at": "2026-10-22T19:39:12.199Z"
+    },
+    {
+      "id": "1280ee42-879a-48df-95d4-3ffbd4d5b78f",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "34e723a0-3c23-4261-b2da-5134dda4bd13",
+      "points": 100,
+      "updated_at": "2026-10-22T18:39:12.199Z"
+    },
+    {
+      "id": "78c03c36-a906-473e-8ef9-44cc29957c10",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "40073e85-6df5-4c6f-b49e-cca56193d98d",
+      "points": 0,
+      "updated_at": "2026-10-22T17:39:12.199Z"
+    },
+    {
+      "id": "22d9a3cc-9960-414e-be87-0fc4daa6def2",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "2b7a437f-c6d3-42f1-af90-0d2c93206b16",
+      "points": 0,
+      "updated_at": "2026-10-22T16:39:12.199Z"
+    },
+    {
+      "id": "2c31078d-5312-41d2-ac1b-fb1b575ad9a6",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "1809fa83-c75b-4f18-bf3d-b585441f795b",
+      "points": 0,
+      "updated_at": "2026-10-22T15:39:12.199Z"
+    },
+    {
+      "id": "3b0af784-9983-4f80-97eb-ef96cce1952f",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "85c1657c-baf0-438f-81a9-df7dfa17e754",
+      "points": 0,
+      "updated_at": "2026-10-22T14:39:12.199Z"
+    },
+    {
+      "id": "c09e0625-c298-421e-acb6-0ae72999006f",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "32d6f436-3fa8-4a1b-b924-f776ce5c847b",
+      "points": 0,
+      "updated_at": "2026-10-22T13:39:12.199Z"
+    },
+    {
+      "id": "89463c5c-89da-4f11-b036-113aed9f87c8",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "4ff26ec4-1445-4060-9d37-ad9264e95775",
+      "points": 0,
+      "updated_at": "2026-10-22T12:39:12.199Z"
+    },
+    {
+      "id": "b1fe47ae-b120-4cb7-a15d-0f435756be7f",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "e0a9bd8b-b316-4c86-85f9-4843a3958677",
+      "points": 100,
+      "updated_at": "2026-10-22T11:39:12.199Z"
+    },
+    {
+      "id": "80d5c6d8-5a6c-4693-b48d-42a6d35927c4",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "cf1fbfa0-e407-4e0c-8164-01b9c0380d91",
+      "points": 0,
+      "updated_at": "2026-10-22T10:39:12.199Z"
+    },
+    {
+      "id": "edaaf940-fc9d-4ca4-af86-7683cada36a2",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "e033895f-c789-434a-87ea-f34e0a93cb68",
+      "points": 0,
+      "updated_at": "2026-10-22T09:39:12.199Z"
+    },
+    {
+      "id": "60da53d0-4d23-462e-b36f-9ce0dbb99d7e",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "4176a17d-9e0d-42c8-8814-bbcd6a552ffd",
+      "points": 0,
+      "updated_at": "2026-10-22T08:39:12.200Z"
+    },
+    {
+      "id": "824e6ef6-47bf-43a6-97b8-61a844c39836",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "06aa64a3-5c30-4bf4-89d7-a024b781c9c3",
+      "points": 0,
+      "updated_at": "2026-10-22T07:39:12.200Z"
+    },
+    {
+      "id": "19253492-3f9d-4dc0-8159-9a12b1e9ba2a",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "53a0a99e-d54c-4f96-a272-36f6911aef88",
+      "points": 0,
+      "updated_at": "2026-10-22T06:39:12.200Z"
+    },
+    {
+      "id": "b7b393c2-bade-4a0d-b2ab-1a63d962ea24",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "43ec79f5-6d0c-496c-bb45-7799e1ef5aab",
+      "points": 0,
+      "updated_at": "2026-10-22T05:39:12.200Z"
+    },
+    {
+      "id": "5ea551bd-b81c-4d92-a5a5-a4242f936b06",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "a862d992-6171-4908-9708-e854c4ce92de",
+      "points": 0,
+      "updated_at": "2026-10-22T04:39:12.200Z"
+    },
+    {
+      "id": "d0c7b459-10e9-4fc0-8fec-341ed36a961f",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "12a3e79c-9ef9-4625-a926-82f60287c048",
+      "points": 100,
+      "updated_at": "2026-10-22T03:39:12.200Z"
+    },
+    {
+      "id": "bd9366f8-ce65-4e2c-b447-2a1efb1c4fda",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "362b2e24-8a50-4c8d-a5e0-653966c2d867",
+      "points": 0,
+      "updated_at": "2026-10-22T02:39:12.200Z"
+    },
+    {
+      "id": "955c2267-78dd-465a-9b6d-81f6e541e3b8",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "30c38c64-0dd4-4773-8ad3-76fba891944a",
+      "points": 0,
+      "updated_at": "2026-10-22T01:39:12.200Z"
+    },
+    {
+      "id": "14623e25-c722-4de6-8e57-6a64c8b00983",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "7bcabf10-95a9-441c-b51c-c721d9187f74",
+      "points": 0,
+      "updated_at": "2026-10-22T00:39:12.200Z"
+    },
+    {
+      "id": "06a953d1-0339-44eb-9c78-15a0ce95e3a2",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "bbd223fc-34bc-4c01-9e3a-11b8a1c9d6f8",
+      "points": 0,
+      "updated_at": "2026-10-21T23:39:12.200Z"
+    },
+    {
+      "id": "dc83a95e-52da-4938-b765-9610d5d238a2",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "a1ab42d2-d37e-4a47-a415-418e1147318e",
+      "points": 0,
+      "updated_at": "2026-10-21T22:39:12.200Z"
+    },
+    {
+      "id": "71a09025-aa80-4ad1-9ce3-cbdc38775b14",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "14aa29b9-4587-4a64-9e6f-a2712cc61a50",
+      "points": 0,
+      "updated_at": "2026-10-21T21:39:12.200Z"
+    },
+    {
+      "id": "5ef1ff25-3a25-4521-bbca-39eb6ff9f306",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "6d267c6b-dcf5-43ba-a24f-7c3b4f8265b6",
+      "points": 0,
+      "updated_at": "2026-10-21T20:39:12.200Z"
+    },
+    {
+      "id": "88be599b-7cf6-4645-adb4-c28614cf0f8c",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "aff1418a-9253-49a9-96e5-13fb6666f006",
+      "points": 100,
+      "updated_at": "2026-10-21T19:39:12.200Z"
+    },
+    {
+      "id": "04fa4fc6-9146-4109-b073-f65fdbc69573",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "4f13d80d-128f-443d-85b2-499ca0bc620e",
+      "points": 0,
+      "updated_at": "2026-10-21T18:39:12.200Z"
+    },
+    {
+      "id": "0432accc-cf5e-4fca-9cf3-a0a3bff8d310",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "eab84773-867e-4e69-a520-582bcafdb5cd",
+      "points": 0,
+      "updated_at": "2026-10-21T17:39:12.200Z"
+    },
+    {
+      "id": "979b6358-06ee-4d43-b8a1-29ec8dd07036",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "72ac9bec-4a1b-4382-af81-df809a609927",
+      "points": 0,
+      "updated_at": "2026-10-21T16:39:12.200Z"
+    },
+    {
+      "id": "ac6a6dd9-ab67-4caa-b224-13a86d38bdbc",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "388588bd-8476-40bb-8d10-d8b1fa6f0c79",
+      "points": 0,
+      "updated_at": "2026-10-21T15:39:12.200Z"
+    },
+    {
+      "id": "db5df463-a2c1-42ba-9b9c-a820c7ddd736",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "ed16f543-c03d-42f9-92b1-9218168409b4",
+      "points": 0,
+      "updated_at": "2026-10-21T14:39:12.200Z"
+    },
+    {
+      "id": "25c9c3df-00fe-45f1-952c-1a4dd1aa31f7",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "bce4c5d8-5353-42ed-874c-4abfeaa1303a",
+      "points": 0,
+      "updated_at": "2026-10-21T13:39:12.200Z"
+    },
+    {
+      "id": "c507c013-0065-45e4-a9c3-5cf080533cc1",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "268723db-738a-4c1a-b800-ca06ecee2d10",
+      "points": 0,
+      "updated_at": "2026-10-21T12:39:12.200Z"
+    },
+    {
+      "id": "e5c42041-fe18-4e2a-8b17-88153876fddf",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "eff0ceae-7f22-4803-a235-1b9108694b71",
+      "points": 100,
+      "updated_at": "2026-10-21T11:39:12.200Z"
+    },
+    {
+      "id": "f50eebfd-b273-4777-aca1-83d1f2f0eb10",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "86f0d578-1147-495a-97cc-50c2e6b3086e",
+      "points": 0,
+      "updated_at": "2026-10-21T10:39:12.200Z"
+    },
+    {
+      "id": "c6e60ffe-40b2-4000-badc-5ce62150aebc",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "81f59c40-e329-46e1-bf7a-eab5f6dae166",
+      "points": 0,
+      "updated_at": "2026-10-21T09:39:12.200Z"
+    },
+    {
+      "id": "c2d962a3-aca6-4bf2-91c6-7dab630881d2",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "b870ceba-f342-4934-af25-67c0d42b1cff",
+      "points": 0,
+      "updated_at": "2026-10-21T08:39:12.200Z"
+    },
+    {
+      "id": "5c19a49e-cc00-4ddc-b2f0-8dbcd5d78bd9",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "608cfb0f-cad9-4186-a0e9-59f4d57994c0",
+      "points": 0,
+      "updated_at": "2026-10-21T07:39:12.200Z"
+    },
+    {
+      "id": "5728c340-869b-408a-b9ef-50506c1ef858",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "fbe200f9-49aa-4f89-9047-63151dc53f59",
+      "points": 0,
+      "updated_at": "2026-10-21T06:39:12.200Z"
+    },
+    {
+      "id": "10e7b101-50d5-4ddf-96a6-5372474e99bd",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "2d71fb05-d267-4e6e-b602-59ae7aa57716",
+      "points": 0,
+      "updated_at": "2026-10-21T05:39:12.200Z"
+    },
+    {
+      "id": "073a676b-e0e0-486c-90e9-9e028673c8b9",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "b1963894-fd40-47ad-9ca0-e46c792f0b1d",
+      "points": 0,
+      "updated_at": "2026-10-21T04:39:12.200Z"
+    },
+    {
+      "id": "2430d664-0cd8-417b-b79e-357d4487380a",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "7993906a-02c0-47b1-94b3-0ff950396fd6",
+      "points": 100,
+      "updated_at": "2026-10-21T03:39:12.200Z"
+    },
+    {
+      "id": "466b5c3c-a0be-4448-9fe0-9f90e77a4061",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "70d3fb92-f35e-479d-bd73-47e294cfae01",
+      "points": 0,
+      "updated_at": "2026-10-21T02:39:12.200Z"
+    },
+    {
+      "id": "2ee2ce69-878b-4c2c-9ae9-294bffd38789",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "b460276d-6f70-4e85-9a6c-f6cb97f53893",
+      "points": 0,
+      "updated_at": "2026-10-21T01:39:12.200Z"
+    },
+    {
+      "id": "0e02c265-38e1-43d6-8645-c7dc3bccf6f3",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "b43584b7-b6e0-423c-8ead-810218527923",
+      "points": 0,
+      "updated_at": "2026-10-21T00:39:12.200Z"
+    },
+    {
+      "id": "b7f75782-dba5-4cd6-9d95-baedb22b0c60",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "830eb8dd-b429-4cdf-a185-492b65fe0301",
+      "points": 0,
+      "updated_at": "2026-10-20T23:39:12.200Z"
+    },
+    {
+      "id": "3bd4264b-3a23-48e5-845f-5328c277fdf0",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "717c2f7a-940f-4192-9da3-7e3755361571",
+      "points": 0,
+      "updated_at": "2026-10-20T22:39:12.200Z"
+    },
+    {
+      "id": "f11b3366-313b-47a8-8ef1-365ac03ed2ef",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "3f0adf86-b420-42d8-a02e-68f2bdbfb4a6",
+      "points": 0,
+      "updated_at": "2026-10-20T21:39:12.200Z"
+    },
+    {
+      "id": "aa73f1e0-1ce7-4494-b37a-cbea4aaa8507",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "007b8bc6-2150-40de-9796-16c99f8dd4f9",
+      "points": 0,
+      "updated_at": "2026-10-20T20:39:12.200Z"
+    },
+    {
+      "id": "a2bca06a-7dd4-4a69-8c74-5ae601f764f8",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "e324e9f5-f036-408d-b8b5-c90c44b6a6fc",
+      "points": 100,
+      "updated_at": "2026-10-20T19:39:12.200Z"
+    },
+    {
+      "id": "ae31a6e9-e1e2-40de-a9fa-e4cb94acfcda",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "26f2e511-1456-4e91-a70e-2cb362b626ed",
+      "points": 0,
+      "updated_at": "2026-10-20T18:39:12.200Z"
+    },
+    {
+      "id": "0c6bbd0d-8190-40b2-bb5b-f726b348cacb",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "cafb9d7a-4c08-4fd8-8f2d-fa2ad8f289b1",
+      "points": 0,
+      "updated_at": "2026-10-20T17:39:12.200Z"
+    },
+    {
+      "id": "dc3fffa1-f53d-49bf-97c3-336958f8067c",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "be4cea31-e0b8-4626-9352-63bf2bfe1f1d",
+      "points": 0,
+      "updated_at": "2026-10-20T16:39:12.200Z"
+    },
+    {
+      "id": "4b7584da-419f-4eed-b107-ea07c81a0d14",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "7faee348-ebf1-406e-a5db-9dcff2a603b9",
+      "points": 0,
+      "updated_at": "2026-10-20T15:39:12.200Z"
+    },
+    {
+      "id": "36b16eb6-be51-4d1b-8adf-12ed5ee35405",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "6f42be77-51c9-4f9b-b164-97cfa665561e",
+      "points": 0,
+      "updated_at": "2026-10-20T14:39:12.200Z"
+    },
+    {
+      "id": "308aca81-d167-49de-b424-38e940f79ff4",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "c2b8c7b8-8f9a-4ea5-81f8-eb82793a9108",
+      "points": 0,
+      "updated_at": "2026-10-20T13:39:12.200Z"
+    },
+    {
+      "id": "826b836b-2cf6-48e0-8da0-cd5b8a84151c",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "964f2ec9-f2d4-4a9c-88c0-eb4d7feed729",
+      "points": 100,
+      "updated_at": "2026-10-26T12:50:45.004Z"
+    },
+    {
+      "id": "0f20b071-d633-466b-b561-c9d635ec35b7",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "a8d6e1c4-67a5-4128-9aa2-f687d0904345",
+      "points": 100,
+      "updated_at": "2026-10-26T12:55:57.223Z"
+    },
+    {
+      "id": "fbdaff1c-fd14-41bc-8281-64e5339996d4",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "f5c26442-23b8-4972-88d4-f14300fc5535",
+      "points": 100,
+      "updated_at": "2026-10-26T12:58:29.103Z"
     }
   ]
 }
