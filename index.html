@@ -2272,15 +2272,47 @@
                         </div>
                         <form id="creator-onboard-form" onsubmit="handleCreatorOnboardSubmit(event)" style="display: flex; flex-direction: column; gap: 20px; padding-top: 12px;">
                             <div style="font-size: 0.82rem; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; color: #5E3435; border-bottom: 1px solid rgba(94,52,53,0.15); padding-bottom: 6px;">1. Basic Details</div>
-                            <div class="form-row-2col">
-                                <div class="form-group">
-                                    <label for="creator-input-name" class="account-label">Creator Display Name *</label>
-                                    <input type="text" id="creator-input-name" class="form-input" required placeholder="e.g. Priya Sharma">
+                            <div class="form-group">
+                                <label for="creator-input-name" class="account-label">Creator Display Name *</label>
+                                <input type="text" id="creator-input-name" class="form-input" required placeholder="e.g. Priya Sharma">
+                            </div>
+
+                            <div class="form-group creator-photo-upload-group">
+                                <label class="account-label" style="display:block; margin-bottom:4px; font-weight:600;">Profile Photo</label>
+                                <input type="hidden" id="creator-input-avatar" value="">
+                                <input type="file" id="creator-photo-file-input" accept="image/jpeg,image/png,image/webp" style="display:none;" onchange="handleCreatorPhotoSelect(event)">
+                                <div class="creator-photo-box" id="creator-photo-box">
+                                    <div class="creator-photo-preview-wrap">
+                                        <img id="creator-photo-preview-img" src="" alt="Profile Photo Preview" style="display:none;" class="creator-photo-preview-img">
+                                        <div id="creator-photo-placeholder" class="creator-photo-placeholder">
+                                            <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.5">
+                                                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                                                <circle cx="12" cy="7" r="4"></circle>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    <div class="creator-photo-meta">
+                                        <div id="creator-photo-empty-actions">
+                                            <button type="button" class="btn btn-secondary creator-photo-btn" onclick="triggerCreatorPhotoSelect()">
+                                                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                                                <span>UPLOAD PHOTO</span>
+                                            </button>
+                                            <div class="creator-photo-hint">JPG, PNG, or WebP. Max 5 MB (1:1 square preview)</div>
+                                        </div>
+                                        <div id="creator-photo-active-actions" style="display:none;">
+                                            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                                                <button type="button" class="btn btn-secondary creator-photo-btn" onclick="triggerCreatorPhotoSelect()">
+                                                    CHANGE PHOTO
+                                                </button>
+                                                <button type="button" class="creator-photo-btn-remove" onclick="removeCreatorPhoto()">
+                                                    REMOVE
+                                                </button>
+                                            </div>
+                                            <div class="creator-photo-hint" id="creator-photo-status-text" style="color:#047857; font-weight:500;">✓ Photo ready</div>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div class="form-group">
-                                    <label for="creator-input-avatar" class="account-label">Profile Photo URL (Optional)</label>
-                                    <input type="url" id="creator-input-avatar" class="form-input" placeholder="https://example.com/photo.jpg">
-                                </div>
+                                <div id="creator-photo-error" style="display:none;"></div>
                             </div>
                             <div class="form-group">
                                 <label for="creator-input-bio" class="account-label">Bio</label>
@@ -2361,11 +2393,17 @@
                             <div class="creator-avatar-wrap">
                                 <img id="creator-dash-avatar" src="/images/default-avatar.png" alt="Creator Avatar" class="creator-dash-avatar" onerror="this.src='/images/default-avatar.png'">
                             </div>
-                            <div class="creator-profile-info">
-                                <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-                                    <h3 id="creator-dash-name" class="creator-dash-name">Creator Name</h3>
-                                    <span class="status-badge verified" style="font-size:0.75rem;">WishRite Creator</span>
-                                    <span id="creator-code-badge" style="font-family:monospace; font-size:0.75rem; background:rgba(0,0,0,0.06); padding:2px 8px; border-radius:3px;">WR-INF-000000</span>
+                            <div class="creator-profile-info" style="flex:1;">
+                                <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+                                    <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                                        <h3 id="creator-dash-name" class="creator-dash-name">Creator Name</h3>
+                                        <span class="status-badge verified" style="font-size:0.75rem;">WishRite Creator</span>
+                                        <span id="creator-code-badge" style="font-family:monospace; font-size:0.75rem; background:rgba(0,0,0,0.06); padding:2px 8px; border-radius:3px;">WR-INF-000000</span>
+                                    </div>
+                                    <button type="button" class="btn btn-ghost" onclick="openEditCreatorProfileModal()" style="font-size:0.78rem; padding:6px 12px; display:inline-flex; align-items:center; gap:6px; border:1px solid rgba(94,52,53,0.25); border-radius:4px; color:#5E3435;">
+                                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                        <span>EDIT PROFILE</span>
+                                    </button>
                                 </div>
                                 <p id="creator-dash-bio" style="font-size:0.88rem; color:var(--wr-text-muted); margin:4px 0 8px 0;"></p>
                                 <div id="creator-dash-socials" class="creator-dash-socials" style="display:flex; gap:12px; flex-wrap:wrap; font-size:0.82rem;"></div>
@@ -2608,6 +2646,132 @@
                 <div id="share-reel-error" style="display:none;color:#c53030;background:#fff5f5;border:1px solid #feb2b2;padding:10px 14px;border-radius:4px;font-size:0.88rem;margin-bottom:14px;"></div>
                 <div id="share-reel-success" style="display:none;color:#2e7d32;background:#f4fbf7;border:1px solid #c8e6c9;padding:10px 14px;border-radius:4px;font-size:0.88rem;margin-bottom:14px;">✓ Reel submitted successfully for review!</div>
                 <button type="submit" id="share-reel-submit-btn" class="btn btn-primary" style="width:100%;padding:12px;font-weight:600;letter-spacing:0.5px;">SUBMIT REEL FOR REVIEW</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- ═══ EDIT CREATOR PROFILE MODAL ═══ -->
+    <div class="creator-modal" id="modal-edit-creator-profile" role="dialog" aria-modal="true" aria-labelledby="edit-profile-modal-title"
+        style="display:none;position:fixed;inset:0;z-index:9999;align-items:center;justify-content:center;">
+        <div class="creator-modal-backdrop" onclick="closeEditCreatorProfileModal()"
+            style="position:absolute;inset:0;background:rgba(0,0,0,0.6);backdrop-filter:blur(3px);"></div>
+        <div class="creator-modal-content"
+            style="position:relative;background:#fff;border-radius:8px;max-width:620px;width:92%;max-height:90vh;overflow-y:auto;padding:32px 28px;box-shadow:0 12px 36px rgba(0,0,0,0.2);z-index:2;">
+            <button class="creator-modal-close" onclick="closeEditCreatorProfileModal()" aria-label="Close modal"
+                style="position:absolute;top:16px;right:16px;background:none;border:none;font-size:24px;cursor:pointer;color:var(--wr-text-muted);">&times;</button>
+            <div style="margin-bottom:20px;">
+                <span style="font-size:0.75rem;letter-spacing:1.5px;color:var(--wr-primary);text-transform:uppercase;font-weight:600;">WISHRITE CREATOR CLUB</span>
+                <h3 id="edit-profile-modal-title" style="font-family:var(--wr-font-heading);font-size:1.35rem;color:var(--wr-primary);margin-top:6px;">Edit Creator Profile</h3>
+                <p style="font-size:0.88rem;color:var(--wr-text-muted);margin-top:4px;line-height:1.4;">Update your public creator profile, photo, location, and social links.</p>
+            </div>
+            <form id="form-edit-creator-profile" onsubmit="handleEditCreatorProfileSubmit(event)" style="display:flex; flex-direction:column; gap:16px;">
+                <!-- Profile Photo -->
+                <div class="form-group creator-photo-upload-group">
+                    <label class="account-label" style="display:block; margin-bottom:4px; font-weight:600;">Profile Photo</label>
+                    <input type="hidden" id="edit-creator-input-avatar" value="">
+                    <input type="file" id="edit-creator-photo-file-input" accept="image/jpeg,image/png,image/webp" style="display:none;" onchange="handleEditCreatorPhotoSelect(event)">
+                    <div class="creator-photo-box" id="edit-creator-photo-box">
+                        <div class="creator-photo-preview-wrap">
+                            <img id="edit-creator-photo-preview-img" src="" alt="Profile Photo Preview" style="display:none;" class="creator-photo-preview-img">
+                            <div id="edit-creator-photo-placeholder" class="creator-photo-placeholder">
+                                <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.5">
+                                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                                    <circle cx="12" cy="7" r="4"></circle>
+                                </svg>
+                            </div>
+                        </div>
+                        <div class="creator-photo-meta">
+                            <div id="edit-creator-photo-empty-actions">
+                                <button type="button" class="btn btn-secondary creator-photo-btn" onclick="triggerEditCreatorPhotoSelect()">
+                                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                                    <span>UPLOAD PHOTO</span>
+                                </button>
+                                <div class="creator-photo-hint">JPG, PNG, or WebP. Max 5 MB (1:1 square preview)</div>
+                            </div>
+                            <div id="edit-creator-photo-active-actions" style="display:none;">
+                                <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                                    <button type="button" class="btn btn-secondary creator-photo-btn" onclick="triggerEditCreatorPhotoSelect()">
+                                        CHANGE PHOTO
+                                    </button>
+                                    <button type="button" class="creator-photo-btn-remove" onclick="removeEditCreatorPhoto()">
+                                        REMOVE
+                                    </button>
+                                </div>
+                                <div class="creator-photo-hint" id="edit-creator-photo-status-text" style="color:#047857; font-weight:500;">✓ Current photo</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="edit-creator-photo-error" style="display:none;"></div>
+                </div>
+
+                <!-- Basic Details -->
+                <div class="form-group">
+                    <label for="edit-creator-input-name" class="account-label">Creator Display Name *</label>
+                    <input type="text" id="edit-creator-input-name" class="form-input" required placeholder="e.g. Priya Sharma">
+                </div>
+                <div class="form-group">
+                    <label for="edit-creator-input-bio" class="account-label">Bio</label>
+                    <textarea id="edit-creator-input-bio" class="form-input" rows="2" placeholder="Tell us about your style..."></textarea>
+                </div>
+                <div class="form-row-3col">
+                    <div class="form-group">
+                        <label for="edit-creator-input-city" class="account-label">City *</label>
+                        <input type="text" id="edit-creator-input-city" class="form-input" required placeholder="Mumbai">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-creator-input-state" class="account-label">State *</label>
+                        <input type="text" id="edit-creator-input-state" class="form-input" required placeholder="Maharashtra">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-creator-input-country" class="account-label">Country</label>
+                        <input type="text" id="edit-creator-input-country" class="form-input" value="India">
+                    </div>
+                </div>
+
+                <!-- Socials -->
+                <div class="form-row-2col">
+                    <div class="form-group">
+                        <label for="edit-creator-input-instagram" class="account-label">Instagram Username / URL *</label>
+                        <input type="text" id="edit-creator-input-instagram" class="form-input" required placeholder="@handle or instagram.com/handle">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-creator-input-youtube" class="account-label">YouTube Channel URL</label>
+                        <input type="url" id="edit-creator-input-youtube" class="form-input" placeholder="https://youtube.com/@channel">
+                    </div>
+                </div>
+                <div class="form-row-2col">
+                    <div class="form-group">
+                        <label for="edit-creator-input-facebook" class="account-label">Facebook Profile URL</label>
+                        <input type="url" id="edit-creator-input-facebook" class="form-input" placeholder="https://facebook.com/profile">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-creator-input-other" class="account-label">Other Social Profile URL</label>
+                        <input type="url" id="edit-creator-input-other" class="form-input" placeholder="https://pinterest.com/handle">
+                    </div>
+                </div>
+
+                <!-- Content Preferences -->
+                <div>
+                    <label class="account-label" style="display:block; margin-bottom:6px;">Content Preferences</label>
+                    <div class="creator-chips-group" id="edit-creator-preference-chips">
+                        <label class="creator-chip"><input type="checkbox" name="edit_content_pref" value="Jewellery styling"><span>Jewellery</span></label>
+                        <label class="creator-chip"><input type="checkbox" name="edit_content_pref" value="Fashion"><span>Fashion</span></label>
+                        <label class="creator-chip"><input type="checkbox" name="edit_content_pref" value="Beauty"><span>Beauty</span></label>
+                        <label class="creator-chip"><input type="checkbox" name="edit_content_pref" value="Lifestyle"><span>Lifestyle</span></label>
+                        <label class="creator-chip"><input type="checkbox" name="edit_content_pref" value="Unboxing"><span>Unboxing</span></label>
+                        <label class="creator-chip"><input type="checkbox" name="edit_content_pref" value="Festive"><span>Festive</span></label>
+                        <label class="creator-chip"><input type="checkbox" name="edit_content_pref" value="Wedding"><span>Wedding</span></label>
+                        <label class="creator-chip"><input type="checkbox" name="edit_content_pref" value="Other"><span>Other</span></label>
+                    </div>
+                </div>
+
+                <div id="edit-creator-error" style="display:none;color:#c53030;background:#fff5f5;border:1px solid #feb2b2;padding:10px 14px;border-radius:4px;font-size:0.88rem;"></div>
+                <div id="edit-creator-success" style="display:none;color:#2e7d32;background:#f4fbf7;border:1px solid #c8e6c9;padding:10px 14px;border-radius:4px;font-size:0.88rem;">✓ Profile updated successfully!</div>
+
+                <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:8px;">
+                    <button type="button" class="btn btn-ghost" onclick="closeEditCreatorProfileModal()">Cancel</button>
+                    <button type="submit" id="btn-save-creator-profile" class="btn btn-primary" style="padding:10px 24px; font-weight:600;">SAVE CHANGES</button>
+                </div>
             </form>
         </div>
     </div>

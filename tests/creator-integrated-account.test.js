@@ -524,4 +524,169 @@ describe('WishRite — Integrated Creator Program Inside My Account', () => {
       assert.match(authJs, /navigateTo\('profile',\s*'creator'\)/);
     });
   });
+
+  // ═══ 7. CREATOR PROFILE PHOTO UPLOAD & PROFILE EDITING FLOW ═══
+  describe('Creator Profile Photo Upload & Profile Editing Flow', () => {
+    const photoUserEmail = `photo_creator_${Date.now()}@example.com`;
+    const photoUserId = `usr_photo_${Date.now()}`;
+    const photoAuthHeader = makeCustomerAuthHeader(photoUserEmail, photoUserId);
+    let photoCreatorToken = null;
+
+    // Minimal valid 1x1 transparent PNG:
+    const validPngBase64 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+    // Minimal valid 1x1 JPEG:
+    const validJpegBuffer = Buffer.from([0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0x01, 0x00, 0x48, 0x00, 0x48, 0x00, 0x00, 0xFF, 0xDB, 0x00, 0x43, 0x00, 0x08, 0x06, 0x06, 0x07, 0x06, 0x05, 0x08, 0x07, 0x07, 0x07, 0x09, 0x09, 0x08, 0x0A, 0x0C, 0x14, 0x0D, 0x0C, 0x0B, 0x0B, 0x0C, 0x19, 0x12, 0x13, 0x0F, 0x14, 0x1D, 0x1A, 0x1F, 0x1E, 0x1D, 0x1A, 0x1C, 0x1C, 0x20, 0x24, 0x2E, 0x27, 0x20, 0x22, 0x2C, 0x23, 0x1C, 0x1C, 0x28, 0x37, 0x29, 0x2C, 0x30, 0x31, 0x34, 0x34, 0x34, 0x1F, 0x27, 0x39, 0x3D, 0x38, 0x32, 0x3C, 0x2E, 0x33, 0x34, 0x32, 0xFF, 0xC0, 0x00, 0x0B, 0x08, 0x00, 0x01, 0x00, 0x01, 0x01, 0x01, 0x11, 0x00, 0xFF, 0xC4, 0x00, 0x1F, 0x00, 0x00, 0x01, 0x05, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0xFF, 0xDA, 0x00, 0x08, 0x01, 0x01, 0x00, 0x00, 0x3F, 0x00, 0x7F, 0x00, 0xFF, 0xD9]);
+    const validJpegBase64 = `data:image/jpeg;base64,${validJpegBuffer.toString('base64')}`;
+
+    test('Customer can upload a valid JPEG profile photo before/during onboarding', async () => {
+      const res = await makeRequest({
+        path: '/api/creator/profile-photo',
+        method: 'POST',
+        headers: { 'Authorization': photoAuthHeader }
+      }, {
+        image: validJpegBase64,
+        mimeType: 'image/jpeg'
+      });
+
+      assert.equal(res.statusCode, 200);
+      assert.equal(res.data.success, true);
+      assert.ok(res.data.url, 'Expected public URL to be returned');
+      assert.equal(res.data.message, 'Profile photo uploaded successfully.');
+    });
+
+    test('Customer can upload a valid PNG profile photo', async () => {
+      const res = await makeRequest({
+        path: '/api/creator/profile-photo',
+        method: 'POST',
+        headers: { 'Authorization': photoAuthHeader }
+      }, {
+        image: validPngBase64,
+        mimeType: 'image/png'
+      });
+
+      assert.equal(res.statusCode, 200);
+      assert.equal(res.data.success, true);
+      assert.ok(res.data.url);
+    });
+
+    test('Reject oversized profile photo (>5 MB) with exact error message', async () => {
+      // 5.2 MB payload
+      const largeBuffer = Buffer.alloc(5.2 * 1024 * 1024, 0xFF);
+      largeBuffer[0] = 0xFF; largeBuffer[1] = 0xD8; largeBuffer[2] = 0xFF;
+      const largeBase64 = `data:image/jpeg;base64,${largeBuffer.toString('base64')}`;
+
+      const res = await makeRequest({
+        path: '/api/creator/profile-photo',
+        method: 'POST',
+        headers: { 'Authorization': photoAuthHeader }
+      }, {
+        image: largeBase64
+      });
+
+      assert.equal(res.statusCode, 400);
+      assert.equal(res.data.success, false);
+      assert.equal(res.data.error.message, 'Please upload an image smaller than 5 MB.');
+    });
+
+    test('Reject invalid file format (e.g. SVG or arbitrary executable) with 400', async () => {
+      const svgBase64 = `data:image/svg+xml;base64,${Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><circle r="10"/></svg>').toString('base64')}`;
+
+      const res = await makeRequest({
+        path: '/api/creator/profile-photo',
+        method: 'POST',
+        headers: { 'Authorization': photoAuthHeader }
+      }, {
+        image: svgBase64,
+        mimeType: 'image/svg+xml'
+      });
+
+      assert.equal(res.statusCode, 400);
+      assert.equal(res.data.success, false);
+      assert.ok(res.data.error.message.includes('Unsupported image format'));
+    });
+
+    test('Activate creator profile with the uploaded profile photo', async () => {
+      const onboardRes = await makeRequest({
+        path: '/api/creator/onboard',
+        method: 'POST',
+        headers: { 'Authorization': photoAuthHeader }
+      }, {
+        name: 'Aanya Verma',
+        bio: 'Silver jewellery enthusiast & designer',
+        city: 'Bengaluru',
+        state: 'Karnataka',
+        country: 'India',
+        instagram: '@aanya_silver',
+        preferences: ['Jewellery styling', 'Wedding'],
+        agreement_accepted: true,
+        profile_image: validJpegBase64
+      });
+
+      assert.equal(onboardRes.statusCode, 200);
+      assert.equal(onboardRes.data.success, true);
+      assert.ok(onboardRes.data.creator);
+      photoCreatorToken = onboardRes.data.token;
+    });
+
+    test('Edit creator profile via PATCH /api/creator/profile', async () => {
+      const updatePayload = {
+        name: 'Aanya Verma Luxury',
+        bio: 'Official 925 sterling silver curator and fashion stylist.',
+        city: 'Mumbai',
+        state: 'Maharashtra',
+        country: 'India',
+        instagram: '@aanya_luxury_silver',
+        youtube_url: 'https://youtube.com/@aanyastyle',
+        facebook_url: 'https://facebook.com/aanya.official',
+        content_preferences: ['Jewellery styling', 'Festive', 'Wedding']
+      };
+
+      const res = await makeRequest({
+        path: '/api/creator/profile',
+        method: 'PATCH',
+        headers: { 'Authorization': `Bearer ${photoCreatorToken}` }
+      }, updatePayload);
+
+      assert.equal(res.statusCode, 200);
+      assert.equal(res.data.success, true);
+      assert.equal(res.data.data.name, 'Aanya Verma Luxury');
+      assert.equal(res.data.data.city, 'Mumbai');
+      assert.equal(res.data.data.state, 'Maharashtra');
+      assert.equal(res.data.data.youtube_url, 'https://youtube.com/@aanyastyle');
+      assert.deepEqual(res.data.data.content_preferences, ['Jewellery styling', 'Festive', 'Wedding']);
+    });
+
+    test('GET /api/creator/profile returns updated creator details', async () => {
+      const res = await makeRequest({
+        path: '/api/creator/profile',
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${photoCreatorToken}` }
+      });
+
+      assert.equal(res.statusCode, 200);
+      assert.equal(res.data.success, true);
+      assert.equal(res.data.data.name, 'Aanya Verma Luxury');
+      assert.equal(res.data.data.city, 'Mumbai');
+    });
+
+    test('Remove profile photo via DELETE /api/creator/profile-photo resets to default avatar', async () => {
+      const delRes = await makeRequest({
+        path: '/api/creator/profile-photo',
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${photoCreatorToken}` }
+      });
+
+      assert.equal(delRes.statusCode, 200);
+      assert.equal(delRes.data.success, true);
+
+      const profileRes = await makeRequest({
+        path: '/api/creator/profile',
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${photoCreatorToken}` }
+      });
+
+      assert.equal(profileRes.statusCode, 200);
+      assert.ok(profileRes.data.data.profile_image.includes('ui-avatars.com'));
+    });
+  });
 });

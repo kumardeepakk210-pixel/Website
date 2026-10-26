@@ -175,6 +175,14 @@ module.exports = async function handler(req, res) {
         }
 
         // 10. Integrated Customer Creator Program Routes
+        if (subPath === '/profile-photo') {
+            if (method === 'POST') {
+                return await creator.handleCreatorPhotoUpload(req, res);
+            }
+            if (method === 'DELETE') {
+                return await creator.handleCreatorPhotoDelete(req, res);
+            }
+        }
         if (subPath === '/status' && method === 'GET') {
             return await creator.handleCustomerCreatorStatus(req, res);
         }

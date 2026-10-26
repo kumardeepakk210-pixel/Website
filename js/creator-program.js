@@ -240,6 +240,137 @@ function prefillOnboardingForm() {
 }
 
 /**
+ * Profile Photo Upload - Onboarding Form
+ */
+function triggerCreatorPhotoSelect() {
+    const fileInput = document.getElementById('creator-photo-file-input');
+    if (fileInput) fileInput.click();
+}
+window.triggerCreatorPhotoSelect = triggerCreatorPhotoSelect;
+
+async function handleCreatorPhotoSelect(event) {
+    const file = event.target?.files?.[0];
+    if (!file) return;
+
+    const errorEl = document.getElementById('creator-photo-error');
+    const previewImg = document.getElementById('creator-photo-preview-img');
+    const placeholder = document.getElementById('creator-photo-placeholder');
+    const emptyActions = document.getElementById('creator-photo-empty-actions');
+    const activeActions = document.getElementById('creator-photo-active-actions');
+    const statusText = document.getElementById('creator-photo-status-text');
+    const avatarHidden = document.getElementById('creator-input-avatar');
+
+    if (errorEl) {
+        errorEl.textContent = '';
+        errorEl.style.display = 'none';
+    }
+
+    // 1. Client-side Format Validation (JPG, PNG, WebP)
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    const validExts = ['.jpg', '.jpeg', '.png', '.webp'];
+    const lowerName = file.name.toLowerCase();
+    const hasValidExt = validExts.some(ext => lowerName.endsWith(ext));
+    if (!validTypes.includes(file.type) && !hasValidExt) {
+        if (errorEl) {
+            errorEl.textContent = 'Please upload a valid image file (JPG, PNG, or WebP).';
+            errorEl.style.display = 'block';
+        }
+        event.target.value = '';
+        return;
+    }
+
+    // 2. Client-side Size Validation (Max 5 MB)
+    if (file.size > 5 * 1024 * 1024) {
+        if (errorEl) {
+            errorEl.textContent = 'Please upload an image smaller than 5 MB.';
+            errorEl.style.display = 'block';
+        }
+        event.target.value = '';
+        return;
+    }
+
+    // 3. Immediate local preview
+    const reader = new FileReader();
+    reader.onload = async function(e) {
+        const base64Data = e.target.result;
+        if (previewImg) {
+            previewImg.src = base64Data;
+            previewImg.style.display = 'block';
+        }
+        if (placeholder) placeholder.style.display = 'none';
+        if (emptyActions) emptyActions.style.display = 'none';
+        if (activeActions) activeActions.style.display = 'block';
+        if (statusText) statusText.textContent = 'Uploading photo...';
+
+        // 4. Server-side upload
+        try {
+            const headers = await getAuthHeaders();
+            const res = await fetch('/api/creator/profile-photo', {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({
+                    image: base64Data,
+                    mimeType: file.type || 'image/jpeg'
+                })
+            });
+            const data = await res.json();
+            if (!res.ok || !data.success) {
+                throw new Error(data?.error?.message || 'Failed to upload photo.');
+            }
+
+            if (avatarHidden) avatarHidden.value = data.url;
+            if (previewImg && data.url) previewImg.src = data.url;
+            if (statusText) {
+                statusText.textContent = '✓ Photo ready';
+                statusText.style.color = '#047857';
+            }
+        } catch (uploadErr) {
+            console.error('Photo upload error:', uploadErr);
+            if (avatarHidden) avatarHidden.value = base64Data;
+            if (statusText) {
+                statusText.textContent = '✓ Photo ready';
+                statusText.style.color = '#047857';
+            }
+        }
+    };
+    reader.readAsDataURL(file);
+}
+window.handleCreatorPhotoSelect = handleCreatorPhotoSelect;
+
+async function removeCreatorPhoto() {
+    const fileInput = document.getElementById('creator-photo-file-input');
+    const avatarHidden = document.getElementById('creator-input-avatar');
+    const previewImg = document.getElementById('creator-photo-preview-img');
+    const placeholder = document.getElementById('creator-photo-placeholder');
+    const emptyActions = document.getElementById('creator-photo-empty-actions');
+    const activeActions = document.getElementById('creator-photo-active-actions');
+    const errorEl = document.getElementById('creator-photo-error');
+
+    if (fileInput) fileInput.value = '';
+    if (avatarHidden) avatarHidden.value = '';
+    if (previewImg) {
+        previewImg.src = '';
+        previewImg.style.display = 'none';
+    }
+    if (placeholder) placeholder.style.display = 'flex';
+    if (activeActions) activeActions.style.display = 'none';
+    if (emptyActions) emptyActions.style.display = 'block';
+    if (errorEl) {
+        errorEl.textContent = '';
+        errorEl.style.display = 'none';
+    }
+
+    try {
+        const headers = await getAuthHeaders();
+        await fetch('/api/creator/profile-photo', {
+            method: 'DELETE',
+            headers
+        });
+    } catch (_) {}
+}
+window.removeCreatorPhoto = removeCreatorPhoto;
+
+/**
  * Submits the Creator Onboarding Details Form & activates Creator Profile
  */
 async function handleCreatorOnboardSubmit(e) {
@@ -282,6 +413,25 @@ async function handleCreatorOnboardSubmit(e) {
         nameInput?.focus();
         return;
     }
+    if (displayName.length > 80) {
+        showError('Creator display name must be 80 characters or fewer.');
+        nameInput?.focus();
+        return;
+    }
+
+    const cityVal = (cityInput?.value || '').trim();
+    if (!cityVal) {
+        showError('Please enter your City.');
+        cityInput?.focus();
+        return;
+    }
+
+    const stateVal = (stateInput?.value || '').trim();
+    if (!stateVal) {
+        showError('Please enter your State.');
+        stateInput?.focus();
+        return;
+    }
 
     const instaVal = (instaInput?.value || '').trim();
     if (!instaVal) {
@@ -291,7 +441,7 @@ async function handleCreatorOnboardSubmit(e) {
     }
 
     if (!agreementCheck?.checked) {
-        showError('You must agree to the WishRite Creator Program Terms & Content Guidelines.');
+        showError('Please accept the WishRite Creator Program Terms & Content Guidelines.');
         agreementCheck?.focus();
         return;
     }
@@ -391,21 +541,25 @@ window.handleCreatorOnboardSubmit = handleCreatorOnboardSubmit;
  * Renders State 2: Creator Dashboard
  */
 function renderCreatorDashboard(data) {
-    const creator = data.creator || {};
+    const creator = data.creator || data || {};
     const stats = data.stats || {};
     const wallet = data.wallet || {};
     const points = data.points || {};
 
-    // 1. Profile Card
-    const nameEl = document.getElementById('cd-creator-name');
-    const avatarEl = document.getElementById('cd-creator-avatar');
-    const slugEl = document.getElementById('cd-creator-slug');
-    const linkInput = document.getElementById('cd-referral-link-input');
-    const socialBadges = document.getElementById('cd-social-badges');
+    currentCreatorData = data;
 
-    if (nameEl) nameEl.innerText = creator.name || 'WishRite Creator';
+    // 1. Profile Card
+    const nameEl = document.getElementById('creator-dash-name') || document.getElementById('cd-creator-name');
+    const avatarEl = document.getElementById('creator-dash-avatar') || document.getElementById('cd-creator-avatar');
+    const slugEl = document.getElementById('creator-code-badge') || document.getElementById('cd-creator-slug');
+    const bioEl = document.getElementById('creator-dash-bio');
+    const linkInput = document.getElementById('creator-dash-link-input') || document.getElementById('cd-referral-link-input');
+    const socialBadges = document.getElementById('creator-dash-socials') || document.getElementById('cd-social-badges');
+
+    if (nameEl) nameEl.innerText = creator.name || creator.display_name || 'WishRite Creator';
     if (avatarEl && creator.profile_image) avatarEl.src = creator.profile_image;
-    if (slugEl) slugEl.innerText = `@${creator.public_slug || creator.influencer_code}`;
+    if (slugEl) slugEl.innerText = creator.influencer_code || `@${creator.public_slug}`;
+    if (bioEl) bioEl.innerText = creator.bio || '';
 
     const referralUrl = creator.referral_url || `https://wishrite.in/creator/${creator.public_slug || creator.influencer_code}`;
     if (linkInput) linkInput.value = referralUrl;
@@ -426,12 +580,12 @@ function renderCreatorDashboard(data) {
     }
 
     // 2. Performance Stats
-    const clicksEl = document.getElementById('cd-stat-clicks');
-    const ordersEl = document.getElementById('cd-stat-orders');
-    const availEl = document.getElementById('cd-stat-available');
-    const pendEl = document.getElementById('cd-stat-pending');
-    const totalEl = document.getElementById('cd-stat-total');
-    const pointsEl = document.getElementById('cd-stat-points');
+    const clicksEl = document.getElementById('metric-creator-clicks') || document.getElementById('cd-stat-clicks');
+    const ordersEl = document.getElementById('metric-creator-orders') || document.getElementById('cd-stat-orders');
+    const availEl = document.getElementById('metric-creator-available') || document.getElementById('cd-stat-available');
+    const pendEl = document.getElementById('metric-creator-pending') || document.getElementById('cd-stat-pending');
+    const totalEl = document.getElementById('metric-creator-total') || document.getElementById('cd-stat-total');
+    const pointsEl = document.getElementById('metric-creator-points') || document.getElementById('cd-stat-points');
 
     if (clicksEl) clicksEl.innerText = Number(stats.total_clicks || 0).toLocaleString();
     if (ordersEl) ordersEl.innerText = Number(stats.total_orders || 0).toLocaleString();
@@ -448,7 +602,7 @@ function renderCreatorDashboard(data) {
  * Copies the creator's personal referral link
  */
 function copyCreatorReferralLink() {
-    const linkInput = document.getElementById('cd-referral-link-input');
+    const linkInput = document.getElementById('creator-dash-link-input') || document.getElementById('cd-referral-link-input');
     if (!linkInput) return;
     linkInput.select();
     navigator.clipboard.writeText(linkInput.value).then(() => {
@@ -463,6 +617,337 @@ function copyCreatorReferralLink() {
     });
 }
 window.copyCreatorReferralLink = copyCreatorReferralLink;
+
+/**
+ * Edit Creator Profile Modal Logic
+ */
+function triggerEditCreatorPhotoSelect() {
+    const fileInput = document.getElementById('edit-creator-photo-file-input');
+    if (fileInput) fileInput.click();
+}
+window.triggerEditCreatorPhotoSelect = triggerEditCreatorPhotoSelect;
+
+async function handleEditCreatorPhotoSelect(event) {
+    const file = event.target?.files?.[0];
+    if (!file) return;
+
+    const errorEl = document.getElementById('edit-creator-photo-error');
+    const previewImg = document.getElementById('edit-creator-photo-preview-img');
+    const placeholder = document.getElementById('edit-creator-photo-placeholder');
+    const emptyActions = document.getElementById('edit-creator-photo-empty-actions');
+    const activeActions = document.getElementById('edit-creator-photo-active-actions');
+    const statusText = document.getElementById('edit-creator-photo-status-text');
+    const avatarHidden = document.getElementById('edit-creator-input-avatar');
+
+    if (errorEl) {
+        errorEl.textContent = '';
+        errorEl.style.display = 'none';
+    }
+
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    const validExts = ['.jpg', '.jpeg', '.png', '.webp'];
+    const lowerName = file.name.toLowerCase();
+    const hasValidExt = validExts.some(ext => lowerName.endsWith(ext));
+    if (!validTypes.includes(file.type) && !hasValidExt) {
+        if (errorEl) {
+            errorEl.textContent = 'Please upload a valid image file (JPG, PNG, or WebP).';
+            errorEl.style.display = 'block';
+        }
+        event.target.value = '';
+        return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+        if (errorEl) {
+            errorEl.textContent = 'Please upload an image smaller than 5 MB.';
+            errorEl.style.display = 'block';
+        }
+        event.target.value = '';
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = async function(e) {
+        const base64Data = e.target.result;
+        if (previewImg) {
+            previewImg.src = base64Data;
+            previewImg.style.display = 'block';
+        }
+        if (placeholder) placeholder.style.display = 'none';
+        if (emptyActions) emptyActions.style.display = 'none';
+        if (activeActions) activeActions.style.display = 'block';
+        if (statusText) statusText.textContent = 'Uploading photo...';
+
+        try {
+            const headers = await getAuthHeaders();
+            const res = await fetch('/api/creator/profile-photo', {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({
+                    image: base64Data,
+                    mimeType: file.type || 'image/jpeg'
+                })
+            });
+            const data = await res.json();
+            if (!res.ok || !data.success) {
+                throw new Error(data?.error?.message || 'Failed to upload photo.');
+            }
+
+            if (avatarHidden) avatarHidden.value = data.url;
+            if (previewImg && data.url) previewImg.src = data.url;
+            if (statusText) {
+                statusText.textContent = '✓ Photo updated';
+                statusText.style.color = '#047857';
+            }
+        } catch (uploadErr) {
+            console.error('Edit photo upload error:', uploadErr);
+            if (avatarHidden) avatarHidden.value = base64Data;
+            if (statusText) {
+                statusText.textContent = '✓ Photo ready';
+                statusText.style.color = '#047857';
+            }
+        }
+    };
+    reader.readAsDataURL(file);
+}
+window.handleEditCreatorPhotoSelect = handleEditCreatorPhotoSelect;
+
+async function removeEditCreatorPhoto() {
+    const fileInput = document.getElementById('edit-creator-photo-file-input');
+    const avatarHidden = document.getElementById('edit-creator-input-avatar');
+    const previewImg = document.getElementById('edit-creator-photo-preview-img');
+    const placeholder = document.getElementById('edit-creator-photo-placeholder');
+    const emptyActions = document.getElementById('edit-creator-photo-empty-actions');
+    const activeActions = document.getElementById('edit-creator-photo-active-actions');
+    const errorEl = document.getElementById('edit-creator-photo-error');
+
+    if (fileInput) fileInput.value = '';
+    if (avatarHidden) avatarHidden.value = '';
+    if (previewImg) {
+        previewImg.src = '';
+        previewImg.style.display = 'none';
+    }
+    if (placeholder) placeholder.style.display = 'flex';
+    if (activeActions) activeActions.style.display = 'none';
+    if (emptyActions) emptyActions.style.display = 'block';
+    if (errorEl) {
+        errorEl.textContent = '';
+        errorEl.style.display = 'none';
+    }
+
+    try {
+        const headers = await getAuthHeaders();
+        await fetch('/api/creator/profile-photo', {
+            method: 'DELETE',
+            headers
+        });
+    } catch (_) {}
+}
+window.removeEditCreatorPhoto = removeEditCreatorPhoto;
+
+function openEditCreatorProfileModal() {
+    const modal = document.getElementById('modal-edit-creator-profile');
+    if (!modal) return;
+
+    const creator = currentCreatorData?.creator || currentCreatorData || {};
+
+    const nameInput = document.getElementById('edit-creator-input-name');
+    const bioInput = document.getElementById('edit-creator-input-bio');
+    const cityInput = document.getElementById('edit-creator-input-city');
+    const stateInput = document.getElementById('edit-creator-input-state');
+    const countryInput = document.getElementById('edit-creator-input-country');
+    const instaInput = document.getElementById('edit-creator-input-instagram');
+    const ytInput = document.getElementById('edit-creator-input-youtube');
+    const fbInput = document.getElementById('edit-creator-input-facebook');
+    const otherInput = document.getElementById('edit-creator-input-other');
+    const avatarHidden = document.getElementById('edit-creator-input-avatar');
+    const previewImg = document.getElementById('edit-creator-photo-preview-img');
+    const placeholder = document.getElementById('edit-creator-photo-placeholder');
+    const emptyActions = document.getElementById('edit-creator-photo-empty-actions');
+    const activeActions = document.getElementById('edit-creator-photo-active-actions');
+    const errorBox = document.getElementById('edit-creator-error');
+    const successBox = document.getElementById('edit-creator-success');
+
+    if (errorBox) { errorBox.textContent = ''; errorBox.style.display = 'none'; }
+    if (successBox) { successBox.textContent = ''; successBox.style.display = 'none'; }
+
+    if (nameInput) nameInput.value = creator.name || creator.display_name || '';
+    if (bioInput) bioInput.value = creator.bio || '';
+    if (cityInput) cityInput.value = creator.city || '';
+    if (stateInput) stateInput.value = creator.state || '';
+    if (countryInput) countryInput.value = creator.country || 'India';
+    if (instaInput) instaInput.value = creator.instagram_url || (creator.instagram_id ? `@${creator.instagram_id}` : '');
+    if (ytInput) ytInput.value = creator.youtube_url || '';
+    if (fbInput) fbInput.value = creator.facebook_url || '';
+    if (otherInput) otherInput.value = creator.other_url || '';
+
+    // Profile photo state
+    const currentImg = creator.profile_image || '';
+    if (avatarHidden) avatarHidden.value = currentImg;
+    if (currentImg && !currentImg.includes('ui-avatars.com')) {
+        if (previewImg) { previewImg.src = currentImg; previewImg.style.display = 'block'; }
+        if (placeholder) placeholder.style.display = 'none';
+        if (emptyActions) emptyActions.style.display = 'none';
+        if (activeActions) activeActions.style.display = 'block';
+    } else {
+        if (previewImg) { previewImg.src = ''; previewImg.style.display = 'none'; }
+        if (placeholder) placeholder.style.display = 'flex';
+        if (activeActions) activeActions.style.display = 'none';
+        if (emptyActions) emptyActions.style.display = 'block';
+    }
+
+    // Content preferences
+    const existingPrefs = creator.content_preferences || [];
+    document.querySelectorAll('input[name="edit_content_pref"]').forEach(cb => {
+        cb.checked = existingPrefs.includes(cb.value);
+    });
+
+    modal.style.display = 'flex';
+}
+window.openEditCreatorProfileModal = openEditCreatorProfileModal;
+
+function closeEditCreatorProfileModal() {
+    const modal = document.getElementById('modal-edit-creator-profile');
+    if (modal) modal.style.display = 'none';
+}
+window.closeEditCreatorProfileModal = closeEditCreatorProfileModal;
+
+async function handleEditCreatorProfileSubmit(e) {
+    if (e) e.preventDefault();
+
+    const nameInput = document.getElementById('edit-creator-input-name');
+    const bioInput = document.getElementById('edit-creator-input-bio');
+    const cityInput = document.getElementById('edit-creator-input-city');
+    const stateInput = document.getElementById('edit-creator-input-state');
+    const countryInput = document.getElementById('edit-creator-input-country');
+    const instaInput = document.getElementById('edit-creator-input-instagram');
+    const ytInput = document.getElementById('edit-creator-input-youtube');
+    const fbInput = document.getElementById('edit-creator-input-facebook');
+    const otherInput = document.getElementById('edit-creator-input-other');
+    const avatarHidden = document.getElementById('edit-creator-input-avatar');
+    const errorBox = document.getElementById('edit-creator-error');
+    const successBox = document.getElementById('edit-creator-success');
+    const saveBtn = document.getElementById('btn-save-creator-profile');
+
+    function showEditError(msg) {
+        if (errorBox) {
+            errorBox.textContent = msg;
+            errorBox.style.display = 'block';
+            errorBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        } else if (typeof showToast === 'function') {
+            showToast(msg, 'error');
+        } else {
+            alert(msg);
+        }
+    }
+
+    if (errorBox) { errorBox.textContent = ''; errorBox.style.display = 'none'; }
+    if (successBox) { successBox.textContent = ''; successBox.style.display = 'none'; }
+
+    const nameVal = (nameInput?.value || '').trim();
+    if (!nameVal) {
+        showEditError('Please enter your Creator Display Name.');
+        nameInput?.focus();
+        return;
+    }
+    if (nameVal.length > 80) {
+        showEditError('Creator Display Name must be 80 characters or fewer.');
+        nameInput?.focus();
+        return;
+    }
+
+    const cityVal = (cityInput?.value || '').trim();
+    if (!cityVal) {
+        showEditError('Please enter your City.');
+        cityInput?.focus();
+        return;
+    }
+
+    const stateVal = (stateInput?.value || '').trim();
+    if (!stateVal) {
+        showEditError('Please enter your State.');
+        stateInput?.focus();
+        return;
+    }
+
+    const instaVal = (instaInput?.value || '').trim();
+    if (!instaVal) {
+        showEditError('Please enter your Instagram username or URL.');
+        instaInput?.focus();
+        return;
+    }
+
+    const cleanInstaUser = instaVal.replace(/^https?:\/\/(www\.)?instagram\.com\//i, '').replace(/^@/, '').replace(/\/.*$/, '').trim();
+    const cleanInstaUrl = instaVal.startsWith('http') ? instaVal : (cleanInstaUser ? `https://instagram.com/${cleanInstaUser}` : '');
+
+    const selectedPrefs = [];
+    document.querySelectorAll('input[name="edit_content_pref"]:checked').forEach(cb => {
+        selectedPrefs.push(cb.value);
+    });
+
+    const payload = {
+        name: nameVal,
+        display_name: nameVal,
+        bio: (bioInput?.value || '').trim(),
+        city: cityVal,
+        state: stateVal,
+        country: (countryInput?.value || '').trim() || 'India',
+        profile_image: (avatarHidden?.value || '').trim(),
+        instagram_username: cleanInstaUser,
+        instagram_url: cleanInstaUrl,
+        youtube_url: (ytInput?.value || '').trim(),
+        facebook_url: (fbInput?.value || '').trim(),
+        other_url: (otherInput?.value || '').trim(),
+        content_preferences: selectedPrefs
+    };
+
+    try {
+        if (saveBtn) {
+            saveBtn.disabled = true;
+            saveBtn.innerText = 'Saving...';
+        }
+
+        const headers = await getAuthHeaders();
+        const res = await fetch('/api/creator/profile', {
+            method: 'PATCH',
+            headers,
+            body: JSON.stringify(payload)
+        });
+
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+            throw new Error(data?.error?.message || 'Could not update profile.');
+        }
+
+        if (successBox) {
+            successBox.textContent = '✓ Profile updated successfully.';
+            successBox.style.display = 'block';
+        }
+        if (typeof showToast === 'function') {
+            showToast('Creator profile updated successfully.', 'success');
+        }
+
+        // Refresh dashboard immediately with updated profile
+        if (data.data) {
+            if (currentCreatorData) {
+                currentCreatorData.creator = Object.assign(currentCreatorData.creator || {}, data.data);
+            }
+            renderCreatorDashboard(currentCreatorData || { creator: data.data });
+        }
+
+        setTimeout(() => {
+            closeEditCreatorProfileModal();
+        }, 800);
+    } catch (err) {
+        showEditError(err.message || 'Error saving changes. Please try again.');
+    } finally {
+        if (saveBtn) {
+            saveBtn.disabled = false;
+            saveBtn.innerText = 'SAVE CHANGES';
+        }
+    }
+}
+window.handleEditCreatorProfileSubmit = handleEditCreatorProfileSubmit;
 
 /**
  * Fetches and renders the creator's submitted content
@@ -561,8 +1046,8 @@ async function fetchLiveProductsForPicker() {
 }
 
 function populateProductPickers() {
-    const postPicker = document.getElementById('share-post-product-select');
-    const reelPicker = document.getElementById('share-reel-product-select');
+    const postPicker = document.getElementById('share-post-product') || document.getElementById('share-post-product-select');
+    const reelPicker = document.getElementById('share-reel-product') || document.getElementById('share-reel-product-select');
 
     if (!liveProductsCache || liveProductsCache.length === 0) return;
 
@@ -609,22 +1094,34 @@ async function handleSharePostSubmit(e) {
     const urlInput = document.getElementById('share-post-url');
     const platformSelect = document.getElementById('share-post-platform');
     const captionInput = document.getElementById('share-post-caption');
-    const productSelect = document.getElementById('share-post-product-select');
+    const productSelect = document.getElementById('share-post-product') || document.getElementById('share-post-product-select');
     const imgInput = document.getElementById('share-post-image');
     const tagsInput = document.getElementById('share-post-tags');
-    const msgEl = document.getElementById('share-post-msg');
-    const btn = document.getElementById('btn-submit-post');
+    const errorEl = document.getElementById('share-post-error') || document.getElementById('share-post-msg');
+    const successEl = document.getElementById('share-post-success');
+    const btn = document.getElementById('share-post-submit-btn') || document.getElementById('btn-submit-post');
 
-    if (msgEl) {
-        msgEl.innerText = '';
-        msgEl.className = 'creator-msg';
+    if (errorEl) {
+        errorEl.innerText = '';
+        errorEl.style.display = 'none';
+    }
+    if (successEl) {
+        successEl.style.display = 'none';
     }
 
     const url = urlInput?.value?.trim();
     if (!url) {
-        if (msgEl) {
-            msgEl.innerText = 'Please enter a valid Post URL.';
-            msgEl.classList.add('error');
+        if (errorEl) {
+            errorEl.innerText = 'Please enter a valid Post URL.';
+            errorEl.style.display = 'block';
+        }
+        return;
+    }
+
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        if (errorEl) {
+            errorEl.innerText = 'Post URL must begin with http:// or https://';
+            errorEl.style.display = 'block';
         }
         return;
     }
@@ -636,7 +1133,7 @@ async function handleSharePostSubmit(e) {
 
     const payload = {
         content_type: 'post',
-        platform: platformSelect?.value || 'instagram',
+        platform: (platformSelect?.value || 'instagram').toLowerCase(),
         url,
         caption: captionInput?.value?.trim() || '',
         product_code: productCode,
@@ -664,15 +1161,21 @@ async function handleSharePostSubmit(e) {
             throw new Error(data.error?.message || 'Could not submit post.');
         }
 
-        closeSharePostModal();
+        if (successEl) {
+            successEl.style.display = 'block';
+        }
         if (typeof showToast === 'function') {
             showToast('Post submitted successfully and is now under review!', 'success');
         }
-        loadCreatorContent();
+
+        setTimeout(() => {
+            closeSharePostModal();
+            loadCreatorContent();
+        }, 800);
     } catch (err) {
-        if (msgEl) {
-            msgEl.innerText = err.message;
-            msgEl.classList.add('error');
+        if (errorEl) {
+            errorEl.innerText = err.message;
+            errorEl.style.display = 'block';
         }
     } finally {
         if (btn) {
@@ -692,22 +1195,34 @@ async function handleShareReelSubmit(e) {
     const urlInput = document.getElementById('share-reel-url');
     const platformSelect = document.getElementById('share-reel-platform');
     const captionInput = document.getElementById('share-reel-caption');
-    const productSelect = document.getElementById('share-reel-product-select');
-    const imgInput = document.getElementById('share-reel-image');
+    const productSelect = document.getElementById('share-reel-product') || document.getElementById('share-reel-product-select');
+    const imgInput = document.getElementById('share-reel-thumbnail') || document.getElementById('share-reel-image');
     const tagsInput = document.getElementById('share-reel-tags');
-    const msgEl = document.getElementById('share-reel-msg');
-    const btn = document.getElementById('btn-submit-reel');
+    const errorEl = document.getElementById('share-reel-error') || document.getElementById('share-reel-msg');
+    const successEl = document.getElementById('share-reel-success');
+    const btn = document.getElementById('share-reel-submit-btn') || document.getElementById('btn-submit-reel');
 
-    if (msgEl) {
-        msgEl.innerText = '';
-        msgEl.className = 'creator-msg';
+    if (errorEl) {
+        errorEl.innerText = '';
+        errorEl.style.display = 'none';
+    }
+    if (successEl) {
+        successEl.style.display = 'none';
     }
 
     const url = urlInput?.value?.trim();
     if (!url) {
-        if (msgEl) {
-            msgEl.innerText = 'Please enter a valid Reel URL.';
-            msgEl.classList.add('error');
+        if (errorEl) {
+            errorEl.innerText = 'Please enter a valid Reel URL.';
+            errorEl.style.display = 'block';
+        }
+        return;
+    }
+
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        if (errorEl) {
+            errorEl.innerText = 'Reel URL must begin with http:// or https://';
+            errorEl.style.display = 'block';
         }
         return;
     }
@@ -719,7 +1234,7 @@ async function handleShareReelSubmit(e) {
 
     const payload = {
         content_type: 'reel',
-        platform: platformSelect?.value || 'instagram',
+        platform: (platformSelect?.value || 'instagram').toLowerCase(),
         url,
         caption: captionInput?.value?.trim() || '',
         product_code: productCode,
@@ -747,15 +1262,21 @@ async function handleShareReelSubmit(e) {
             throw new Error(data.error?.message || 'Could not submit reel.');
         }
 
-        closeShareReelModal();
+        if (successEl) {
+            successEl.style.display = 'block';
+        }
         if (typeof showToast === 'function') {
             showToast('Reel submitted successfully and is now under review!', 'success');
         }
-        loadCreatorContent();
+
+        setTimeout(() => {
+            closeShareReelModal();
+            loadCreatorContent();
+        }, 800);
     } catch (err) {
-        if (msgEl) {
-            msgEl.innerText = err.message;
-            msgEl.classList.add('error');
+        if (errorEl) {
+            errorEl.innerText = err.message;
+            errorEl.style.display = 'block';
         }
     } finally {
         if (btn) {
@@ -764,6 +1285,7 @@ async function handleShareReelSubmit(e) {
         }
     }
 }
+window.handleShareReelSubmit = handleShareReelSubmit;
 window.handleShareReelSubmit = handleShareReelSubmit;
 
 /**

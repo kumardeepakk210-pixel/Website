@@ -11,7 +11,10 @@ import {
     dbQuery, 
     dbInsert, 
     dbUpdate, 
-    adminClient 
+    adminClient,
+    storageUpload,
+    storageDelete,
+    getStoragePublicUrl
 } from './supabase-client.js';
 import { 
     buildInfluencerPublicUrl, 
@@ -1048,8 +1051,15 @@ export async function handleGetCreatorProfile(req, res) {
             display_name: creator.name,
             profile_image: creator.profile_image,
             bio: creator.bio,
+            city: creator.city || '',
+            state: creator.state || '',
+            country: creator.country || 'India',
             instagram_id: creator.instagram_id,
             instagram_url: creator.instagram_url,
+            youtube_url: creator.youtube_url || null,
+            facebook_url: creator.facebook_url || null,
+            other_url: creator.other_url || null,
+            content_preferences: creator.content_preferences || [],
             public_slug: creator.public_slug,
             public_profile_url: creator.public_profile_url || buildInfluencerPublicUrl(creator.public_slug),
             category: creator.category || 'Jewelry & Lifestyle',
@@ -1082,19 +1092,29 @@ export async function handleUpdateCreatorProfile(req, res) {
     if (body.display_name !== undefined) permittedUpdates.name = sanitizeText(body.display_name);
     if (body.name !== undefined) permittedUpdates.name = sanitizeText(body.name);
     if (body.bio !== undefined) permittedUpdates.bio = sanitizeText(body.bio);
+    if (body.city !== undefined) permittedUpdates.city = sanitizeText(body.city);
+    if (body.state !== undefined) permittedUpdates.state = sanitizeText(body.state);
+    if (body.country !== undefined) permittedUpdates.country = sanitizeText(body.country || 'India');
 
     if (body.profile_image !== undefined) {
         const imgUrl = String(body.profile_image).trim();
-        if (imgUrl && !isValidHttpUrl(imgUrl)) {
+        if (imgUrl && !isValidHttpUrl(imgUrl) && !imgUrl.startsWith('data:') && !imgUrl.startsWith('/uploads/')) {
             return res.status(400).json({
                 success: false,
                 error: {
                     code: 'INVALID_URL',
-                    message: 'profile_image must be a valid http or https URL.'
+                    message: 'profile_image must be a valid http, https, or relative URL.'
                 }
             });
         }
-        permittedUpdates.profile_image = imgUrl;
+        permittedUpdates.profile_image = imgUrl || null;
+    }
+
+    if (body.instagram_username !== undefined) {
+        permittedUpdates.instagram_id = sanitizeText(String(body.instagram_username).replace('@', ''));
+    }
+    if (body.instagram !== undefined && permittedUpdates.instagram_id === undefined) {
+        permittedUpdates.instagram_id = sanitizeText(String(body.instagram).replace('@', ''));
     }
 
     if (body.instagram_url !== undefined) {
@@ -1108,7 +1128,52 @@ export async function handleUpdateCreatorProfile(req, res) {
                 }
             });
         }
-        permittedUpdates.instagram_url = instaUrl;
+        permittedUpdates.instagram_url = instaUrl || null;
+    }
+
+    if (body.youtube_url !== undefined || body.youtube !== undefined) {
+        const yt = String(body.youtube_url || body.youtube || '').trim();
+        if (yt && !isValidHttpUrl(yt)) {
+            return res.status(400).json({
+                success: false,
+                error: { code: 'INVALID_URL', message: 'youtube_url must be a valid http or https URL.' }
+            });
+        }
+        permittedUpdates.youtube_url = yt || null;
+    }
+
+    if (body.facebook_url !== undefined || body.facebook !== undefined) {
+        const fb = String(body.facebook_url || body.facebook || '').trim();
+        if (fb && !isValidHttpUrl(fb)) {
+            return res.status(400).json({
+                success: false,
+                error: { code: 'INVALID_URL', message: 'facebook_url must be a valid http or https URL.' }
+            });
+        }
+        permittedUpdates.facebook_url = fb || null;
+    }
+
+    if (body.other_url !== undefined) {
+        const oth = String(body.other_url || '').trim();
+        if (oth && !isValidHttpUrl(oth)) {
+            return res.status(400).json({
+                success: false,
+                error: { code: 'INVALID_URL', message: 'other_url must be a valid http or https URL.' }
+            });
+        }
+        permittedUpdates.other_url = oth || null;
+    }
+
+    if (Array.isArray(body.content_preferences)) {
+        permittedUpdates.content_preferences = body.content_preferences;
+        if (body.content_preferences[0]) {
+            permittedUpdates.category = sanitizeText(body.content_preferences[0]);
+        }
+    } else if (Array.isArray(body.preferences)) {
+        permittedUpdates.content_preferences = body.preferences;
+        if (body.preferences[0]) {
+            permittedUpdates.category = sanitizeText(body.preferences[0]);
+        }
     }
 
     if (Object.keys(permittedUpdates).length === 0) {
@@ -1142,14 +1207,212 @@ export async function handleUpdateCreatorProfile(req, res) {
             name: creator.name,
             display_name: creator.name,
             bio: creator.bio,
+            city: creator.city,
+            state: creator.state,
+            country: creator.country,
             profile_image: creator.profile_image,
+            instagram_id: creator.instagram_id,
             instagram_url: creator.instagram_url,
+            youtube_url: creator.youtube_url,
+            facebook_url: creator.facebook_url,
+            other_url: creator.other_url,
+            content_preferences: creator.content_preferences,
+            category: creator.category,
             public_slug: creator.public_slug,
             public_profile_url: creator.public_profile_url,
             tier: creator.tier,
             updated_at: creator.updated_at
         }
     });
+}
+
+/**
+ * POST /api/creator/profile-photo
+ * Handles secure direct photo upload for creators with server-side validation
+ */
+export async function handleCreatorPhotoUpload(req, res) {
+    try {
+        const ident = await resolveCustomerIdentity(req);
+        if (!ident.userId && !ident.email && !ident.influencerId) {
+            return res.status(401).json({
+                success: false,
+                error: { message: 'Authentication required to upload profile photo.' }
+            });
+        }
+
+        const body = req.body || {};
+        const rawData = body.image || body.photo || body.file;
+        if (!rawData || typeof rawData !== 'string') {
+            return res.status(400).json({
+                success: false,
+                error: { message: 'Image data is required.' }
+            });
+        }
+
+        // Parse base64
+        let base64Content = rawData;
+        let mimeType = body.mimeType || 'image/jpeg';
+        if (rawData.startsWith('data:')) {
+            const matches = rawData.match(/^data:([a-zA-Z0-9]+\/[a-zA-Z0-9-.+]+);base64,(.+)$/);
+            if (matches) {
+                mimeType = matches[1].toLowerCase();
+                base64Content = matches[2];
+            } else {
+                return res.status(400).json({
+                    success: false,
+                    error: { message: 'Invalid data URL format.' }
+                });
+            }
+        }
+
+        const buffer = Buffer.from(base64Content, 'base64');
+
+        // Validation: Max 5 MB
+        if (buffer.length > 5 * 1024 * 1024) {
+            return res.status(400).json({
+                success: false,
+                error: { message: 'Please upload an image smaller than 5 MB.' }
+            });
+        }
+
+        // Validation: Format / Magic Bytes check
+        let ext = 'jpg';
+        let validatedMime = 'image/jpeg';
+
+        const isJpeg = buffer.length > 3 && buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF;
+        const isPng = buffer.length > 8 && buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47;
+        const isWebp = buffer.length > 12 && buffer.slice(0, 4).toString('ascii') === 'RIFF' && buffer.slice(8, 12).toString('ascii') === 'WEBP';
+
+        if (isJpeg) {
+            ext = 'jpg';
+            validatedMime = 'image/jpeg';
+        } else if (isPng) {
+            ext = 'png';
+            validatedMime = 'image/png';
+        } else if (isWebp) {
+            ext = 'webp';
+            validatedMime = 'image/webp';
+        } else {
+            return res.status(400).json({
+                success: false,
+                error: { message: 'Unsupported image format. Please upload JPG, PNG, or WebP.' }
+            });
+        }
+
+        const targetId = ident.userId || ident.influencerId || (ident.email ? ident.email.replace(/[^a-z0-9]/gi, '_') : 'guest');
+        const filename = `profile-${Date.now()}.${ext}`;
+        const storagePath = `creator-profiles/${targetId}/${filename}`;
+
+        let publicUrl = '';
+        try {
+            publicUrl = await storageUpload('product-images', storagePath, buffer, validatedMime);
+        } catch (storageErr) {
+            console.warn('[Creator Photo Upload] Supabase storage notice:', storageErr.message);
+        }
+
+        // Local filesystem fallback
+        try {
+            const localDir = path.join(process.cwd(), 'uploads', 'creator-profiles', targetId);
+            fs.mkdirSync(localDir, { recursive: true });
+            fs.writeFileSync(path.join(localDir, `profile.${ext}`), buffer);
+            if (!publicUrl) {
+                publicUrl = `/uploads/creator-profiles/${targetId}/profile.${ext}`;
+            }
+        } catch (fsErr) {
+            console.warn('[Creator Photo Upload] Local fs write notice:', fsErr.message);
+        }
+
+        if (!publicUrl) {
+            publicUrl = `data:${validatedMime};base64,${base64Content}`;
+        }
+
+        // If creator already exists, update their record and clean up previous photo if safe
+        const local = readLocalStore();
+        let targetCreator = null;
+        if (ident.influencerId) {
+            targetCreator = (local.influencers || []).find(i => i.id === ident.influencerId);
+        } else if (ident.email) {
+            targetCreator = (local.influencers || []).find(i => i.email && i.email.toLowerCase() === ident.email.toLowerCase());
+        }
+
+        if (targetCreator) {
+            const oldPhoto = targetCreator.profile_image;
+            if (oldPhoto && oldPhoto !== publicUrl && oldPhoto.includes('creator-profiles/')) {
+                const match = oldPhoto.match(/creator-profiles\/[^\s"')]+/);
+                if (match) {
+                    try {
+                        await storageDelete('product-images', match[0]).catch(() => {});
+                    } catch (_) {}
+                }
+            }
+            targetCreator.profile_image = publicUrl;
+            targetCreator.updated_at = new Date().toISOString();
+            writeLocalStore(local);
+        }
+
+        return res.json({
+            success: true,
+            url: publicUrl,
+            message: 'Profile photo uploaded successfully.'
+        });
+    } catch (err) {
+        console.error('[handleCreatorPhotoUpload Error]:', err);
+        return res.status(500).json({
+            success: false,
+            error: { message: err.message || 'Error uploading profile photo.' }
+        });
+    }
+}
+
+/**
+ * DELETE /api/creator/profile-photo
+ * Removes the creator's profile photo
+ */
+export async function handleCreatorPhotoDelete(req, res) {
+    try {
+        const ident = await resolveCustomerIdentity(req);
+        if (!ident.userId && !ident.email && !ident.influencerId) {
+            return res.status(401).json({
+                success: false,
+                error: { message: 'Authentication required to remove profile photo.' }
+            });
+        }
+
+        const local = readLocalStore();
+        let targetCreator = null;
+        if (ident.influencerId) {
+            targetCreator = (local.influencers || []).find(i => i.id === ident.influencerId);
+        } else if (ident.email) {
+            targetCreator = (local.influencers || []).find(i => i.email && i.email.toLowerCase() === ident.email.toLowerCase());
+        }
+
+        if (targetCreator) {
+            const oldPhoto = targetCreator.profile_image;
+            if (oldPhoto && oldPhoto.includes('creator-profiles/')) {
+                const match = oldPhoto.match(/creator-profiles\/[^\s"')]+/);
+                if (match) {
+                    try {
+                        await storageDelete('product-images', match[0]).catch(() => {});
+                    } catch (_) {}
+                }
+            }
+            const defaultAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(targetCreator.name || 'WishRite Creator')}&background=5E3435&color=fff`;
+            targetCreator.profile_image = defaultAvatar;
+            targetCreator.updated_at = new Date().toISOString();
+            writeLocalStore(local);
+        }
+
+        return res.json({
+            success: true,
+            message: 'Profile photo removed successfully.'
+        });
+    } catch (err) {
+        console.error('[handleCreatorPhotoDelete Error]:', err);
+        return res.status(500).json({
+            success: false,
+            error: { message: err.message || 'Error removing profile photo.' }
+        });
+    }
 }
 
 /**
@@ -1440,7 +1703,7 @@ export async function handleCustomerCreatorOnboard(req, res) {
             city: sanitizeText(body.city || ''),
             state: sanitizeText(body.state || ''),
             country: sanitizeText(body.country || 'India'),
-            profile_image: isValidHttpUrl(body.profile_image) ? body.profile_image : `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=5E3435&color=fff`,
+            profile_image: (body.profile_image && (isValidHttpUrl(body.profile_image) || body.profile_image.startsWith('/uploads/') || body.profile_image.startsWith('data:'))) ? body.profile_image : `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=5E3435&color=fff`,
             instagram_id: sanitizeText((body.instagram_username || '').replace('@', '')),
             instagram_url: isValidHttpUrl(body.instagram_url) ? body.instagram_url : (body.instagram_username ? `https://instagram.com/${body.instagram_username.replace('@', '')}` : null),
             youtube_url: isValidHttpUrl(body.youtube_url) ? body.youtube_url : null,
