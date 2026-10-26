@@ -168,12 +168,17 @@ export function decodeJwtPayload(token) {
 /**
  * Reads local JSON backup store safely
  */
+let memoryStoreCache = null;
+
 function readLocalStore() {
+    if (memoryStoreCache) {
+        return memoryStoreCache;
+    }
     try {
         if (fs.existsSync(INFLUENCERS_STORE_PATH)) {
             const raw = fs.readFileSync(INFLUENCERS_STORE_PATH, 'utf-8');
             const data = JSON.parse(raw);
-            return {
+            memoryStoreCache = {
                 influencers: data.influencers || [],
                 accounts: data.accounts || [],
                 links: data.links || [],
@@ -192,11 +197,12 @@ function readLocalStore() {
                 payout_webhooks: data.payout_webhooks || [],
                 creator_content: data.creator_content || []
             };
+            return memoryStoreCache;
         }
     } catch (e) {
         console.warn('[Creator API] Could not read influencers_store.json:', e.message);
     }
-    return {
+    memoryStoreCache = {
         influencers: [],
         accounts: [],
         links: [],
@@ -215,14 +221,18 @@ function readLocalStore() {
         payout_webhooks: [],
         creator_content: []
     };
+    return memoryStoreCache;
 }
 
 /**
- * Writes to local JSON backup store safely
+ * Writes to local JSON backup store safely and atomically
  */
 function writeLocalStore(store) {
+    memoryStoreCache = store;
     try {
-        fs.writeFileSync(INFLUENCERS_STORE_PATH, JSON.stringify(store, null, 2), 'utf-8');
+        const tempPath = `${INFLUENCERS_STORE_PATH}.tmp.${process.pid}.${Date.now()}`;
+        fs.writeFileSync(tempPath, JSON.stringify(store, null, 2), 'utf-8');
+        fs.renameSync(tempPath, INFLUENCERS_STORE_PATH);
     } catch (e) {
         console.error('[Creator API] Could not write influencers_store.json:', e.message);
     }

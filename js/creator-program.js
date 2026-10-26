@@ -116,102 +116,226 @@ async function loadCustomerCreatorStatus() {
             // Not a creator yet -> show Onboard invite & details form
             currentCreatorData = null;
             if (onboardState) onboardState.style.display = 'block';
+            const heroCard = document.querySelector('.creator-onboard-hero') || document.getElementById('creator-onboard-hero');
+            const formCard = document.getElementById('creator-onboard-form-card');
+            if (heroCard) heroCard.style.display = 'block';
+            if (formCard) formCard.style.display = 'none';
+            const becomeBtn = document.getElementById('btn-become-creator');
+            if (becomeBtn && !becomeBtn._boundClick) {
+                becomeBtn._boundClick = true;
+                becomeBtn.addEventListener('click', showCreatorOnboardForm);
+            }
             prefillOnboardingForm();
         }
     } catch (err) {
         console.error('Error checking creator status:', err);
         if (loadingState) loadingState.style.display = 'none';
         if (onboardState) onboardState.style.display = 'block';
+        const heroCard = document.querySelector('.creator-onboard-hero') || document.getElementById('creator-onboard-hero');
+        const formCard = document.getElementById('creator-onboard-form-card');
+        if (heroCard) heroCard.style.display = 'block';
+        if (formCard) formCard.style.display = 'none';
         prefillOnboardingForm();
     }
 }
 window.loadCustomerCreatorStatus = loadCustomerCreatorStatus;
 
 /**
+ * Opens the Creator Onboarding Form inside My Account
+ * Replaces the Creator welcome/hero card with the Creator Details form
+ */
+function showCreatorOnboardForm() {
+    // Check if user is signed in
+    const authUser = (typeof getWishriteAuthUser === 'function') ? getWishriteAuthUser() : window.currentUser;
+    const custProfile = (typeof getWishriteCustomerProfile === 'function') ? getWishriteCustomerProfile() : null;
+    const isUserLoggedIn = !!(authUser || custProfile || (window.isLoggedIn));
+
+    if (!isUserLoggedIn) {
+        if (typeof showToast === 'function') {
+            showToast('Please sign in to activate your Creator profile.', 'warning');
+        }
+        if (typeof navigateTo === 'function') {
+            navigateTo('login');
+        }
+        return;
+    }
+
+    const heroCard = document.querySelector('.creator-onboard-hero') || document.getElementById('creator-onboard-hero');
+    const formCard = document.getElementById('creator-onboard-form-card');
+    const errorBox = document.getElementById('creator-onboard-error') || document.getElementById('creator-onboard-message');
+
+    if (errorBox) {
+        errorBox.textContent = '';
+        errorBox.style.display = 'none';
+    }
+
+    // Prefill customer details from existing account
+    prefillOnboardingForm();
+
+    // Replace welcome card with Creator Details form in-page
+    if (heroCard) {
+        heroCard.style.display = 'none';
+    }
+    if (formCard) {
+        formCard.style.display = 'block';
+        formCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+        const nameInput = document.getElementById('creator-input-name');
+        const instaInput = document.getElementById('creator-input-instagram');
+        if (nameInput && !nameInput.value.trim()) {
+            nameInput.focus();
+        } else if (instaInput) {
+            instaInput.focus();
+        }
+    }
+}
+window.showCreatorOnboardForm = showCreatorOnboardForm;
+
+/**
+ * Cancels/hides Creator Onboarding Form and restores the Welcome Card
+ */
+function hideCreatorOnboardForm() {
+    const heroCard = document.querySelector('.creator-onboard-hero') || document.getElementById('creator-onboard-hero');
+    const formCard = document.getElementById('creator-onboard-form-card');
+    const errorBox = document.getElementById('creator-onboard-error') || document.getElementById('creator-onboard-message');
+
+    if (errorBox) {
+        errorBox.textContent = '';
+        errorBox.style.display = 'none';
+    }
+
+    if (formCard) {
+        formCard.style.display = 'none';
+    }
+    if (heroCard) {
+        heroCard.style.display = 'block';
+        heroCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+}
+window.hideCreatorOnboardForm = hideCreatorOnboardForm;
+
+/**
  * Prefills onboarding details using existing customer account info
  */
 function prefillOnboardingForm() {
     const nameInput = document.getElementById('creator-input-name');
+    const countryInput = document.getElementById('creator-input-country');
     const emailLabel = document.getElementById('creator-onboard-email-label');
 
-    const customerName = document.getElementById('account-name')?.innerText || window.currentUser?.user_metadata?.full_name || '';
-    const customerEmail = document.getElementById('account-email')?.innerText || window.currentUser?.email || '';
+    const authUser = (typeof getWishriteAuthUser === 'function') ? getWishriteAuthUser() : window.currentUser;
+    const custProfile = (typeof getWishriteCustomerProfile === 'function') ? getWishriteCustomerProfile() : null;
 
-    if (nameInput && !nameInput.value && customerName && customerName !== '—') {
+    const customerName = custProfile?.name || authUser?.user_metadata?.full_name || document.getElementById('account-name')?.innerText || '';
+    const customerEmail = custProfile?.email || authUser?.email || document.getElementById('account-email')?.innerText || '';
+
+    if (nameInput && (!nameInput.value || nameInput.value.trim() === '') && customerName && customerName !== '—') {
         nameInput.value = customerName;
     }
-    if (emailLabel && customerEmail) {
+    if (countryInput && !countryInput.value) {
+        countryInput.value = 'India';
+    }
+    if (emailLabel && customerEmail && customerEmail !== '—') {
         emailLabel.innerText = customerEmail;
     }
 }
 
 /**
- * Submits the Creator Onboarding Details Form
+ * Submits the Creator Onboarding Details Form & activates Creator Profile
  */
 async function handleCreatorOnboardSubmit(e) {
-    if (e) e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
 
     const nameInput = document.getElementById('creator-input-name');
+    const avatarInput = document.getElementById('creator-input-avatar');
     const bioInput = document.getElementById('creator-input-bio');
     const cityInput = document.getElementById('creator-input-city');
     const stateInput = document.getElementById('creator-input-state');
     const countryInput = document.getElementById('creator-input-country');
-    const instaUserInput = document.getElementById('creator-input-instagram-user');
-    const instaUrlInput = document.getElementById('creator-input-instagram-url');
-    const ytUrlInput = document.getElementById('creator-input-youtube-url');
-    const fbUrlInput = document.getElementById('creator-input-facebook-url');
-    const otherUrlInput = document.getElementById('creator-input-other-url');
+    const instaInput = document.getElementById('creator-input-instagram') || document.getElementById('creator-input-instagram-user');
+    const ytInput = document.getElementById('creator-input-youtube') || document.getElementById('creator-input-youtube-url');
+    const fbInput = document.getElementById('creator-input-facebook') || document.getElementById('creator-input-facebook-url');
+    const otherInput = document.getElementById('creator-input-other') || document.getElementById('creator-input-other-url');
     const agreementCheck = document.getElementById('creator-agreement-check');
-    const msgEl = document.getElementById('creator-onboard-message');
-    const btn = document.getElementById('btn-activate-creator');
+    const errorBox = document.getElementById('creator-onboard-error') || document.getElementById('creator-onboard-message');
+    const submitBtn = document.getElementById('creator-onboard-submit-btn') || document.getElementById('btn-activate-creator');
 
-    if (msgEl) {
-        msgEl.innerText = '';
-        msgEl.className = 'creator-msg';
+    function showError(msg) {
+        if (errorBox) {
+            errorBox.textContent = msg;
+            errorBox.style.display = 'block';
+            errorBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        } else if (typeof showToast === 'function') {
+            showToast(msg, 'error');
+        } else {
+            alert(msg);
+        }
     }
 
-    if (!nameInput?.value?.trim()) {
-        if (msgEl) {
-            msgEl.innerText = 'Please provide your Creator display name.';
-            msgEl.classList.add('error');
-        }
+    if (errorBox) {
+        errorBox.textContent = '';
+        errorBox.style.display = 'none';
+    }
+
+    const displayName = (nameInput?.value || '').trim();
+    if (!displayName) {
+        showError('Please provide your Creator display name.');
         nameInput?.focus();
         return;
     }
 
-    if (!agreementCheck?.checked) {
-        if (msgEl) {
-            msgEl.innerText = 'You must agree to the WishRite Creator Program Terms & Guidelines.';
-            msgEl.classList.add('error');
-        }
+    const instaVal = (instaInput?.value || '').trim();
+    if (!instaVal) {
+        showError('Please provide your Instagram username or profile link.');
+        instaInput?.focus();
         return;
     }
 
+    if (!agreementCheck?.checked) {
+        showError('You must agree to the WishRite Creator Program Terms & Content Guidelines.');
+        agreementCheck?.focus();
+        return;
+    }
+
+    // Process Instagram username vs URL cleanly
+    const cleanInstaUser = instaVal.replace(/^https?:\/\/(www\.)?instagram\.com\//i, '').replace(/^@/, '').replace(/\/.*$/, '').trim();
+    const cleanInstaUrl = instaVal.startsWith('http') ? instaVal : (cleanInstaUser ? `https://instagram.com/${cleanInstaUser}` : '');
+
     // Collect content preferences
     const selectedPreferences = [];
-    document.querySelectorAll('.creator-chip-checkbox:checked').forEach(cb => {
+    document.querySelectorAll('input[name="content_pref"]:checked, .creator-chip-checkbox:checked').forEach(cb => {
         selectedPreferences.push(cb.value);
     });
 
+    const authUser = (typeof getWishriteAuthUser === 'function') ? getWishriteAuthUser() : window.currentUser;
+    const custProfile = (typeof getWishriteCustomerProfile === 'function') ? getWishriteCustomerProfile() : null;
+    const customerEmail = custProfile?.email || authUser?.email || document.getElementById('account-email')?.innerText || '';
+
     const payload = {
-        display_name: nameInput.value.trim(),
-        bio: bioInput?.value?.trim() || '',
-        city: cityInput?.value?.trim() || '',
-        state: stateInput?.value?.trim() || '',
-        country: countryInput?.value?.trim() || 'India',
-        instagram_username: instaUserInput?.value?.trim() || '',
-        instagram_url: instaUrlInput?.value?.trim() || '',
-        youtube_url: ytUrlInput?.value?.trim() || '',
-        facebook_url: fbUrlInput?.value?.trim() || '',
-        other_url: otherUrlInput?.value?.trim() || '',
+        name: displayName,
+        display_name: displayName,
+        profile_image: (avatarInput?.value || '').trim(),
+        bio: (bioInput?.value || '').trim(),
+        city: (cityInput?.value || '').trim(),
+        state: (stateInput?.value || '').trim(),
+        country: (countryInput?.value || '').trim() || 'India',
+        instagram: instaVal,
+        instagram_username: cleanInstaUser,
+        instagram_url: cleanInstaUrl,
+        youtube: (ytInput?.value || '').trim(),
+        youtube_url: (ytInput?.value || '').trim(),
+        facebook: (fbInput?.value || '').trim(),
+        facebook_url: (fbInput?.value || '').trim(),
+        other_url: (otherInput?.value || '').trim(),
         content_preferences: selectedPreferences,
-        agreement_accepted: true
+        preferences: selectedPreferences,
+        agreement_accepted: true,
+        email: customerEmail
     };
 
     try {
-        if (btn) {
-            btn.disabled = true;
-            btn.innerText = 'Activating Profile…';
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.innerText = 'ACTIVATING...';
         }
 
         const headers = await getAuthHeaders();
@@ -221,10 +345,21 @@ async function handleCreatorOnboardSubmit(e) {
             body: JSON.stringify(payload)
         });
 
-        const data = await res.json();
+        if (res.status === 401) {
+            throw new Error('Please sign in to activate your Creator profile.');
+        }
 
-        if (!res.ok || !data.success) {
-            throw new Error(data.error?.message || 'Could not activate creator profile.');
+        const data = await res.json().catch(() => null);
+
+        if (!res.ok || !data) {
+            if (res.status >= 500) {
+                throw new Error("We couldn't activate your Creator profile. Please try again.");
+            }
+            throw new Error(data?.error?.message || "We couldn't activate your Creator profile. Please try again.");
+        }
+
+        if (!data.success && !data.already_active) {
+            throw new Error(data.error?.message || "We couldn't activate your Creator profile. Please try again.");
         }
 
         if (data.token) {
@@ -232,20 +367,21 @@ async function handleCreatorOnboardSubmit(e) {
         }
 
         if (typeof showToast === 'function') {
-            showToast('WishRite Creator Profile activated successfully!', 'success');
+            showToast(data.already_active ? 'Welcome back to WishRite Creator Club!' : 'WishRite Creator Profile activated successfully!', 'success');
         }
 
-        // Immediately refresh into State 2: Creator Dashboard
+        // Immediately transition into State 2: Creator Dashboard
         await loadCustomerCreatorStatus();
     } catch (err) {
-        if (msgEl) {
-            msgEl.innerText = err.message;
-            msgEl.classList.add('error');
+        let msg = err.message || "We couldn't activate your Creator profile. Please try again.";
+        if (err.name === 'TypeError' && String(err).includes('fetch')) {
+            msg = 'Unable to connect. Please check your internet connection and try again.';
         }
+        showError(msg);
     } finally {
-        if (btn) {
-            btn.disabled = false;
-            btn.innerText = 'ACTIVATE CREATOR PROFILE';
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerText = 'ACTIVATE CREATOR';
         }
     }
 }

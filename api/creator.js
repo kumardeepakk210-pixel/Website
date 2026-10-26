@@ -178,7 +178,7 @@ module.exports = async function handler(req, res) {
         if (subPath === '/status' && method === 'GET') {
             return await creator.handleCustomerCreatorStatus(req, res);
         }
-        if (subPath === '/onboard' && method === 'POST') {
+        if ((subPath === '/onboard' || subPath === '/activate') && method === 'POST') {
             return await creator.handleCustomerCreatorOnboard(req, res);
         }
         if (subPath === '/content') {

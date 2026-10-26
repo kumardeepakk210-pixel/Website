@@ -147,6 +147,64 @@ describe('WishRite — Integrated Creator Program Inside My Account', () => {
       assert.equal(dupRes.data.already_active, true);
       assert.equal(dupRes.data.creator.influencer_code, res.data.creator.influencer_code);
     });
+
+    test('BECOME A CREATOR button and showCreatorOnboardForm function are properly wired', () => {
+      const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+      assert.match(html, /id="btn-become-creator"/);
+      assert.match(html, /onclick="showCreatorOnboardForm\(\)"/);
+      assert.match(html, /BECOME A CREATOR/);
+      assert.match(html, /id="creator-onboard-form-card"/);
+      assert.match(html, /onclick="hideCreatorOnboardForm\(\)"/);
+      assert.match(html, /id="creator-onboard-submit-btn"/);
+      assert.match(html, /ACTIVATE CREATOR/);
+
+      const js = fs.readFileSync(path.join(__dirname, '..', 'js', 'creator-program.js'), 'utf8');
+      assert.match(js, /function showCreatorOnboardForm/);
+      assert.match(js, /window\.showCreatorOnboardForm\s*=\s*showCreatorOnboardForm/);
+      assert.match(js, /function hideCreatorOnboardForm/);
+      assert.match(js, /window\.hideCreatorOnboardForm\s*=\s*hideCreatorOnboardForm/);
+      assert.match(js, /function handleCreatorOnboardSubmit/);
+    });
+
+    test('POST /api/creator/activate alias works identically to /api/creator/onboard', async () => {
+      const testEmail = `activate_alias_${Date.now()}@example.com`;
+      const authHeader = makeCustomerAuthHeader(testEmail, `usr_alias_${Date.now()}`);
+
+      const res = await makeRequest({
+        path: '/api/creator/activate',
+        method: 'POST',
+        headers: { 'Authorization': authHeader }
+      }, {
+        name: 'Alias Creator',
+        city: 'Bangalore',
+        state: 'Karnataka',
+        instagram: '@alias_creator',
+        agreement_accepted: true
+      });
+
+      assert.equal(res.statusCode, 200);
+      assert.equal(res.data.success, true);
+      assert.ok(res.data.creator);
+      assert.equal(res.data.creator.name, 'Alias Creator');
+    });
+
+    test('Activation without terms agreement is rejected with 400', async () => {
+      const res = await makeRequest({
+        path: '/api/creator/activate',
+        method: 'POST',
+        headers: { 'Authorization': makeCustomerAuthHeader(`no_terms_${Date.now()}@example.com`, 'usr_1') }
+      }, {
+        name: 'No Agreement',
+        city: 'Delhi',
+        state: 'Delhi',
+        instagram: '@noagree',
+        agreement_accepted: false
+      });
+
+      assert.equal(res.statusCode, 400);
+      assert.equal(res.data.success, false);
+      assert.match(res.data.error.message, /agree to the WishRite Creator Program Terms/i);
+    });
   });
 
   // ═══ 3. EXISTING CREATOR PRESERVATION ═══
