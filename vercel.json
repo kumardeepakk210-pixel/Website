@@ -1,6 +1,22 @@
 {
   "rewrites": [
     {
+      "source": "/api/creator/:path*",
+      "destination": "/api/creator.js"
+    },
+    {
+      "source": "/api/influencers/:path*",
+      "destination": "/api/influencers.js"
+    },
+    {
+      "source": "/api/orders/:path*",
+      "destination": "/api/orders.js"
+    },
+    {
+      "source": "/api/public/:path*",
+      "destination": "/api/public.js"
+    },
+    {
       "source": "/inventory",
       "destination": "/index.html"
     },
@@ -75,6 +91,54 @@
     {
       "source": "/admin-rewards",
       "destination": "/admin-rewards.html"
+    },
+    {
+      "source": "/creator",
+      "destination": "/creator.html"
+    },
+    {
+      "source": "/creator/login",
+      "destination": "/creator.html"
+    },
+    {
+      "source": "/creator/dashboard",
+      "destination": "/creator.html"
+    },
+    {
+      "source": "/creator/links",
+      "destination": "/creator.html"
+    },
+    {
+      "source": "/creator/wallet",
+      "destination": "/creator.html"
+    },
+    {
+      "source": "/creator/withdraw",
+      "destination": "/creator.html"
+    },
+    {
+      "source": "/creator/points",
+      "destination": "/creator.html"
+    },
+    {
+      "source": "/creator/rewards",
+      "destination": "/creator.html"
+    },
+    {
+      "source": "/creator/profile",
+      "destination": "/creator.html"
+    },
+    {
+      "source": "/influencer/:path*",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/creator/:slug",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/creator/:slug/product/:code*",
+      "destination": "/index.html"
     }
   ],
   "headers": [

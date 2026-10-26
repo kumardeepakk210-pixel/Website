@@ -1,0 +1,1090 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WishRite Creator Club — Luxury Ambassador Portal</title>
+    <meta name="description" content="WishRite Creator Club Dashboard. Track performance, referral earnings, wallet ledger, points, rewards and withdrawals.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/variables.css?v=20261025-v1">
+    <link rel="stylesheet" href="/css/components.css?v=20261025-v1">
+    <link rel="stylesheet" href="/css/creator.css?v=20261025-v1">
+    <style>
+        :root {
+            --wr-c-primary: #5E3435;
+            --wr-c-primary-dark: #442526;
+            --wr-c-primary-light: #7E4B4C;
+            --wr-c-primary-subtle: rgba(94, 52, 53, 0.08);
+            --wr-c-gold: #B8956A;
+            --wr-c-gold-light: rgba(184, 149, 106, 0.12);
+            --wr-c-bg: #FAF7F5;
+            --wr-c-card: #FFFFFF;
+            --wr-c-border: #EFE8E8;
+            --wr-c-text: #2D2329;
+            --wr-c-muted: #6B5B65;
+            --wr-c-green: #2E7D32;
+            --wr-c-green-bg: #E8F5E9;
+            --wr-c-orange: #EF6C00;
+            --wr-c-orange-bg: #FFF3E0;
+            --wr-c-red: #C62828;
+            --wr-c-red-bg: #FFEBEE;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Montserrat', sans-serif;
+            background: var(--wr-c-bg);
+            color: var(--wr-c-text);
+            line-height: 1.5;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ── Top Header ── */
+        .creator-top-bar {
+            background: var(--wr-c-primary);
+            color: #FFFFFF;
+            padding: 16px 28px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 4px 20px rgba(94, 52, 53, 0.15);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .creator-top-brand {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            text-decoration: none;
+            color: #FFFFFF;
+        }
+
+        .creator-brand-logo {
+            font-family: 'Cinzel', serif;
+            font-size: 1.35rem;
+            font-weight: 700;
+            letter-spacing: 2px;
+            color: #FFFFFF;
+        }
+
+        .creator-club-pill {
+            background: rgba(184, 149, 106, 0.25);
+            border: 1px solid var(--wr-c-gold);
+            color: #F8EFE4;
+            padding: 3px 10px;
+            border-radius: 14px;
+            font-size: 0.7rem;
+            letter-spacing: 1.2px;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        .creator-top-user {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .creator-balance-pill {
+            background: rgba(255, 255, 255, 0.14);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .creator-balance-val {
+            color: #FDE8C7;
+            font-weight: 700;
+        }
+
+        .creator-profile-snippet {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            text-decoration: none;
+            color: #FFFFFF;
+            cursor: pointer;
+        }
+
+        .creator-mini-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid rgba(255, 255, 255, 0.8);
+            background: #FFFFFF;
+        }
+
+        .creator-top-name {
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .creator-logout-btn {
+            background: transparent;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: #FFFFFF;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 0.78rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .creator-logout-btn:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        /* ── Main Navigation Bar ── */
+        .creator-nav-bar {
+            background: #FFFFFF;
+            border-bottom: 1px solid var(--wr-c-border);
+            padding: 0 28px;
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            position: sticky;
+            top: 68px;
+            z-index: 90;
+        }
+
+        .creator-nav-tab {
+            padding: 16px 18px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--wr-c-muted);
+            text-decoration: none;
+            border-bottom: 3px solid transparent;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            white-space: nowrap;
+            transition: all 0.2s ease;
+        }
+
+        .creator-nav-tab:hover {
+            color: var(--wr-c-primary);
+        }
+
+        .creator-nav-tab.active {
+            color: var(--wr-c-primary);
+            border-bottom-color: var(--wr-c-primary);
+        }
+
+        /* ── Container & Views ── */
+        .creator-container {
+            max-width: 1240px;
+            width: 100%;
+            margin: 0 auto;
+            padding: 32px 24px 80px;
+            flex: 1;
+        }
+
+        .creator-view {
+            display: none;
+        }
+
+        .creator-view.active {
+            display: block;
+            animation: fadeIn 0.25s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ── Page Headers & Cards ── */
+        .creator-header-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 28px;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .creator-page-title {
+            font-family: 'Cinzel', serif;
+            font-size: 1.8rem;
+            color: var(--wr-c-primary);
+            font-weight: 600;
+            margin: 0;
+        }
+
+        .creator-page-sub {
+            font-size: 0.85rem;
+            color: var(--wr-c-muted);
+            margin-top: 4px;
+        }
+
+        .creator-card {
+            background: var(--wr-c-card);
+            border: 1px solid var(--wr-c-border);
+            border-radius: 14px;
+            padding: 24px;
+            box-shadow: 0 4px 16px rgba(94, 52, 53, 0.04);
+            margin-bottom: 24px;
+        }
+
+        /* ── Metrics Grid (8 Cards) ── */
+        .creator-metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 20px;
+            margin-bottom: 32px;
+        }
+
+        .creator-metric-card {
+            background: #FFFFFF;
+            border: 1px solid var(--wr-c-border);
+            border-radius: 12px;
+            padding: 20px 22px;
+            box-shadow: 0 4px 14px rgba(94, 52, 53, 0.03);
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .creator-metric-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(94, 52, 53, 0.08);
+        }
+
+        .creator-metric-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: var(--wr-c-primary);
+        }
+
+        .creator-metric-label {
+            font-size: 0.74rem;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            color: var(--wr-c-muted);
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .creator-metric-value {
+            font-size: 1.65rem;
+            font-weight: 700;
+            color: var(--wr-c-primary);
+            font-family: 'Cinzel', serif;
+            letter-spacing: 0.5px;
+        }
+
+        .creator-metric-highlight {
+            color: var(--wr-c-green);
+        }
+
+        /* ── Tables ── */
+        .creator-table-responsive {
+            width: 100%;
+            overflow-x: auto;
+        }
+
+        .creator-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.88rem;
+            text-align: left;
+        }
+
+        .creator-table th {
+            background: #FAF7F5;
+            color: var(--wr-c-primary);
+            font-weight: 600;
+            padding: 14px 16px;
+            border-bottom: 2px solid var(--wr-c-border);
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+        }
+
+        .creator-table td {
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--wr-c-border);
+            color: var(--wr-c-text);
+            vertical-align: middle;
+        }
+
+        .creator-table tr:hover td {
+            background: #FCFAF8;
+        }
+
+        /* ── Status Badges ── */
+        .creator-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.72rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .badge-green { background: var(--wr-c-green-bg); color: var(--wr-c-green); }
+        .badge-orange { background: var(--wr-c-orange-bg); color: var(--wr-c-orange); }
+        .badge-red { background: var(--wr-c-red-bg); color: var(--wr-c-red); }
+        .badge-primary { background: var(--wr-c-primary-subtle); color: var(--wr-c-primary); }
+
+        /* ── Forms & Buttons ── */
+        .creator-form-group {
+            margin-bottom: 20px;
+        }
+
+        .creator-label {
+            display: block;
+            font-size: 0.82rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: var(--wr-c-primary);
+        }
+
+        .creator-input, .creator-select, .creator-textarea {
+            width: 100%;
+            padding: 12px 14px;
+            border: 1px solid var(--wr-c-border);
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 0.92rem;
+            background: #FFFFFF;
+            color: var(--wr-c-text);
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .creator-input:focus, .creator-select:focus, .creator-textarea:focus {
+            outline: none;
+            border-color: var(--wr-c-primary);
+            box-shadow: 0 0 0 3px rgba(94, 52, 53, 0.12);
+        }
+
+        .creator-btn-action {
+            background: var(--wr-c-primary);
+            color: #FFFFFF;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.88rem;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s ease;
+        }
+
+        .creator-btn-action:hover {
+            background: var(--wr-c-primary-dark);
+            transform: translateY(-1px);
+        }
+
+        .creator-btn-action:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .creator-btn-secondary {
+            background: #FFFFFF;
+            color: var(--wr-c-primary);
+            border: 1px solid var(--wr-c-primary);
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 0.82rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .creator-btn-secondary:hover {
+            background: var(--wr-c-primary-subtle);
+        }
+
+        /* ── Safety Notice Banner (Section 14 & 27) ── */
+        .creator-safety-notice {
+            background: #FFF8E1;
+            border: 1px solid #FFE082;
+            color: #795548;
+            padding: 14px 18px;
+            border-radius: 10px;
+            font-size: 0.84rem;
+            line-height: 1.5;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+        }
+
+        .creator-safety-icon {
+            color: #FFA000;
+            font-size: 1.2rem;
+            line-height: 1;
+        }
+
+        /* ── Login Modal / Screen ── */
+        .creator-login-box {
+            max-width: 440px;
+            margin: 40px auto;
+            background: #FFFFFF;
+            border: 1px solid var(--wr-c-border);
+            border-radius: 16px;
+            padding: 36px 32px;
+            box-shadow: 0 12px 36px rgba(94, 52, 53, 0.08);
+            text-align: center;
+        }
+
+        .creator-login-title {
+            font-family: 'Cinzel', serif;
+            font-size: 1.6rem;
+            color: var(--wr-c-primary);
+            margin: 12px 0 6px;
+        }
+
+        .creator-login-sub {
+            font-size: 0.88rem;
+            color: var(--wr-c-muted);
+            margin-bottom: 28px;
+        }
+
+        /* ── Rewards Catalogue Cards ── */
+        .creator-rewards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 24px;
+            margin-top: 20px;
+        }
+
+        .creator-reward-card {
+            background: #FFFFFF;
+            border: 1px solid var(--wr-c-border);
+            border-radius: 14px;
+            padding: 22px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            box-shadow: 0 4px 14px rgba(94, 52, 53, 0.03);
+            transition: transform 0.2s ease;
+        }
+
+        .creator-reward-card:hover {
+            transform: translateY(-2px);
+        }
+
+        .creator-reward-cost {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--wr-c-gold);
+            margin-bottom: 12px;
+        }
+
+        /* ── Mobile Bottom Navigation (Section 20) ── */
+        .creator-mobile-nav {
+            display: none;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: #FFFFFF;
+            border-top: 1px solid var(--wr-c-border);
+            padding: 8px 12px;
+            z-index: 200;
+            box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.06);
+            justify-content: space-around;
+        }
+
+        .creator-mobile-nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            color: var(--wr-c-muted);
+            text-decoration: none;
+            font-size: 0.68rem;
+            font-weight: 600;
+            padding: 6px 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: color 0.2s ease;
+        }
+
+        .creator-mobile-nav-item.active {
+            color: var(--wr-c-primary);
+        }
+
+        .creator-mobile-nav-item svg {
+            width: 20px;
+            height: 20px;
+            stroke-width: 2;
+        }
+
+        /* ── Responsive Mobile Adjustments ── */
+        @media (max-width: 768px) {
+            .creator-top-bar {
+                padding: 14px 18px;
+            }
+
+            .creator-nav-bar {
+                display: none; /* Replaced by bottom nav on mobile */
+            }
+
+            .creator-mobile-nav {
+                display: flex;
+            }
+
+            .creator-container {
+                padding: 20px 14px 90px;
+            }
+
+            .creator-metrics-grid {
+                grid-template-columns: 1fr 1fr;
+                gap: 12px;
+            }
+
+            .creator-metric-card {
+                padding: 16px;
+            }
+
+            .creator-metric-value {
+                font-size: 1.35rem;
+            }
+
+            .creator-table th, .creator-table td {
+                padding: 10px 12px;
+                font-size: 0.8rem;
+            }
+        }
+
+        @media (max-width: 440px) {
+            .creator-metrics-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ═══ TOP HEADER ═══ -->
+    <header class="creator-top-bar">
+        <a href="/" class="creator-top-brand" title="WishRite Home">
+            <span class="creator-brand-logo">WISHRITE</span>
+            <span class="creator-club-pill">Creator Club</span>
+        </a>
+
+        <div class="creator-top-user" id="top-user-area">
+            <!-- Rendered dynamically by JS (balance, profile, logout) -->
+        </div>
+    </header>
+
+    <!-- ═══ DESKTOP NAVIGATION BAR ═══ -->
+    <nav class="creator-nav-bar" id="desktop-nav">
+        <a class="creator-nav-tab active" data-view="dashboard">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+            Dashboard
+        </a>
+        <a class="creator-nav-tab" data-view="links">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+            My Referral Links
+        </a>
+        <a class="creator-nav-tab" data-view="wallet">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 10h12"/><circle cx="16" cy="14" r="1"/></svg>
+            Wallet &amp; Ledger
+        </a>
+        <a class="creator-nav-tab" data-view="withdraw">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M7 17l9.2-9.2M17 17V8H8"/></svg>
+            Withdraw
+        </a>
+        <a class="creator-nav-tab" data-view="points">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg>
+            Points &amp; Rewards
+        </a>
+        <a class="creator-nav-tab" data-view="profile">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            Profile
+        </a>
+    </nav>
+
+    <!-- ═══ MAIN CONTENT CONTAINER ═══ -->
+    <main class="creator-container">
+
+        <!-- ── VIEW 1: LOGIN ── -->
+        <section id="view-login" class="creator-view">
+            <div class="creator-login-box">
+                <div style="font-size: 32px; color: var(--wr-c-primary); margin-bottom: 8px;">✨</div>
+                <h2 class="creator-login-title">Creator Club Sign In</h2>
+                <p class="creator-login-sub">Access your personal creator analytics, wallet, referral links and rewards.</p>
+
+                <div id="login-alert" style="display: none; padding: 10px 14px; border-radius: 8px; font-size: 0.82rem; margin-bottom: 16px;"></div>
+
+                <form id="creator-login-form" onsubmit="window.WishRiteCreatorPortal.handleLoginSubmit(event);">
+                    <div class="creator-form-group" style="text-align: left;">
+                        <label class="creator-label" for="login-email">Registered Email</label>
+                        <input type="email" id="login-email" class="creator-input" placeholder="creator@example.com" required autocomplete="email">
+                    </div>
+                    <div class="creator-form-group" style="text-align: left;">
+                        <label class="creator-label" for="login-password">Password</label>
+                        <input type="password" id="login-password" class="creator-input" placeholder="••••••••" required autocomplete="current-password">
+                    </div>
+                    <button type="submit" id="login-submit-btn" class="creator-btn-action" style="width: 100%; justify-content: center; margin-top: 10px;">
+                        Sign In to Creator Club
+                    </button>
+                </form>
+
+                <div style="margin-top: 24px; font-size: 0.8rem; color: var(--wr-c-muted);">
+                    <a href="/" style="color: var(--wr-c-primary); text-decoration: none; font-weight: 600;">&larr; Back to WishRite Store</a>
+                </div>
+            </div>
+        </section>
+
+        <!-- ── VIEW 2: DASHBOARD OVERVIEW ── -->
+        <section id="view-dashboard" class="creator-view">
+            <div class="creator-header-row">
+                <div>
+                    <h1 class="creator-page-title" id="dash-greeting">Welcome, Creator</h1>
+                    <p class="creator-page-sub" id="dash-sub">Real-time performance metrics and live attributed earnings.</p>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <button class="creator-btn-action" onclick="window.WishRiteCreatorPortal.copyStorefrontLink();">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                        Copy Storefront Link
+                    </button>
+                    <a href="#withdraw" class="creator-btn-secondary" onclick="window.WishRiteCreatorPortal.navigateTo('withdraw');">
+                        Request Payout
+                    </a>
+                </div>
+            </div>
+
+            <!-- 8 Key Server-Provided Metrics -->
+            <div class="creator-metrics-grid">
+                <div class="creator-metric-card">
+                    <div class="creator-metric-label">Total Attributed Sales</div>
+                    <div class="creator-metric-value" id="metric-sales">₹0</div>
+                </div>
+                <div class="creator-metric-card">
+                    <div class="creator-metric-label">Total Orders</div>
+                    <div class="creator-metric-value" id="metric-orders">0</div>
+                </div>
+                <div class="creator-metric-card">
+                    <div class="creator-metric-label">Referral Clicks</div>
+                    <div class="creator-metric-value" id="metric-clicks">0</div>
+                </div>
+                <div class="creator-metric-card">
+                    <div class="creator-metric-label">Conversion Rate</div>
+                    <div class="creator-metric-value" id="metric-cvr">0.0%</div>
+                </div>
+                <div class="creator-metric-card">
+                    <div class="creator-metric-label">Total Commission</div>
+                    <div class="creator-metric-value" id="metric-total-comm">₹0</div>
+                </div>
+                <div class="creator-metric-card">
+                    <div class="creator-metric-label">Pending Commission</div>
+                    <div class="creator-metric-value" id="metric-pending-comm" style="color: var(--wr-c-orange);">₹0</div>
+                </div>
+                <div class="creator-metric-card">
+                    <div class="creator-metric-label">Available Balance</div>
+                    <div class="creator-metric-value creator-metric-highlight" id="metric-available-bal">₹0</div>
+                </div>
+                <div class="creator-metric-card">
+                    <div class="creator-metric-label">Lifetime Earnings</div>
+                    <div class="creator-metric-value" id="metric-lifetime">₹0</div>
+                </div>
+            </div>
+
+            <!-- Recent Attributed Orders (Zero Customer PII) -->
+            <div class="creator-card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px;">
+                    <h3 style="font-family: 'Cinzel', serif; font-size: 1.25rem; color: var(--wr-c-primary); margin: 0;">Attributed Sales Activity</h3>
+                    <span style="font-size: 0.78rem; color: var(--wr-c-muted);">Server-verified orders</span>
+                </div>
+                <div class="creator-table-responsive">
+                    <table class="creator-table">
+                        <thead>
+                            <tr>
+                                <th>Order Ref</th>
+                                <th>Date</th>
+                                <th>Items</th>
+                                <th>Order Amount</th>
+                                <th>Commission Rate</th>
+                                <th>Commission</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dash-orders-tbody">
+                            <tr><td colspan="7" style="text-align: center; color: var(--wr-c-muted); padding: 24px;">Loading attributed orders...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ── VIEW 3: REFERRAL LINKS ── -->
+        <section id="view-links" class="creator-view">
+            <div class="creator-header-row">
+                <div>
+                    <h1 class="creator-page-title">Referral Link Management</h1>
+                    <p class="creator-page-sub">Generate product-specific links and track campaign performance.</p>
+                </div>
+            </div>
+
+            <!-- Custom Product Link Generator -->
+            <div class="creator-card">
+                <h3 style="font-family: 'Cinzel', serif; font-size: 1.15rem; color: var(--wr-c-primary); margin-bottom: 14px;">Generate Product Referral Link</h3>
+                <form id="create-link-form" onsubmit="window.WishRiteCreatorPortal.handleCreateLink(event);" style="display: flex; gap: 12px; flex-wrap: wrap;">
+                    <input type="text" id="new-link-product-code" class="creator-input" placeholder="Enter Product SKU or Code (e.g. WR-SLV-001)" style="flex: 1; min-width: 220px;" required>
+                    <input type="text" id="new-link-title" class="creator-input" placeholder="Campaign or Product Name (optional)" style="flex: 1; min-width: 200px;">
+                    <button type="submit" class="creator-btn-action">Create Deep Link</button>
+                </form>
+            </div>
+
+            <!-- Links Table -->
+            <div class="creator-card">
+                <h3 style="font-family: 'Cinzel', serif; font-size: 1.25rem; color: var(--wr-c-primary); margin-bottom: 18px;">Active Referral Links</h3>
+                <div class="creator-table-responsive">
+                    <table class="creator-table">
+                        <thead>
+                            <tr>
+                                <th>Campaign / Product</th>
+                                <th>Referral URL</th>
+                                <th>Clicks</th>
+                                <th>Orders</th>
+                                <th>Sales</th>
+                                <th>Commission</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="links-tbody">
+                            <tr><td colspan="8" style="text-align: center; color: var(--wr-c-muted); padding: 24px;">Loading links...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ── VIEW 4: WALLET & LEDGER ── -->
+        <section id="view-wallet" class="creator-view">
+            <div class="creator-header-row">
+                <div>
+                    <h1 class="creator-page-title">Creator Wallet &amp; Ledger</h1>
+                    <p class="creator-page-sub">Dual-entry immutable accounting ledger of all earnings and withdrawals.</p>
+                </div>
+                <button class="creator-btn-action" onclick="window.WishRiteCreatorPortal.navigateTo('withdraw');">
+                    Request Payout
+                </button>
+            </div>
+
+            <div class="creator-metrics-grid" style="grid-template-columns: repeat(3, 1fr);">
+                <div class="creator-metric-card">
+                    <div class="creator-metric-label">Available for Withdrawal</div>
+                    <div class="creator-metric-value creator-metric-highlight" id="wallet-avail-bal">₹0</div>
+                </div>
+                <div class="creator-metric-card">
+                    <div class="creator-metric-label">Pending Clearance</div>
+                    <div class="creator-metric-value" id="wallet-pending-bal" style="color: var(--wr-c-orange);">₹0</div>
+                </div>
+                <div class="creator-metric-card">
+                    <div class="creator-metric-label">Lifetime Earned</div>
+                    <div class="creator-metric-value" id="wallet-lifetime-bal">₹0</div>
+                </div>
+            </div>
+
+            <div class="creator-card">
+                <h3 style="font-family: 'Cinzel', serif; font-size: 1.25rem; color: var(--wr-c-primary); margin-bottom: 18px;">Transaction Ledger</h3>
+                <div class="creator-table-responsive">
+                    <table class="creator-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Description</th>
+                                <th>Type</th>
+                                <th>Amount</th>
+                                <th>Reference</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="wallet-tx-tbody">
+                            <tr><td colspan="6" style="text-align: center; color: var(--wr-c-muted); padding: 24px;">Loading ledger transactions...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ── VIEW 5: WITHDRAW ── -->
+        <section id="view-withdraw" class="creator-view">
+            <div class="creator-header-row">
+                <div>
+                    <h1 class="creator-page-title">Withdraw Earnings</h1>
+                    <p class="creator-page-sub">Transfer approved commission to your verified UPI ID or Bank Account.</p>
+                </div>
+            </div>
+
+            <!-- Safety Notice Banner (Section 14) -->
+            <div class="creator-safety-notice">
+                <span class="creator-safety-icon">⚠️</span>
+                <div>
+                    <strong>RazorpayX Automated Payouts Operating in Sandbox/Manual Verification Mode:</strong>
+                    Live instant bank dispatch is disabled for financial safety (ALLOW_LIVE_PAYOUTS=false). Withdrawal requests submitted here are safely debited from your available balance and queued as <em>Requested / Processing</em> for administrative review.
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 24px;">
+                <!-- Withdrawal Request Form -->
+                <div class="creator-card">
+                    <h3 style="font-family: 'Cinzel', serif; font-size: 1.2rem; color: var(--wr-c-primary); margin-bottom: 16px;">Request New Payout</h3>
+                    
+                    <div style="margin-bottom: 16px; padding: 12px 16px; background: #FAF7F5; border-radius: 8px;">
+                        <span style="font-size: 0.78rem; text-transform: uppercase; color: var(--wr-c-muted); font-weight: 600;">Available to Withdraw:</span>
+                        <div style="font-size: 1.4rem; font-weight: 700; color: var(--wr-c-green);" id="withdraw-available-display">₹0</div>
+                    </div>
+
+                    <form id="withdraw-form" onsubmit="window.WishRiteCreatorPortal.handleWithdrawSubmit(event);">
+                        <div class="creator-form-group">
+                            <label class="creator-label" for="withdraw-method-select">Select Payout Method</label>
+                            <select id="withdraw-method-select" class="creator-select" required>
+                                <option value="">Loading payout methods...</option>
+                            </select>
+                        </div>
+
+                        <div class="creator-form-group">
+                            <label class="creator-label" for="withdraw-amount">Amount (₹)</label>
+                            <input type="number" id="withdraw-amount" class="creator-input" min="500" max="100000" step="1" placeholder="Minimum ₹500" required>
+                            <span style="font-size: 0.74rem; color: var(--wr-c-muted); margin-top: 4px; display: block;">Minimum withdrawal: ₹500. Maximum per request: ₹1,00,000.</span>
+                        </div>
+
+                        <button type="submit" id="withdraw-submit-btn" class="creator-btn-action" style="width: 100%; justify-content: center;">
+                            Submit Withdrawal Request
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Add New Payout Method Form -->
+                <div class="creator-card">
+                    <h3 style="font-family: 'Cinzel', serif; font-size: 1.2rem; color: var(--wr-c-primary); margin-bottom: 16px;">Add Payout Method</h3>
+                    <form id="add-payout-form" onsubmit="window.WishRiteCreatorPortal.handleAddPayoutMethod(event);">
+                        <div class="creator-form-group">
+                            <label class="creator-label">Payout Type</label>
+                            <select id="new-payout-type" class="creator-select" onchange="window.WishRiteCreatorPortal.togglePayoutFields(this.value);" required>
+                                <option value="upi">UPI ID (e.g. name@okaxis)</option>
+                                <option value="bank_account">Bank Account (NEFT / IMPS)</option>
+                            </select>
+                        </div>
+
+                        <div id="payout-upi-group" class="creator-form-group">
+                            <label class="creator-label" for="new-payout-upi">UPI VPA</label>
+                            <input type="text" id="new-payout-upi" class="creator-input" placeholder="yourhandle@bank">
+                        </div>
+
+                        <div id="payout-bank-group" style="display: none;">
+                            <div class="creator-form-group">
+                                <label class="creator-label" for="new-payout-account">Bank Account Number</label>
+                                <input type="text" id="new-payout-account" class="creator-input" placeholder="Account Number">
+                            </div>
+                            <div class="creator-form-group">
+                                <label class="creator-label" for="new-payout-ifsc">IFSC Code</label>
+                                <input type="text" id="new-payout-ifsc" class="creator-input" placeholder="HDFC0001234">
+                            </div>
+                            <div class="creator-form-group">
+                                <label class="creator-label" for="new-payout-name">Beneficiary Name</label>
+                                <input type="text" id="new-payout-name" class="creator-input" placeholder="Name as per Bank Record">
+                            </div>
+                        </div>
+
+                        <button type="submit" class="creator-btn-secondary" style="width: 100%; justify-content: center;">
+                            Save Payout Method
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Withdrawal History Table -->
+            <div class="creator-card">
+                <h3 style="font-family: 'Cinzel', serif; font-size: 1.25rem; color: var(--wr-c-primary); margin-bottom: 18px;">Withdrawal Requests &amp; Payout History</h3>
+                <div class="creator-table-responsive">
+                    <table class="creator-table">
+                        <thead>
+                            <tr>
+                                <th>Date Requested</th>
+                                <th>Amount</th>
+                                <th>Payout Destination</th>
+                                <th>Reference</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="withdraw-history-tbody">
+                            <tr><td colspan="5" style="text-align: center; color: var(--wr-c-muted); padding: 24px;">Loading withdrawal history...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ── VIEW 6: POINTS & REWARDS ── -->
+        <section id="view-points" class="creator-view">
+            <div class="creator-header-row">
+                <div>
+                    <h1 class="creator-page-title">Creator Points &amp; Rewards</h1>
+                    <p class="creator-page-sub">Earn 1 reward point for every ₹100 of attributed sales. Redeem for luxury perks.</p>
+                </div>
+            </div>
+
+            <div class="creator-metrics-grid" style="grid-template-columns: repeat(3, 1fr);">
+                <div class="creator-metric-card">
+                    <div class="creator-metric-label">Current Points Balance</div>
+                    <div class="creator-metric-value" id="points-avail" style="color: var(--wr-c-gold);">0</div>
+                </div>
+                <div class="creator-metric-card">
+                    <div class="creator-metric-label">Lifetime Points Earned</div>
+                    <div class="creator-metric-value" id="points-lifetime">0</div>
+                </div>
+                <div class="creator-metric-card">
+                    <div class="creator-metric-label">Points Redeemed</div>
+                    <div class="creator-metric-value" id="points-redeemed">0</div>
+                </div>
+            </div>
+
+            <h3 style="font-family: 'Cinzel', serif; font-size: 1.35rem; color: var(--wr-c-primary); margin: 32px 0 16px;">Available Rewards Catalogue</h3>
+            <div class="creator-rewards-grid" id="rewards-catalogue-grid">
+                <!-- Populated dynamically -->
+            </div>
+
+            <div class="creator-card" style="margin-top: 36px;">
+                <h3 style="font-family: 'Cinzel', serif; font-size: 1.25rem; color: var(--wr-c-primary); margin-bottom: 18px;">Points Activity Ledger</h3>
+                <div class="creator-table-responsive">
+                    <table class="creator-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Description</th>
+                                <th>Type</th>
+                                <th>Points</th>
+                            </tr>
+                        </thead>
+                        <tbody id="points-tx-tbody">
+                            <tr><td colspan="4" style="text-align: center; color: var(--wr-c-muted); padding: 24px;">Loading points activity...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ── VIEW 7: PROFILE ── -->
+        <section id="view-profile" class="creator-view">
+            <div class="creator-header-row">
+                <div>
+                    <h1 class="creator-page-title">Creator Brand Profile</h1>
+                    <p class="creator-page-sub">Manage your public brand identity and social profiles.</p>
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 24px;">
+                <!-- Profile Edit Form -->
+                <div class="creator-card">
+                    <h3 style="font-family: 'Cinzel', serif; font-size: 1.2rem; color: var(--wr-c-primary); margin-bottom: 16px;">Edit Profile Details</h3>
+                    <form id="profile-edit-form" onsubmit="window.WishRiteCreatorPortal.handleProfileUpdate(event);">
+                        <div class="creator-form-group">
+                            <label class="creator-label" for="prof-name">Display Name</label>
+                            <input type="text" id="prof-name" class="creator-input" required>
+                        </div>
+                        <div class="creator-form-group">
+                            <label class="creator-label" for="prof-bio">Public Bio</label>
+                            <textarea id="prof-bio" class="creator-textarea" rows="3" placeholder="Tell your followers about your silver style..."></textarea>
+                        </div>
+                        <div class="creator-form-group">
+                            <label class="creator-label" for="prof-instagram">Instagram Handle</label>
+                            <input type="text" id="prof-instagram" class="creator-input" placeholder="e.g. priya.jewels">
+                        </div>
+                        <div class="creator-form-group">
+                            <label class="creator-label" for="prof-youtube">YouTube Handle / Channel</label>
+                            <input type="text" id="prof-youtube" class="creator-input" placeholder="e.g. @priya_style">
+                        </div>
+                        <button type="submit" id="profile-save-btn" class="creator-btn-action">Save Profile Changes</button>
+                    </form>
+                </div>
+
+                <!-- Account Governance (Read-Only) -->
+                <div class="creator-card">
+                    <h3 style="font-family: 'Cinzel', serif; font-size: 1.2rem; color: var(--wr-c-primary); margin-bottom: 16px;">Account Governance &amp; Tier</h3>
+                    <div style="display: flex; flex-direction: column; gap: 14px; font-size: 0.88rem;">
+                        <div>
+                            <span style="color: var(--wr-c-muted); display: block; font-size: 0.74rem; text-transform: uppercase;">Creator Code:</span>
+                            <strong id="gov-code">—</strong>
+                        </div>
+                        <div>
+                            <span style="color: var(--wr-c-muted); display: block; font-size: 0.74rem; text-transform: uppercase;">Commission Rate:</span>
+                            <strong id="gov-rate">—</strong> (Server-governed)
+                        </div>
+                        <div>
+                            <span style="color: var(--wr-c-muted); display: block; font-size: 0.74rem; text-transform: uppercase;">Ambassador Tier:</span>
+                            <span class="creator-badge badge-primary" id="gov-tier">STARTER</span>
+                        </div>
+                        <div>
+                            <span style="color: var(--wr-c-muted); display: block; font-size: 0.74rem; text-transform: uppercase;">Public Slug:</span>
+                            <code id="gov-slug" style="background: #FAF7F5; padding: 2px 6px; border-radius: 4px;">—</code>
+                        </div>
+                        <div>
+                            <span style="color: var(--wr-c-muted); display: block; font-size: 0.74rem; text-transform: uppercase;">Status:</span>
+                            <span class="creator-badge badge-green" id="gov-status">ACTIVE</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- ═══ MOBILE STICKY BOTTOM NAVIGATION (Section 20) ═══ -->
+    <nav class="creator-mobile-nav" id="mobile-nav">
+        <div class="creator-mobile-nav-item active" data-view="dashboard">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+            <span>Home</span>
+        </div>
+        <div class="creator-mobile-nav-item" data-view="links">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+            <span>Links</span>
+        </div>
+        <div class="creator-mobile-nav-item" data-view="wallet">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="2" y="4" width="20" height="16" rx="2"/><circle cx="16" cy="14" r="1"/></svg>
+            <span>Wallet</span>
+        </div>
+        <div class="creator-mobile-nav-item" data-view="points">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg>
+            <span>Points</span>
+        </div>
+        <div class="creator-mobile-nav-item" data-view="profile">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            <span>Profile</span>
+        </div>
+    </nav>
+
+    <!-- ═══ SCRIPTS ═══ -->
+    <script src="/js/creator-portal.js?v=20261025-v1"></script>
+</body>
+</html>

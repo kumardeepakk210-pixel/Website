@@ -6,7 +6,7 @@
    ============================================ */
 
 // All customer-facing storefront views
-const views = ['home', 'shop', 'collections', 'collection-detail', 'new-arrivals', 'best-sellers', 'kids', 'men', 'about', 'login', 'register', 'profile', 'cart', 'wishlist', 'product', 'occasion'];
+const views = ['home', 'shop', 'collections', 'collection-detail', 'new-arrivals', 'best-sellers', 'kids', 'men', 'about', 'login', 'register', 'profile', 'cart', 'wishlist', 'product', 'occasion', 'creator-storefront'];
 
 const COLLECTIONS_CONFIG = [
     {
@@ -208,6 +208,16 @@ function navigateTo(viewId, param, pushHistory = true) {
         case 'register':
             resetRegistration();
             if (pushHistory) { try { history.pushState({ view: 'register' }, '', '/register'); } catch (e) { } }
+            break;
+        case 'creator-storefront':
+            if (typeof renderCreatorStorefront === 'function') {
+                renderCreatorStorefront(param);
+            }
+            if (pushHistory) {
+                try {
+                    history.pushState({ view: 'creator-storefront', param }, '', `/creator/${param}`);
+                } catch (e) { }
+            }
             break;
         default:
             renderHomeSections();
@@ -438,6 +448,176 @@ async function renderCollectionsPage() {
     }
 }
 window.renderCollectionsPage = renderCollectionsPage;
+
+/**
+ * Render Public Creator Storefront with Creator Hero & Recommended Products
+ */
+async function renderCreatorStorefront(slug) {
+    const viewEl = document.getElementById('creator-storefront-view');
+    if (!viewEl) return;
+
+    viewEl.innerHTML = `
+        <div class="container" style="max-width:1240px;margin:0 auto;text-align:center;padding:60px 20px;">
+            <div style="font-size:32px;color:var(--wr-primary);margin-bottom:12px;">✨</div>
+            <p style="color:var(--wr-text-muted);font-size:0.95rem;">Loading curated creator boutique…</p>
+        </div>
+    `;
+
+    try {
+        let creator = null;
+        if (typeof WishRiteAttribution !== 'undefined') {
+            creator = await WishRiteAttribution.fetchPublicCreator(slug);
+        } else {
+            const res = await fetch(`/api/public/influencers/${encodeURIComponent(slug)}`);
+            if (res.ok) {
+                const data = await res.json();
+                creator = data?.data || null;
+            }
+        }
+
+        if (!creator || creator.status !== 'active') {
+            viewEl.innerHTML = `
+                <div class="container">
+                    <div class="creator-empty-state">
+                        <div class="creator-empty-icon">💎</div>
+                        <h2 class="creator-empty-title">Creator Boutique Not Found</h2>
+                        <p class="creator-empty-desc">
+                            The creator storefront you are looking for may be inactive or does not exist. Explore our full collection of hallmarked 925 sterling silver jewellery.
+                        </p>
+                        <button class="btn btn-primary" onclick="navigateTo('shop');" style="margin-top:12px;">
+                            Explore WishRite Collections &rarr;
+                        </button>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+
+        // Set active attribution for the customer
+        if (typeof WishRiteAttribution !== 'undefined') {
+            WishRiteAttribution.setAttribution({
+                influencer_id: creator.id || creator.influencer_id,
+                public_slug: creator.public_slug || slug,
+                code: creator.influencer_code,
+                name: creator.name
+            });
+        }
+
+        // Dynamic SEO Update (Section 23)
+        document.title = `${creator.name}'s Curated Silver Collection | WishRite`;
+        const metaDesc = document.querySelector('meta[name="description"]');
+        if (metaDesc) {
+            metaDesc.setAttribute('content', `Explore handcrafted 925 sterling silver jewellery handpicked by ${creator.name} exclusively on WishRite.`);
+        }
+
+        // Fetch recommended products or fallback to store catalog
+        let recommendedProducts = [];
+        try {
+            const prodRes = await fetch(`/api/public/influencers/${encodeURIComponent(slug)}/products`);
+            if (prodRes.ok) {
+                const pData = await prodRes.json();
+                recommendedProducts = Array.isArray(pData?.data) ? pData.data : (pData?.data?.products || []);
+            }
+        } catch (pe) { }
+
+        // If specific recommended products are not defined, showcase top live products from allProducts
+        if (recommendedProducts.length === 0 && Array.isArray(allProducts) && allProducts.length > 0) {
+            recommendedProducts = allProducts.filter(p => p && Number(p.stockQuantity || 0) > 0).slice(0, 12);
+        }
+
+        const avatarUrl = creator.profile_image || `https://ui-avatars.com/api/?name=${encodeURIComponent(creator.name)}&background=5E3435&color=fff&size=200`;
+        const instagramLink = creator.instagram_id
+            ? `<a href="https://instagram.com/${creator.instagram_id.replace(/^@/, '')}" target="_blank" rel="noopener" class="creator-social">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>
+                @${creator.instagram_id.replace(/^@/, '')}
+               </a>`
+            : '';
+
+        const bioText = creator.bio || 'Curated hallmarked 925 sterling silver pieces designed for timeless elegance and everyday wear.';
+
+        let productsHTML = '';
+        if (recommendedProducts.length > 0) {
+            productsHTML = recommendedProducts.map(p => {
+                if (typeof createProductCardHTML === 'function') {
+                    const safeName = (p.name || 'Jewellery').replace(/'/g, "\\'");
+                    const safeCreatorName = (creator.name || 'Creator').replace(/'/g, "\\'");
+                    return `
+                        <div style="position: relative;">
+                            <span class="creator-curated-badge">✨ Curated</span>
+                            <button class="creator-card-share-btn" title="Share this piece" onclick="event.stopPropagation(); if (typeof WishRiteAttribution !== 'undefined') WishRiteAttribution.shareCreatorLink({ slug: '${creator.public_slug || slug}', name: '${safeCreatorName}', productCode: '${p.productCode || p.sku || p.id}', title: '${safeName}' });">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                            </button>
+                            ${createProductCardHTML(p)}
+                        </div>
+                    `;
+                }
+                return '';
+            }).join('');
+        } else {
+            productsHTML = `
+                <div style="grid-column: 1/-1; text-align: center; padding: 48px 20px; color: var(--wr-text-muted);">
+                    <p>Curated recommendations are being refreshed. Explore all pieces below.</p>
+                </div>
+            `;
+        }
+
+        viewEl.innerHTML = `
+            <div class="container">
+                <!-- Creator Hero Banner -->
+                <div class="creator-hero">
+                    <div class="creator-hero-content">
+                        <div class="creator-avatar-wrap">
+                            <img src="${avatarUrl}" alt="${creator.name}" class="creator-avatar">
+                            <span class="creator-verified-badge" title="Verified WishRite Ambassador">✓</span>
+                        </div>
+                        <div class="creator-info">
+                            <div class="creator-eyebrow">
+                                <span>WishRite Creator Club</span>
+                                <span>•</span>
+                                <span>Curated Boutique</span>
+                            </div>
+                            <h1 class="creator-name">${escapeWishriteHtml(creator.name)}</h1>
+                            ${instagramLink}
+                            <p class="creator-bio">${escapeWishriteHtml(bioText)}</p>
+                            <div class="creator-actions">
+                                <button class="creator-btn creator-btn-primary" onclick="if (typeof WishRiteAttribution !== 'undefined') WishRiteAttribution.shareCreatorLink({ slug: '${creator.public_slug || slug}', name: '${escapeWishriteHtml(creator.name)}' });">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                                    Share Collection
+                                </button>
+                                <button class="creator-btn creator-btn-ghost" onclick="if (typeof WishRiteAttribution !== 'undefined') WishRiteAttribution.shareViaWhatsApp({ slug: '${creator.public_slug || slug}', name: '${escapeWishriteHtml(creator.name)}' });">
+                                    Share on WhatsApp
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Products Section -->
+                <div class="creator-section-header">
+                    <div class="creator-section-sub">Handpicked by ${escapeWishriteHtml(creator.name)}</div>
+                    <h2 class="creator-section-title">Recommended Silver Jewellery</h2>
+                </div>
+
+                <div class="creator-products-grid">
+                    ${productsHTML}
+                </div>
+            </div>
+        `;
+
+        if (typeof initScrollReveal === 'function') {
+            initScrollReveal();
+        }
+    } catch (err) {
+        console.error('[WishRite Storefront] Render error:', err);
+        viewEl.innerHTML = `
+            <div class="container" style="text-align:center;padding:60px 20px;">
+                <p style="color:var(--wr-text-muted);">Unable to load creator storefront. Please try again.</p>
+                <button class="btn btn-primary" onclick="navigateTo('home');" style="margin-top:16px;">Back to Home</button>
+            </div>
+        `;
+    }
+}
+window.renderCreatorStorefront = renderCreatorStorefront;
 
 /**
  * Render dedicated Collection Detail Page with real product grid & counts
@@ -801,6 +981,29 @@ function handleInitialURLRoute(pushHistory = false) {
     if (viewParam && views.includes(viewParam)) {
         navigateTo(viewParam, urlParams.get('param') || null, pushHistory);
         return;
+    }
+
+    // Detect Creator / Influencer Public Storefront (/influencer/:slug or /creator/:slug)
+    const creatorPortalRoutes = ['login', 'dashboard', 'links', 'wallet', 'withdraw', 'points', 'rewards', 'profile'];
+    const creatorMatch = path.match(/^\/(?:influencer|creator)\/([^\/]+)(?:\/product\/([^\/]+))?/);
+    if (creatorMatch) {
+        const slug = creatorMatch[1].trim();
+        const productCode = creatorMatch[2] ? creatorMatch[2].trim() : null;
+
+        if (!creatorPortalRoutes.includes(slug.toLowerCase())) {
+            if (typeof WishRiteAttribution !== 'undefined') {
+                WishRiteAttribution.initializeArrival();
+            }
+
+            if (productCode) {
+                navigateTo('product', productCode, pushHistory);
+            } else {
+                navigateTo('creator-storefront', slug, pushHistory);
+            }
+            return;
+        }
+    } else if (typeof WishRiteAttribution !== 'undefined') {
+        WishRiteAttribution.initializeArrival();
     }
 
     // Occasion Route (path /occasion or hash #occasion)

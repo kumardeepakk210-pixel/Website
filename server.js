@@ -1,9 +1,13 @@
+try {
+    require('dotenv').config();
+} catch (_) {}
+
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const url = require('url');
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8085;
 const ROOT_DIR = __dirname;
 
 const MIME_TYPES = {
@@ -114,7 +118,39 @@ const server = http.createServer(async (req, res) => {
         return fs.createReadStream(safeFilePath).pipe(res);
     }
 
-    // 4. SPA Fallback (Rewrites to index.html for client-side routing)
+    // 4. SPA Rewrites & Fallbacks (matching vercel.json)
+    const creatorPortalRoutes = [
+        '/creator',
+        '/creator/',
+        '/creator/login',
+        '/creator/dashboard',
+        '/creator/links',
+        '/creator/wallet',
+        '/creator/withdraw',
+        '/creator/points',
+        '/creator/rewards',
+        '/creator/profile'
+    ];
+
+    if (creatorPortalRoutes.includes(pathname)) {
+        const creatorPath = path.join(ROOT_DIR, 'creator.html');
+        if (fs.existsSync(creatorPath)) {
+            res.statusCode = 200;
+            res.setHeader('Content-Type', 'text/html; charset=utf-8');
+            return fs.createReadStream(creatorPath).pipe(res);
+        }
+    }
+
+    if (pathname === '/admin' || pathname === '/admin-rewards') {
+        const adminPath = path.join(ROOT_DIR, 'admin-rewards.html');
+        if (fs.existsSync(adminPath)) {
+            res.statusCode = 200;
+            res.setHeader('Content-Type', 'text/html; charset=utf-8');
+            return fs.createReadStream(adminPath).pipe(res);
+        }
+    }
+
+    // Default SPA Fallback (Rewrites to index.html for customer storefront routing)
     const indexPath = path.join(ROOT_DIR, 'index.html');
     if (fs.existsSync(indexPath)) {
         res.statusCode = 200;
@@ -127,11 +163,15 @@ const server = http.createServer(async (req, res) => {
     res.end('Not Found');
 });
 
-server.listen(PORT, () => {
-    console.log(`\n==================================================`);
-    console.log(`🚀 WishRite Website Localhost is Active!`);
-    console.log(`📡 URL: http://localhost:${PORT}`);
-    console.log(`📦 Serving files from: ${ROOT_DIR}`);
-    console.log(`⚡ SPA Routing & API Routes Enabled`);
-    console.log(`==================================================\n`);
-});
+if (require.main === module) {
+    server.listen(PORT, () => {
+        console.log(`\n==================================================`);
+        console.log(`🚀 WishRite Website Localhost is Active!`);
+        console.log(`📡 URL: http://localhost:${PORT}`);
+        console.log(`📦 Serving files from: ${ROOT_DIR}`);
+        console.log(`⚡ SPA Routing & API Routes Enabled`);
+        console.log(`==================================================\n`);
+    });
+}
+
+module.exports = server;

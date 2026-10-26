@@ -1,0 +1,349 @@
+/* ==============================================================================
+   WISHRITE — CREATOR CLUB STOREFRONT STYLING
+   Luxury Rosewood & Silver Design System (#5E3435 / #53374F)
+   Seamlessly integrates with WishRite's core typography, buttons & cards
+   ============================================================================== */
+
+/* ── Creator Storefront View Container ── */
+#creator-storefront-view {
+    padding-top: 100px;
+    padding-bottom: 80px;
+    background: var(--wr-ivory, #FAF7F5);
+    min-height: 80vh;
+}
+
+/* ── Creator Hero Header ── */
+.creator-hero {
+    background: linear-gradient(135deg, #442A41 0%, #5E3435 60%, #764A57 100%);
+    color: #FFFFFF;
+    border-radius: 16px;
+    padding: 48px 36px;
+    margin: 0 auto 48px;
+    max-width: 1240px;
+    box-shadow: 0 16px 36px rgba(94, 52, 53, 0.16);
+    position: relative;
+    overflow: hidden;
+}
+
+.creator-hero::after {
+    content: '';
+    position: absolute;
+    right: -60px;
+    bottom: -60px;
+    width: 260px;
+    height: 260px;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.08) 0%, transparent 70%);
+    pointer-events: none;
+    border-radius: 50%;
+}
+
+.creator-hero-content {
+    display: flex;
+    align-items: center;
+    gap: 36px;
+    position: relative;
+    z-index: 1;
+}
+
+.creator-avatar-wrap {
+    position: relative;
+    flex-shrink: 0;
+}
+
+.creator-avatar {
+    width: 110px;
+    height: 110px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 3px solid rgba(255, 255, 255, 0.85);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+    background: #FAF7F5;
+}
+
+.creator-verified-badge {
+    position: absolute;
+    bottom: 4px;
+    right: 4px;
+    background: #FFFFFF;
+    color: #5E3435;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.creator-info {
+    flex: 1;
+}
+
+.creator-eyebrow {
+    font-size: 0.76rem;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.8);
+    font-weight: 600;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.creator-name {
+    font-family: 'Cinzel', serif;
+    font-size: 2.2rem;
+    font-weight: 600;
+    color: #FFFFFF;
+    margin: 0 0 8px;
+    letter-spacing: 1px;
+    line-height: 1.2;
+}
+
+.creator-social {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(8px);
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 0.84rem;
+    color: #FFFFFF;
+    text-decoration: none;
+    margin-bottom: 12px;
+    transition: all 0.2s ease;
+}
+
+.creator-social:hover {
+    background: rgba(255, 255, 255, 0.25);
+    transform: translateY(-1px);
+}
+
+.creator-bio {
+    font-size: 0.94rem;
+    line-height: 1.6;
+    color: rgba(255, 255, 255, 0.9);
+    max-width: 680px;
+    margin: 0 0 20px;
+}
+
+.creator-actions {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.creator-btn {
+    padding: 10px 20px;
+    border-radius: 24px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.25s ease;
+    border: none;
+    text-decoration: none;
+}
+
+.creator-btn-primary {
+    background: #FFFFFF;
+    color: #5E3435;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.creator-btn-primary:hover {
+    background: #FAF7F5;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+}
+
+.creator-btn-ghost {
+    background: rgba(255, 255, 255, 0.15);
+    color: #FFFFFF;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.creator-btn-ghost:hover {
+    background: rgba(255, 255, 255, 0.25);
+}
+
+/* ── Section Title & Grid ── */
+.creator-section-header {
+    text-align: center;
+    margin-bottom: 40px;
+}
+
+.creator-section-sub {
+    font-size: 0.78rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #84627F;
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+
+.creator-section-title {
+    font-family: 'Cinzel', serif;
+    font-size: 1.85rem;
+    color: #5E3435;
+    font-weight: 600;
+    margin: 0;
+}
+
+.creator-products-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 28px;
+    max-width: 1240px;
+    margin: 0 auto;
+    padding: 0 16px;
+}
+
+/* ── Product Card Share Button & Badge ── */
+.creator-curated-badge {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    background: rgba(94, 52, 53, 0.9);
+    color: #FFFFFF;
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    padding: 4px 10px;
+    border-radius: 12px;
+    backdrop-filter: blur(4px);
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.creator-card-share-btn {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: #FFFFFF;
+    color: #5E3435;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+    cursor: pointer;
+    border: none;
+    z-index: 2;
+    transition: all 0.2s ease;
+}
+
+.creator-card-share-btn:hover {
+    transform: scale(1.1);
+    background: #5E3435;
+    color: #FFFFFF;
+}
+
+/* ── Floating Curated Pill on Product Detail Page ── */
+.creator-pdp-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(94, 52, 53, 0.08);
+    border: 1px solid rgba(94, 52, 53, 0.2);
+    padding: 6px 14px;
+    border-radius: 20px;
+    margin-bottom: 16px;
+    font-size: 0.82rem;
+    color: #5E3435;
+    font-weight: 500;
+}
+
+.creator-pdp-pill a {
+    color: #5E3435;
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+/* ── Empty / Error States ── */
+.creator-empty-state {
+    text-align: center;
+    padding: 64px 20px;
+    max-width: 600px;
+    margin: 40px auto;
+    background: #FFFFFF;
+    border-radius: 16px;
+    border: 1px solid var(--wr-silver-mist, #EFE8E8);
+    box-shadow: 0 8px 24px rgba(94, 52, 53, 0.05);
+}
+
+.creator-empty-icon {
+    font-size: 48px;
+    color: #84627F;
+    margin-bottom: 16px;
+}
+
+.creator-empty-title {
+    font-family: 'Cinzel', serif;
+    font-size: 1.5rem;
+    color: #5E3435;
+    margin: 0 0 12px;
+}
+
+.creator-empty-desc {
+    font-size: 0.92rem;
+    color: #666;
+    line-height: 1.6;
+    margin: 0 0 24px;
+}
+
+/* ── Responsive Mobile Optimizations ── */
+@media (max-width: 768px) {
+    #creator-storefront-view {
+        padding-top: 80px;
+    }
+
+    .creator-hero {
+        padding: 32px 20px;
+        margin: 0 12px 32px;
+        border-radius: 12px;
+    }
+
+    .creator-hero-content {
+        flex-direction: column;
+        text-align: center;
+        gap: 20px;
+    }
+
+    .creator-avatar {
+        width: 90px;
+        height: 90px;
+    }
+
+    .creator-name {
+        font-size: 1.65rem;
+    }
+
+    .creator-actions {
+        justify-content: center;
+    }
+
+    .creator-products-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 14px;
+        padding: 0 12px;
+    }
+}
+
+@media (max-width: 440px) {
+    .creator-products-grid {
+        grid-template-columns: 1fr;
+    }
+}

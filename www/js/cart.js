@@ -1781,6 +1781,30 @@ async function proceedToRazorpayPayment(internalOrderId) {
                     if (typeof WishRiteWalletRewards !== 'undefined') {
                         WishRiteWalletRewards.loadUserData();
                     }
+                    // Creator Club Server-Authoritative Attribution Hook
+                    try {
+                        if (typeof WishRiteAttribution !== 'undefined') {
+                            const attrPayload = WishRiteAttribution.getAttributionPayload();
+                            if (attrPayload && attrPayload.influencer_id) {
+                                console.log('[WishRite Attribution] Notifying server of attributed order:', orderNumber);
+                                fetch('/api/orders/attribute', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                        order_id: orderIdToVerify,
+                                        order_reference: orderNumber,
+                                        sales_amount: pending.final_amount || pending.grand_total || total,
+                                        attribution_id: attrPayload.attribution_id,
+                                        session_id: attrPayload.session_id,
+                                        influencer_id: attrPayload.influencer_id,
+                                        referral_attribution: attrPayload
+                                    })
+                                }).catch(e => console.warn('[WishRite Attribution] Attribution notify notice:', e.message));
+                            }
+                        }
+                    } catch (attrErr) {
+                        console.warn('[WishRite Attribution] Attribution error:', attrErr.message);
+                    }
 
                     // Render luxury WishRite Order Confirmation UI immediately after cart is cleared
                     renderWishriteOrderConfirmation(window.wishritePendingCheckout, verifyData);
@@ -2314,6 +2338,30 @@ async function submitWishriteCustomerCheckout(event) {
             clearCart();
             if (typeof WishRiteWalletRewards !== 'undefined') {
                 WishRiteWalletRewards.loadUserData();
+            }
+
+            // Creator Club Server-Authoritative Attribution Hook for COD
+            try {
+                if (typeof WishRiteAttribution !== 'undefined') {
+                    const attrPayload = WishRiteAttribution.getAttributionPayload();
+                    if (attrPayload && attrPayload.influencer_id) {
+                        fetch('/api/orders/attribute', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                order_id: internalOrderId,
+                                order_reference: orderNumber,
+                                sales_amount: remainingAfterDeductions,
+                                attribution_id: attrPayload.attribution_id,
+                                session_id: attrPayload.session_id,
+                                influencer_id: attrPayload.influencer_id,
+                                referral_attribution: attrPayload
+                            })
+                        }).catch(e => console.warn('[WishRite Attribution] COD attribution notice:', e.message));
+                    }
+                }
+            } catch (attrErr) {
+                console.warn('[WishRite Attribution] COD attribution error:', attrErr.message);
             }
 
             renderWishriteOrderConfirmation(window.wishritePendingCheckout, {

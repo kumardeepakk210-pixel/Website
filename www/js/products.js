@@ -2247,6 +2247,12 @@ function renderProductDetail(product) {
                         <span class="pdp-badge-text">WISHRITE EXCLUSIVE</span>
                     </div>
 
+                    ${(typeof WishRiteAttribution !== 'undefined' && WishRiteAttribution.getActiveAttribution()) ? `
+                        <div class="creator-pdp-pill">
+                            <span>✨ Curated by <a href="/creator/${WishRiteAttribution.getActiveAttribution().public_slug}" onclick="event.preventDefault(); navigateTo('creator-storefront', '${WishRiteAttribution.getActiveAttribution().public_slug}');">${WishRiteAttribution.getActiveAttribution().name}</a></span>
+                        </div>
+                    ` : ''}
+
                     <!-- Title & Subtitle -->
                     <h1 class="pdp-product-title">${product.name}</h1>
                     <div class="pdp-metal-subtitle">${subtitleText}</div>
