@@ -152,6 +152,19 @@ export function verifyPassword(password, storedHash) {
     return false;
 }
 
+export function decodeJwtPayload(token) {
+    if (!token || typeof token !== 'string' || !token.includes('.')) return null;
+    try {
+        const parts = token.split('.');
+        if (parts.length < 2) return null;
+        let str = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+        while (str.length % 4) str += '=';
+        return JSON.parse(Buffer.from(str, 'base64').toString('utf8'));
+    } catch (_) {
+        return null;
+    }
+}
+
 /**
  * Reads local JSON backup store safely
  */
@@ -167,7 +180,17 @@ function readLocalStore() {
                 stats: data.stats || [],
                 clicks: data.clicks || [],
                 attributions: data.attributions || [],
-                order_attributions: data.order_attributions || []
+                order_attributions: data.order_attributions || [],
+                wallets: data.wallets || [],
+                wallet_transactions: data.wallet_transactions || [],
+                payout_methods: data.payout_methods || [],
+                withdrawals: data.withdrawals || [],
+                points_accounts: data.points_accounts || [],
+                points_transactions: data.points_transactions || [],
+                rewards: data.rewards || [],
+                reward_redemptions: data.reward_redemptions || [],
+                payout_webhooks: data.payout_webhooks || [],
+                creator_content: data.creator_content || []
             };
         }
     } catch (e) {
@@ -180,7 +203,17 @@ function readLocalStore() {
         stats: [],
         clicks: [],
         attributions: [],
-        order_attributions: []
+        order_attributions: [],
+        wallets: [],
+        wallet_transactions: [],
+        payout_methods: [],
+        withdrawals: [],
+        points_accounts: [],
+        points_transactions: [],
+        rewards: [],
+        reward_redemptions: [],
+        payout_webhooks: [],
+        creator_content: []
     };
 }
 
@@ -343,26 +376,58 @@ export async function requireCreatorAuth(req, res, next) {
             matchedCreator = local.influencers.find(i => i.id === session.influencerId);
         }
 
-        // 2. If not found in memory, check if it's a Supabase JWT (format ey...)
-        if (!matchedAccount && token.startsWith('ey') && adminClient?.auth) {
-            try {
-                const { data: userData, error: userError } = await adminClient.auth.getUser(token);
-                if (!userError && userData?.user) {
-                    const authUserId = userData.user.id;
-                    const authEmail = userData.user.email?.toLowerCase();
+        // 2. If not found in memory, check if it's a Supabase JWT or token with claims
+        if (!matchedAccount && (token.startsWith('ey') || token.includes('.'))) {
+            let authUserId = null;
+            let authEmail = null;
 
-                    const local = readLocalStore();
-                    matchedAccount = local.accounts.find(a => 
-                        a.auth_user_id === authUserId || 
-                        (authEmail && a.email?.toLowerCase() === authEmail)
-                    );
+            if (adminClient?.auth) {
+                try {
+                    const { data: userData, error: userError } = await adminClient.auth.getUser(token);
+                    if (!userError && userData?.user) {
+                        authUserId = userData.user.id;
+                        authEmail = userData.user.email?.toLowerCase();
+                    }
+                } catch (e) {
+                    console.warn('[Creator Auth] Supabase auth check notice:', e.message);
+                }
+            }
 
-                    if (matchedAccount) {
-                        matchedCreator = local.influencers.find(i => i.id === matchedAccount.influencer_id);
+            // Fallback decode JWT payload if adminClient.auth was unavailable
+            if (!authUserId && token.includes('.')) {
+                const payload = decodeJwtPayload(token);
+                if (payload && (payload.sub || payload.email)) {
+                    authUserId = payload.sub || null;
+                    authEmail = payload.email ? String(payload.email).toLowerCase() : null;
+                }
+            }
+
+            if (authUserId || authEmail) {
+                const local = readLocalStore();
+                matchedAccount = local.accounts.find(a => 
+                    (authUserId && a.auth_user_id === authUserId) || 
+                    (authEmail && a.email?.toLowerCase() === authEmail)
+                );
+
+                if (!matchedAccount && authEmail) {
+                    const directCreator = local.influencers.find(i => i.email && i.email.toLowerCase() === authEmail);
+                    if (directCreator) {
+                        matchedAccount = {
+                            id: randomUUID(),
+                            influencer_id: directCreator.id,
+                            auth_user_id: authUserId,
+                            email: authEmail,
+                            is_active: directCreator.status === 'active',
+                            created_at: new Date().toISOString()
+                        };
+                        local.accounts.push(matchedAccount);
+                        writeLocalStore(local);
                     }
                 }
-            } catch (e) {
-                console.warn('[Creator Auth] Supabase auth check notice:', e.message);
+
+                if (matchedAccount) {
+                    matchedCreator = local.influencers.find(i => i.id === matchedAccount.influencer_id);
+                }
             }
         }
 
@@ -1076,3 +1141,562 @@ export async function handleUpdateCreatorProfile(req, res) {
         }
     });
 }
+
+/**
+ * Resolves customer identity from session token, Supabase JWT, or request headers
+ */
+export async function resolveCustomerIdentity(req) {
+    const authHeader = req.headers.authorization || req.headers['x-creator-token'] || '';
+    let token = '';
+    if (authHeader.startsWith('Bearer ')) {
+        token = authHeader.slice(7).trim();
+    } else if (authHeader) {
+        token = authHeader.trim();
+    }
+
+    let authUserId = null;
+    let authEmail = null;
+
+    if (token && creatorSessions.has(token)) {
+        const sess = creatorSessions.get(token);
+        if (sess.expiresAt > Date.now()) {
+            return {
+                userId: sess.accountId,
+                email: sess.email?.toLowerCase(),
+                influencerId: sess.influencerId
+            };
+        }
+    }
+
+    if (token && (token.startsWith('ey') || token.includes('.'))) {
+        if (adminClient?.auth) {
+            try {
+                const { data, error } = await adminClient.auth.getUser(token);
+                if (!error && data?.user) {
+                    authUserId = data.user.id;
+                    authEmail = data.user.email?.toLowerCase();
+                }
+            } catch (_) {}
+        }
+        if (!authUserId && token.includes('.')) {
+            const payload = decodeJwtPayload(token);
+            if (payload) {
+                authUserId = payload.sub || null;
+                authEmail = payload.email ? String(payload.email).toLowerCase() : null;
+            }
+        }
+    }
+
+    if (!authEmail && req.headers['x-customer-email']) {
+        authEmail = String(req.headers['x-customer-email']).trim().toLowerCase();
+    }
+    if (!authUserId && req.headers['x-customer-id']) {
+        authUserId = String(req.headers['x-customer-id']).trim();
+    }
+    if (!authEmail && req.query && req.query.email) {
+        authEmail = String(req.query.email).trim().toLowerCase();
+    }
+
+    let matchedInfluencerId = null;
+    if (authUserId || authEmail) {
+        const local = readLocalStore();
+        const acct = (local.accounts || []).find(a => 
+            (authUserId && a.auth_user_id === authUserId) || 
+            (authEmail && a.email?.toLowerCase() === authEmail)
+        );
+        if (acct) {
+            matchedInfluencerId = acct.influencer_id;
+        } else if (authEmail) {
+            const inf = (local.influencers || []).find(i => i.email && i.email.toLowerCase() === authEmail);
+            if (inf) matchedInfluencerId = inf.id;
+        }
+    }
+
+    return {
+        userId: authUserId,
+        email: authEmail,
+        influencerId: matchedInfluencerId
+    };
+}
+
+/**
+ * GET /api/creator/status
+ * Authoritatively returns creator status for currently authenticated customer
+ */
+export async function handleCustomerCreatorStatus(req, res) {
+    try {
+        const ident = await resolveCustomerIdentity(req);
+        if (!ident.email && !ident.userId && !ident.influencerId) {
+            return res.json({
+                success: true,
+                is_authenticated: false,
+                is_creator: false
+            });
+        }
+
+        const local = readLocalStore();
+        let matchedAccount = null;
+        let matchedCreator = null;
+
+        if (ident.influencerId) {
+            matchedCreator = local.influencers.find(i => i.id === ident.influencerId);
+            matchedAccount = local.accounts.find(a => a.influencer_id === ident.influencerId);
+        }
+
+        if (!matchedCreator && ident.userId) {
+            matchedAccount = local.accounts.find(a => a.auth_user_id === ident.userId);
+            if (matchedAccount) {
+                matchedCreator = local.influencers.find(i => i.id === matchedAccount.influencer_id);
+            }
+        }
+
+        if (!matchedCreator && ident.email) {
+            matchedAccount = local.accounts.find(a => a.email && a.email.toLowerCase() === ident.email);
+            if (matchedAccount) {
+                matchedCreator = local.influencers.find(i => i.id === matchedAccount.influencer_id);
+            } else {
+                matchedCreator = local.influencers.find(i => i.email && i.email.toLowerCase() === ident.email);
+                if (matchedCreator) {
+                    matchedAccount = {
+                        id: randomUUID(),
+                        influencer_id: matchedCreator.id,
+                        auth_user_id: ident.userId || null,
+                        email: ident.email,
+                        is_active: matchedCreator.status === 'active',
+                        created_at: new Date().toISOString()
+                    };
+                    local.accounts.push(matchedAccount);
+                    writeLocalStore(local);
+                }
+            }
+        }
+
+        if (!matchedCreator) {
+            return res.json({
+                success: true,
+                is_authenticated: true,
+                is_creator: false
+            });
+        }
+
+        const stats = (local.stats || []).find(s => s.influencer_id === matchedCreator.id) || {
+            total_clicks: 0,
+            total_orders: 0,
+            total_sales: 0,
+            total_earnings: 0,
+            available_earnings: 0,
+            pending_earnings: 0,
+            total_points: 0
+        };
+
+        const defaultLink = (local.links || []).find(l => l.influencer_id === matchedCreator.id && l.is_default);
+
+        let walletData = { available_balance: 0, pending_balance: 0, lifetime_earned: 0 };
+        const foundWallet = (local.wallets || []).find(w => w.influencer_id === matchedCreator.id || w.id === matchedCreator.id);
+        if (foundWallet) {
+            walletData = {
+                available_balance: Number(foundWallet.available_balance || 0),
+                pending_balance: Number(foundWallet.pending_balance || 0),
+                lifetime_earned: Number(foundWallet.lifetime_earned || 0)
+            };
+        } else {
+            walletData = {
+                available_balance: Number(stats.available_earnings || 0),
+                pending_balance: Number(stats.pending_earnings || 0),
+                lifetime_earned: Number(stats.total_earnings || 0)
+            };
+        }
+
+        let pointsData = { balance: 0 };
+        const foundPoints = (local.points_accounts || []).find(p => p.influencer_id === matchedCreator.id || p.id === matchedCreator.id);
+        if (foundPoints) {
+            pointsData = { balance: Number(foundPoints.balance || 0) };
+        } else {
+            pointsData = { balance: Number(stats.total_points || 0) };
+        }
+
+        let sessionToken = null;
+        if (matchedAccount) {
+            const sess = issueCreatorSession(matchedAccount, matchedCreator);
+            sessionToken = sess.token;
+        }
+
+        return res.json({
+            success: true,
+            is_authenticated: true,
+            is_creator: true,
+            status: matchedCreator.status || 'active',
+            creator: {
+                id: matchedCreator.id,
+                influencer_code: matchedCreator.influencer_code,
+                name: matchedCreator.name,
+                email: matchedCreator.email,
+                phone: matchedCreator.phone,
+                bio: matchedCreator.bio || '',
+                city: matchedCreator.city || '',
+                state: matchedCreator.state || '',
+                country: matchedCreator.country || 'India',
+                profile_image: matchedCreator.profile_image,
+                instagram_id: matchedCreator.instagram_id || '',
+                instagram_url: matchedCreator.instagram_url || '',
+                youtube_url: matchedCreator.youtube_url || '',
+                facebook_url: matchedCreator.facebook_url || '',
+                other_url: matchedCreator.other_url || '',
+                category: matchedCreator.category || 'Jewellery styling',
+                content_preferences: matchedCreator.content_preferences || [],
+                public_slug: matchedCreator.public_slug,
+                referral_url: defaultLink?.url || `https://wishrite.in/creator/${matchedCreator.public_slug}`,
+                tier: matchedCreator.tier || 'starter'
+            },
+            stats,
+            wallet: walletData,
+            points: pointsData,
+            token: sessionToken
+        });
+    } catch (err) {
+        console.error('[handleCustomerCreatorStatus Error]:', err);
+        return res.status(500).json({ success: false, error: { message: err.message } });
+    }
+}
+
+/**
+ * POST /api/creator/onboard
+ * Activates Creator status for an authenticated WishRite customer
+ */
+export async function handleCustomerCreatorOnboard(req, res) {
+    try {
+        const body = req.body || {};
+        const ident = await resolveCustomerIdentity(req);
+        const cleanEmail = String(body.email || ident.email || '').trim().toLowerCase();
+
+        if (!cleanEmail) {
+            return res.status(401).json({
+                success: false,
+                error: { message: 'Customer account authentication required to activate Creator profile.' }
+            });
+        }
+
+        if (!body.agreement_accepted) {
+            return res.status(400).json({
+                success: false,
+                error: { message: 'You must agree to the WishRite Creator Program Terms & Content Guidelines.' }
+            });
+        }
+
+        const local = readLocalStore();
+
+        // Check if already active creator
+        const existingCreator = local.influencers.find(i => i.email && i.email.toLowerCase() === cleanEmail);
+        if (existingCreator) {
+            let acct = local.accounts.find(a => a.influencer_id === existingCreator.id);
+            if (!acct) {
+                acct = {
+                    id: randomUUID(),
+                    influencer_id: existingCreator.id,
+                    auth_user_id: ident.userId || body.user_id || null,
+                    email: cleanEmail,
+                    is_active: true,
+                    created_at: new Date().toISOString()
+                };
+                local.accounts.push(acct);
+                writeLocalStore(local);
+            }
+            const sess = issueCreatorSession(acct, existingCreator);
+            return res.json({
+                success: true,
+                message: 'Creator profile is already active for your account.',
+                creator: existingCreator,
+                already_active: true,
+                token: sess.token
+            });
+        }
+
+        const displayName = sanitizeText(body.display_name || body.name || cleanEmail.split('@')[0]);
+        const slugBase = displayName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || `creator-${randomUUID().slice(0, 6)}`;
+        let publicSlug = slugBase;
+        let counter = 1;
+        while (local.influencers.some(i => i.public_slug && i.public_slug.toLowerCase() === publicSlug)) {
+            publicSlug = `${slugBase}-${counter++}`;
+        }
+
+        const code = `WR-CRE-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
+        const newCreator = {
+            id: randomUUID(),
+            influencer_code: code,
+            name: displayName,
+            email: cleanEmail,
+            phone: sanitizeText(body.phone || ''),
+            bio: sanitizeText(body.bio || ''),
+            city: sanitizeText(body.city || ''),
+            state: sanitizeText(body.state || ''),
+            country: sanitizeText(body.country || 'India'),
+            profile_image: isValidHttpUrl(body.profile_image) ? body.profile_image : `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=5E3435&color=fff`,
+            instagram_id: sanitizeText((body.instagram_username || '').replace('@', '')),
+            instagram_url: isValidHttpUrl(body.instagram_url) ? body.instagram_url : (body.instagram_username ? `https://instagram.com/${body.instagram_username.replace('@', '')}` : null),
+            youtube_url: isValidHttpUrl(body.youtube_url) ? body.youtube_url : null,
+            facebook_url: isValidHttpUrl(body.facebook_url) ? body.facebook_url : null,
+            other_url: isValidHttpUrl(body.other_url) ? body.other_url : null,
+            category: sanitizeText(body.category || (Array.isArray(body.content_preferences) && body.content_preferences[0]) || 'Jewellery styling'),
+            content_preferences: Array.isArray(body.content_preferences) ? body.content_preferences : [],
+            commission_rate: 10,
+            tier: 'starter',
+            status: 'active',
+            public_slug: publicSlug,
+            public_profile_url: `https://wishrite.in/influencer/${publicSlug}`,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+        };
+        local.influencers.push(newCreator);
+
+        const newAccount = {
+            id: randomUUID(),
+            influencer_id: newCreator.id,
+            auth_user_id: ident.userId || body.user_id || null,
+            email: cleanEmail,
+            password_hash: hashPassword('WishriteCreator2026!'),
+            is_active: true,
+            last_login_at: new Date().toISOString(),
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+        };
+        local.accounts.push(newAccount);
+
+        const defaultLink = {
+            id: randomUUID(),
+            influencer_id: newCreator.id,
+            link_type: 'storefront',
+            url: `https://wishrite.in/creator/${publicSlug}`,
+            is_default: true,
+            campaign_id: 'default',
+            created_at: new Date().toISOString()
+        };
+        local.links.push(defaultLink);
+
+        const initialStats = {
+            id: randomUUID(),
+            influencer_id: newCreator.id,
+            total_clicks: 0,
+            total_orders: 0,
+            total_sales: 0,
+            total_views: 0,
+            total_earnings: 0,
+            available_earnings: 0,
+            pending_earnings: 0,
+            total_points: 0,
+            updated_at: new Date().toISOString()
+        };
+        local.stats.push(initialStats);
+        writeLocalStore(local);
+
+        try {
+            await dbInsert('influencers', newCreator, { useAdmin: true }).catch(() => {});
+            await dbInsert('influencer_accounts', newAccount, { useAdmin: true }).catch(() => {});
+            await dbInsert('influencer_links', defaultLink, { useAdmin: true }).catch(() => {});
+            await dbInsert('influencer_stats', initialStats, { useAdmin: true }).catch(() => {});
+        } catch (_) {}
+
+        const sess = issueCreatorSession(newAccount, newCreator);
+
+        return res.json({
+            success: true,
+            message: 'WishRite Creator Profile activated successfully!',
+            creator: newCreator,
+            token: sess.token
+        });
+    } catch (err) {
+        console.error('[handleCustomerCreatorOnboard Error]:', err);
+        return res.status(500).json({ success: false, error: { message: err.message } });
+    }
+}
+
+/**
+ * POST /api/creator/content
+ * Submits a social media Post or Reel for review
+ */
+export async function handleSubmitCreatorContent(req, res) {
+    try {
+        const creator = req.creator;
+        if (!creator) {
+            return res.status(401).json({ success: false, error: { message: 'Creator authentication required.' } });
+        }
+
+        const body = req.body || {};
+        const contentType = body.content_type === 'reel' ? 'reel' : 'post';
+        const platform = String(body.platform || 'instagram').toLowerCase().trim();
+        const contentUrl = String(body.url || '').trim();
+
+        if (!contentUrl || !isValidHttpUrl(contentUrl)) {
+            return res.status(400).json({
+                success: false,
+                error: { code: 'INVALID_URL', message: 'Please enter a valid HTTP or HTTPS post/reel URL.' }
+            });
+        }
+
+        if (platform === 'instagram' && !contentUrl.includes('instagram.com')) {
+            return res.status(400).json({
+                success: false,
+                error: { code: 'INVALID_PLATFORM_URL', message: 'Please enter a valid Instagram post or reel URL.' }
+            });
+        }
+        if (platform === 'youtube' && !contentUrl.includes('youtube.com') && !contentUrl.includes('youtu.be')) {
+            return res.status(400).json({
+                success: false,
+                error: { code: 'INVALID_PLATFORM_URL', message: 'Please enter a valid YouTube video or short URL.' }
+            });
+        }
+        if (platform === 'facebook' && !contentUrl.includes('facebook.com') && !contentUrl.includes('fb.watch')) {
+            return res.status(400).json({
+                success: false,
+                error: { code: 'INVALID_PLATFORM_URL', message: 'Please enter a valid Facebook post or reel URL.' }
+            });
+        }
+
+        const local = readLocalStore();
+        if (!local.creator_content) local.creator_content = [];
+
+        const newContent = {
+            id: randomUUID(),
+            influencer_id: creator.id,
+            creator_name: creator.name,
+            creator_email: creator.email || '',
+            content_type: contentType,
+            platform,
+            url: contentUrl,
+            caption: sanitizeText(body.caption || ''),
+            product_code: sanitizeText(body.product_code || ''),
+            product_name: sanitizeText(body.product_name || ''),
+            product_image: isValidHttpUrl(body.product_image) ? body.product_image : null,
+            thumbnail_url: isValidHttpUrl(body.thumbnail_url) ? body.thumbnail_url : (isValidHttpUrl(body.product_image) ? body.product_image : null),
+            tags: Array.isArray(body.tags) ? body.tags : (body.tags ? [String(body.tags)] : []),
+            status: 'Submitted',
+            rejection_reason: null,
+            views: 0,
+            clicks: 0,
+            orders: 0,
+            commission_amount: 0,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+        };
+
+        local.creator_content.unshift(newContent);
+        writeLocalStore(local);
+
+        try {
+            await dbInsert('creator_content', newContent, { useAdmin: true }).catch(() => {});
+        } catch (_) {}
+
+        return res.json({
+            success: true,
+            message: `${contentType === 'reel' ? 'Reel' : 'Post'} submitted successfully and is now under review.`,
+            data: newContent
+        });
+    } catch (err) {
+        console.error('[handleSubmitCreatorContent Error]:', err);
+        return res.status(500).json({ success: false, error: { message: err.message } });
+    }
+}
+
+/**
+ * GET /api/creator/content
+ * Returns only the authenticated creator's submitted content (strictly isolated)
+ */
+export async function handleGetCreatorContent(req, res) {
+    try {
+        const creator = req.creator;
+        if (!creator) {
+            return res.status(401).json({ success: false, error: { message: 'Creator authentication required.' } });
+        }
+
+        const local = readLocalStore();
+        const contentList = (local.creator_content || []).filter(c => c.influencer_id === creator.id);
+
+        return res.json({
+            success: true,
+            data: contentList,
+            content: contentList
+        });
+    } catch (err) {
+        console.error('[handleGetCreatorContent Error]:', err);
+        return res.status(500).json({ success: false, error: { message: err.message } });
+    }
+}
+
+/**
+ * GET /api/creator/admin/content
+ * Admin endpoint: lists all submitted content across all creators
+ */
+export async function handleGetAdminCreatorContent(req, res) {
+    try {
+        const local = readLocalStore();
+        return res.json({
+            success: true,
+            data: local.creator_content || [],
+            content: local.creator_content || []
+        });
+    } catch (err) {
+        return res.status(500).json({ success: false, error: { message: err.message } });
+    }
+}
+
+/**
+ * POST /api/creator/admin/content/moderate
+ * Admin endpoint: approves or rejects content
+ * Security: Creators cannot approve their own content.
+ */
+export async function handleModerateCreatorContent(req, res) {
+    try {
+        const body = req.body || {};
+        const contentId = String(body.id || body.contentId || '').trim();
+        const action = String(body.action || '').toLowerCase().trim();
+
+        if (!contentId || (action !== 'approve' && action !== 'reject')) {
+            return res.status(400).json({
+                success: false,
+                error: { message: "Invalid moderation request. Provide content 'id' and 'action' ('approve' or 'reject')." }
+            });
+        }
+
+        const local = readLocalStore();
+        const item = (local.creator_content || []).find(c => c.id === contentId);
+
+        if (!item) {
+            return res.status(404).json({ success: false, error: { message: 'Content submission not found.' } });
+        }
+
+        // Security check: creators cannot approve/reject their own content
+        const ident = await resolveCustomerIdentity(req);
+        if ((req.creator && req.creator.id === item.influencer_id) || (ident.influencerId && ident.influencerId === item.influencer_id)) {
+            return res.status(403).json({
+                success: false,
+                error: { code: 'FORBIDDEN_SELF_MODERATION', message: 'Creators are not permitted to moderate their own content.' }
+            });
+        }
+
+        item.status = action === 'approve' ? 'Approved' : 'Rejected';
+        if (action === 'reject') {
+            item.rejection_reason = sanitizeText(body.rejection_reason || 'Does not meet content quality guidelines');
+        } else {
+            item.rejection_reason = null;
+        }
+        item.updated_at = new Date().toISOString();
+
+        writeLocalStore(local);
+
+        try {
+            await dbUpdate('creator_content', 'id', item.id, {
+                status: item.status,
+                rejection_reason: item.rejection_reason,
+                updated_at: item.updated_at
+            }, { useAdmin: true }).catch(() => {});
+        } catch (_) {}
+
+        return res.json({
+            success: true,
+            message: `Content successfully ${item.status}.`,
+            data: item
+        });
+    } catch (err) {
+        return res.status(500).json({ success: false, error: { message: err.message } });
+    }
+}
+

@@ -200,7 +200,12 @@ function navigateTo(viewId, param, pushHistory = true) {
             if (typeof renderProfileAccountDetails === 'function') {
                 renderProfileAccountDetails();
             }
-            if (pushHistory) { try { history.pushState({ view: 'profile' }, '', '/account'); } catch (e) { } }
+            if (param === 'creator' && typeof switchProfileTab === 'function') {
+                switchProfileTab('creator');
+            } else if (typeof switchProfileTab === 'function') {
+                switchProfileTab('account');
+            }
+            if (pushHistory) { try { history.pushState({ view: 'profile', param }, '', '/account'); } catch (e) { } }
             break;
         case 'login':
             if (pushHistory) { try { history.pushState({ view: 'login' }, '', '/login'); } catch (e) { } }

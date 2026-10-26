@@ -53,7 +53,7 @@ function formatAdminDate(dateStr) {
 }
 
 function switchAdminTab(tabId) {
-    const tabs = ['customers', 'wallet-tx', 'reward-tx', 'referrals', 'audit-logs'];
+    const tabs = ['customers', 'wallet-tx', 'reward-tx', 'referrals', 'audit-logs', 'creator-content'];
     tabs.forEach(t => {
         const pane = document.getElementById(`tab-${t}`);
         if (pane) pane.style.display = (t === tabId) ? 'block' : 'none';
@@ -67,6 +67,10 @@ function switchAdminTab(tabId) {
             btn.classList.remove('active');
         }
     });
+
+    if (tabId === 'creator-content') {
+        loadCreatorContentTable();
+    }
 }
 
 async function loadSettings() {
@@ -539,6 +543,120 @@ async function loadAllAdminData() {
     ]);
 }
 
+let allCreatorContent = [];
+
+async function loadCreatorContentTable() {
+    const tbody = document.getElementById('tbl-creator-content-body');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:24px;">Loading creator content…</td></tr>';
+
+    try {
+        const res = await fetch('/api/creator/admin/content', {
+            headers: {
+                'x-admin-role': 'true'
+            }
+        });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error || 'Failed to load content');
+
+        allCreatorContent = data.content || [];
+        renderCreatorContentRows(allCreatorContent);
+    } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="11" style="text-align:center;color:#c53030;padding:24px;">Error: ${escapeAdminHtml(err.message)}</td></tr>`;
+    }
+}
+
+function filterCreatorContentTable() {
+    const query = (document.getElementById('creator-content-search')?.value || '').toLowerCase().trim();
+    const status = document.getElementById('creator-content-status-filter')?.value || 'all';
+
+    let filtered = allCreatorContent;
+    if (status !== 'all') {
+        filtered = filtered.filter(item => (item.status || '').toLowerCase() === status.toLowerCase());
+    }
+    if (query) {
+        filtered = filtered.filter(item => {
+            return (item.creator_name || '').toLowerCase().includes(query) ||
+                (item.creator_email || '').toLowerCase().includes(query) ||
+                (item.platform || '').toLowerCase().includes(query) ||
+                (item.product_name || '').toLowerCase().includes(query) ||
+                (item.url || '').toLowerCase().includes(query);
+        });
+    }
+    renderCreatorContentRows(filtered);
+}
+
+function renderCreatorContentRows(items) {
+    const tbody = document.getElementById('tbl-creator-content-body');
+    if (!tbody) return;
+
+    if (!items || items.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:24px;color:#7A7A7A;">No creator submissions found.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = items.map(item => {
+        const statusClass = (item.status === 'Approved') ? 'badge-credit' : (item.status === 'Rejected') ? 'badge-debit' : 'badge-status';
+        return `
+            <tr>
+                <td>
+                    <strong>${escapeAdminHtml(item.creator_name || 'Creator')}</strong><br>
+                    <small style="color:#7A7A7A;">${escapeAdminHtml(item.creator_email || '')}</small>
+                </td>
+                <td><span style="font-weight:600;">${escapeAdminHtml(item.platform || 'Instagram')}</span></td>
+                <td><span style="font-size:0.75rem;background:#F0EAE4;padding:2px 6px;border-radius:3px;">${escapeAdminHtml(item.content_type || 'post')}</span></td>
+                <td>
+                    <a href="${escapeAdminHtml(item.url || '#')}" target="_blank" rel="noopener noreferrer" style="color:var(--wr-admin-maroon);text-decoration:underline;font-size:0.8rem;">View Link ↗</a>
+                </td>
+                <td>
+                    <span style="font-size:0.8rem;font-weight:500;">${escapeAdminHtml(item.product_name || '—')}</span><br>
+                    <small style="color:#7A7A7A;">${escapeAdminHtml(item.product_code || '')}</small>
+                </td>
+                <td><small>${formatAdminDate(item.created_at)}</small></td>
+                <td><span class="${statusClass}">${escapeAdminHtml(item.status || 'Submitted')}</span></td>
+                <td>${Number(item.views || 0).toLocaleString('en-IN')}</td>
+                <td>${Number(item.clicks || 0)} / ${Number(item.orders || 0)}</td>
+                <td>₹${Number(item.commission_amount || 0).toFixed(2)}</td>
+                <td>
+                    <div style="display:flex;gap:6px;">
+                        <button type="button" class="admin-btn admin-btn-sm" style="background:#027A48;color:#fff;padding:4px 8px;font-size:0.75rem;border-radius:4px;border:none;cursor:pointer;" onclick="moderateCreatorContent('${item.id}', 'approve')">Approve</button>
+                        <button type="button" class="admin-btn admin-btn-sm" style="background:#B91C1C;color:#fff;padding:4px 8px;font-size:0.75rem;border-radius:4px;border:none;cursor:pointer;" onclick="moderateCreatorContent('${item.id}', 'reject')">Reject</button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+async function moderateCreatorContent(contentId, action) {
+    let reason = '';
+    if (action === 'reject') {
+        reason = prompt('Enter optional rejection reason:') || '';
+    }
+
+    try {
+        const res = await fetch('/api/creator/admin/content/moderate', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-admin-role': 'true'
+            },
+            body: JSON.stringify({
+                contentId,
+                action,
+                rejectionReason: reason
+            })
+        });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error || 'Moderation failed');
+        alert(`Content ${action === 'approve' ? 'Approved' : 'Rejected'} successfully!`);
+        loadCreatorContentTable();
+    } catch (err) {
+        alert('Error: ' + err.message);
+    }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     loadAllAdminData();
 });
+

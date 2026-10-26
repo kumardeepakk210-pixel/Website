@@ -172,11 +172,10 @@ function switchLoginMethod(method) {
 
 function navigateToCreatorAccount() {
     document.querySelectorAll('.user-dropdown').forEach(d => d.classList.remove('show'));
-    const creatorToken = localStorage.getItem('wishrite_creator_token');
-    if (creatorToken) {
-        window.location.href = '/creator/dashboard';
+    if (typeof navigateTo === 'function') {
+        navigateTo('profile', 'creator');
     } else {
-        window.location.href = '/creator/login';
+        window.location.href = '/account';
     }
 }
 window.navigateToCreatorAccount = navigateToCreatorAccount;
@@ -187,24 +186,20 @@ function updateAuthDropdown() {
 
     if (!dropdown) return;
 
-    const hasCreatorSession = Boolean(localStorage.getItem('wishrite_creator_token'));
-    const creatorSubText = hasCreatorSession ? 'Open Creator Dashboard' : 'Join Creator Club';
-
     dropdown.innerHTML = isLoggedIn
         ? `
-            <a onclick="navigateTo('profile')" role="menuitem">My Profile</a>
-            <a onclick="navigateTo('profile'); setTimeout(() => { const o = document.getElementById('account-orders-card'); if (o) o.scrollIntoView({ behavior: 'smooth' }); }, 150);" role="menuitem">My Orders</a>
-            <a onclick="navigateTo('wishlist')" role="menuitem">Wishlist</a>
-            <div class="user-dropdown-divider" role="separator"></div>
-            <a onclick="navigateToCreatorAccount()" class="creator-account-link" id="user-dropdown-creator-link" role="menuitem">
+            <a onclick="navigateTo('profile', 'account')" role="menuitem">My Account</a>
+            <a onclick="navigateTo('profile', 'creator')" class="creator-account-link" id="user-dropdown-creator-link" role="menuitem">
                 <div class="creator-menu-item">
                     <div class="creator-menu-header-row">
-                        <span class="creator-menu-title">Creator Account</span>
+                        <span class="creator-menu-title">Creator Program</span>
                         <span class="creator-menu-badge">Club</span>
                     </div>
-                    <span class="creator-menu-sub">${creatorSubText}</span>
+                    <span class="creator-menu-sub">Available inside My Account</span>
                 </div>
             </a>
+            <a onclick="navigateTo('profile', 'account'); setTimeout(() => { const o = document.getElementById('account-orders-card'); if (o) o.scrollIntoView({ behavior: 'smooth' }); }, 150);" role="menuitem">My Orders</a>
+            <a onclick="navigateTo('wishlist')" role="menuitem">Wishlist</a>
             <div class="user-dropdown-divider" role="separator"></div>
             <a onclick="handleLogout()" role="menuitem">Logout</a>
           `
@@ -213,13 +208,13 @@ function updateAuthDropdown() {
             <a onclick="navigateTo('register')" role="menuitem">Register</a>
             <a onclick="navigateTo('wishlist')" role="menuitem">Wishlist</a>
             <div class="user-dropdown-divider" role="separator"></div>
-            <a onclick="navigateToCreatorAccount()" class="creator-account-link" id="user-dropdown-creator-link-guest" role="menuitem">
+            <a onclick="navigateTo('login')" class="creator-account-link" id="user-dropdown-creator-link-guest" role="menuitem">
                 <div class="creator-menu-item">
                     <div class="creator-menu-header-row">
-                        <span class="creator-menu-title">Creator Account</span>
+                        <span class="creator-menu-title">Creator Program</span>
                         <span class="creator-menu-badge">Club</span>
                     </div>
-                    <span class="creator-menu-sub">${creatorSubText}</span>
+                    <span class="creator-menu-sub">Sign in to access Creator tab</span>
                 </div>
             </a>
           `;

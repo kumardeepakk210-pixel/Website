@@ -174,6 +174,28 @@ module.exports = async function handler(req, res) {
             return await withAuth(wallet.handleGetCreatorRedemptions);
         }
 
+        // 10. Integrated Customer Creator Program Routes
+        if (subPath === '/status' && method === 'GET') {
+            return await creator.handleCustomerCreatorStatus(req, res);
+        }
+        if (subPath === '/onboard' && method === 'POST') {
+            return await creator.handleCustomerCreatorOnboard(req, res);
+        }
+        if (subPath === '/content') {
+            if (method === 'POST') {
+                return await withAuth(creator.handleSubmitCreatorContent);
+            }
+            if (method === 'GET') {
+                return await withAuth(creator.handleGetCreatorContent);
+            }
+        }
+        if (subPath === '/admin/content' && method === 'GET') {
+            return await creator.handleGetAdminCreatorContent(req, res);
+        }
+        if (subPath === '/admin/content/moderate' && method === 'POST') {
+            return await creator.handleModerateCreatorContent(req, res);
+        }
+
         // Route Not Found
         res.status(404).json({
             success: false,

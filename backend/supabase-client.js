@@ -242,6 +242,12 @@ export const tableColumnsCache = {
         'wallet_delta', 'wallet_balance_after', 'points_delta', 'points_balance_after',
         'note', 'performed_by', 'created_at'
     ]),
+    creator_content: new Set([
+        'id', 'influencer_id', 'customer_id', 'creator_name', 'creator_email', 'content_type',
+        'platform', 'url', 'caption', 'product_code', 'product_name',
+        'product_image', 'thumbnail_url', 'tags', 'status', 'rejection_reason',
+        'views', 'clicks', 'orders', 'commission_amount', 'created_at', 'updated_at'
+    ]),
     influencers: new Set([
         'id', 'influencer_code', 'name', 'email', 'phone',
         'instagram_id', 'instagram_url', 'public_slug', 'public_profile_url',

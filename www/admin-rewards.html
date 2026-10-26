@@ -501,6 +501,7 @@
                     <button class="admin-tab-btn" onclick="switchAdminTab('reward-tx')">Reward Ledger</button>
                     <button class="admin-tab-btn" onclick="switchAdminTab('referrals')">Referrals</button>
                     <button class="admin-tab-btn" onclick="switchAdminTab('audit-logs')">Admin Audit Trail</button>
+                    <button class="admin-tab-btn" onclick="switchAdminTab('creator-content')">Creator Content</button>
                 </div>
             </div>
 
@@ -615,6 +616,45 @@
                             </thead>
                             <tbody id="tbl-audit-logs-body">
                                 <tr><td colspan="6" style="text-align:center;padding:24px;">Loading audit trail…</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Tab 6: Creator Content Moderation -->
+                <div id="tab-creator-content" style="display:none;">
+                    <div style="margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+                        <input type="text" id="creator-content-search" class="admin-input" placeholder="Search by creator, platform, product, URL…" style="max-width:380px;" oninput="filterCreatorContentTable()">
+                        <div style="display:flex;gap:8px;">
+                            <select id="creator-content-status-filter" class="admin-input" onchange="filterCreatorContentTable()" style="max-width:160px;">
+                                <option value="all">All Statuses</option>
+                                <option value="Submitted">Submitted</option>
+                                <option value="Under Review">Under Review</option>
+                                <option value="Approved">Approved</option>
+                                <option value="Rejected">Rejected</option>
+                            </select>
+                            <button type="button" class="admin-btn admin-btn-gold" onclick="loadCreatorContentTable()">Refresh</button>
+                        </div>
+                    </div>
+                    <div class="admin-table-wrap">
+                        <table class="admin-table">
+                            <thead>
+                                <tr>
+                                    <th>Creator</th>
+                                    <th>Platform</th>
+                                    <th>Type</th>
+                                    <th>URL / Preview</th>
+                                    <th>Product</th>
+                                    <th>Date</th>
+                                    <th>Status</th>
+                                    <th>Views</th>
+                                    <th>Clicks / Orders</th>
+                                    <th>Commission</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbl-creator-content-body">
+                                <tr><td colspan="11" style="text-align:center;padding:24px;">Loading creator content…</td></tr>
                             </tbody>
                         </table>
                     </div>
