@@ -2531,23 +2531,44 @@
                         </div>
                     </div>
 
-                    <!-- My Content Section -->
-                    <div class="creator-section-heading" style="margin-top: 32px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
-                        <div>
-                            <h3 style="margin:0;">My Content</h3>
-                            <span style="font-size:0.8rem; color:var(--wr-text-muted);">Your submitted posts and reels</span>
+                    <!-- My Content Section (List / Table View with Instagram Insights) -->
+                    <div class="creator-content-section" id="creator-content-section" style="margin-top: 36px;">
+                        <!-- Instagram Connection Status Banner -->
+                        <div id="creator-instagram-conn-card" class="creator-instagram-conn-card" style="margin-bottom: 20px;">
+                            <!-- Rendered dynamically by renderInstagramConnection() -->
                         </div>
-                        <div class="creator-content-filters" style="display:flex; gap:6px;">
-                            <button type="button" class="content-filter-btn active" onclick="filterCreatorContent('all', this)">All</button>
-                            <button type="button" class="content-filter-btn" onclick="filterCreatorContent('post', this)">Posts</button>
-                            <button type="button" class="content-filter-btn" onclick="filterCreatorContent('reel', this)">Reels</button>
-                            <button type="button" class="content-filter-btn" onclick="filterCreatorContent('pending', this)">Pending</button>
-                            <button type="button" class="content-filter-btn" onclick="filterCreatorContent('approved', this)">Approved</button>
-                        </div>
-                    </div>
 
-                    <div id="creator-content-grid" class="creator-content-grid" style="margin-top: 16px;">
-                        <!-- Cards dynamically rendered by loadCreatorContent() -->
+                        <div class="creator-section-heading" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+                            <div>
+                                <h3 style="margin:0; text-transform:uppercase; letter-spacing:0.5px;">My Content</h3>
+                                <span style="font-size:0.8rem; color:var(--wr-text-muted);">Your submitted posts and reels</span>
+                            </div>
+                            <div class="creator-content-controls" style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+                                <div class="creator-content-filters" style="display:flex; gap:6px;">
+                                    <button type="button" class="content-filter-btn active" onclick="filterCreatorContent('all', this)">All</button>
+                                    <button type="button" class="content-filter-btn" onclick="filterCreatorContent('post', this)">Posts</button>
+                                    <button type="button" class="content-filter-btn" onclick="filterCreatorContent('reel', this)">Reels</button>
+                                    <button type="button" class="content-filter-btn" onclick="filterCreatorContent('pending', this)">Pending</button>
+                                    <button type="button" class="content-filter-btn" onclick="filterCreatorContent('approved', this)">Approved</button>
+                                </div>
+                                <div class="creator-content-sorting" style="display:flex; align-items:center; gap:6px;">
+                                    <label for="creator-content-sort" style="font-size:0.75rem; color:var(--wr-text-muted); text-transform:uppercase; font-weight:600;">Sort:</label>
+                                    <select id="creator-content-sort" class="content-sort-select" onchange="sortCreatorContent(this.value)" style="font-size:0.8rem; padding:4px 8px; border-radius:4px; border:1px solid rgba(94,52,53,0.2); background:#fff; color:#5E3435;">
+                                        <option value="newest">Newest</option>
+                                        <option value="views">Most Viewed</option>
+                                        <option value="likes">Most Liked</option>
+                                        <option value="comments">Most Commented</option>
+                                        <option value="shares">Most Shared</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Content List / Table View & Mobile Cards -->
+                        <div id="creator-content-list-container" class="creator-content-list-container" style="margin-top: 16px;">
+                            <!-- Dynamically rendered by renderCreatorContentList() -->
+                            <div id="creator-content-grid" class="creator-content-grid" style="display:none;"></div>
+                        </div>
                     </div>
                 </div>
 
@@ -2876,6 +2897,45 @@
             <div id="creator-rewards-catalogue-list" style="display:flex; flex-direction:column; gap:12px; margin-top:16px;">
                 <!-- Dynamically rendered -->
             </div>
+        </div>
+    </div>
+
+    <!-- ═══ CONNECT INSTAGRAM MODAL ═══ -->
+    <div class="creator-modal" id="modal-connect-instagram" role="dialog" aria-modal="true" aria-labelledby="connect-ig-modal-title" style="display:none;position:fixed;inset:0;z-index:9999;align-items:center;justify-content:center;">
+        <div class="creator-modal-backdrop" onclick="closeInstagramConnectModal()" style="position:absolute;inset:0;background:rgba(0,0,0,0.6);backdrop-filter:blur(3px);"></div>
+        <div class="creator-modal-content" style="position:relative;background:#fff;border-radius:10px;max-width:480px;width:92%;padding:32px 28px;box-shadow:0 16px 40px rgba(0,0,0,0.2);z-index:2;">
+            <button class="creator-modal-close" onclick="closeInstagramConnectModal()" aria-label="Close modal" style="position:absolute;top:16px;right:16px;background:none;border:none;font-size:24px;cursor:pointer;color:var(--wr-text-muted);">&times;</button>
+            <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
+                <div style="width:36px; height:36px; border-radius:8px; background:linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%); display:flex; align-items:center; justify-content:center; color:#fff;">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>
+                </div>
+                <div>
+                    <h3 id="connect-ig-modal-title" style="margin:0; font-family:var(--wr-font-heading); font-size:1.35rem; color:#5E3435;">Connect Instagram Account</h3>
+                    <span style="font-size:0.78rem; color:var(--wr-text-muted);">Official Meta / Instagram Insights Sync</span>
+                </div>
+            </div>
+            <div style="background:rgba(94,52,53,0.04); border:1px solid rgba(94,52,53,0.12); border-radius:6px; padding:12px; margin:14px 0; font-size:0.8rem; line-height:1.45; color:var(--wr-text);">
+                <strong>Professional Account Notice:</strong>
+                <p style="margin:4px 0 0 0; color:var(--wr-text-muted);">Instagram insights require an eligible <strong>Instagram professional account (Creator or Business)</strong> connected to WishRite.</p>
+            </div>
+            <form id="form-connect-instagram" onsubmit="handleInstagramConnectSubmit(event)">
+                <div class="form-group" style="margin-bottom:14px;">
+                    <label for="ig-connect-handle" style="display:block; font-size:0.82rem; font-weight:600; color:#5E3435; margin-bottom:4px;">Instagram Username / Handle</label>
+                    <div style="position:relative;">
+                        <span style="position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--wr-text-muted); font-weight:600;">@</span>
+                        <input type="text" id="ig-connect-handle" required placeholder="yourusername" style="width:100%; padding:9px 12px 9px 28px; border:1px solid var(--wr-border, #E4E4E7); border-radius:6px; font-size:0.9rem;" />
+                    </div>
+                </div>
+                <div class="form-group" style="margin-bottom:18px;">
+                    <label for="ig-connect-token" style="display:block; font-size:0.82rem; font-weight:600; color:#5E3435; margin-bottom:4px;">Meta Graph API User Token <span style="font-weight:400; color:var(--wr-text-muted);">(Optional for direct integration)</span></label>
+                    <input type="password" id="ig-connect-token" placeholder="EAA..." autocomplete="off" style="width:100%; padding:9px 12px; border:1px solid var(--wr-border, #E4E4E7); border-radius:6px; font-size:0.85rem;" />
+                    <span style="font-size:0.72rem; color:var(--wr-text-muted); display:block; margin-top:4px;">Tokens are encrypted server-side and never exposed to browser JavaScript.</span>
+                </div>
+                <div style="display:flex; justify-content:flex-end; gap:8px;">
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="closeInstagramConnectModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary btn-sm" id="btn-submit-ig-connect">Connect Account</button>
+                </div>
+            </form>
         </div>
     </div>
     <div class="filter-backdrop" id="filter-backdrop" onclick="closeFilterSheet()"></div>

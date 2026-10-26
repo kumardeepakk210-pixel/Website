@@ -207,6 +207,26 @@ module.exports = async function handler(req, res) {
             return await creator.handleGetCreatorContest(req, res);
         }
 
+        // 8. Instagram Insights & Content Sync
+        if (subPath === '/instagram/status' && method === 'GET') {
+            return await withAuth(creator.handleGetInstagramStatus);
+        }
+        if (subPath === '/instagram/connect' && (method === 'POST' || method === 'GET')) {
+            return await withAuth(creator.handleConnectInstagram);
+        }
+        if (subPath === '/instagram/disconnect' && method === 'POST') {
+            return await withAuth(creator.handleDisconnectInstagram);
+        }
+        if (subPath === '/instagram/sync' && method === 'POST') {
+            return await withAuth(creator.handleSyncAllInstagramContent);
+        }
+
+        const syncMatch = subPath.match(/^\/content\/([^\/]+)\/sync$/);
+        if (syncMatch && method === 'POST') {
+            const contentId = syncMatch[1];
+            return await withAuth((req, res) => creator.handleSyncCreatorContent(req, res, contentId));
+        }
+
         // Route Not Found
         res.status(404).json({
             success: false,

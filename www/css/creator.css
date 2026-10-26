@@ -1815,4 +1815,326 @@
     }
 }
 
+/* ==============================================================================
+   INSTAGRAM CONTENT LIST & AUTOMATIC REEL INSIGHTS STYLES
+   Desktop table, mobile compact cards (375x812 & 390x844), zero horizontal scroll.
+   ============================================================================== */
+
+/* ── Instagram Connection Card ── */
+.creator-instagram-conn-card {
+    background: #FFFFFF;
+    border: 1px solid rgba(94, 52, 53, 0.15);
+    border-radius: 8px;
+    padding: 18px 20px;
+    box-shadow: 0 2px 10px rgba(94, 52, 53, 0.04);
+}
+
+.ig-conn-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.ig-conn-brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #5E3435;
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+}
+
+.ig-conn-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+.ig-conn-badge.connected {
+    background: #E8F5E9;
+    color: #2E7D32;
+    border: 1px solid #A5D6A7;
+}
+
+.ig-conn-badge.unconnected {
+    background: #F4F4F5;
+    color: #71717A;
+    border: 1px solid #E4E4E7;
+}
+
+.ig-conn-body {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+}
+
+.ig-conn-handle {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: #5E3435;
+}
+
+.ig-conn-sub {
+    font-size: 0.78rem;
+    color: var(--wr-text-muted, #71717A);
+    margin-top: 2px;
+}
+
+.ig-conn-synced {
+    font-size: 0.75rem;
+    color: var(--wr-text-muted, #71717A);
+    margin-top: 4px;
+}
+
+.ig-conn-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* ── Content List Table (Desktop) ── */
+.content-table-wrapper {
+    width: 100%;
+    overflow-x: auto;
+    border: 1px solid rgba(94, 52, 53, 0.12);
+    border-radius: 8px;
+    background: #FFFFFF;
+    box-shadow: 0 2px 8px rgba(94, 52, 53, 0.04);
+}
+
+.content-list-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+    text-align: left;
+    white-space: nowrap;
+}
+
+.content-list-table th {
+    background: rgba(94, 52, 53, 0.05);
+    color: #5E3435;
+    font-size: 0.74rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    padding: 12px 14px;
+    border-bottom: 1px solid rgba(94, 52, 53, 0.12);
+}
+
+.content-list-table td {
+    padding: 12px 14px;
+    border-bottom: 1px solid rgba(94, 52, 53, 0.07);
+    color: var(--wr-text, #18181B);
+    vertical-align: middle;
+}
+
+.content-list-table tr:last-child td {
+    border-bottom: none;
+}
+
+.content-list-table tr:hover td {
+    background: rgba(94, 52, 53, 0.02);
+}
+
+.content-col-media {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 220px;
+    max-width: 280px;
+}
+
+.content-table-thumb {
+    width: 42px;
+    height: 42px;
+    border-radius: 6px;
+    object-fit: cover;
+    background: #E4E4E7;
+    border: 1px solid rgba(94, 52, 53, 0.15);
+    flex-shrink: 0;
+}
+
+.content-table-type {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #5E3435;
+    display: block;
+}
+
+.content-table-url {
+    font-size: 0.72rem;
+    color: #5E3435;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: inline-block;
+    max-width: 180px;
+}
+
+.content-table-url:hover {
+    color: #8C4E50;
+}
+
+.content-product-name {
+    font-weight: 600;
+    color: var(--wr-text, #18181B);
+    display: block;
+}
+
+.content-product-code {
+    font-size: 0.72rem;
+    color: var(--wr-text-muted, #71717A);
+    display: block;
+}
+
+.content-metric-val {
+    font-weight: 700;
+    color: #5E3435;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    display: block;
+}
+
+.content-metric-na {
+    color: #A1A1AA;
+    font-weight: 400;
+    text-align: right;
+    display: block;
+}
+
+.content-table-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    justify-content: flex-end;
+}
+
+/* ── Mobile Responsive Card Layout (Under 860px) ── */
+.content-card-mobile-list {
+    display: none;
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+}
+
+.content-mobile-card {
+    background: #FFFFFF;
+    border: 1px solid rgba(94, 52, 53, 0.12);
+    border-radius: 8px;
+    padding: 16px;
+    box-shadow: 0 2px 8px rgba(94, 52, 53, 0.04);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+.content-mobile-card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+}
+
+.content-mobile-card-product {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.content-mobile-thumb {
+    width: 44px;
+    height: 44px;
+    border-radius: 6px;
+    object-fit: cover;
+    border: 1px solid rgba(94, 52, 53, 0.15);
+    flex-shrink: 0;
+}
+
+.content-mobile-url-row {
+    font-size: 0.75rem;
+    padding: 6px 8px;
+    background: rgba(94, 52, 53, 0.03);
+    border-radius: 4px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.content-mobile-url-row a {
+    color: #5E3435;
+    text-decoration: underline;
+}
+
+.content-mobile-metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    background: #FAF7F5;
+    border-radius: 6px;
+    padding: 10px 8px;
+    text-align: center;
+}
+
+.content-mobile-metric-item span:first-child {
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: #5E3435;
+    display: block;
+}
+
+.content-mobile-metric-item span:last-child {
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--wr-text-muted, #71717A);
+    display: block;
+}
+
+.content-mobile-card-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(94, 52, 53, 0.08);
+}
+
+.content-mobile-actions {
+    display: flex;
+    gap: 6px;
+}
+
+@media (max-width: 860px) {
+    .content-table-wrapper {
+        display: none !important;
+    }
+    .content-card-mobile-list {
+        display: flex !important;
+    }
+    .ig-conn-body {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .ig-conn-actions {
+        width: 100%;
+        justify-content: flex-start;
+    }
+}
+
+
 

@@ -645,6 +645,9 @@ function renderCreatorDashboard(data) {
 
     // 4. Load Contest Leaderboard
     loadCreatorContest();
+
+    // 5. Load Instagram Connection
+    loadInstagramConnection();
 }
 
 /**
@@ -1147,9 +1150,332 @@ window.renderReelInsightsGrid = renderReelInsightsGrid;
 /**
  * Fetches and renders the creator's submitted content and updates Reel Insights
  */
+/* ==============================================================================
+   MY CONTENT — INSTAGRAM CONTENT LIST & AUTOMATIC INSIGHTS CONTROLLER
+   Official Meta/Instagram API sync, responsive table on desktop, cards on mobile.
+   ============================================================================== */
+
+let currentContentFilter = 'all';
+let currentContentSort = 'newest';
+let currentInstagramConnection = null;
+
+function formatContentMetric(val) {
+    if (val === null || val === undefined) {
+        return '<span class="content-metric-na">—</span>';
+    }
+    const num = Number(val);
+    if (isNaN(num)) return '<span class="content-metric-na">—</span>';
+    if (num >= 1000000) {
+        return `<span class="content-metric-val">${(num / 1000000).toFixed(1).replace(/\.0$/, '')}M</span>`;
+    }
+    if (num >= 1000) {
+        return `<span class="content-metric-val">${(num / 1000).toFixed(1).replace(/\.0$/, '')}K</span>`;
+    }
+    return `<span class="content-metric-val">${num.toLocaleString()}</span>`;
+}
+
+function formatMobileMetricText(val) {
+    if (val === null || val === undefined) return '—';
+    const num = Number(val);
+    if (isNaN(num)) return '—';
+    if (num >= 1000000) return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+    if (num >= 1000) return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
+    return num.toLocaleString();
+}
+
+function formatSyncTime(isoStr) {
+    if (!isoStr) return 'Not synced yet';
+    try {
+        const d = new Date(isoStr);
+        return d.toLocaleDateString('en-IN', {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true
+        });
+    } catch (_) {
+        return 'Not synced yet';
+    }
+}
+
+function formatSubmissionDate(isoStr) {
+    if (!isoStr) return '';
+    try {
+        return new Date(isoStr).toLocaleDateString('en-IN', {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric'
+        });
+    } catch (_) {
+        return '';
+    }
+}
+
+/**
+ * Loads Instagram Connection status and renders the connection card
+ */
+async function loadInstagramConnection() {
+    const cardEl = document.getElementById('creator-instagram-conn-card');
+    if (!cardEl) return;
+
+    try {
+        const headers = await getAuthHeaders();
+        const res = await fetch('/api/creator/instagram/status', { headers });
+        const json = await res.json();
+        currentInstagramConnection = json;
+        renderInstagramConnectionCard(json);
+    } catch (e) {
+        console.warn('Could not load Instagram connection status:', e);
+    }
+}
+window.loadInstagramConnection = loadInstagramConnection;
+
+/**
+ * Renders the Instagram Connection Card above the content list
+ */
+function renderInstagramConnectionCard(conn) {
+    const cardEl = document.getElementById('creator-instagram-conn-card');
+    if (!cardEl) return;
+
+    if (conn && conn.connected && conn.username) {
+        const syncText = conn.last_synced_at ? `Last synced: ${formatSyncTime(conn.last_synced_at)}` : 'Not synced yet';
+        cardEl.innerHTML = `
+            <div class="ig-conn-connected">
+                <div class="ig-conn-header">
+                    <div class="ig-conn-brand">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>
+                        <span>INSTAGRAM CONNECTION</span>
+                    </div>
+                    <span class="ig-conn-badge connected">✓ Connected</span>
+                </div>
+                <div class="ig-conn-body">
+                    <div>
+                        <div class="ig-conn-handle">@${conn.username}</div>
+                        <div class="ig-conn-sub">Eligible Professional Account &bull; Official Meta Graph API Connected</div>
+                        <div class="ig-conn-synced">${syncText}</div>
+                    </div>
+                    <div class="ig-conn-actions">
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="syncAllInstagramInsights()" id="btn-sync-all-ig" style="display:inline-flex; align-items:center; gap:6px; padding:6px 14px; font-size:0.75rem;">
+                            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" id="icon-sync-all-ig"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                            <span>SYNC NOW</span>
+                        </button>
+                        <button type="button" class="btn btn-ghost btn-sm" onclick="disconnectInstagramAccount()" style="padding:6px 12px; font-size:0.75rem; color:#dc2626;">
+                            <span>DISCONNECT</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    } else {
+        cardEl.innerHTML = `
+            <div class="ig-conn-unconnected">
+                <div class="ig-conn-header">
+                    <div class="ig-conn-brand">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>
+                        <span>INSTAGRAM CONNECTION</span>
+                    </div>
+                    <span class="ig-conn-badge unconnected">Not Connected</span>
+                </div>
+                <div class="ig-conn-body">
+                    <div style="max-width:540px;">
+                        <p style="margin:0 0 4px 0; font-weight:600; font-size:0.88rem; color:var(--wr-text);">Connect your Instagram account to automatically receive Reel and Post performance insights.</p>
+                        <span style="font-size:0.78rem; color:var(--wr-text-muted);">Instagram insights require an eligible Instagram professional account connected to WishRite.</span>
+                    </div>
+                    <div class="ig-conn-actions">
+                        <button type="button" class="btn btn-primary btn-sm" onclick="openInstagramConnectModal()" style="padding:8px 16px; font-size:0.78rem; letter-spacing:0.5px;">
+                            <span>CONNECT INSTAGRAM</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+}
+window.renderInstagramConnectionCard = renderInstagramConnectionCard;
+
+function openInstagramConnectModal() {
+    const modal = document.getElementById('modal-connect-instagram');
+    if (modal) modal.style.display = 'flex';
+}
+window.openInstagramConnectModal = openInstagramConnectModal;
+
+function closeInstagramConnectModal() {
+    const modal = document.getElementById('modal-connect-instagram');
+    if (modal) modal.style.display = 'none';
+}
+window.closeInstagramConnectModal = closeInstagramConnectModal;
+
+async function handleInstagramConnectSubmit(event) {
+    if (event && event.preventDefault) event.preventDefault();
+    const handleInput = document.getElementById('ig-connect-handle');
+    const tokenInput = document.getElementById('ig-connect-token');
+    const submitBtn = document.getElementById('btn-submit-ig-connect');
+
+    const handle = handleInput ? handleInput.value.trim() : '';
+    const token = tokenInput ? tokenInput.value.trim() : '';
+
+    if (!handle) {
+        alert('Please enter your Instagram username.');
+        return;
+    }
+
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerText = 'Connecting...';
+    }
+
+    try {
+        const headers = await getAuthHeaders();
+        headers['Content-Type'] = 'application/json';
+
+        const res = await fetch('/api/creator/instagram/connect', {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ instagram_handle: handle, access_token: token })
+        });
+        const json = await res.json();
+
+        if (json.success) {
+            if (typeof showToast === 'function') {
+                showToast(json.message || 'Instagram account connected successfully!', 'success');
+            }
+            closeInstagramConnectModal();
+            loadInstagramConnection();
+            loadCreatorContent();
+        } else {
+            alert(json.error?.message || 'Failed to connect Instagram account.');
+        }
+    } catch (e) {
+        alert('Error connecting Instagram: ' + e.message);
+    } finally {
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerText = 'Connect Account';
+        }
+    }
+}
+window.handleInstagramConnectSubmit = handleInstagramConnectSubmit;
+
+async function disconnectInstagramAccount() {
+    if (!confirm('Are you sure you want to disconnect your Instagram account? Automatic metric synchronization will be paused.')) return;
+
+    try {
+        const headers = await getAuthHeaders();
+        const res = await fetch('/api/creator/instagram/disconnect', {
+            method: 'POST',
+            headers
+        });
+        const json = await res.json();
+        if (json.success) {
+            if (typeof showToast === 'function') {
+                showToast('Instagram account disconnected.', 'success');
+            }
+            loadInstagramConnection();
+            loadCreatorContent();
+        }
+    } catch (e) {
+        alert('Error disconnecting Instagram: ' + e.message);
+    }
+}
+window.disconnectInstagramAccount = disconnectInstagramAccount;
+
+/**
+ * Synchronizes metrics for a single content item via official Meta Graph API
+ */
+async function syncContentInsights(contentId, btnEl) {
+    if (btnEl) {
+        btnEl.disabled = true;
+        btnEl.innerText = '↻ Syncing...';
+    }
+
+    try {
+        const headers = await getAuthHeaders();
+        const res = await fetch(`/api/creator/content/${contentId}/sync`, {
+            method: 'POST',
+            headers
+        });
+        const json = await res.json();
+
+        if (json.success) {
+            if (json.sync && json.sync.synced) {
+                if (typeof showToast === 'function') {
+                    showToast('✓ Updated just now from Instagram API', 'success');
+                }
+            } else if (json.sync && json.sync.insights_status === 'not_connected') {
+                if (typeof showToast === 'function') {
+                    showToast('Connect your Instagram professional account to view official metrics.', 'info');
+                }
+            } else if (json.sync && json.sync.insights_status === 'auth_expired') {
+                if (typeof showToast === 'function') {
+                    showToast('Your Instagram connection needs attention. Please reconnect Instagram.', 'error');
+                }
+            } else if (json.sync && json.sync.message) {
+                if (typeof showToast === 'function') {
+                    showToast(json.sync.message, 'info');
+                }
+            }
+            loadCreatorContent(currentContentFilter);
+        } else {
+            alert(json.error?.message || 'Insights temporarily unavailable. Please try again later.');
+        }
+    } catch (e) {
+        console.error('Error syncing insights:', e);
+        if (typeof showToast === 'function') {
+            showToast('Instagram insights are temporarily unavailable. Please try again later.', 'error');
+        }
+    } finally {
+        if (btnEl) {
+            btnEl.disabled = false;
+            btnEl.innerText = '↻ Sync';
+        }
+    }
+}
+window.syncContentInsights = syncContentInsights;
+
+/**
+ * Batch synchronizes all Instagram content for the creator
+ */
+async function syncAllInstagramInsights() {
+    const icon = document.getElementById('icon-sync-all-ig');
+    const btn = document.getElementById('btn-sync-all-ig');
+    if (icon) icon.classList.add('rotating');
+    if (btn) btn.disabled = true;
+
+    try {
+        const headers = await getAuthHeaders();
+        const res = await fetch('/api/creator/instagram/sync', {
+            method: 'POST',
+            headers
+        });
+        const json = await res.json();
+        if (json.success) {
+            if (typeof showToast === 'function') {
+                showToast(json.message || 'Instagram metrics synchronized.', 'success');
+            }
+            loadCreatorContent(currentContentFilter);
+            loadInstagramConnection();
+        } else {
+            if (typeof showToast === 'function') {
+                showToast('Instagram insights temporarily unavailable.', 'info');
+            }
+        }
+    } catch (e) {
+        console.error('Error syncing all Instagram insights:', e);
+    } finally {
+        if (icon) icon.classList.remove('rotating');
+        if (btn) btn.disabled = false;
+    }
+}
+window.syncAllInstagramInsights = syncAllInstagramInsights;
+
+/**
+ * Fetches and renders creator's submitted content in list/table view
+ */
 async function loadCreatorContent(statusFilter = 'all') {
-    const grid = document.getElementById('creator-content-grid') || document.getElementById('creator-my-content-grid');
-    const emptyEl = document.getElementById('creator-content-empty');
+    currentContentFilter = statusFilter;
+    const container = document.getElementById('creator-content-list-container') || document.getElementById('creator-content-grid');
 
     try {
         const headers = await getAuthHeaders();
@@ -1159,25 +1485,32 @@ async function loadCreatorContent(statusFilter = 'all') {
         if (!json.success || !Array.isArray(json.data) || json.data.length === 0) {
             currentCreatorContent = [];
             currentReelsList = [];
-            if (grid) grid.innerHTML = '';
-            if (emptyEl) emptyEl.style.display = 'block';
+            if (container) {
+                container.innerHTML = `
+                    <div style="text-align:center; padding:36px 20px; background:#fff; border:1px solid rgba(94,52,53,0.12); border-radius:8px; color:var(--wr-text-muted);">
+                        <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.5" style="margin-bottom:8px; color:#5E3435;"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>
+                        <h4 style="margin:0 0 4px 0; color:#5E3435; font-size:1rem;">No Content Submitted Yet</h4>
+                        <p style="margin:0; font-size:0.82rem;">Share a WishRite Instagram Reel or Post to track its performance metrics here.</p>
+                    </div>
+                `;
+            }
             renderReelInsightsGrid();
             return;
         }
 
         currentCreatorContent = json.data;
-        currentReelsList = json.data.filter(i => i.content_type === 'reel');
+        currentReelsList = json.data.filter(i => (i.content_type || '').toLowerCase() === 'reel');
         renderReelInsightsGrid();
 
-        if (!grid) return;
+        if (!container) return;
 
         let items = [...json.data];
         const normFilter = String(statusFilter || 'all').toLowerCase();
         if (normFilter !== 'all') {
             if (normFilter === 'post' || normFilter === 'posts') {
-                items = items.filter(i => i.content_type === 'post');
+                items = items.filter(i => (i.content_type || '').toLowerCase() === 'post');
             } else if (normFilter === 'reel' || normFilter === 'reels') {
-                items = items.filter(i => i.content_type === 'reel');
+                items = items.filter(i => (i.content_type || '').toLowerCase() === 'reel');
             } else if (normFilter === 'pending') {
                 items = items.filter(i => (i.status || '').toLowerCase() !== 'approved' && (i.status || '').toLowerCase() !== 'rejected');
             } else if (normFilter === 'approved') {
@@ -1185,46 +1518,30 @@ async function loadCreatorContent(statusFilter = 'all') {
             }
         }
 
+        // Apply sorting
+        if (currentContentSort === 'views') {
+            items.sort((a, b) => (Number(b.views_count || b.views || -1)) - (Number(a.views_count || a.views || -1)));
+        } else if (currentContentSort === 'likes') {
+            items.sort((a, b) => (Number(b.likes_count || -1)) - (Number(a.likes_count || -1)));
+        } else if (currentContentSort === 'comments') {
+            items.sort((a, b) => (Number(b.comments_count || -1)) - (Number(a.comments_count || -1)));
+        } else if (currentContentSort === 'shares') {
+            items.sort((a, b) => (Number(b.shares_count || -1)) - (Number(a.shares_count || -1)));
+        } else {
+            // Newest default
+            items.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+        }
+
         if (items.length === 0) {
-            grid.innerHTML = '<p style="color:var(--wr-text-muted);grid-column:1/-1;text-align:center;padding:24px;">No content matching this filter.</p>';
-            if (emptyEl) emptyEl.style.display = 'none';
+            container.innerHTML = `
+                <div style="text-align:center; padding:32px 20px; background:#fff; border:1px solid rgba(94,52,53,0.12); border-radius:8px; color:var(--wr-text-muted);">
+                    <p style="margin:0; font-size:0.85rem;">No content matching the '${statusFilter}' filter.</p>
+                </div>
+            `;
             return;
         }
 
-        if (emptyEl) emptyEl.style.display = 'none';
-
-        grid.innerHTML = items.map(item => {
-            const dateStr = item.created_at ? new Date(item.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
-            const statusClass = (item.status || '').toLowerCase() === 'approved' ? 'verified' : ((item.status || '').toLowerCase() === 'rejected' ? 'rejected' : 'pending');
-            const statusLabel = (item.status || '').toLowerCase() === 'approved' ? '✓ Approved' : ((item.status || '').toLowerCase() === 'rejected' ? '✕ Rejected' : '⧖ Under Review');
-            const platformIcon = item.platform === 'instagram' ? '📸 Instagram' : (item.platform === 'youtube' ? '▶ YouTube' : (item.platform === 'facebook' ? '👥 Facebook' : '🔗 Web'));
-            const typeLabel = item.content_type === 'reel' ? 'Reel' : 'Post';
-            const imgUrl = item.thumbnail_url || item.product_image || 'https://placehold.co/400x400/5E3435/FFF?text=WishRite+Jewellery';
-
-            return `
-                <div class="creator-content-card">
-                    <div class="content-thumb-wrap">
-                        <img src="${imgUrl}" alt="${item.caption || 'WishRite Content'}" loading="lazy" onerror="this.src='/images/default-avatar.png'" />
-                        <span class="content-type-pill">${platformIcon} ${typeLabel}</span>
-                        <span class="content-status-badge ${statusClass}">${statusLabel}</span>
-                    </div>
-                    <div class="content-card-body">
-                        ${item.product_name ? `
-                            <div style="margin-bottom:6px;">
-                                <div class="content-product-tag" style="margin-bottom:2px;">✨ Product: ${item.product_name}</div>
-                                ${item.product_category ? `<div style="font-size:0.75rem; color:var(--wr-text-muted); padding-left:4px;">Category: ${item.product_category}</div>` : ''}
-                            </div>
-                        ` : ''}
-                        <p class="content-caption">${item.caption || 'Shared WishRite styling piece'}</p>
-                        ${item.rejection_reason ? `<div class="content-reject-reason">Feedback: ${item.rejection_reason}</div>` : ''}
-                        <div class="content-card-footer">
-                            <span class="content-date">${dateStr}</span>
-                            <a href="${item.url}" target="_blank" rel="noopener" class="content-external-link">View ${typeLabel} ↗</a>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }).join('');
+        renderCreatorContentList(items, container);
     } catch (e) {
         console.error('Error loading creator content:', e);
     }
@@ -1232,8 +1549,159 @@ async function loadCreatorContent(statusFilter = 'all') {
 window.loadCreatorContent = loadCreatorContent;
 
 /**
- * Filter buttons for My Content
+ * Renders both Desktop Table View and Mobile Cards
  */
+function renderCreatorContentList(items, container) {
+    if (!container) return;
+
+    // 1. Desktop Table View
+    let tableHtml = `
+        <div class="content-table-wrapper">
+            <table class="content-list-table">
+                <thead>
+                    <tr>
+                        <th style="min-width:240px;">Content</th>
+                        <th>Platform</th>
+                        <th style="min-width:140px;">Product</th>
+                        <th>Category</th>
+                        <th>Status</th>
+                        <th style="text-align:right;">Views</th>
+                        <th style="text-align:right;">Likes</th>
+                        <th style="text-align:right;">Comments</th>
+                        <th style="text-align:right;">Shares</th>
+                        <th>Submitted</th>
+                        <th style="text-align:right; min-width:130px;">Link / Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+
+    items.forEach(item => {
+        const isReel = (item.content_type || '').toLowerCase() === 'reel';
+        const typeLabel = isReel ? 'Reel' : 'Post';
+        const statusClass = (item.status || '').toLowerCase() === 'approved' ? 'verified' : ((item.status || '').toLowerCase() === 'rejected' ? 'rejected' : 'pending');
+        const statusLabel = (item.status || '').toLowerCase() === 'approved' ? '✓ Approved' : ((item.status || '').toLowerCase() === 'rejected' ? '✕ Rejected' : '⧖ Under Review');
+        const thumbImg = item.thumbnail_url || item.product_image || 'https://images.wishrite.in/products/WR-ER-002.jpg';
+        const safeUrl = (item.url || '').replace(/"/g, '&quot;');
+        const safeName = (item.product_name || 'WishRite Piece').replace(/"/g, '&quot;');
+        const safeCat = (item.product_category || 'Jewellery').replace(/"/g, '&quot;');
+
+        tableHtml += `
+            <tr data-content-id="${item.id}">
+                <td>
+                    <div class="content-col-media">
+                        <a href="${safeUrl}" target="_blank" rel="noopener" title="Open on Instagram">
+                            <img src="${thumbImg}" alt="${typeLabel}" class="content-table-thumb" onerror="this.src='/images/default-avatar.png'" />
+                        </a>
+                        <div>
+                            <span class="content-table-type">Instagram ${typeLabel}</span>
+                            <a href="${safeUrl}" target="_blank" rel="noopener" class="content-table-url" title="${safeUrl}">${item.url}</a>
+                        </div>
+                    </div>
+                </td>
+                <td>
+                    <span style="font-weight:600; color:#5E3435;">📸 Instagram</span>
+                </td>
+                <td>
+                    <span class="content-product-name">${safeName}</span>
+                    ${item.product_code ? `<span class="content-product-code">${item.product_code}</span>` : ''}
+                </td>
+                <td>
+                    <span style="color:#5E3435; font-size:0.8rem;">${safeCat}</span>
+                </td>
+                <td>
+                    <span class="content-status-badge ${statusClass}">${statusLabel}</span>
+                </td>
+                <td>${formatContentMetric(item.views_count)}</td>
+                <td>${formatContentMetric(item.likes_count)}</td>
+                <td>${formatContentMetric(item.comments_count)}</td>
+                <td>${formatContentMetric(item.shares_count)}</td>
+                <td>
+                    <span style="font-size:0.78rem; color:var(--wr-text-muted);">${formatSubmissionDate(item.created_at)}</span>
+                </td>
+                <td>
+                    <div class="content-table-actions">
+                        <a href="${safeUrl}" target="_blank" rel="noopener" class="btn btn-outline btn-xs btn-view-content" style="padding:4px 8px; font-size:0.75rem; text-decoration:none; white-space:nowrap;">View ${typeLabel} ↗</a>
+                        <button type="button" class="btn btn-ghost btn-xs btn-sync-content" onclick="syncContentInsights('${item.id}', this)" title="Sync Insights" style="padding:4px 8px; font-size:0.75rem;">↻ Sync</button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    });
+
+    tableHtml += `
+                </tbody>
+            </table>
+        </div>
+    `;
+
+    // 2. Mobile Responsive Card List (Under 860px)
+    let mobileCardsHtml = `<div class="content-card-mobile-list">`;
+    items.forEach(item => {
+        const isReel = (item.content_type || '').toLowerCase() === 'reel';
+        const typeLabel = isReel ? 'Reel' : 'Post';
+        const statusClass = (item.status || '').toLowerCase() === 'approved' ? 'verified' : ((item.status || '').toLowerCase() === 'rejected' ? 'rejected' : 'pending');
+        const statusLabel = (item.status || '').toLowerCase() === 'approved' ? '✓ Approved' : ((item.status || '').toLowerCase() === 'rejected' ? '✕ Rejected' : '⧖ Under Review');
+        const thumbImg = item.thumbnail_url || item.product_image || 'https://images.wishrite.in/products/WR-ER-002.jpg';
+        const safeUrl = (item.url || '').replace(/"/g, '&quot;');
+        const safeName = (item.product_name || 'WishRite Piece').replace(/"/g, '&quot;');
+        const safeCat = (item.product_category || 'Jewellery').replace(/"/g, '&quot;');
+
+        mobileCardsHtml += `
+            <div class="content-mobile-card" data-content-id="${item.id}">
+                <div class="content-mobile-card-top">
+                    <span style="font-size:0.75rem; font-weight:700; color:#5E3435; text-transform:uppercase; letter-spacing:0.5px;">📸 Instagram ${typeLabel}</span>
+                    <span class="content-status-badge ${statusClass}">${statusLabel}</span>
+                </div>
+                <div class="content-mobile-card-product">
+                    <a href="${safeUrl}" target="_blank" rel="noopener">
+                        <img src="${thumbImg}" alt="${typeLabel}" class="content-mobile-thumb" onerror="this.src='/images/default-avatar.png'" />
+                    </a>
+                    <div>
+                        <div style="font-weight:600; font-size:0.9rem; color:var(--wr-text);">${safeName}</div>
+                        <div style="font-size:0.78rem; color:#5E3435;">Category: ${safeCat}</div>
+                    </div>
+                </div>
+                <div class="content-mobile-url-row">
+                    <a href="${safeUrl}" target="_blank" rel="noopener">${item.url}</a>
+                </div>
+                <div class="content-mobile-metrics-grid">
+                    <div class="content-mobile-metric-item">
+                        <span>${formatMobileMetricText(item.views_count)}</span>
+                        <span>Views</span>
+                    </div>
+                    <div class="content-mobile-metric-item">
+                        <span>${formatMobileMetricText(item.likes_count)}</span>
+                        <span>Likes</span>
+                    </div>
+                    <div class="content-mobile-metric-item">
+                        <span>${formatMobileMetricText(item.comments_count)}</span>
+                        <span>Comments</span>
+                    </div>
+                    <div class="content-mobile-metric-item">
+                        <span>${formatMobileMetricText(item.shares_count)}</span>
+                        <span>Shares</span>
+                    </div>
+                </div>
+                <div class="content-mobile-card-footer">
+                    <div style="font-size:0.72rem; color:var(--wr-text-muted);">
+                        Submitted: ${formatSubmissionDate(item.created_at)}<br />
+                        ${item.last_synced_at ? `Last synced: ${formatSyncTime(item.last_synced_at)}` : 'Not synced yet'}
+                    </div>
+                    <div class="content-mobile-actions">
+                        <a href="${safeUrl}" target="_blank" rel="noopener" class="btn btn-outline btn-xs" style="padding:4px 8px; font-size:0.75rem; text-decoration:none;">View ${typeLabel} ↗</a>
+                        <button type="button" class="btn btn-primary btn-xs" onclick="syncContentInsights('${item.id}', this)" style="padding:4px 8px; font-size:0.75rem;">↻ Sync</button>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    mobileCardsHtml += `</div>`;
+
+    container.innerHTML = tableHtml + mobileCardsHtml;
+}
+window.renderCreatorContentList = renderCreatorContentList;
+
 function filterCreatorContent(filter, btn) {
     document.querySelectorAll('.content-filter-btn').forEach(b => b.classList.remove('active'));
     if (btn) btn.classList.add('active');
@@ -1241,6 +1709,12 @@ function filterCreatorContent(filter, btn) {
 }
 window.filterCreatorContent = filterCreatorContent;
 window.setContentFilter = filterCreatorContent;
+
+function sortCreatorContent(sortVal) {
+    currentContentSort = sortVal;
+    loadCreatorContent(currentContentFilter);
+}
+window.sortCreatorContent = sortCreatorContent;
 
 /**
  * Fetches live WishRite products for the category & product selector

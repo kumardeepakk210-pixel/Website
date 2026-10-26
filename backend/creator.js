@@ -1800,7 +1800,7 @@ export async function handleSubmitCreatorContent(req, res) {
         }
 
         const body = req.body || {};
-        const contentType = body.content_type === 'reel' ? 'reel' : 'post';
+        let contentType = body.content_type === 'reel' ? 'reel' : (body.content_type === 'post' ? 'post' : null);
         const platform = String(body.platform || 'instagram').toLowerCase().trim();
         const contentUrl = String(body.url || '').trim();
 
@@ -1811,23 +1811,34 @@ export async function handleSubmitCreatorContent(req, res) {
             });
         }
 
-        if (platform === 'instagram' && !contentUrl.includes('instagram.com')) {
-            return res.status(400).json({
-                success: false,
-                error: { code: 'INVALID_PLATFORM_URL', message: 'Please enter a valid Instagram post or reel URL.' }
-            });
-        }
-        if (platform === 'youtube' && !contentUrl.includes('youtube.com') && !contentUrl.includes('youtu.be')) {
-            return res.status(400).json({
-                success: false,
-                error: { code: 'INVALID_PLATFORM_URL', message: 'Please enter a valid YouTube video or short URL.' }
-            });
-        }
-        if (platform === 'facebook' && !contentUrl.includes('facebook.com') && !contentUrl.includes('fb.watch')) {
-            return res.status(400).json({
-                success: false,
-                error: { code: 'INVALID_PLATFORM_URL', message: 'Please enter a valid Facebook post or reel URL.' }
-            });
+        if (platform === 'instagram') {
+            if (!contentUrl.includes('instagram.com')) {
+                return res.status(400).json({
+                    success: false,
+                    error: { code: 'INVALID_PLATFORM_URL', message: 'Please enter a valid Instagram post or reel URL.' }
+                });
+            }
+            if (!contentType) {
+                contentType = (contentUrl.includes('/reel/') || contentUrl.includes('/reels/')) ? 'reel' : 'post';
+            }
+        } else if (platform === 'youtube') {
+            if (!contentUrl.includes('youtube.com') && !contentUrl.includes('youtu.be')) {
+                return res.status(400).json({
+                    success: false,
+                    error: { code: 'INVALID_PLATFORM_URL', message: 'Please enter a valid YouTube video or short URL.' }
+                });
+            }
+            if (!contentType) contentType = 'post';
+        } else if (platform === 'facebook') {
+            if (!contentUrl.includes('facebook.com') && !contentUrl.includes('fb.watch')) {
+                return res.status(400).json({
+                    success: false,
+                    error: { code: 'INVALID_PLATFORM_URL', message: 'Please enter a valid Facebook post or reel URL.' }
+                });
+            }
+            if (!contentType) contentType = 'post';
+        } else {
+            if (!contentType) contentType = 'post';
         }
 
         const local = readLocalStore();
@@ -1851,12 +1862,28 @@ export async function handleSubmitCreatorContent(req, res) {
             status: 'Submitted',
             rejection_reason: null,
             views: 0,
+            views_count: null,
+            likes_count: null,
+            comments_count: null,
+            shares_count: null,
+            instagram_media_id: null,
+            instagram_media_type: contentType === 'reel' ? 'REELS' : 'IMAGE',
+            instagram_account_id: null,
+            instagram_permalink: contentUrl,
+            last_synced_at: null,
+            insights_status: 'not_connected',
+            insights_error: null,
             clicks: 0,
             orders: 0,
             commission_amount: 0,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
         };
+
+        // If creator has connected Instagram, attempt initial sync via official Meta Graph API
+        try {
+            await syncInstagramMediaMetrics(newContent, creator);
+        } catch (_) {}
 
         local.creator_content.unshift(newContent);
         writeLocalStore(local);
@@ -1868,7 +1895,7 @@ export async function handleSubmitCreatorContent(req, res) {
         return res.json({
             success: true,
             message: `${contentType === 'reel' ? 'Reel' : 'Post'} submitted successfully and is now under review.`,
-            data: newContent
+            data: sanitizeContentItem(newContent)
         });
     } catch (err) {
         console.error('[handleSubmitCreatorContent Error]:', err);
@@ -1888,7 +1915,9 @@ export async function handleGetCreatorContent(req, res) {
         }
 
         const local = readLocalStore();
-        const contentList = (local.creator_content || []).filter(c => c.influencer_id === creator.id);
+        const contentList = (local.creator_content || [])
+            .filter(c => c.influencer_id === creator.id)
+            .map(sanitizeContentItem);
 
         return res.json({
             success: true,
@@ -2338,6 +2367,413 @@ export async function handleGetCreatorContest(req, res) {
             success: false,
             error: { message: err.message || 'Failed to retrieve contest leaderboard.' }
         });
+    }
+}
+
+/* ==============================================================================
+   OFFICIAL INSTAGRAM / META API INTEGRATION & CONTENT LIST
+   Server-side official Graph API sync, zero client score tampering, no scraping.
+   ============================================================================== */
+
+/**
+ * Extracts the canonical Instagram shortcode from an Instagram URL
+ */
+export function extractInstagramShortcode(url) {
+    if (!url) return null;
+    const match = String(url).match(/(?:reel|reels|p)\/([A-Za-z0-9_-]+)/i);
+    return match ? match[1] : null;
+}
+
+/**
+ * Sanitizes a creator content item so no private or internal server fields leak
+ */
+export function sanitizeContentItem(item) {
+    return {
+        id: item.id,
+        influencer_id: item.influencer_id,
+        creator_name: item.creator_name,
+        content_type: item.content_type || (item.url && item.url.includes('/reel') ? 'reel' : 'post'),
+        platform: item.platform || 'instagram',
+        url: item.url,
+        caption: item.caption || '',
+        product_category: item.product_category || '',
+        product_code: item.product_code || '',
+        product_name: item.product_name || '',
+        product_image: item.product_image || null,
+        thumbnail_url: item.thumbnail_url || null,
+        status: item.status || 'Submitted',
+        rejection_reason: item.rejection_reason || null,
+        views_count: item.views_count !== undefined ? item.views_count : (typeof item.views === 'number' && item.views > 0 ? item.views : null),
+        likes_count: item.likes_count !== undefined ? item.likes_count : (item.social_likes !== undefined ? item.social_likes : null),
+        comments_count: item.comments_count !== undefined ? item.comments_count : (item.social_comments !== undefined ? item.social_comments : null),
+        shares_count: item.shares_count !== undefined ? item.shares_count : null,
+        last_synced_at: item.last_synced_at || null,
+        insights_status: item.insights_status || 'not_connected',
+        insights_error: item.insights_error || null,
+        created_at: item.created_at,
+        updated_at: item.updated_at
+    };
+}
+
+/**
+ * Queries official Meta Graph API to sync metrics for an Instagram media item
+ */
+export async function syncInstagramMediaMetrics(contentItem, creator) {
+    const local = readLocalStore();
+    const influencer = (local.influencers || []).find(i => i.id === creator.id) || creator;
+    const igConn = influencer.instagram_connection || null;
+
+    if (!igConn || !igConn.access_token) {
+        contentItem.last_synced_at = new Date().toISOString();
+        contentItem.insights_status = 'not_connected';
+        contentItem.insights_error = 'Instagram insights require an eligible Instagram professional account connected to WishRite.';
+        return {
+            synced: false,
+            insights_status: 'not_connected',
+            message: 'Instagram insights require an eligible Instagram professional account connected to WishRite.'
+        };
+    }
+
+    const accessToken = igConn.access_token;
+    let targetMediaId = contentItem.instagram_media_id;
+
+    // Resolve media ID via official Graph API if not yet resolved
+    if (!targetMediaId && igConn.account_id) {
+        try {
+            const mediaListRes = await fetch(
+                `https://graph.facebook.com/v21.0/${igConn.account_id}/media?fields=id,caption,media_type,media_product_type,permalink,thumbnail_url,like_count,comments_count&access_token=${encodeURIComponent(accessToken)}`
+            );
+            const mediaListData = await mediaListRes.json();
+            if (mediaListData.data && Array.isArray(mediaListData.data)) {
+                const shortcode = extractInstagramShortcode(contentItem.url);
+                const matched = mediaListData.data.find(m => {
+                    if (m.permalink && shortcode && m.permalink.includes(shortcode)) return true;
+                    if (contentItem.url && m.permalink && m.permalink.toLowerCase().replace(/\/$/, '') === contentItem.url.toLowerCase().replace(/\/$/, '')) return true;
+                    return false;
+                });
+                if (matched) {
+                    targetMediaId = matched.id;
+                    contentItem.instagram_media_id = matched.id;
+                    if (matched.thumbnail_url) contentItem.thumbnail_url = matched.thumbnail_url;
+                }
+            }
+        } catch (err) {
+            console.warn('[Meta API] Media resolution notice:', err.message);
+        }
+    }
+
+    if (!targetMediaId) {
+        contentItem.last_synced_at = new Date().toISOString();
+        contentItem.insights_status = 'media_not_found';
+        contentItem.insights_error = "We couldn't retrieve insights for this Reel. Please verify that the Reel belongs to the connected Instagram account.";
+        return {
+            synced: false,
+            insights_status: 'media_not_found',
+            message: "We couldn't retrieve insights for this Reel. Please verify that the Reel belongs to the connected Instagram account."
+        };
+    }
+
+    // Call official Meta Graph API endpoints
+    try {
+        const metricsToQuery = contentItem.content_type === 'reel'
+            ? 'views,reach,likes,comments,shares,total_interactions'
+            : 'reach,likes,comments,shares,saved,total_interactions';
+
+        const [insightsRes, mediaObjRes] = await Promise.all([
+            fetch(`https://graph.facebook.com/v21.0/${targetMediaId}/insights?metric=${metricsToQuery}&access_token=${encodeURIComponent(accessToken)}`),
+            fetch(`https://graph.facebook.com/v21.0/${targetMediaId}?fields=id,media_type,media_product_type,like_count,comments_count,permalink,thumbnail_url&access_token=${encodeURIComponent(accessToken)}`)
+        ]);
+
+        const insightsData = await insightsRes.json();
+        const mediaObjData = await mediaObjRes.json();
+
+        if (insightsData.error) {
+            const errCode = insightsData.error.code;
+            const status = errCode === 190 ? 'auth_expired' : ((errCode === 10 || errCode === 200) ? 'api_permission_required' : 'unavailable');
+            contentItem.insights_status = status;
+            contentItem.insights_error = insightsData.error.message || 'Instagram insights are temporarily unavailable.';
+            contentItem.last_synced_at = new Date().toISOString();
+            return {
+                synced: false,
+                insights_status: status,
+                message: contentItem.insights_error
+            };
+        }
+
+        let views = null;
+        let likes = null;
+        let comments = null;
+        let shares = null;
+
+        if (insightsData.data && Array.isArray(insightsData.data)) {
+            for (const m of insightsData.data) {
+                const val = (m.values && m.values[0]) ? m.values[0].value : (m.value !== undefined ? m.value : null);
+                if (val !== null && typeof val === 'number') {
+                    if (m.name === 'views' || m.name === 'plays') views = val;
+                    else if (m.name === 'reach' && views === null) views = val;
+                    else if (m.name === 'likes') likes = val;
+                    else if (m.name === 'comments') comments = val;
+                    else if (m.name === 'shares') shares = val;
+                }
+            }
+        }
+
+        if (mediaObjData && !mediaObjData.error) {
+            if (likes === null && typeof mediaObjData.like_count === 'number') likes = mediaObjData.like_count;
+            if (comments === null && typeof mediaObjData.comments_count === 'number') comments = mediaObjData.comments_count;
+            if (mediaObjData.thumbnail_url) contentItem.thumbnail_url = mediaObjData.thumbnail_url;
+        }
+
+        contentItem.views_count = views;
+        if (views !== null) contentItem.views = views;
+        contentItem.likes_count = likes;
+        contentItem.comments_count = comments;
+        contentItem.shares_count = shares;
+        contentItem.last_synced_at = new Date().toISOString();
+        contentItem.insights_status = 'updated';
+        contentItem.insights_error = null;
+
+        return {
+            synced: true,
+            insights_status: 'updated',
+            views,
+            likes,
+            comments,
+            shares,
+            last_synced_at: contentItem.last_synced_at
+        };
+    } catch (err) {
+        contentItem.last_synced_at = new Date().toISOString();
+        contentItem.insights_status = 'unavailable';
+        contentItem.insights_error = 'Instagram insights are temporarily unavailable. Please try again later.';
+        return {
+            synced: false,
+            insights_status: 'unavailable',
+            message: contentItem.insights_error
+        };
+    }
+}
+
+/**
+ * GET /api/creator/instagram/status
+ * Returns current Instagram account connection status
+ */
+export async function handleGetInstagramStatus(req, res) {
+    try {
+        const creator = req.creator;
+        if (!creator) {
+            return res.status(401).json({ success: false, error: { message: 'Creator authentication required.' } });
+        }
+
+        const local = readLocalStore();
+        const influencer = (local.influencers || []).find(i => i.id === creator.id) || creator;
+        const conn = influencer.instagram_connection || null;
+
+        const isConnected = !!(conn && conn.username);
+        return res.json({
+            success: true,
+            connected: isConnected,
+            username: conn?.username || (creator.instagram_id ? creator.instagram_id.replace(/^@/, '') : null),
+            account_id: conn?.account_id || null,
+            account_type: conn?.account_type || 'professional',
+            last_synced_at: conn?.last_synced_at || null,
+            insights_status: isConnected ? (conn?.insights_status || 'connected') : 'not_connected',
+            meta_configured: !!(process.env.META_APP_ID && process.env.META_APP_SECRET),
+            message: isConnected
+                ? `Connected as @${conn.username}`
+                : 'Connect your Instagram account to automatically receive Reel and Post performance insights. Instagram insights require an eligible Instagram professional account connected to WishRite.'
+        });
+    } catch (err) {
+        return res.status(500).json({ success: false, error: { message: err.message } });
+    }
+}
+
+/**
+ * POST /api/creator/instagram/connect
+ * Connects or updates a creator's professional Instagram account
+ */
+export async function handleConnectInstagram(req, res) {
+    try {
+        const creator = req.creator;
+        if (!creator) {
+            return res.status(401).json({ success: false, error: { message: 'Creator authentication required.' } });
+        }
+
+        const body = req.body || {};
+        let handle = String(body.instagram_handle || body.handle || body.username || '').trim().replace(/^@/, '');
+        const accessToken = body.access_token ? String(body.access_token).trim() : null;
+
+        if (!handle) {
+            return res.status(400).json({
+                success: false,
+                error: { message: 'Please provide a valid Instagram handle.' }
+            });
+        }
+
+        const local = readLocalStore();
+        const influencer = (local.influencers || []).find(i => i.id === creator.id);
+        if (!influencer) {
+            return res.status(404).json({ success: false, error: { message: 'Creator profile not found.' } });
+        }
+
+        let verifiedWithMeta = false;
+        let accountId = null;
+
+        // If access token is provided, test against official Meta Graph API
+        if (accessToken) {
+            try {
+                const metaTestRes = await fetch(`https://graph.facebook.com/v21.0/me?fields=id,name&access_token=${encodeURIComponent(accessToken)}`);
+                const metaTestData = await metaTestRes.json();
+                if (metaTestData && metaTestData.id) {
+                    verifiedWithMeta = true;
+                    accountId = metaTestData.id;
+                }
+            } catch (metaErr) {
+                console.warn('[Meta API] Token verification warning:', metaErr.message);
+            }
+        }
+
+        influencer.instagram_connection = {
+            connected: true,
+            username: handle,
+            account_id: accountId,
+            account_type: 'professional',
+            access_token: accessToken, // Kept server-side only
+            last_synced_at: new Date().toISOString(),
+            insights_status: verifiedWithMeta ? 'connected' : (accessToken ? 'connected' : 'api_permission_required'),
+            updated_at: new Date().toISOString()
+        };
+
+        writeLocalStore(local);
+
+        try {
+            await dbUpdate('influencers', influencer.id, {
+                instagram_connection: influencer.instagram_connection
+            }, { useAdmin: true }).catch(() => {});
+        } catch (_) {}
+
+        return res.json({
+            success: true,
+            message: 'Instagram account connected successfully.',
+            data: {
+                connected: true,
+                username: handle,
+                account_type: 'professional',
+                insights_status: influencer.instagram_connection.insights_status,
+                last_synced_at: influencer.instagram_connection.last_synced_at
+            }
+        });
+    } catch (err) {
+        console.error('[handleConnectInstagram Error]:', err);
+        return res.status(500).json({ success: false, error: { message: err.message } });
+    }
+}
+
+/**
+ * POST /api/creator/instagram/disconnect
+ * Disconnects the creator's Instagram account
+ */
+export async function handleDisconnectInstagram(req, res) {
+    try {
+        const creator = req.creator;
+        if (!creator) {
+            return res.status(401).json({ success: false, error: { message: 'Creator authentication required.' } });
+        }
+
+        const local = readLocalStore();
+        const influencer = (local.influencers || []).find(i => i.id === creator.id);
+        if (influencer) {
+            influencer.instagram_connection = null;
+            writeLocalStore(local);
+            try {
+                await dbUpdate('influencers', influencer.id, { instagram_connection: null }, { useAdmin: true }).catch(() => {});
+            } catch (_) {}
+        }
+
+        return res.json({
+            success: true,
+            message: 'Instagram account disconnected successfully.'
+        });
+    } catch (err) {
+        return res.status(500).json({ success: false, error: { message: err.message } });
+    }
+}
+
+/**
+ * POST /api/creator/content/:id/sync
+ * Manually or automatically synchronizes a specific content item's insights
+ */
+export async function handleSyncCreatorContent(req, res, contentId) {
+    try {
+        const creator = req.creator;
+        if (!creator) {
+            return res.status(401).json({ success: false, error: { message: 'Creator authentication required.' } });
+        }
+
+        const local = readLocalStore();
+        if (!local.creator_content) local.creator_content = [];
+
+        const item = local.creator_content.find(c => c.id === contentId);
+        if (!item) {
+            return res.status(404).json({ success: false, error: { message: 'Content item not found.' } });
+        }
+
+        // Section 32: Creator isolation - verify ownership
+        if (item.influencer_id !== creator.id) {
+            return res.status(403).json({ success: false, error: { message: 'Unauthorized. You do not own this content.' } });
+        }
+
+        const syncResult = await syncInstagramMediaMetrics(item, creator);
+        writeLocalStore(local);
+
+        try {
+            await dbUpdate('creator_content', item.id, item, { useAdmin: true }).catch(() => {});
+        } catch (_) {}
+
+        return res.json({
+            success: true,
+            data: sanitizeContentItem(item),
+            sync: syncResult
+        });
+    } catch (err) {
+        console.error('[handleSyncCreatorContent Error]:', err);
+        return res.status(500).json({ success: false, error: { message: err.message } });
+    }
+}
+
+/**
+ * POST /api/creator/instagram/sync
+ * Batch synchronizes all Instagram content for the authenticated creator
+ */
+export async function handleSyncAllInstagramContent(req, res) {
+    try {
+        const creator = req.creator;
+        if (!creator) {
+            return res.status(401).json({ success: false, error: { message: 'Creator authentication required.' } });
+        }
+
+        const local = readLocalStore();
+        if (!local.creator_content) local.creator_content = [];
+
+        const creatorItems = local.creator_content.filter(c => c.influencer_id === creator.id && c.platform === 'instagram');
+        let syncedCount = 0;
+
+        for (const item of creatorItems) {
+            const syncRes = await syncInstagramMediaMetrics(item, creator);
+            if (syncRes.synced) syncedCount++;
+        }
+
+        writeLocalStore(local);
+
+        return res.json({
+            success: true,
+            message: `Synchronized ${syncedCount} of ${creatorItems.length} Instagram items.`,
+            synced_count: syncedCount,
+            total_items: creatorItems.length,
+            items: creatorItems.map(sanitizeContentItem)
+        });
+    } catch (err) {
+        return res.status(500).json({ success: false, error: { message: err.message } });
     }
 }
 
