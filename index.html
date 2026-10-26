@@ -247,6 +247,15 @@
                 </svg>
                 Account
             </a>
+            <a onclick="closeMobileMenu(); navigateToCreatorAccount()" class="mobile-creator-account-link" id="mobile-menu-creator-link" style="color: #5E3435;">
+                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" style="stroke: #5E3435; fill: none; stroke-width: 1.5;">
+                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                </svg>
+                <div style="display:flex; flex-direction:column; line-height: 1.2;">
+                    <span style="font-weight: 600; color: #5E3435;">Creator Account</span>
+                    <span style="font-size: 0.72rem; color: var(--wr-text-muted);">Join Creator Club</span>
+                </div>
+            </a>
             <a onclick="closeMobileMenu(); navigateTo('wishlist')">
                 <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path
@@ -2203,7 +2212,13 @@
                     </div>
 
                     <div
-                        style="margin-top: var(--space-6); padding-top: var(--space-4); border-top: 1px solid var(--wr-border-light); display: flex; justify-content: flex-end;">
+                        style="margin-top: var(--space-6); padding-top: var(--space-4); border-top: 1px solid var(--wr-border-light); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                        <a onclick="navigateToCreatorAccount()" class="creator-profile-portal-link" style="display: inline-flex; align-items: center; gap: 8px; color: #5E3435; font-weight: 600; font-size: 0.88rem; text-decoration: none; cursor: pointer; padding: 6px 14px; background: rgba(94, 52, 53, 0.06); border: 1px solid rgba(94, 52, 53, 0.2); border-radius: 4px; transition: all 0.2s ease;">
+                            <svg viewBox="0 0 24 24" style="width: 16px; height: 16px; stroke: #5E3435; fill: none; stroke-width: 1.8;">
+                                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                            </svg>
+                            <span>Creator Account <span style="font-size: 0.75rem; font-weight: 400; color: var(--wr-text-muted);">(Creator Club)</span></span>
+                        </a>
                         <button type="button" class="btn btn-ghost" onclick="handleLogout()">Sign Out</button>
                     </div>
                 </div>
