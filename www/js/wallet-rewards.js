@@ -129,94 +129,130 @@
             const client = this.getClient();
             if (!client) return;
 
-            try {
-                this.state.isLoading = true;
+            // In-flight de-duplication guard
+            if (this._syncPromise) return this._syncPromise;
 
-                // 1. Ensure user has wallet, points and referral code via atomic RPC
-                const { data: walletData, error: rpcErr } = await client.rpc('get_or_create_customer_wallet', {
-                    p_user_id: user.id
-                });
+            this._syncPromise = (async () => {
+                try {
+                    this.state.isLoading = true;
 
-                if (!rpcErr && walletData && walletData.success) {
-                    this.state.walletBalance = Number(walletData.wallet_balance) || 0.00;
-                    this.state.pointsBalance = Number(walletData.points_balance) || 0.00;
-                    this.state.currency = walletData.currency || 'INR';
-                    this.state.referralCode = walletData.referral_code || '';
-                } else {
-                    // Fallback: direct table queries
-                    const [wRes, pRes, cRes] = await Promise.all([
-                        client.from('wallets').select('balance, currency').eq('user_id', user.id).maybeSingle(),
-                        client.from('customer_points').select('points_balance').eq('user_id', user.id).maybeSingle(),
-                        client.from('customers').select('referral_code').eq('user_id', user.id).maybeSingle()
-                    ]);
+                    // 1. Primary lookup: direct query on public.customers (authoritative store)
+                    let cust = null;
+                    try {
+                        const { data } = await client
+                            .from('customers')
+                            .select('id, wallet_balance, points_balance, referral_code')
+                            .eq('user_id', user.id)
+                            .maybeSingle();
+                        cust = data;
+                    } catch (_) {}
 
-                    if (wRes.data) this.state.walletBalance = Number(wRes.data.balance) || 0.00;
-                    if (pRes.data) this.state.pointsBalance = Number(pRes.data.points_balance) || 0.00;
-                    if (cRes.data) this.state.referralCode = cRes.data.referral_code || '';
+                    if (!cust && user.email) {
+                        try {
+                            const { data } = await client
+                                .from('customers')
+                                .select('id, wallet_balance, points_balance, referral_code')
+                                .eq('customer_email', user.email.toLowerCase().trim())
+                                .maybeSingle();
+                            cust = data;
+                        } catch (_) {}
+                    }
+
+                    if (cust) {
+                        this.state.walletBalance = Number(cust.wallet_balance) || 0.00;
+                        this.state.pointsBalance = Number(cust.points_balance) || 0.00;
+                        if (cust.referral_code) this.state.referralCode = cust.referral_code;
+                    } else {
+                        // Fallback: try RPC or separate tables if they exist
+                        try {
+                            const { data: walletData, error: rpcErr } = await client.rpc('get_or_create_customer_wallet', {
+                                p_user_id: user.id
+                            });
+
+                            if (!rpcErr && walletData && walletData.success) {
+                                this.state.walletBalance = Number(walletData.wallet_balance) || 0.00;
+                                this.state.pointsBalance = Number(walletData.points_balance) || 0.00;
+                                this.state.currency = walletData.currency || 'INR';
+                                this.state.referralCode = walletData.referral_code || '';
+                            }
+                        } catch (_) {}
+                    }
+
+                    // 2. Fetch history ledgers in parallel safely
+                    try {
+                        await Promise.allSettled([
+                            this.fetchWalletTransactions(user.id),
+                            this.fetchRewardTransactions(user.id),
+                            this.fetchReferrals(user.id)
+                        ]);
+                    } catch (_) {}
+
+                } catch (err) {
+                    console.error('[WishRite Wallet & Rewards] syncUser error:', err);
+                } finally {
+                    this.state.isLoading = false;
+                    this.renderHeaderBalances();
+                    this.renderAccountSection();
                 }
+            })().finally(() => {
+                this._syncPromise = null;
+            });
 
-                // 2. Fetch history ledgers in parallel
-                await Promise.all([
-                    this.fetchWalletTransactions(user.id),
-                    this.fetchRewardTransactions(user.id),
-                    this.fetchReferrals(user.id)
-                ]);
-
-            } catch (err) {
-                console.error('[WishRite Wallet & Rewards] syncUser error:', err);
-            } finally {
-                this.state.isLoading = false;
-                this.renderHeaderBalances();
-                this.renderAccountSection();
-            }
+            return this._syncPromise;
         },
 
         async fetchWalletTransactions(userId) {
-            const client = this.getClient();
-            if (!client || !userId) return;
+            try {
+                const client = this.getClient();
+                if (!client || !userId) return;
 
-            const { data, error } = await client
-                .from('wallet_transactions')
-                .select('*')
-                .eq('user_id', userId)
-                .order('created_at', { ascending: false })
-                .limit(50);
+                const { data, error } = await client
+                    .from('wallet_transactions')
+                    .select('*')
+                    .eq('user_id', userId)
+                    .order('created_at', { ascending: false })
+                    .limit(50);
 
-            if (!error && Array.isArray(data)) {
-                this.state.walletTransactions = data;
-            }
+                if (!error && Array.isArray(data)) {
+                    this.state.walletTransactions = data;
+                }
+            } catch (_) {}
         },
 
         async fetchRewardTransactions(userId) {
-            const client = this.getClient();
-            if (!client || !userId) return;
+            try {
+                const client = this.getClient();
+                if (!client || !userId) return;
 
-            const { data, error } = await client
-                .from('reward_transactions')
-                .select('*')
-                .eq('user_id', userId)
-                .order('created_at', { ascending: false })
-                .limit(50);
+                const { data, error } = await client
+                    .from('reward_transactions')
+                    .select('*')
+                    .eq('user_id', userId)
+                    .order('created_at', { ascending: false })
+                    .limit(50);
 
-            if (!error && Array.isArray(data)) {
-                this.state.rewardTransactions = data;
-            }
+                if (!error && Array.isArray(data)) {
+                    this.state.rewardTransactions = data;
+                }
+            } catch (_) {}
         },
 
         async fetchReferrals(userId) {
-            const client = this.getClient();
-            if (!client || !userId) return;
+            try {
+                const client = this.getClient();
+                if (!client || !userId) return;
 
-            const { data, error } = await client
-                .from('referrals')
-                .select('*')
-                .eq('referrer_user_id', userId)
-                .order('created_at', { ascending: false })
-                .limit(50);
+                const { data, error } = await client
+                    .from('referrals')
+                    .select('*')
+                    .eq('referrer_user_id', userId)
+                    .order('created_at', { ascending: false })
+                    .limit(50);
 
-            if (!error && Array.isArray(data)) {
-                this.state.referrals = data;
-            }
+                if (!error && Array.isArray(data)) {
+                    this.state.referrals = data;
+                }
+            } catch (_) {}
         },
 
         // Header / Navigation compact balance badges (removed from main page; kept in My Account and checkout)

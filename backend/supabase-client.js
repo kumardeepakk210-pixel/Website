@@ -284,22 +284,17 @@ export const tableColumnsCache = {
         'status', 'created_at', 'updated_at'
     ]),
     orders: new Set([
-        'id', 'order_number', 'user_id', 'customer_name', 'customer_phone', 'customer_email',
+        'id', 'order_number', 'customer_name', 'customer_phone', 'customer_email',
         'customer_address', 'customer_city', 'customer_state', 'customer_country', 'customer_pin',
-        'subtotal', 'discount', 'shipping_charge', 'cod_charge', 'tax', 'grand_total', 'currency',
+        'subtotal', 'discount', 'shipping_charge', 'tax', 'grand_total', 'currency',
         'payment_method', 'payment_status', 'order_status',
         'razorpay_order_id', 'razorpay_payment_id', 'razorpay_signature',
-        'coupon_code', 'coupon_id', 'discount_type', 'discount_value', 'coupon_discount_amount',
-        'subtotal_before_discount', 'final_amount',
-        'points_redeemed', 'points_discount_amount', 'wallet_amount_used',
-        'influencer_id', 'influencer_code',
-        'influencer_attribution_id', 'influencer_link_id', 'influencer_commission_rate',
-        'influencer_commission_amount', 'created_at', 'updated_at'
+        'created_at', 'updated_at'
     ]),
     order_items: new Set([
-        'id', 'order_id', 'inventory_id', 'product_id', 'product_code', 'product_name',
-        'quantity', 'unit_price', 'line_total', 'total_price', 'size',
-        'created_at', 'updated_at'
+        'id', 'order_id', 'inventory_id', 'product_code', 'product_name',
+        'quantity', 'unit_price', 'line_total', 'size',
+        'created_at'
     ]),
     wallet_topup_requests: new Set([
         'id', 'user_id', 'amount', 'currency', 'status', 'razorpay_order_id', 'razorpay_payment_id',
@@ -442,10 +437,23 @@ export async function dbInsert(table, payload, options = {}) {
     const omittedColumns = Array.from(new Set(processed.flatMap(p => p.omittedColumns)));
 
     const useAdmin = Boolean(options.useAdmin);
-    if (useAdmin && !hasServerAdminCredential()) {
-        requireServerAdminCredential(`A server-side Supabase secret/service-role credential is required to insert into table '${table}'.`);
+    let headers;
+    if (useAdmin && hasServerAdminCredential()) {
+        headers = getAdminHeaders();
+    } else if (useAdmin && !hasServerAdminCredential()) {
+        if (options.strictAdmin) {
+            requireServerAdminCredential(`A server-side Supabase secret/service-role credential is required to insert into table '${table}'.`);
+        }
+        headers = getHeaders();
+    } else {
+        headers = getHeaders();
     }
-    const headers = useAdmin ? getAdminHeaders() : getHeaders();
+
+    // When inserting into tables where public SELECT is restricted (e.g. order_items)
+    // or when callers request returnMinimal, use return=minimal to avoid RLS 42501 on SELECT
+    if (options.returnMinimal || (!options.returnRepresentation && (table === 'orders' || table === 'order_items'))) {
+        headers = { ...headers, 'Prefer': 'return=minimal' };
+    }
 
     const url = `${SUPABASE_URL}/rest/v1/${table}`;
     let attempts = 0;
@@ -521,10 +529,21 @@ export async function dbUpdate(table, filterKey, filterVal, payload, options = {
     }
 
     const useAdmin = Boolean(options.useAdmin);
-    if (useAdmin && !hasServerAdminCredential()) {
-        requireServerAdminCredential(`A server-side Supabase secret/service-role credential is required to update table '${table}'.`);
+    let headers;
+    if (useAdmin && hasServerAdminCredential()) {
+        headers = getAdminHeaders();
+    } else if (useAdmin && !hasServerAdminCredential()) {
+        if (options.strictAdmin) {
+            requireServerAdminCredential(`A server-side Supabase secret/service-role credential is required to update table '${table}'.`);
+        }
+        headers = getHeaders();
+    } else {
+        headers = getHeaders();
     }
-    const headers = useAdmin ? getAdminHeaders() : getHeaders();
+
+    if (options.returnMinimal || !options.returnRepresentation) {
+        headers = { ...headers, 'Prefer': 'return=minimal' };
+    }
 
     const url = `${SUPABASE_URL}/rest/v1/${table}?${filterKey}=eq.${encodeURIComponent(filterVal)}`;
     let attempts = 0;

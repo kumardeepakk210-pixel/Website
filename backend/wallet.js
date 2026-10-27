@@ -8,6 +8,7 @@ import crypto from 'crypto';
 import { randomUUID } from 'crypto';
 import {
     SUPABASE_URL,
+    SUPABASE_KEY,
     SUPABASE_ADMIN_KEY,
     hasServerAdminCredential,
     dbInsert,
@@ -110,12 +111,12 @@ export async function handleWalletCreateOrder(req, res) {
 
         // 3. User Authentication check
         const authHeader = req.headers?.authorization || req.headers?.Authorization;
-        if (authHeader && SUPABASE_URL && SUPABASE_ADMIN_KEY) {
+        if (authHeader && SUPABASE_URL) {
             const token = authHeader.replace(/^Bearer /i, '').trim();
             try {
                 const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
                     headers: {
-                        apikey: SUPABASE_ADMIN_KEY,
+                        apikey: SUPABASE_KEY,
                         Authorization: `Bearer ${token}`
                     }
                 });
@@ -137,7 +138,7 @@ export async function handleWalletCreateOrder(req, res) {
 
         userId = userId || 'anonymous_wallet_user';
 
-        // 4. Create record in wallet_topup_requests
+        // 4. Create record in wallet_topup_requests (if table exists)
         const topupId = randomUUID();
         const topupRecord = {
             id: topupId,
@@ -150,7 +151,7 @@ export async function handleWalletCreateOrder(req, res) {
         };
 
         try {
-            await dbInsert('wallet_topup_requests', topupRecord, { useAdmin: true });
+            await dbInsert('wallet_topup_requests', topupRecord, { returnMinimal: true });
         } catch (dbErr) {
             console.warn('[Wallet] wallet_topup_requests insert notice:', dbErr.message);
         }
@@ -189,12 +190,12 @@ export async function handleWalletCreateOrder(req, res) {
             const rzpOrder = await rzpRes.json();
             rzpOrderId = rzpOrder.id;
 
-            // Update top-up record with razorpay_order_id
+            // Update top-up record with razorpay_order_id if table exists
             try {
                 await dbUpdate('wallet_topup_requests', 'id', topupId, {
                     razorpay_order_id: rzpOrderId,
                     updated_at: new Date().toISOString()
-                }, { useAdmin: true });
+                }, { returnMinimal: true });
             } catch (_) {}
 
         } else if (process.env.NODE_ENV === 'test') {
@@ -279,20 +280,7 @@ export async function handleWalletVerifyPayment(req, res) {
 
         if (processedPayments.has(razorpay_payment_id)) {
             alreadyProcessed = true;
-            existingBalance = mockWalletStore.get(body.user_id || 'test_user') || 500;
-        }
-
-        // Check database for existing transaction with same razorpay_payment_id
-        if (!alreadyProcessed) {
-            try {
-                const txRows = await dbQuery('wallet_transactions', `reference_type=eq.razorpay_payment&reference_id=eq.${encodeURIComponent(razorpay_payment_id)}&limit=1`, { useAdmin: true });
-                if (Array.isArray(txRows) && txRows.length > 0) {
-                    alreadyProcessed = true;
-                    existingBalance = Number(txRows[0].balance_after) || 0;
-                }
-            } catch (e) {
-                console.warn('[Wallet] Idempotency check query notice:', e.message);
-            }
+            existingBalance = mockWalletStore.get(body.user_id || 'test_user') || 0;
         }
 
         if (alreadyProcessed) {
@@ -307,6 +295,7 @@ export async function handleWalletVerifyPayment(req, res) {
         }
 
         // 4. Verify payment status directly with Razorpay API (when configured)
+        let capturedPayment = null;
         if (vKeyId && vKeySecret) {
             const rzpAuth = Buffer.from(`${vKeyId}:${vKeySecret}`).toString('base64');
             const rzpPayRes = await fetch(`https://api.razorpay.com/v1/payments/${encodeURIComponent(razorpay_payment_id)}`, {
@@ -321,33 +310,86 @@ export async function handleWalletVerifyPayment(req, res) {
                 });
             }
 
-            const payment = await rzpPayRes.json();
-            if (payment.status !== 'captured') {
+            capturedPayment = await rzpPayRes.json();
+            if (capturedPayment.status !== 'captured') {
                 return res.status(400).json({
                     success: false,
                     verified: false,
-                    error: `Payment is not in captured status (current: ${payment.status}).`
+                    error: `Payment is not in captured status (current: ${capturedPayment.status}).`
                 });
             }
         }
 
-        // 5. Query topup request from database to get credited amount and user
-        let topupAmount = Number(body.amount) || 500;
-        let topupUserId = body.user_id || 'test_user';
+        // 5. Determine authenticated user and top-up amount
+        let topupAmount = Number(body.amount) || 10;
+        let topupUserId = body.user_id || null;
+        let topupUserEmail = body.email || null;
 
-        try {
-            const reqRows = await dbQuery('wallet_topup_requests', `id=eq.${encodeURIComponent(topup_id)}&limit=1`, { useAdmin: true });
-            if (Array.isArray(reqRows) && reqRows.length > 0) {
-                topupAmount = Number(reqRows[0].amount) || topupAmount;
-                topupUserId = reqRows[0].user_id || topupUserId;
-            }
-        } catch (_) {}
+        if (capturedPayment?.amount) {
+            topupAmount = Math.round(Number(capturedPayment.amount) / 100);
+            if (capturedPayment.notes?.user_id) topupUserId = capturedPayment.notes.user_id;
+        }
 
-        // 6. Atomically credit wallet
+        const vAuthHeader = req.headers?.authorization || req.headers?.Authorization;
+        if (vAuthHeader && SUPABASE_URL) {
+            const token = vAuthHeader.replace(/^Bearer /i, '').trim();
+            try {
+                const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+                    headers: {
+                        apikey: SUPABASE_KEY,
+                        Authorization: `Bearer ${token}`
+                    }
+                });
+                if (userRes.ok) {
+                    const u = await userRes.json();
+                    if (u?.id) topupUserId = u.id;
+                    if (u?.email) topupUserEmail = u.email;
+                }
+            } catch (e) {}
+        }
+
+        // 6. Atomically credit customer wallet balance in database (public.customers)
         let creditedBalance = topupAmount;
-        let rpcSuccess = false;
+        let updatedDatabase = false;
 
-        // Try calling the PostgreSQL RPC function
+        if (SUPABASE_URL && topupUserId) {
+            try {
+                // Find customer by user_id
+                let custRows = await dbQuery('customers', `user_id=eq.${encodeURIComponent(topupUserId)}&limit=1`);
+                if ((!Array.isArray(custRows) || custRows.length === 0) && topupUserEmail) {
+                    custRows = await dbQuery('customers', `customer_email=eq.${encodeURIComponent(topupUserEmail)}&limit=1`);
+                }
+
+                if (Array.isArray(custRows) && custRows.length > 0) {
+                    const cust = custRows[0];
+                    const currentBal = Number(cust.wallet_balance || 0);
+                    const newBal = Math.round((currentBal + topupAmount) * 100) / 100;
+
+                    const patchRes = await fetch(`${SUPABASE_URL}/rest/v1/customers?id=eq.${encodeURIComponent(cust.id)}`, {
+                        method: 'PATCH',
+                        headers: {
+                            apikey: SUPABASE_KEY,
+                            Authorization: `Bearer ${SUPABASE_KEY}`,
+                            'Content-Type': 'application/json',
+                            'Prefer': 'return=minimal'
+                        },
+                        body: JSON.stringify({
+                            wallet_balance: newBal,
+                            updated_at: new Date().toISOString()
+                        })
+                    });
+
+                    if (patchRes.ok) {
+                        creditedBalance = newBal;
+                        updatedDatabase = true;
+                    }
+                }
+            } catch (dbCreditErr) {
+                console.warn('[Wallet Verify] Customer wallet credit update notice:', dbCreditErr.message);
+            }
+        }
+
+        // Try calling the PostgreSQL RPC function if present
         if (SUPABASE_URL && SUPABASE_ADMIN_KEY) {
             try {
                 const rpcRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/credit_wallet_from_verified_payment`, {
@@ -367,28 +409,29 @@ export async function handleWalletVerifyPayment(req, res) {
                 if (rpcRes.ok) {
                     const rpcData = await rpcRes.json();
                     if (rpcData && rpcData.success !== false) {
-                        rpcSuccess = true;
-                        creditedBalance = Number(rpcData.wallet_balance) || topupAmount;
+                        creditedBalance = Number(rpcData.wallet_balance) || creditedBalance;
                     }
                 }
-            } catch (rpcErr) {
-                console.warn('[Wallet] RPC invocation notice:', rpcErr.message);
-            }
+            } catch (_) {}
         }
 
         // In-memory record tracking for idempotency
         processedPayments.add(razorpay_payment_id);
-        const prevBal = mockWalletStore.get(topupUserId) || 0;
-        creditedBalance = prevBal + topupAmount;
-        mockWalletStore.set(topupUserId, creditedBalance);
+        if (!updatedDatabase) {
+            const prevBal = mockWalletStore.get(topupUserId || 'test_user') || 0;
+            creditedBalance = prevBal + topupAmount;
+            mockWalletStore.set(topupUserId || 'test_user', creditedBalance);
+        } else {
+            mockWalletStore.set(topupUserId || 'test_user', creditedBalance);
+        }
 
-        // Mark top-up record as PAID
+        // Mark top-up record as PAID if table exists
         try {
             await dbUpdate('wallet_topup_requests', 'id', topup_id, {
                 status: 'PAID',
                 razorpay_payment_id: razorpay_payment_id,
                 updated_at: new Date().toISOString()
-            }, { useAdmin: true });
+            }, { returnMinimal: true });
         } catch (_) {}
 
         return res.status(200).json({

@@ -1464,7 +1464,10 @@ function initCheckoutPinLookup(initialPin) {
             if (lookupFn) {
                 res = await lookupFn(cleaned);
             } else {
-                const resp = await fetch(`https://api.postalpincode.in/pincode/${cleaned}`);
+                const fetchOpts = typeof AbortSignal !== 'undefined' && AbortSignal.timeout
+                    ? { signal: AbortSignal.timeout(3500) }
+                    : {};
+                const resp = await fetch(`https://api.postalpincode.in/pincode/${cleaned}`, fetchOpts);
                 const data = await resp.json();
                 if (data?.[0]?.Status === 'Success' && Array.isArray(data[0].PostOffice) && data[0].PostOffice[0]) {
                     const po = data[0].PostOffice[0];
@@ -2139,11 +2142,22 @@ async function submitWishriteCustomerCheckout(event) {
             referral_attribution: attrPayload || null
         };
 
+        let checkoutHeaders = {
+            'Content-Type': 'application/json'
+        };
+        try {
+            const authClient = window.supabaseClient || (typeof supabaseClient !== 'undefined' ? supabaseClient : null);
+            if (authClient?.auth) {
+                const { data } = await authClient.auth.getSession();
+                if (data?.session?.access_token) {
+                    checkoutHeaders['Authorization'] = `Bearer ${data.session.access_token}`;
+                }
+            }
+        } catch (_) {}
+
         const checkoutRes = await fetch('/api/orders/checkout', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
+            headers: checkoutHeaders,
             body: JSON.stringify(checkoutPayload)
         });
 

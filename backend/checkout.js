@@ -36,7 +36,9 @@ export function getRazorpayServerConfigStatus() {
         key_id_present: Boolean(keyId),
         key_secret_present: Boolean(keySecret),
         key_id_prefix: keyId ? keyId.substring(0, 8) : null,
-        mode: keyId.startsWith('rzp_live') ? 'live' : 'test'
+        mode: keyId.startsWith('rzp_live') ? 'live' : 'test',
+        supabase_admin_key_present: hasServerAdminCredential(),
+        supabase_url_present: Boolean(SUPABASE_URL)
     };
 }
 

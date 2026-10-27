@@ -1381,9 +1381,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     initScrollReveal();
     initAboutScrollSpy();
 
-    // Initial route handling (instant view rendering without waiting for async network inventory)
-    handleInitialURLRoute(false);
-
     // Initial occasion visibility check
     updateOccasionContentVisibility();
 
