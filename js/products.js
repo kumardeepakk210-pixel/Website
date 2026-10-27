@@ -439,6 +439,12 @@ const productsService = {
         this.error = null;
 
         this.loadPromise = (async () => {
+            const controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+            const timeoutId = controller ? setTimeout(() => {
+                controller.abort();
+                console.warn('[WishRite] Product inventory request timed out after 10s');
+            }, 10000) : null;
+
             try {
                 const headers = {
                     'apikey': WR_SUPABASE_ANON_KEY,
@@ -448,7 +454,10 @@ const productsService = {
 
                 // 1. Fetch sales aggregation in parallel (best-effort)
                 try {
-                    const salesRes = await fetch(`${WR_SUPABASE_URL}/rest/v1/sales?select=product_code,quantity`, { headers });
+                    const salesRes = await fetch(`${WR_SUPABASE_URL}/rest/v1/sales?select=product_code,quantity`, { 
+                        headers,
+                        signal: controller?.signal 
+                    });
                     if (salesRes.ok) {
                         const salesRows = await salesRes.json();
                         productSalesMap.clear();
@@ -509,7 +518,10 @@ const productsService = {
                     'updated_at'
                 ].join(',');
                 const inventoryUrl = `${WR_SUPABASE_URL}/rest/v1/inventory?status=eq.Active&select=${publicFields}&order=created_at.desc`;
-                const invRes = await fetch(inventoryUrl, { headers });
+                const invRes = await fetch(inventoryUrl, { 
+                    headers,
+                    signal: controller?.signal 
+                });
 
                 if (!invRes.ok) {
                     throw new Error(`Failed to load inventory: HTTP ${invRes.status}`);
@@ -643,14 +655,23 @@ const productsService = {
                                 if (p.productCode) productCodeMap.set(p.productCode.toUpperCase(), p);
                                 if (p.id) productSlugMap.set(p.id, p);
                             });
-                            console.info(`✓ Restored ${inStock.length} in-stock products from offline cache.`);
+                            console.info(`✓ Restored ${activeProducts.length} in-stock products from offline cache.`);
+                            try {
+                                window.dispatchEvent(new CustomEvent('wishrite:productsLoaded', { detail: { products: productsDB } }));
+                            } catch (e) {}
                             return productsDB;
                         }
                     }
                 } catch (cacheErr) { }
 
+                // Even on error, notify listeners so loading states and skeletons clear immediately
+                try {
+                    window.dispatchEvent(new CustomEvent('wishrite:productsLoaded', { detail: { products: [], error: err } }));
+                } catch (uiErr) {}
+
                 throw err;
             } finally {
+                if (timeoutId) clearTimeout(timeoutId);
                 this.isLoading = false;
                 this.loadPromise = null;
             }

@@ -187,12 +187,17 @@ async function loadCustomerCreatorStatus() {
     if (dashboardState) dashboardState.style.display = 'none';
     if (reviewState) reviewState.style.display = 'none';
 
+    const controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+    const timeoutId = controller ? setTimeout(() => controller.abort(), 8000) : null;
+
     try {
         const headers = await getAuthHeaders();
-        const res = await fetch('/api/creator/status', { headers });
+        const res = await fetch('/api/creator/status', { 
+            headers,
+            signal: controller?.signal 
+        });
+        if (timeoutId) clearTimeout(timeoutId);
         const data = await res.json();
-
-        if (loadingState) loadingState.style.display = 'none';
 
         if (data.success && data.is_creator && data.creator) {
             currentCreatorData = data;
@@ -202,7 +207,8 @@ async function loadCustomerCreatorStatus() {
 
             initCreatorRealtimeSync(data.creator.id);
 
-            if (data.status === 'under_review') {
+            const creatorStatus = (data.status || data.creator.status || '').toLowerCase();
+            if (creatorStatus === 'under_review' || creatorStatus === 'pending') {
                 if (reviewState) reviewState.style.display = 'block';
             } else {
                 if (dashboardState) dashboardState.style.display = 'block';
@@ -225,13 +231,15 @@ async function loadCustomerCreatorStatus() {
         }
     } catch (err) {
         console.error('Error checking creator status:', err);
-        if (loadingState) loadingState.style.display = 'none';
         if (onboardState) onboardState.style.display = 'block';
         const heroCard = document.querySelector('.creator-onboard-hero') || document.getElementById('creator-onboard-hero');
         const formCard = document.getElementById('creator-onboard-form-card');
         if (heroCard) heroCard.style.display = 'block';
         if (formCard) formCard.style.display = 'none';
         prefillOnboardingForm();
+    } finally {
+        if (timeoutId) clearTimeout(timeoutId);
+        if (loadingState) loadingState.style.display = 'none';
     }
 }
 window.loadCustomerCreatorStatus = loadCustomerCreatorStatus;
@@ -578,18 +586,27 @@ async function handleCreatorOnboardSubmit(e) {
         email: customerEmail
     };
 
+    const controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+    const timeoutId = controller ? setTimeout(() => {
+        controller.abort();
+        console.warn('[WishRite Creator] Onboard submission request timed out after 15s');
+    }, 15000) : null;
+
     try {
         if (submitBtn) {
             submitBtn.disabled = true;
-            submitBtn.innerText = 'ACTIVATING...';
+            submitBtn.innerText = 'SUBMITTING APPLICATION...';
         }
 
         const headers = await getAuthHeaders();
         const res = await fetch('/api/creator/onboard', {
             method: 'POST',
             headers,
-            body: JSON.stringify(payload)
+            body: JSON.stringify(payload),
+            signal: controller?.signal
         });
+
+        if (timeoutId) clearTimeout(timeoutId);
 
         if (res.status === 401) {
             throw new Error('Please sign in to activate your Creator profile.');
@@ -599,32 +616,53 @@ async function handleCreatorOnboardSubmit(e) {
 
         if (!res.ok || !data) {
             if (res.status >= 500) {
-                throw new Error("We couldn't activate your Creator profile. Please try again.");
+                throw new Error("We couldn't submit your Creator application right now. Please try again.");
             }
-            throw new Error(data?.error?.message || "We couldn't activate your Creator profile. Please try again.");
+            throw new Error(data?.error?.message || "We couldn't submit your Creator application. Please try again.");
         }
 
         if (!data.success && !data.already_active) {
-            throw new Error(data.error?.message || "We couldn't activate your Creator profile. Please try again.");
+            throw new Error(data.error?.message || "We couldn't submit your Creator application. Please try again.");
         }
 
         if (data.token) {
             localStorage.setItem('wishrite_creator_token', data.token);
         }
 
+        // Reset form ONLY after confirmed success
+        if (nameInput) nameInput.value = '';
+        if (avatarInput) avatarInput.value = '';
+        if (bioInput) bioInput.value = '';
+        if (cityInput) cityInput.value = '';
+        if (stateInput) stateInput.value = '';
+        if (instaInput) instaInput.value = '';
+        if (ytInput) ytInput.value = '';
+        if (fbInput) fbInput.value = '';
+        if (otherInput) otherInput.value = '';
+        if (agreementCheck) agreementCheck.checked = false;
+
+        const successMsg = data.already_active
+            ? 'Welcome back to WishRite Creator Club!'
+            : (data.status === 'pending'
+                ? 'Your Creator application was submitted successfully and is now under review!'
+                : 'WishRite Creator Profile activated successfully!');
+
         if (typeof showToast === 'function') {
-            showToast(data.already_active ? 'Welcome back to WishRite Creator Club!' : 'WishRite Creator Profile activated successfully!', 'success');
+            showToast(successMsg, 'success');
         }
 
-        // Immediately transition into State 2: Creator Dashboard
+        // Transition into appropriate creator state (Review state for pending, Dashboard for active)
         await loadCustomerCreatorStatus();
     } catch (err) {
-        let msg = err.message || "We couldn't activate your Creator profile. Please try again.";
-        if (err.name === 'TypeError' && String(err).includes('fetch')) {
+        let msg = err.message || "We couldn't submit your Creator application. Please try again.";
+        if (err.name === 'AbortError' || String(err).includes('aborted')) {
+            msg = 'Request timed out. Please check your internet connection and try again.';
+        } else if (err.name === 'TypeError' && String(err).includes('fetch')) {
             msg = 'Unable to connect. Please check your internet connection and try again.';
         }
         showError(msg);
     } finally {
+        if (timeoutId) clearTimeout(timeoutId);
         if (submitBtn) {
             submitBtn.disabled = false;
             submitBtn.innerText = 'ACTIVATE CREATOR';
@@ -2287,9 +2325,13 @@ async function loadCreatorContest(showLoading = false) {
         `;
     }
 
+    const controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+    const timeoutId = controller ? setTimeout(() => controller.abort(), 8000) : null;
+
     try {
         const headers = await getAuthHeaders();
-        const res = await fetch('/api/creator/contest', { headers });
+        const res = await fetch('/api/creator/contest', { headers, signal: controller?.signal });
+        if (timeoutId) clearTimeout(timeoutId);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         if (!data.success) throw new Error(data.error?.message || 'Failed to load contest standings');

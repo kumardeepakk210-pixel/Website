@@ -284,8 +284,23 @@ async function handleProductViewNavigation(param, targetView, pushHistory = true
                 <p style="font-family:var(--wr-font-heading);font-size:1.1rem;color:var(--wr-primary);">Loading WishRite Piece...</p>
             </div>
         `;
-        await loadProductsFromInventory();
-        product = getProductBySlug(param) || getProductById(param);
+        try {
+            await loadProductsFromInventory();
+            product = getProductBySlug(param) || getProductById(param);
+        } catch (loadErr) {
+            console.error('[WishRite PDP] Failed to load inventory for product view:', loadErr);
+            unmountStickyCTA();
+            document.body.classList.remove('view-product');
+            targetView.innerHTML = `
+                <div class="container" style="padding:100px 0;text-align:center;">
+                    <h2 style="font-family:var(--wr-font-heading);color:var(--wr-primary);">Unable to Load Piece</h2>
+                    <p style="color:var(--wr-text-muted);margin:12px 0 24px;">We encountered an issue loading this jewellery piece. Please check your connection.</p>
+                    <button class="btn btn-primary" onclick="handleProductViewNavigation('${param}', document.getElementById('product-view'))">Retry</button>
+                    <button class="btn btn-outline" onclick="navigateTo('shop')" style="margin-left:12px;">Browse Collections</button>
+                </div>
+            `;
+            return;
+        }
     }
 
     // Guard: Ensure user is STILL on the product route after async wait
@@ -406,6 +421,11 @@ async function renderHomeSections() {
                 await productsService.ensureLoaded();
             }
         } catch (e) {
+            console.error('[WishRite Home] Products failed to load:', e);
+            if (typeof renderProductsToContainer === 'function') {
+                if (bsEl) renderProductsToContainer([], 'bestsellers-container');
+                if (naEl) renderProductsToContainer([], naEl.id);
+            }
             return;
         }
     }
@@ -424,7 +444,15 @@ async function renderHomeSections() {
 }
 
 // Listen for async inventory sync and automatically update active views
-window.addEventListener('wishrite:productsLoaded', () => {
+window.addEventListener('wishrite:productsLoaded', (e) => {
+    const error = e?.detail?.error;
+    if (error && (!productsDB || !productsDB.length)) {
+        // Clear all initial loading toolbar counts to avoid staying in 'Loading products...'
+        ['collections-count', 'collection-detail-count', 'new-arrivals-count', 'best-sellers-count', 'kids-count', 'men-count', 'shop-product-count'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el && el.textContent.includes('Loading')) el.textContent = 'Unavailable';
+        });
+    }
     const current = getCurrentView();
     if (current === 'home') {
         renderHomeSections();
@@ -473,14 +501,20 @@ async function renderCreatorStorefront(slug) {
 
     try {
         let creator = null;
-        if (typeof WishRiteAttribution !== 'undefined') {
-            creator = await WishRiteAttribution.fetchPublicCreator(slug);
-        } else {
-            const res = await fetch(`/api/public/influencers/${encodeURIComponent(slug)}`);
-            if (res.ok) {
-                const data = await res.json();
-                creator = data?.data || null;
+        const controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+        const timeoutId = controller ? setTimeout(() => controller.abort(), 8000) : null;
+        try {
+            if (typeof WishRiteAttribution !== 'undefined') {
+                creator = await WishRiteAttribution.fetchPublicCreator(slug);
+            } else {
+                const res = await fetch(`/api/public/influencers/${encodeURIComponent(slug)}`, { signal: controller?.signal });
+                if (res.ok) {
+                    const data = await res.json();
+                    creator = data?.data || null;
+                }
             }
+        } finally {
+            if (timeoutId) clearTimeout(timeoutId);
         }
 
         if (!creator || creator.status !== 'active') {

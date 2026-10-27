@@ -543,6 +543,8 @@
 
             // 1. Primary Source: Direct query to Supabase public.occasion_settings
             try {
+                const sbController = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+                const sbTimeout = sbController ? setTimeout(() => sbController.abort(), 5000) : null;
                 const sbUrl = `${WR_SUPABASE_URL}/rest/v1/occasion_settings?select=id,occasion_slug,occasion_name,page_title,page_description,banner_image,start_date,end_date,is_active,is_selected,updated_at&order=updated_at.desc${forceRefresh ? `&_t=${Date.now()}` : ''}`;
                 const sbRes = await fetch(sbUrl, {
                     method: 'GET',
@@ -551,8 +553,10 @@
                         'Authorization': `Bearer ${WR_SUPABASE_ANON_KEY}`,
                         'Accept': 'application/json'
                     },
+                    signal: sbController?.signal,
                     cache: forceRefresh ? 'no-store' : 'default'
                 });
+                if (sbTimeout) clearTimeout(sbTimeout);
                 if (sbRes.ok) {
                     const rows = await sbRes.json();
                     if (Array.isArray(rows) && rows.length > 0) {
@@ -590,11 +594,15 @@
             // 2. Secondary Fallback: Same-origin proxy endpoint
             if (!rawData || !rawData.success) {
                 try {
+                    const proxyController = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+                    const proxyTimeout = proxyController ? setTimeout(() => proxyController.abort(), 5000) : null;
                     const proxyRes = await fetch(`/api/occasion-settings${cacheParam}`, {
                         method: 'GET',
                         headers: { 'Accept': 'application/json' },
+                        signal: proxyController?.signal,
                         cache: forceRefresh ? 'no-store' : 'default'
                     });
+                    if (proxyTimeout) clearTimeout(proxyTimeout);
                     if (proxyRes.ok) {
                         const parsed = await proxyRes.json();
                         if (parsed && parsed.success) {
@@ -609,12 +617,16 @@
             // 3. Tertiary Fallback: Upstream Inventory endpoint
             if (!rawData || !rawData.success) {
                 try {
+                    const directController = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+                    const directTimeout = directController ? setTimeout(() => directController.abort(), 5000) : null;
                     const directUrl = `https://inventory-mu-lilac.vercel.app/api/settings/occasion${cacheParam}`;
                     const directRes = await fetch(directUrl, {
                         method: 'GET',
                         headers: { 'Accept': 'application/json' },
+                        signal: directController?.signal,
                         cache: forceRefresh ? 'no-store' : 'default'
                     });
+                    if (directTimeout) clearTimeout(directTimeout);
                     if (directRes.ok) {
                         const parsed = await directRes.json();
                         if (parsed && parsed.success) {
@@ -622,13 +634,14 @@
                         }
                     }
                 } catch (err) {
-                    console.warn('[WishRite Occasion] Failed to fetch upstream occasion settings:', err);
+                    console.warn('[WishRite Occasion] Failed to fetch upstream occasion settings:', err.message);
                 }
             }
 
             // Differentiate genuine OFF from network/API failure
             if (!rawData || !rawData.success) {
                 console.warn('[WishRite Occasion] Occasion API error: unable to reach database or endpoints. Maintaining current state.');
+                occasionSettingsLoaded = true;
                 try {
                     window.dispatchEvent(new CustomEvent('wishrite:occasion-error', { detail: { message: 'Failed to fetch occasion configuration' } }));
                 } catch (e) { }

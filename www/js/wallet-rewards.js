@@ -679,31 +679,16 @@
                     }
                 }
 
-                // Step 1: Create top-up order on backend
-                // Try Supabase Edge Function first, then fallback to /api/wallet-topup-order
+                // Step 1: Create top-up order on server
                 let orderData = null;
-                try {
-                    const { data, error } = await client.functions.invoke('create-razorpay-order', {
-                        body: {
-                            purpose: 'wallet_topup',
-                            amount: amount,
-                            user_id: user.id
-                        }
-                    });
-                    if (!error && data?.success && data?.order_id) {
-                        orderData = data;
-                    }
-                } catch (e) {
-                    console.warn('[WishRite Topup] Edge function create fallback notice:', e.message);
-                }
 
-                if (!orderData) {
-                    // Fallback to local / Vercel API route
-                    const localRes = await fetch('/api/wallet-topup-order', {
+                // Try local / Vercel API route POST /api/wallet/create-order
+                try {
+                    const localRes = await fetch('/api/wallet/create-order', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
-                            Authorization: `Bearer ${session.data.session.access_token}`
+                            Authorization: session?.data?.session?.access_token ? `Bearer ${session.data.session.access_token}` : ''
                         },
                         body: JSON.stringify({
                             purpose: 'wallet_topup',
@@ -711,14 +696,70 @@
                             user_id: user.id
                         })
                     });
-                    const resJson = await localRes.json();
-                    if (!resJson.success || !resJson.order_id) {
-                        throw new Error(resJson.error || 'Failed to create payment order');
+                    const resJson = await localRes.json().catch(() => ({}));
+                    if (resJson && resJson.success && resJson.order_id) {
+                        orderData = resJson;
+                    } else if (resJson && resJson.error) {
+                        throw new Error(resJson.error);
                     }
-                    orderData = resJson;
+                } catch (apiErr) {
+                    if (apiErr.message?.includes('credentials not configured')) {
+                        throw apiErr;
+                    }
+                    console.warn('[WishRite Topup] /api/wallet/create-order notice:', apiErr.message);
                 }
 
-                console.log('[WishRite Topup] Payment order created:', orderData);
+                // Fallback to /api/wallet-topup-order
+                if (!orderData) {
+                    try {
+                        const legacyRes = await fetch('/api/wallet-topup-order', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                Authorization: session?.data?.session?.access_token ? `Bearer ${session.data.session.access_token}` : ''
+                            },
+                            body: JSON.stringify({
+                                purpose: 'wallet_topup',
+                                amount: amount,
+                                user_id: user.id
+                            })
+                        });
+                        const resJson = await legacyRes.json().catch(() => ({}));
+                        if (resJson && resJson.success && resJson.order_id) {
+                            orderData = resJson;
+                        } else if (resJson && resJson.error) {
+                            throw new Error(resJson.error);
+                        }
+                    } catch (legacyErr) {
+                        if (legacyErr.message?.includes('credentials not configured')) {
+                            throw legacyErr;
+                        }
+                    }
+                }
+
+                // Fallback to Supabase Edge Function if server routes not reached
+                if (!orderData && client?.functions) {
+                    try {
+                        const { data, error } = await client.functions.invoke('create-razorpay-order', {
+                            body: {
+                                purpose: 'wallet_topup',
+                                amount: amount,
+                                user_id: user.id
+                            }
+                        });
+                        if (!error && data?.success && data?.order_id) {
+                            orderData = data;
+                        }
+                    } catch (e) {
+                        console.warn('[WishRite Topup] Edge function create fallback notice:', e.message);
+                    }
+                }
+
+                if (!orderData) {
+                    throw new Error('Unable to create payment order. Please verify connection and try again.');
+                }
+
+                console.log('[WishRite Topup] Payment order created successfully:', orderData);
 
                 // Step 2: Open Razorpay modal
                 const self = this;
@@ -755,44 +796,78 @@
                         try {
                             let verifyData = null;
 
-                            // Try Supabase Edge Function first
+                            // 1. Try POST /api/wallet/verify-payment
                             try {
-                                const { data: vData, error: vErr } = await client.functions.invoke('verify-razorpay-payment', {
-                                    body: {
-                                        purpose: 'wallet_topup',
-                                        topup_id: orderData.topup_id,
-                                        razorpay_order_id: response.razorpay_order_id,
-                                        razorpay_payment_id: response.razorpay_payment_id,
-                                        razorpay_signature: response.razorpay_signature
-                                    }
-                                });
-                                if (!vErr && vData?.success && vData?.wallet_credited) {
-                                    verifyData = vData;
-                                }
-                            } catch (e) {
-                                console.warn('[WishRite Topup] Edge function verify fallback notice:', e.message);
-                            }
-
-                            if (!verifyData) {
-                                // Fallback to local / Vercel API route
-                                const verifyRes = await fetch('/api/verify-wallet-topup', {
+                                const verifyRes = await fetch('/api/wallet/verify-payment', {
                                     method: 'POST',
                                     headers: {
                                         'Content-Type': 'application/json',
-                                        Authorization: `Bearer ${session.data.session.access_token}`
+                                        Authorization: session?.data?.session?.access_token ? `Bearer ${session.data.session.access_token}` : ''
                                     },
                                     body: JSON.stringify({
                                         topup_id: orderData.topup_id,
                                         razorpay_order_id: response.razorpay_order_id,
                                         razorpay_payment_id: response.razorpay_payment_id,
-                                        razorpay_signature: response.razorpay_signature
+                                        razorpay_signature: response.razorpay_signature,
+                                        amount: amount,
+                                        user_id: user.id
                                     })
                                 });
-                                const vJson = await verifyRes.json();
-                                if (!vJson.success || !vJson.wallet_credited) {
-                                    throw new Error(vJson.error || 'Payment verification failed');
+                                const vJson = await verifyRes.json().catch(() => ({}));
+                                if (vJson && vJson.success && vJson.wallet_credited) {
+                                    verifyData = vJson;
                                 }
-                                verifyData = vJson;
+                            } catch (vErr) {
+                                console.warn('[WishRite Topup] /api/wallet/verify-payment notice:', vErr.message);
+                            }
+
+                            // 2. Fallback to /api/verify-wallet-topup
+                            if (!verifyData) {
+                                try {
+                                    const vRes = await fetch('/api/verify-wallet-topup', {
+                                        method: 'POST',
+                                        headers: {
+                                            'Content-Type': 'application/json',
+                                            Authorization: session?.data?.session?.access_token ? `Bearer ${session.data.session.access_token}` : ''
+                                        },
+                                        body: JSON.stringify({
+                                            topup_id: orderData.topup_id,
+                                            razorpay_order_id: response.razorpay_order_id,
+                                            razorpay_payment_id: response.razorpay_payment_id,
+                                            razorpay_signature: response.razorpay_signature,
+                                            amount: amount,
+                                            user_id: user.id
+                                        })
+                                    });
+                                    const vJson = await vRes.json().catch(() => ({}));
+                                    if (vJson && vJson.success && vJson.wallet_credited) {
+                                        verifyData = vJson;
+                                    }
+                                } catch (_) {}
+                            }
+
+                            // 3. Fallback to Supabase Edge Function
+                            if (!verifyData && client?.functions) {
+                                try {
+                                    const { data: vData, error: vErr } = await client.functions.invoke('verify-razorpay-payment', {
+                                        body: {
+                                            purpose: 'wallet_topup',
+                                            topup_id: orderData.topup_id,
+                                            razorpay_order_id: response.razorpay_order_id,
+                                            razorpay_payment_id: response.razorpay_payment_id,
+                                            razorpay_signature: response.razorpay_signature
+                                        }
+                                    });
+                                    if (!vErr && vData?.success && vData?.wallet_credited) {
+                                        verifyData = vData;
+                                    }
+                                } catch (e) {
+                                    console.warn('[WishRite Topup] Edge function verify fallback notice:', e.message);
+                                }
+                            }
+
+                            if (!verifyData || !verifyData.wallet_credited) {
+                                throw new Error(verifyData?.error || 'Payment verification failed');
                             }
 
                             // Step 4: Success - update state & UI
@@ -822,7 +897,8 @@
             } catch (err) {
                 console.error('[WishRite Topup] Initiation error:', err);
                 if (errEl) {
-                    errEl.textContent = err.message || 'Unable to open payment gateway. Please try again.';
+                    const msg = err.message || 'Unable to open payment gateway. Please try again.';
+                    errEl.textContent = msg;
                     errEl.style.display = 'block';
                 }
                 submitBtn.disabled = false;

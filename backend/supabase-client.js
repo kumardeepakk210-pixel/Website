@@ -49,10 +49,10 @@ const rawPublishableKey = (
 let adminKey = '';
 let adminCredentialType = 'none';
 
-if (rawSecretKey) {
+if (rawSecretKey && !rawSecretKey.startsWith('sb_publishable_')) {
     adminKey = rawSecretKey;
     adminCredentialType = rawSecretKey.startsWith('sb_secret_') ? 'secret' : 'service_role';
-} else if (rawServiceRoleKey) {
+} else if (rawServiceRoleKey && !rawServiceRoleKey.startsWith('sb_publishable_')) {
     adminKey = rawServiceRoleKey;
     adminCredentialType = rawServiceRoleKey.startsWith('sb_secret_') ? 'secret' : 'service_role';
 }
@@ -99,10 +99,10 @@ export function isPublishableKeyConfigured() {
 export function requireServerAdminCredential(customMessage) {
     if (!hasServerAdminCredential()) {
         const err = new Error(
-            customMessage || 'A server-side Supabase secret/service-role credential is required for administrative database mutations.'
+            customMessage || 'SUPABASE_SERVICE_ROLE_KEY is not configured on the server (a valid server-side secret/service-role key is required).'
         );
         err.code = 'SERVER_ADMIN_CREDENTIAL_MISSING';
-        err.status = 403;
+        err.status = 500;
         throw err;
     }
 }
@@ -249,9 +249,10 @@ export const tableColumnsCache = {
         'views', 'clicks', 'orders', 'commission_amount', 'created_at', 'updated_at'
     ]),
     influencers: new Set([
-        'id', 'influencer_code', 'name', 'email', 'phone',
-        'instagram_id', 'instagram_url', 'public_slug', 'public_profile_url',
+        'id', 'influencer_id', 'influencer_code', 'name', 'influencer_name', 'email', 'email_id',
+        'phone', 'phone_number', 'instagram_id', 'instagram_url', 'public_slug', 'public_profile_url',
         'profile_image', 'category', 'bio', 'commission_rate', 'tier', 'status',
+        'address', 'city', 'state', 'country',
         'created_at', 'updated_at'
     ]),
     influencer_accounts: new Set([
@@ -283,11 +284,34 @@ export const tableColumnsCache = {
         'status', 'created_at', 'updated_at'
     ]),
     orders: new Set([
-        'id', 'order_number', 'customer_name', 'customer_phone', 'customer_email',
-        'subtotal', 'discount', 'tax', 'grand_total', 'order_status', 'payment_status',
-        'razorpay_order_id', 'razorpay_payment_id', 'influencer_id', 'influencer_code',
+        'id', 'order_number', 'user_id', 'customer_name', 'customer_phone', 'customer_email',
+        'customer_address', 'customer_city', 'customer_state', 'customer_country', 'customer_pin',
+        'subtotal', 'discount', 'shipping_charge', 'cod_charge', 'tax', 'grand_total', 'currency',
+        'payment_method', 'payment_status', 'order_status',
+        'razorpay_order_id', 'razorpay_payment_id', 'razorpay_signature',
+        'coupon_code', 'coupon_id', 'discount_type', 'discount_value', 'coupon_discount_amount',
+        'subtotal_before_discount', 'final_amount',
+        'points_redeemed', 'points_discount_amount', 'wallet_amount_used',
+        'influencer_id', 'influencer_code',
         'influencer_attribution_id', 'influencer_link_id', 'influencer_commission_rate',
         'influencer_commission_amount', 'created_at', 'updated_at'
+    ]),
+    order_items: new Set([
+        'id', 'order_id', 'inventory_id', 'product_id', 'product_code', 'product_name',
+        'quantity', 'unit_price', 'line_total', 'total_price', 'size',
+        'created_at', 'updated_at'
+    ]),
+    wallet_topup_requests: new Set([
+        'id', 'user_id', 'amount', 'currency', 'status', 'razorpay_order_id', 'razorpay_payment_id',
+        'created_at', 'updated_at'
+    ]),
+    wallets: new Set([
+        'id', 'user_id', 'balance', 'currency', 'created_at', 'updated_at'
+    ]),
+    wallet_transactions: new Set([
+        'id', 'wallet_id', 'user_id', 'transaction_type', 'amount', 'balance_after',
+        'reference_type', 'reference_id', 'description', 'status', 'metadata',
+        'created_at'
     ]),
     sales: new Set([
         'id', 'product_code', 'product_name', 'product_description', 'category',

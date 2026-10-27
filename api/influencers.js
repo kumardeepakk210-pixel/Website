@@ -15,6 +15,11 @@ module.exports = async function handler(req, res) {
     try {
         req.headers = req.headers || {};
         req.body = req.body || {};
+        if (typeof req.body === 'string' && req.body.trim()) {
+            try {
+                req.body = JSON.parse(req.body);
+            } catch (_) {}
+        }
         req.query = req.query || {};
         req.params = req.params || {};
 

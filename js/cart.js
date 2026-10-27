@@ -1619,12 +1619,8 @@ async function proceedToRazorpayPayment(internalOrderId) {
     }
 
     const submitButton = document.getElementById('wishrite-create-order-button');
-    const client = window.supabaseClient || (typeof supabaseClient !== 'undefined' ? supabaseClient : null);
-
-    if (!client) {
-        showCheckoutFormError('Supabase client is not available. Please refresh the page and try again.');
-        return;
-    }
+    let paymentData = (typeof internalOrderId === 'object' && internalOrderId !== null) ? internalOrderId : null;
+    let orderIdToVerify = paymentData?.order_id || (typeof internalOrderId === 'string' ? internalOrderId : window.wishritePendingCheckout?.internal_order_id);
 
     isCreatingRazorpayOrder = true;
     if (submitButton) {
@@ -1635,32 +1631,36 @@ async function proceedToRazorpayPayment(internalOrderId) {
     try {
         await loadRazorpaySdk();
 
-        console.log('[CHECKOUT-DIAG] Calling create-razorpay-order');
-        const { data: efData, error: efError } = await client.functions.invoke('create-razorpay-order', {
-            body: {
-                order_id: internalOrderId
+        // If paymentData doesn't already contain gateway credentials, invoke edge function or server endpoint
+        if (!paymentData || !paymentData.key_id || (!paymentData.order_id && !paymentData.razorpay_order_id)) {
+            console.log('[CHECKOUT-DIAG] Requesting gateway credentials for order:', orderIdToVerify);
+            const client = window.supabaseClient || (typeof supabaseClient !== 'undefined' ? supabaseClient : null);
+            if (client?.functions) {
+                const { data: efData, error: efError } = await client.functions.invoke('create-razorpay-order', {
+                    body: {
+                        order_id: orderIdToVerify
+                    }
+                });
+                if (!efError && efData?.success && efData?.order_id) {
+                    paymentData = efData;
+                }
             }
-        });
-
-        if (efError) {
-            console.error('create-razorpay-order invocation error:', efError.message || efError);
-            throw new Error(efError.message || 'Unable to initiate payment with payment gateway.');
         }
 
-        if (!efData || !efData.success || !efData.order_id || !efData.key_id) {
-            console.error('create-razorpay-order invalid response:', efData?.error || 'Missing required payment data.');
-            throw new Error(efData?.error || 'Invalid payment response received from server.');
+        if (!paymentData || (!paymentData.order_id && !paymentData.razorpay_order_id) || !paymentData.key_id) {
+            throw new Error('Unable to initialize payment gateway credentials. Please try again.');
         }
 
+        const razorpayOrderId = paymentData.razorpay_order_id || paymentData.order_id;
         const pending = window.wishritePendingCheckout || {};
 
         const razorpayOptions = {
-            key: efData.key_id,
-            amount: efData.amount,
-            currency: efData.currency || 'INR',
+            key: paymentData.key_id,
+            amount: paymentData.amount,
+            currency: paymentData.currency || 'INR',
             name: 'WishRite',
             description: 'Premium 925 Silver Jewellery',
-            order_id: efData.order_id,
+            order_id: razorpayOrderId,
             prefill: {
                 name: pending.customer_name || '',
                 email: pending.customer_email || '',
@@ -1689,9 +1689,9 @@ async function proceedToRazorpayPayment(internalOrderId) {
                 // Prevent duplicate clicks while verification is underway
                 isCreatingRazorpayOrder = true;
 
-                const pending = window.wishritePendingCheckout || {};
-                const orderIdToVerify = pending.internal_order_id || internalOrderId;
-                const orderNumber = pending.order_number || '';
+                const pendingState = window.wishritePendingCheckout || {};
+                const currentOrderId = pendingState.internal_order_id || orderIdToVerify;
+                const currentOrderNumber = pendingState.order_number || '';
 
                 // Prevent accidental double execution of the success flow
                 if (window.wishritePendingCheckout?.is_completed) {
@@ -1700,7 +1700,7 @@ async function proceedToRazorpayPayment(internalOrderId) {
 
                 // Safe diagnostic logging (no personal data, secrets, or signatures)
                 console.log('Razorpay payment response received:', {
-                    internal_order_id: orderIdToVerify,
+                    internal_order_id: currentOrderId,
                     razorpay_order_id: response?.razorpay_order_id
                 });
 
@@ -1722,31 +1722,53 @@ async function proceedToRazorpayPayment(internalOrderId) {
                 );
 
                 try {
-                    const { data: verifyData, error: verifyError } = await client.functions.invoke(
-                        'verify-razorpay-payment',
-                        {
-                            body: {
-                                internal_order_id: orderIdToVerify,
+                    let verifyData = null;
+
+                    // 1. First attempt verification via server-authoritative API route: POST /api/orders/verify-payment
+                    try {
+                        const verifyRes = await fetch('/api/orders/verify-payment', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                internal_order_id: currentOrderId,
                                 razorpay_payment_id: response.razorpay_payment_id,
                                 razorpay_order_id: response.razorpay_order_id,
                                 razorpay_signature: response.razorpay_signature
+                            })
+                        });
+                        const vJson = await verifyRes.json();
+                        if (vJson && vJson.success && vJson.verified) {
+                            verifyData = vJson;
+                        }
+                    } catch (fetchErr) {
+                        console.warn('[Checkout] /api/orders/verify-payment notice:', fetchErr.message);
+                    }
+
+                    // 2. Fallback to Supabase Edge Function if server route was unavailable
+                    if (!verifyData) {
+                        const client = window.supabaseClient || (typeof supabaseClient !== 'undefined' ? supabaseClient : null);
+                        if (client?.functions) {
+                            const { data: efVData, error: efVErr } = await client.functions.invoke(
+                                'verify-razorpay-payment',
+                                {
+                                    body: {
+                                        internal_order_id: currentOrderId,
+                                        razorpay_payment_id: response.razorpay_payment_id,
+                                        razorpay_order_id: response.razorpay_order_id,
+                                        razorpay_signature: response.razorpay_signature
+                                    }
+                                }
+                            );
+                            if (!efVErr && efVData?.success && efVData?.verified) {
+                                verifyData = efVData;
                             }
                         }
-                    );
-
-                    if (verifyError) {
-                        console.error('verify-razorpay-payment invocation failed:', {
-                            internal_order_id: orderIdToVerify,
-                            razorpay_order_id: response?.razorpay_order_id,
-                            error: verifyError.message || verifyError
-                        });
-                        throw new Error(verifyError.message || 'Payment verification failed on the server.');
                     }
 
                     // Require: verifyData.success === true AND verifyData.verified === true
                     if (!verifyData || verifyData.success !== true || verifyData.verified !== true) {
                         console.error('verify-razorpay-payment rejected payment:', {
-                            internal_order_id: orderIdToVerify,
+                            internal_order_id: currentOrderId,
                             razorpay_order_id: response?.razorpay_order_id,
                             error: verifyData?.error || 'Unverified payment response.'
                         });
@@ -2075,193 +2097,87 @@ async function submitWishriteCustomerCheckout(event) {
             walletToUse = Math.max(0, Number(walletInput.value) || 0);
         }
 
-        const internalOrderId = crypto.randomUUID();
-        const orderNumber = generateOrderNumber();
+        // Secure Server-Authoritative Checkout API Call (Bypasses client RLS restrictions safely on server)
+        console.log('[CHECKOUT] Creating order via secure server API: /api/orders/checkout');
 
-        const orderPayload = {
-            id: internalOrderId,
-            order_number: orderNumber,
-            user_id: currentUserId,
-            customer_name: name,
-            customer_phone: phone,
-            customer_email: email,
-            customer_address: address,
-            customer_city: city,
-            customer_state: state,
-            customer_country: 'India',
-            customer_pin: pin,
-            subtotal: Number(subtotal),
-            discount: couponDiscount,
-            shipping_charge: Number(shipping),
-            cod_charge: actualCodFee,
-            tax: 0,
-            grand_total: finalDiscountedTotal,
-            currency: 'INR',
+        const attrPayload = (typeof WishRiteAttribution !== 'undefined')
+            ? WishRiteAttribution.getAttributionPayload()
+            : null;
+
+        const checkoutPayload = {
+            customer: {
+                name,
+                phone,
+                email,
+                address,
+                city,
+                state,
+                pin,
+                user_id: currentUserId
+            },
+            items: cart.map(item => {
+                const product = (typeof getProductById === 'function') ? getProductById(item.id) : null;
+                return {
+                    id: item.id || item.inventory_id || product?.id,
+                    inventory_id: item.inventory_id || item.inventoryId || product?.id || item.id,
+                    product_code: item.productCode || item.product_code || item.sku || product?.productCode || '',
+                    name: item.name || product?.name || 'WishRite Jewellery',
+                    price: Number(item.sellingPrice !== undefined ? item.sellingPrice : (item.price || 0)),
+                    qty: Number(item.qty) || 1,
+                    size: item.size || product?.size || null
+                };
+            }),
             payment_method: paymentMethod,
-            payment_status: 'pending',
-            order_status: paymentMethod === 'cod' ? 'confirmed' : 'pending',
-            eligible_taxable_subtotal: Math.max(0, Number(subtotal) - couponDiscount)
+            coupon_code: appliedCoupon ? appliedCoupon.code : null,
+            points_redeemed: pointsToRedeem,
+            points_discount: 0,
+            wallet_amount_used: walletToUse,
+            user_id: currentUserId,
+            attribution_id: attrPayload?.attribution_id || null,
+            session_id: attrPayload?.session_id || null,
+            influencer_id: attrPayload?.influencer_id || null,
+            referral_attribution: attrPayload || null
         };
 
-        // Add extended coupon audit fields if coupon was applied
-        if (appliedCoupon && couponDiscount > 0) {
-            orderPayload.coupon_code = appliedCoupon.code;
-            orderPayload.coupon_id = appliedCoupon.couponId || null;
-            orderPayload.discount_type = appliedCoupon.discountType || null;
-            orderPayload.discount_value = appliedCoupon.discountValue || null;
-            orderPayload.coupon_discount_amount = couponDiscount;
-            orderPayload.subtotal_before_discount = Number(subtotal);
-            orderPayload.final_amount = finalDiscountedTotal;
-        }
-
-        // 1. Insert order record into public.orders without SELECT/RETURNING
-        console.log('[CHECKOUT-DIAG] Creating internal order');
-        let { error: orderError } = await client
-            .from('orders')
-            .insert([orderPayload]);
-
-        // Graceful fallback if database schema has not yet been migrated with new columns
-        if (orderError && (orderError.message?.includes('column') || orderError.code === 'PGRST204')) {
-            console.warn('Orders insert retry without extended coupon/rewards columns:', orderError.message);
-            const standardPayload = {
-                id: internalOrderId,
-                order_number: orderNumber,
-                customer_name: name,
-                customer_phone: phone,
-                customer_email: email,
-                customer_address: address,
-                customer_city: city,
-                customer_state: state,
-                customer_country: 'India',
-                customer_pin: pin,
-                subtotal: Number(subtotal),
-                discount: couponDiscount,
-                shipping_charge: Number(shipping),
-                tax: 0,
-                grand_total: finalDiscountedTotal,
-                currency: 'INR',
-                payment_method: paymentMethod,
-                payment_status: 'pending',
-                order_status: paymentMethod === 'cod' ? 'confirmed' : 'pending'
-            };
-            const retryRes = await client.from('orders').insert([standardPayload]);
-            orderError = retryRes.error;
-        }
-
-        if (orderError) {
-            console.error('WishRite orders insert error:', orderError.message || orderError);
-            if (submitButton) {
-                submitButton.disabled = false;
-                submitButton.innerHTML = 'Continue to Secure Payment';
-            }
-            showCheckoutFormError(orderError.message || 'Unable to create your order. Please try again.');
-            return;
-        }
-
-        // 2. Prepare and insert order_items for every item in cart
-        const orderItemsPayload = cart.map(item => {
-            const product = (typeof getProductById === 'function') ? getProductById(item.id) : null;
-            const inventoryId = item.inventory_id || item.inventoryId || product?.id || item.id;
-            const quantity = Number(item.qty) || 1;
-            const unitPrice = Number(item.sellingPrice !== undefined ? item.sellingPrice : (item.price || 0));
-            const lineTotal = quantity * unitPrice;
-            const productCode = item.productCode || item.product_code || item.sku || product?.productCode || '';
-            const productName = item.name || product?.name || 'WishRite Jewellery';
-            const size = item.size || product?.size || null;
-
-            return {
-                order_id: internalOrderId,
-                inventory_id: inventoryId,
-                product_code: productCode,
-                product_name: productName,
-                quantity: quantity,
-                unit_price: unitPrice,
-                line_total: lineTotal,
-                size: size
-            };
+        const checkoutRes = await fetch('/api/orders/checkout', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(checkoutPayload)
         });
 
-        const { error: itemsError } = await client
-            .from('order_items')
-            .insert(orderItemsPayload);
+        const checkoutData = await checkoutRes.json().catch(() => ({}));
 
-        if (itemsError) {
-            console.error('WishRite order_items insert error:', itemsError.message || itemsError);
-            // Attempt to clean up newly created pending order header so no orphan record remains
-            try {
-                await client.from('orders').delete().eq('id', internalOrderId);
-            } catch (cleanupErr) {
-                console.error('Failed to clean up pending order header:', cleanupErr.message || cleanupErr);
-            }
-
+        if (!checkoutRes.ok || !checkoutData.success) {
+            const friendlyErr = checkoutData?.error || 'Unable to create your order right now. Please try again.';
+            console.error('[Checkout API Error]', friendlyErr);
             if (submitButton) {
                 submitButton.disabled = false;
                 submitButton.innerHTML = 'Continue to Secure Payment';
             }
-            showCheckoutFormError(itemsError.message || 'Unable to save items for your order. Please try again.');
+            showCheckoutFormError(friendlyErr);
             return;
         }
 
-        // 2.5 Record coupon usage in public.coupon_usages (Section 42)
-        if (appliedCoupon && couponDiscount > 0) {
-            try {
-                await client.from('coupon_usages').insert([{
-                    coupon_id: appliedCoupon.couponId || null,
-                    customer_email: email,
-                    customer_phone: phone,
-                    order_id: internalOrderId,
-                    coupon_code: appliedCoupon.code,
-                    discount_amount: couponDiscount
-                }]);
-            } catch (usageErr) {
-                console.warn('Coupon usage record non-blocking warning:', usageErr);
-            }
-        }
+        const internalOrderId = checkoutData.order_id;
+        const orderNumber = checkoutData.order_number;
 
-        // 2.6 If customer selected points or wallet, invoke atomic apply_wallet_and_points_to_checkout RPC
-        let pointsDiscountApplied = 0;
-        let walletAmountApplied = 0;
-        let isFullyPaidByWalletPoints = false;
-        let remainingAfterDeductions = finalDiscountedTotal;
-
-        if (currentUserId && (pointsToRedeem > 0 || walletToUse > 0)) {
-            try {
-                const { data: applyResult, error: applyError } = await client.rpc('apply_wallet_and_points_to_checkout', {
-                    p_order_id: internalOrderId,
-                    p_user_id: currentUserId,
-                    p_points_to_redeem: pointsToRedeem,
-                    p_wallet_to_use: walletToUse
-                });
-
-                if (applyError) {
-                    console.error('Error applying wallet/points to order:', applyError);
-                    showCheckoutFormError(applyError.message || 'Unable to apply points/wallet to this order.');
-                    if (submitButton) {
-                        submitButton.disabled = false;
-                        submitButton.innerHTML = 'Continue to Secure Payment';
-                    }
-                    return;
-                }
-
-                if (applyResult && applyResult.success) {
-                    pointsToRedeem = Number(applyResult.points_redeemed || 0);
-                    pointsDiscountApplied = Number(applyResult.points_discount || 0);
-                    walletAmountApplied = Number(applyResult.wallet_used || 0);
-                    isFullyPaidByWalletPoints = Boolean(applyResult.is_fully_paid);
-                    remainingAfterDeductions = Number(applyResult.remaining_payable !== undefined ? applyResult.remaining_payable : (finalDiscountedTotal - pointsDiscountApplied - walletAmountApplied));
-                }
-            } catch (rpcErr) {
-                console.error('RPC apply_wallet_and_points_to_checkout failed:', rpcErr);
-            }
-        }
-
-        // 3. Store pending checkout details in window.wishritePendingCheckout
-        const orderItemsWithImages = orderItemsPayload.map((oi, idx) => {
-            const cartItem = cart[idx];
-            const product = (typeof getProductById === 'function') ? getProductById(oi.inventory_id) : null;
+        // Store pending checkout details in window.wishritePendingCheckout
+        const orderItemsWithImages = cart.map(cartItem => {
+            const product = (typeof getProductById === 'function') ? getProductById(cartItem.id) : null;
             const img = cartItem?.images?.[0]?.url || cartItem?.image || product?.images?.[0]?.url || product?.image || '';
+            const unitP = Number(cartItem.sellingPrice !== undefined ? cartItem.sellingPrice : (cartItem.price || 0));
+            const q = Number(cartItem.qty) || 1;
             return {
-                ...oi,
+                order_id: internalOrderId,
+                inventory_id: cartItem.inventory_id || cartItem.id,
+                product_code: cartItem.productCode || cartItem.product_code || '',
+                product_name: cartItem.name || product?.name || 'WishRite Jewellery',
+                quantity: q,
+                unit_price: unitP,
+                line_total: q * unitP,
+                size: cartItem.size || null,
                 image: img
             };
         });
@@ -2284,18 +2200,18 @@ async function submitWishriteCustomerCheckout(event) {
             coupon_code: appliedCoupon ? appliedCoupon.code : null,
             coupon_id: appliedCoupon ? appliedCoupon.couponId : null,
             points_redeemed: pointsToRedeem,
-            points_discount_amount: pointsDiscountApplied,
-            wallet_amount_used: walletAmountApplied,
+            points_discount_amount: 0,
+            wallet_amount_used: walletToUse,
             shipping_charge: Number(shipping),
-            cod_charge: Number(codCharge),
-            grand_total: isFullyPaidByWalletPoints ? 0 : Math.max(0, remainingAfterDeductions),
-            payment_method: isFullyPaidByWalletPoints ? 'wallet_points' : paymentMethod,
+            cod_charge: paymentMethod === 'cod' ? actualCodFee : 0,
+            grand_total: checkoutData.grand_total !== undefined ? checkoutData.grand_total : finalDiscountedTotal,
+            payment_method: paymentMethod,
             currency: 'INR',
             items: orderItemsWithImages
         };
 
         // 4. If order is 100% paid by Points and/or Wallet, finalize immediately
-        if (isFullyPaidByWalletPoints || remainingAfterDeductions <= 0) {
+        if (checkoutData.is_fully_paid || checkoutData.grand_total === 0) {
             window.wishritePendingCheckout.is_completed = true;
             window.wishritePendingCheckout.payment_status = 'paid';
             window.wishritePendingCheckout.order_status = 'processing';
@@ -2325,11 +2241,9 @@ async function submitWishriteCustomerCheckout(event) {
 
         // 5. Online payment goes through Razorpay. COD is confirmed without opening Razorpay.
         if (paymentMethod === 'cod') {
-            if (window.wishritePendingCheckout) {
-                window.wishritePendingCheckout.is_completed = true;
-                window.wishritePendingCheckout.payment_status = 'pending';
-                window.wishritePendingCheckout.order_status = 'confirmed';
-            }
+            window.wishritePendingCheckout.is_completed = true;
+            window.wishritePendingCheckout.payment_status = 'pending';
+            window.wishritePendingCheckout.order_status = 'confirmed';
 
             if (typeof WishRiteCoupons !== 'undefined') {
                 WishRiteCoupons.clearAppliedCoupon();
@@ -2340,43 +2254,19 @@ async function submitWishriteCustomerCheckout(event) {
                 WishRiteWalletRewards.loadUserData();
             }
 
-            // Creator Club Server-Authoritative Attribution Hook for COD
-            try {
-                if (typeof WishRiteAttribution !== 'undefined') {
-                    const attrPayload = WishRiteAttribution.getAttributionPayload();
-                    if (attrPayload && attrPayload.influencer_id) {
-                        fetch('/api/orders/attribute', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                order_id: internalOrderId,
-                                order_reference: orderNumber,
-                                sales_amount: remainingAfterDeductions,
-                                attribution_id: attrPayload.attribution_id,
-                                session_id: attrPayload.session_id,
-                                influencer_id: attrPayload.influencer_id,
-                                referral_attribution: attrPayload
-                            })
-                        }).catch(e => console.warn('[WishRite Attribution] COD attribution notice:', e.message));
-                    }
-                }
-            } catch (attrErr) {
-                console.warn('[WishRite Attribution] COD attribution error:', attrErr.message);
-            }
-
             renderWishriteOrderConfirmation(window.wishritePendingCheckout, {
                 success: true,
                 verified: false,
                 order_number: orderNumber,
                 payment_status: 'pending',
                 order_status: 'confirmed',
-                grand_total: remainingAfterDeductions,
+                grand_total: checkoutData.grand_total !== undefined ? checkoutData.grand_total : finalDiscountedTotal,
                 currency: 'INR'
             });
             return;
         }
 
-        await proceedToRazorpayPayment(internalOrderId);
+        await proceedToRazorpayPayment(checkoutData);
 
     } catch (error) {
         console.error('WishRite checkout error:', error.message || error);

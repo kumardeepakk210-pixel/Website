@@ -17,6 +17,10 @@
       "destination": "/api/public.js"
     },
     {
+      "source": "/api/wallet/:path*",
+      "destination": "/api/wallet.js"
+    },
+    {
       "source": "/inventory",
       "destination": "/index.html"
     },

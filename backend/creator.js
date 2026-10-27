@@ -14,11 +14,13 @@ import {
     adminClient,
     storageUpload,
     storageDelete,
-    getStoragePublicUrl
+    getStoragePublicUrl,
+    hasServerAdminCredential
 } from './supabase-client.js';
 import { 
     buildInfluencerPublicUrl, 
-    buildInfluencerProductUrl 
+    buildInfluencerProductUrl,
+    normalizeInfluencerRecord
 } from './influencers.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -1548,19 +1550,33 @@ export async function handleCustomerCreatorStatus(req, res) {
         // DB lookup for creator if not matched locally
         if (!matchedCreator && ident.email) {
             try {
-                const rows = await dbQuery('influencers', `email=eq.${encodeURIComponent(ident.email)}&limit=1`);
+                const rows = await dbQuery('influencers', `or=(email.eq.${encodeURIComponent(ident.email)},email_id.eq.${encodeURIComponent(ident.email)})&limit=1`);
                 if (Array.isArray(rows) && rows.length > 0) {
-                    matchedCreator = rows[0];
+                    matchedCreator = normalizeInfluencerRecord(rows[0]);
                 }
-            } catch (_) {}
+            } catch (_) {
+                try {
+                    const fallbackRows = await dbQuery('influencers', `email_id=eq.${encodeURIComponent(ident.email)}&limit=1`);
+                    if (Array.isArray(fallbackRows) && fallbackRows.length > 0) {
+                        matchedCreator = normalizeInfluencerRecord(fallbackRows[0]);
+                    }
+                } catch (e2) {}
+            }
         }
         if (!matchedCreator && ident.influencerId) {
             try {
-                const rows = await dbQuery('influencers', `id=eq.${encodeURIComponent(ident.influencerId)}&limit=1`);
+                const rows = await dbQuery('influencers', `or=(id.eq.${encodeURIComponent(ident.influencerId)},influencer_id.eq.${encodeURIComponent(ident.influencerId)})&limit=1`);
                 if (Array.isArray(rows) && rows.length > 0) {
-                    matchedCreator = rows[0];
+                    matchedCreator = normalizeInfluencerRecord(rows[0]);
                 }
-            } catch (_) {}
+            } catch (_) {
+                try {
+                    const fallbackRows = await dbQuery('influencers', `influencer_id=eq.${encodeURIComponent(ident.influencerId)}&limit=1`);
+                    if (Array.isArray(fallbackRows) && fallbackRows.length > 0) {
+                        matchedCreator = normalizeInfluencerRecord(fallbackRows[0]);
+                    }
+                } catch (e2) {}
+            }
         }
 
         if (!matchedCreator) {
@@ -1746,13 +1762,17 @@ export async function handleCustomerCreatorOnboard(req, res) {
             publicSlug = `${slugBase}-${counter++}`;
         }
 
-        const code = `WR-CRE-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
+        const creatorId = randomUUID();
         const newCreator = {
-            id: randomUUID(),
+            id: creatorId,
+            influencer_id: creatorId,
             influencer_code: code,
             name: displayName,
+            influencer_name: displayName,
             email: cleanEmail,
+            email_id: cleanEmail,
             phone: sanitizeText(body.phone || ''),
+            phone_number: sanitizeText(body.phone || ''),
             bio: sanitizeText(body.bio || ''),
             city: sanitizeText(body.city || ''),
             state: sanitizeText(body.state || ''),
@@ -1767,13 +1787,12 @@ export async function handleCustomerCreatorOnboard(req, res) {
             content_preferences: Array.isArray(body.content_preferences) ? body.content_preferences : [],
             commission_rate: 10,
             tier: 'starter',
-            status: 'active',
+            status: 'pending',
             public_slug: publicSlug,
             public_profile_url: `https://wishrite.in/influencer/${publicSlug}`,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
         };
-        local.influencers.push(newCreator);
 
         const newAccount = {
             id: randomUUID(),
@@ -1786,7 +1805,6 @@ export async function handleCustomerCreatorOnboard(req, res) {
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
         };
-        local.accounts.push(newAccount);
 
         const defaultLink = {
             id: randomUUID(),
@@ -1797,7 +1815,6 @@ export async function handleCustomerCreatorOnboard(req, res) {
             campaign_id: 'default',
             created_at: new Date().toISOString()
         };
-        local.links.push(defaultLink);
 
         const initialStats = {
             id: randomUUID(),
@@ -1812,22 +1829,54 @@ export async function handleCustomerCreatorOnboard(req, res) {
             total_points: 0,
             updated_at: new Date().toISOString()
         };
+
+        // Check server-side admin credential before attempting insertion
+        if (!hasServerAdminCredential() && process.env.NODE_ENV !== 'test') {
+            console.error('[CREATOR_ONBOARD] Supabase insert FAILED: SUPABASE_SERVICE_ROLE_KEY is not configured on the server.');
+            return res.status(500).json({
+                success: false,
+                error: {
+                    code: 'SERVER_CONFIGURATION_ERROR',
+                    message: 'SUPABASE_SERVICE_ROLE_KEY is not configured on the server.'
+                }
+            });
+        }
+
+        // In PRODUCTION: Strictly persist to Supabase using privileged client
+        if (process.env.NODE_ENV !== 'test') {
+            try {
+                const insertRes = await dbInsert('influencers', newCreator, { useAdmin: true });
+                if (!insertRes?.data) {
+                    throw new Error('Database did not confirm influencer insertion.');
+                }
+            } catch (dbErr) {
+                console.error('[CREATOR_ONBOARD] Supabase insert FAILED:', dbErr.message);
+                return res.status(500).json({
+                    success: false,
+                    error: {
+                        code: dbErr.code || 'DATABASE_ERROR',
+                        message: dbErr.message || 'Failed to persist creator profile to database.'
+                    }
+                });
+            }
+            try { await dbInsert('influencer_accounts', newAccount, { useAdmin: true }); } catch (_) {}
+            try { await dbInsert('influencer_links', defaultLink, { useAdmin: true }); } catch (_) {}
+            try { await dbInsert('influencer_stats', initialStats, { useAdmin: true }); } catch (_) {}
+        }
+
+        local.influencers.push(newCreator);
+        local.accounts.push(newAccount);
+        local.links.push(defaultLink);
         local.stats.push(initialStats);
         writeLocalStore(local);
 
-        try {
-            await dbInsert('influencers', newCreator, { useAdmin: true }).catch(() => {});
-            await dbInsert('influencer_accounts', newAccount, { useAdmin: true }).catch(() => {});
-            await dbInsert('influencer_links', defaultLink, { useAdmin: true }).catch(() => {});
-            await dbInsert('influencer_stats', initialStats, { useAdmin: true }).catch(() => {});
-        } catch (_) {}
-
         const sess = issueCreatorSession(newAccount, newCreator);
 
-        return res.json({
+        return res.status(201).json({
             success: true,
-            message: 'WishRite Creator Profile activated successfully!',
+            message: 'WishRite Creator Profile submitted successfully! Your application is under review.',
             creator: newCreator,
+            status: 'pending',
             token: sess.token
         });
     } catch (err) {

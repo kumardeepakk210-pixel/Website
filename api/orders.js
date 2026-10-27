@@ -1,7 +1,7 @@
 // ==============================================================================
-// WISHRITE CREATOR CLUB — SERVER API ROUTE: /api/orders/*
-// Server-Authoritative Order Attribution & Commission Engine Hook
-// The browser NEVER calculates commissions or sets commission rates.
+// WISHRITE COMMERCE & CREATOR CLUB — SERVER API ROUTE: /api/orders/*
+// Server-Authoritative Checkout, Line Items, Razorpay Order Creation & Verification
+// The browser NEVER calculates final order amounts, item prices, or commissions.
 // ==============================================================================
 
 module.exports = async function handler(req, res) {
@@ -20,6 +20,7 @@ module.exports = async function handler(req, res) {
         req.params = req.params || {};
 
         const influencers = await import('../backend/influencers.js');
+        const checkout = await import('../backend/checkout.js');
 
         const rawUrl = req.url || '';
         const pathname = rawUrl.split('?')[0];
@@ -28,7 +29,17 @@ module.exports = async function handler(req, res) {
 
         req.params = req.params || {};
 
-        // 1. Attribute order directly: POST /api/orders/attribute
+        // 1. Secure Server-Authoritative Checkout: POST /api/orders/checkout or /api/orders/create
+        if ((subPath === '/checkout' || subPath === '/create') && method === 'POST') {
+            return await checkout.handleCheckoutCreateOrder(req, res);
+        }
+
+        // 2. Server-Authoritative Payment Verification: POST /api/orders/verify-payment or /api/orders/verify
+        if ((subPath === '/verify-payment' || subPath === '/verify') && method === 'POST') {
+            return await checkout.handleCheckoutVerifyPayment(req, res);
+        }
+
+        // 3. Attribute order directly: POST /api/orders/attribute
         if ((subPath === '/attribute' || subPath === '/attribution') && method === 'POST') {
             const body = req.body || {};
             const orderRef = body.order_reference || body.order_number || body.order_id;
@@ -55,15 +66,19 @@ module.exports = async function handler(req, res) {
             });
         }
 
-        // 2. Order Status Update: PATCH /api/orders/:id/status
+        // 4. Order Status Update: PATCH /api/orders/:id/status
         const statusMatch = subPath.match(/^\/([^\/]+)\/status$/);
         if (statusMatch && method === 'PATCH') {
             req.params.id = statusMatch[1];
             return await influencers.handleUpdateOrderStatus(req, res);
         }
 
-        // 3. Create Order with Server-Authoritative Attribution: POST /api/orders
+        // 5. Create Order: POST /api/orders
+        // If request includes items or customer, route to full checkout engine
         if ((subPath === '/' || subPath === '') && method === 'POST') {
+            if (req.body?.items || req.body?.customer) {
+                return await checkout.handleCheckoutCreateOrder(req, res);
+            }
             return await influencers.handleCreateOrder(req, res);
         }
 
