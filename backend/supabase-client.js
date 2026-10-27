@@ -23,7 +23,7 @@ export const SUPABASE_URL = (
     process.env.SUPABASE_URL ||
     process.env.NEXT_PUBLIC_SUPABASE_URL ||
     process.env.VITE_SUPABASE_URL ||
-    ''
+    'https://ptpuepejciqiktmcpuon.supabase.co'
 ).trim();
 
 const rawSecretKey = (process.env.SUPABASE_SECRET_KEY || '').trim();
@@ -33,13 +33,13 @@ const rawAnonKey = (
     process.env.SUPABASE_ANON_KEY ||
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
     process.env.VITE_SUPABASE_ANON_KEY ||
-    ''
+    'sb_publishable_ZHwzEtRBkW9u4T2d_0R2Ag_BX1EeJRX'
 ).trim();
 
 const rawPublishableKey = (
     process.env.SUPABASE_PUBLISHABLE_KEY ||
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
-    ''
+    'sb_publishable_ZHwzEtRBkW9u4T2d_0R2Ag_BX1EeJRX'
 ).trim();
 
 // Credential Priority & Categorization:
