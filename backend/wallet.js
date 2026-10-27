@@ -25,6 +25,20 @@ export function getRazorpayCredentials() {
 }
 
 /**
+ * Safe diagnostic status check (NEVER logs or exposes secret)
+ */
+export function getWalletRazorpayStatus() {
+    const { keyId, keySecret } = getRazorpayCredentials();
+    return {
+        configured: Boolean(keyId && keySecret),
+        keyIdConfigured: Boolean(keyId),
+        keySecretConfigured: Boolean(keySecret),
+        keyIdPrefix: keyId ? keyId.substring(0, 8) : null,
+        mode: keyId ? (keyId.startsWith('rzp_live') ? 'live' : 'test') : 'not_configured'
+    };
+}
+
+/**
  * Timing-safe string comparison
  */
 function timingSafeCompare(a, b) {
@@ -78,11 +92,18 @@ export async function handleWalletCreateOrder(req, res) {
 
         // 2. Validate Gateway Credentials
         const { keyId, keySecret } = getRazorpayCredentials();
+        const configStatus = getWalletRazorpayStatus();
+        console.log('[Wallet API] Razorpay Configuration Status:', configStatus);
+
         if (!keyId || !keySecret) {
             if (process.env.NODE_ENV !== 'test') {
                 return res.status(500).json({
                     success: false,
-                    error: 'Razorpay gateway credentials not configured on server.'
+                    error: 'Razorpay gateway credentials not configured on server.',
+                    config: {
+                        keyIdConfigured: configStatus.keyIdConfigured,
+                        keySecretConfigured: configStatus.keySecretConfigured
+                    }
                 });
             }
         }

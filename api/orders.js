@@ -39,6 +39,14 @@ module.exports = async function handler(req, res) {
             return await checkout.handleCheckoutVerifyPayment(req, res);
         }
 
+        // 3. Safe Configuration Diagnostic Check: GET /api/orders/config-status
+        if ((subPath === '/config-status' || subPath === '/gateway-status') && method === 'GET') {
+            return res.status(200).json({
+                success: true,
+                ...checkout.getRazorpayServerConfigStatus()
+            });
+        }
+
         // 3. Attribute order directly: POST /api/orders/attribute
         if ((subPath === '/attribute' || subPath === '/attribution') && method === 'POST') {
             const body = req.body || {};

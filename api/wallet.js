@@ -35,6 +35,14 @@ module.exports = async function handler(req, res) {
             return await wallet.handleWalletVerifyPayment(req, res);
         }
 
+        // 3. Safe Configuration Diagnostic Check: GET /api/wallet/config-status or /api/wallet/status
+        if ((subPath === '/config-status' || subPath === '/status') && method === 'GET') {
+            return res.status(200).json({
+                success: true,
+                ...wallet.getWalletRazorpayStatus()
+            });
+        }
+
         res.status(404).json({
             success: false,
             error: { message: `Wallet API route '${method} ${rawUrl}' not found.` }
