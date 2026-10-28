@@ -130,7 +130,9 @@ async function getAuthHeaders() {
     const client = window.supabaseClient || (typeof supabaseClient !== 'undefined' ? supabaseClient : null);
     if (client && client.auth) {
         try {
-            const { data } = await client.auth.getSession();
+            const sessionPromise = client.auth.getSession();
+            const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Auth getSession timeout')), 2500));
+            const { data } = await Promise.race([sessionPromise, timeoutPromise]);
             if (data?.session?.access_token) {
                 headers['Authorization'] = `Bearer ${data.session.access_token}`;
             }
@@ -564,6 +566,32 @@ async function handleCreatorOnboardSubmit(e) {
     const custProfile = (typeof getWishriteCustomerProfile === 'function') ? getWishriteCustomerProfile() : null;
     const customerEmail = custProfile?.email || authUser?.email || document.getElementById('account-email')?.innerText || '';
 
+    function sanitizeOptionalSocialUrl(val, placeholders = []) {
+        if (!val) return '';
+        const trimmed = String(val).trim();
+        if (!trimmed) return '';
+        for (const p of placeholders) {
+            if (trimmed.toLowerCase() === p.toLowerCase()) return '';
+        }
+        return trimmed;
+    }
+
+    const cleanYt = sanitizeOptionalSocialUrl(ytInput?.value, [
+        'https://youtube.com/@yourchannel',
+        'https://youtube.com/@channel',
+        '@yourchannel',
+        '@channel'
+    ]);
+    const cleanFb = sanitizeOptionalSocialUrl(fbInput?.value, [
+        'https://facebook.com/yourprofile',
+        'https://facebook.com/yourpage',
+        'https://facebook.com'
+    ]);
+    const cleanOther = sanitizeOptionalSocialUrl(otherInput?.value, [
+        'https://pinterest.com/yourhandle',
+        'https://twitter.com/yourhandle'
+    ]);
+
     const payload = {
         name: displayName,
         display_name: displayName,
@@ -575,11 +603,11 @@ async function handleCreatorOnboardSubmit(e) {
         instagram: instaVal,
         instagram_username: cleanInstaUser,
         instagram_url: cleanInstaUrl,
-        youtube: (ytInput?.value || '').trim(),
-        youtube_url: (ytInput?.value || '').trim(),
-        facebook: (fbInput?.value || '').trim(),
-        facebook_url: (fbInput?.value || '').trim(),
-        other_url: (otherInput?.value || '').trim(),
+        youtube: cleanYt || null,
+        youtube_url: cleanYt || null,
+        facebook: cleanFb || null,
+        facebook_url: cleanFb || null,
+        other_url: cleanOther || null,
         content_preferences: selectedPreferences,
         preferences: selectedPreferences,
         agreement_accepted: true,
@@ -1837,7 +1865,10 @@ async function fetchLiveProductsForPicker() {
         return liveProductsCache;
     }
     try {
-        const res = await fetch('/api/public/products');
+        const controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+        const timer = controller ? setTimeout(() => controller.abort(), 4000) : null;
+        const res = await fetch('/api/public/products', { signal: controller?.signal });
+        if (timer) clearTimeout(timer);
         const json = await res.json();
         const items = json.products || json.data || [];
         if (Array.isArray(items) && items.length > 0) {

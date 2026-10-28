@@ -1006,15 +1006,17 @@ async function renderCustomerOrderHistory(user) {
             .order('created_at', { ascending: false })
             .limit(20);
 
-        if (user.id && emailFilter) {
-            query = query.or(`user_id.eq.${user.id},customer_email.eq.${emailFilter}`);
-        } else if (user.id) {
-            query = query.eq('user_id', user.id);
-        } else if (emailFilter) {
+        if (emailFilter) {
             query = query.eq('customer_email', emailFilter);
+        } else {
+            if (emptyNotice) emptyNotice.style.display = 'block';
+            ordersListEl.innerHTML = '';
+            return;
         }
 
-        const { data: orders, error } = await query;
+        const queryPromise = query;
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Orders query timeout')), 4000));
+        const { data: orders, error } = await Promise.race([queryPromise, timeoutPromise]);
 
         if (error || !orders || !orders.length) {
             if (emptyNotice) emptyNotice.style.display = 'block';

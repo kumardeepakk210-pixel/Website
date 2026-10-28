@@ -249,10 +249,8 @@ export const tableColumnsCache = {
         'views', 'clicks', 'orders', 'commission_amount', 'created_at', 'updated_at'
     ]),
     influencers: new Set([
-        'id', 'influencer_id', 'influencer_code', 'name', 'influencer_name', 'email', 'email_id',
-        'phone', 'phone_number', 'instagram_id', 'instagram_url', 'public_slug', 'public_profile_url',
-        'profile_image', 'category', 'bio', 'commission_rate', 'tier', 'status',
-        'address', 'city', 'state', 'country',
+        'influencer_id', 'influencer_name', 'email_id', 'phone_number',
+        'instagram_id', 'address', 'city', 'state', 'country',
         'created_at', 'updated_at'
     ]),
     influencer_accounts: new Set([
@@ -449,9 +447,13 @@ export async function dbInsert(table, payload, options = {}) {
         headers = getHeaders();
     }
 
-    // When inserting into tables where public SELECT is restricted (e.g. order_items)
+    if (options.userToken) {
+        headers = { ...headers, 'Authorization': `Bearer ${options.userToken}` };
+    }
+
+    // When inserting into tables where public SELECT is restricted (e.g. order_items, influencers)
     // or when callers request returnMinimal, use return=minimal to avoid RLS 42501 on SELECT
-    if (options.returnMinimal || (!options.returnRepresentation && (table === 'orders' || table === 'order_items'))) {
+    if (options.returnMinimal || (!options.returnRepresentation && (table === 'orders' || table === 'order_items' || table === 'influencers' || table === 'influencer_accounts'))) {
         headers = { ...headers, 'Prefer': 'return=minimal' };
     }
 
