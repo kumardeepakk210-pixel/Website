@@ -12,13 +12,17 @@ import {
     dbQuery, 
     dbInsert, 
     dbUpdate, 
-    adminClient 
+    adminClient,
+    SUPABASE_URL,
+    hasServerAdminCredential
 } from './supabase-client.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const DATA_DIR = path.join(__dirname, '../data');
 const INFLUENCERS_STORE_PATH = path.join(DATA_DIR, 'influencers_store.json');
+
+export const CREATOR_USE_LOCAL_STORE = process.env.CREATOR_USE_LOCAL_STORE === 'true' || process.env.NODE_ENV === 'test';
 
 // Business Configuration Constants
 export const MIN_WITHDRAWAL_AMOUNT = 500.00;
@@ -46,28 +50,64 @@ export function releaseWalletLock(influencerId) {
  * PostgreSQL stored procedure is executed when Supabase is available.
  * Fallback performs transactional atomic deduction on the loaded record without process-local lock dependency.
  */
-export async function atomicDeductWalletBalance(influencerId, amount, local) {
+export async function atomicDeductWalletBalance(influencerId, amount, local, options = {}) {
     const numAmount = Number(amount);
     if (!numAmount || numAmount <= 0) {
         return { success: false, code: 'INVALID_AMOUNT', message: 'Amount must be greater than zero.' };
     }
 
+    const {
+        reference_type = 'withdrawal',
+        reference_id = null,
+        description = 'Wallet balance deduction'
+    } = options;
+
     // Attempt Supabase PostgreSQL atomic stored procedure if available
     if (adminClient) {
         try {
             const { data: rpcData, error: rpcError } = await adminClient.rpc('deduct_influencer_wallet_balance', {
+                p_influencer_id: influencerId,
                 p_wallet_id: influencerId,
-                p_amount: numAmount
+                p_amount: numAmount,
+                p_reference_type: reference_type,
+                p_reference_id: reference_id,
+                p_description: description
             });
-            if (!rpcError && rpcData?.success) {
-                return { success: true, wallet: rpcData.wallet };
+
+            if (rpcError) {
+                return {
+                    success: false,
+                    code: 'WALLET_DATABASE_ERROR',
+                    message: rpcError.message || 'Database wallet deduction failed.'
+                };
+            }
+
+            if (rpcData) {
+                if (rpcData.success) {
+                    return {
+                        success: true,
+                        wallet: rpcData.wallet,
+                        idempotent: rpcData.idempotent || false,
+                        transaction_id: rpcData.transaction_id
+                    };
+                } else {
+                    return {
+                        success: false,
+                        code: rpcData.code || 'INSUFFICIENT_BALANCE',
+                        message: rpcData.message || 'Deduction rejected by wallet engine.'
+                    };
+                }
             }
         } catch (e) {
-            // Fall through to atomic store logic
+            return {
+                success: false,
+                code: 'WALLET_DATABASE_ERROR',
+                message: e.message || 'Database wallet deduction failed.'
+            };
         }
     }
 
-    // Atomic deduction logic on store (multi-process safe)
+    // Atomic deduction logic on store (multi-process safe local fallback for test mode when adminClient is not configured)
     const store = readLocalStore();
     let wallet = (store.wallets || []).find(w => w.influencer_id === influencerId || w.id === influencerId);
     if (!wallet) {
@@ -294,9 +334,23 @@ export function generateReference(prefix = 'WR-WTH') {
 }
 
 /**
- * Get or create creator wallet with strict initial balances
+ * Get or create creator wallet with strict initial balances from Supabase
  */
 export async function getOrCreateInfluencerWallet(influencer_id, localStore = null) {
+    if (SUPABASE_URL) {
+        try {
+            const queryOpts = {
+                useAdmin: hasServerAdminCredential()
+            };
+            const rows = await dbQuery('influencer_wallets', `influencer_id=eq.${encodeURIComponent(influencer_id)}&limit=1`, queryOpts);
+            if (Array.isArray(rows) && rows.length > 0) {
+                return rows[0];
+            }
+        } catch (e) {
+            console.warn('[CREATOR WALLET] Supabase query notice:', e.message);
+        }
+    }
+
     const local = localStore || readLocalStore();
     local.wallets = local.wallets || [];
     let wallet = local.wallets.find(w => w.influencer_id === influencer_id);
@@ -315,13 +369,15 @@ export async function getOrCreateInfluencerWallet(influencer_id, localStore = nu
             updated_at: new Date().toISOString()
         };
 
-        local.wallets.push(wallet);
-        if (!localStore) {
-            writeLocalStore(local);
+        if (CREATOR_USE_LOCAL_STORE) {
+            local.wallets.push(wallet);
+            if (!localStore) {
+                writeLocalStore(local);
+            }
         }
 
         try {
-            await dbInsert('influencer_wallets', wallet, { useAdmin: true });
+            await dbInsert('influencer_wallets', wallet, { useAdmin: hasServerAdminCredential() });
         } catch (e) {}
     }
 
@@ -377,6 +433,17 @@ export async function recordOrderCommissionInWallet({
         const local = readLocalStore();
         local.wallet_transactions = local.wallet_transactions || [];
         const cleanRef = String(order_reference).trim();
+
+        // Database-first idempotency check
+        if (hasServerAdminCredential()) {
+            const existingDbTx = await dbQuery('influencer_wallet_transactions', 
+                `influencer_id=eq.${encodeURIComponent(influencer_id)}&transaction_type=eq.commission_pending&reference_id=eq.${encodeURIComponent(cleanRef)}&limit=1`,
+                { useAdmin: true }
+            ).catch(() => []);
+            if (existingDbTx && existingDbTx.length > 0) {
+                return existingDbTx[0];
+            }
+        }
 
         // Idempotency check: verify commission_pending for this order does not already exist
         const existingTx = local.wallet_transactions.find(t => 
@@ -759,6 +826,29 @@ export async function handleGetCreatorWallet(req, res) {
 export async function handleGetCreatorWalletTransactions(req, res) {
     try {
         const creator = req.creator;
+
+        if (!CREATOR_USE_LOCAL_STORE && SUPABASE_URL) {
+            try {
+                const userToken = (req.headers.authorization ? req.headers.authorization.replace(/^Bearer /i, '').trim() : null);
+                const queryOpts = {
+                    useAdmin: hasServerAdminCredential(),
+                    userToken
+                };
+                const rows = await dbQuery('influencer_wallet_transactions', `influencer_id=eq.${encodeURIComponent(creator.id)}&order=created_at.desc`, queryOpts);
+                return res.json({
+                    success: true,
+                    count: (rows || []).length,
+                    data: rows || []
+                });
+            } catch (err) {
+                if (process.env.NODE_ENV === 'test') {
+                    // In test environment with mock tokens, fall through to local store
+                } else {
+                    return res.status(500).json({ success: false, error: { message: err.message } });
+                }
+            }
+        }
+
         const local = readLocalStore();
         const txs = (local.wallet_transactions || [])
             .filter(t => t.influencer_id === creator.id)
@@ -1074,7 +1164,12 @@ export async function handleCreateWithdrawal(req, res) {
         } : payout_details;
 
         // Atomic balance reservation: conditional atomic deduction (WHERE available_balance >= numAmount)
-        const deductResult = await atomicDeductWalletBalance(creator.id, numAmount, local);
+        const withdrawalReference = generateReference('WR-WTH');
+        const deductResult = await atomicDeductWalletBalance(creator.id, numAmount, local, {
+            reference_type: 'withdrawal',
+            reference_id: cleanIdempotencyKey || withdrawalReference,
+            description: `Withdrawal requested (${withdrawalReference})`
+        });
         if (!deductResult.success) {
             return res.status(400).json({
                 success: false,
@@ -1087,7 +1182,6 @@ export async function handleCreateWithdrawal(req, res) {
 
         const wallet = deductResult.wallet;
         const nowIso = new Date().toISOString();
-        const withdrawalReference = generateReference('WR-WTH');
 
         const withdrawalRecord = {
             id: randomUUID(),
@@ -1108,7 +1202,7 @@ export async function handleCreateWithdrawal(req, res) {
 
         // Record immutable ledger entry
         const txRecord = {
-            id: randomUUID(),
+            id: deductResult.transaction_id || randomUUID(),
             influencer_id: creator.id,
             wallet_id: wallet.id,
             transaction_type: 'withdrawal_requested',
@@ -1129,11 +1223,14 @@ export async function handleCreateWithdrawal(req, res) {
 
         try {
             await dbInsert('influencer_withdrawals', withdrawalRecord, { useAdmin: true });
-            await dbInsert('influencer_wallet_transactions', txRecord, { useAdmin: true });
-            await dbUpdate('influencer_wallets', 'id', wallet.id, {
-                available_balance: wallet.available_balance,
-                updated_at: wallet.updated_at
-            }, { useAdmin: true });
+            // Only insert txRecord if it was not already created by the atomic RPC
+            if (!deductResult.transaction_id) {
+                await dbInsert('influencer_wallet_transactions', txRecord, { useAdmin: true });
+                await dbUpdate('influencer_wallets', 'id', wallet.id, {
+                    available_balance: wallet.available_balance,
+                    updated_at: wallet.updated_at
+                }, { useAdmin: true });
+            }
         } catch (e) {}
 
         return res.status(201).json({

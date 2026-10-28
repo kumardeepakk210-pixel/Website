@@ -257,6 +257,12 @@ export const tableColumnsCache = {
         'id', 'influencer_id', 'auth_user_id', 'email', 'password_hash',
         'is_active', 'last_login_at', 'created_at', 'updated_at'
     ]),
+    influencer_wallets: new Set([
+        'id', 'influencer_id', 'available_balance', 'pending_balance', 'paid_balance', 'lifetime_earned', 'lifetime_paid', 'currency', 'created_at', 'updated_at'
+    ]),
+    influencer_wallet_transactions: new Set([
+        'id', 'influencer_id', 'wallet_id', 'amount', 'currency', 'transaction_type', 'status', 'description', 'reference_id', 'created_at'
+    ]),
     influencer_links: new Set([
         'id', 'influencer_id', 'link_type', 'url', 'campaign_id', 'is_default', 'created_at'
     ]),
@@ -546,6 +552,10 @@ export async function dbUpdate(table, filterKey, filterVal, payload, options = {
         headers = getHeaders();
     }
 
+    if (options.userToken) {
+        headers = { ...headers, 'Authorization': `Bearer ${options.userToken}` };
+    }
+
     if (options.returnMinimal || !options.returnRepresentation) {
         headers = { ...headers, 'Prefer': 'return=minimal' };
     }
@@ -620,7 +630,10 @@ export async function dbDelete(table, filterKey, filterVal, options = {}) {
     if (useAdmin && !hasServerAdminCredential()) {
         requireServerAdminCredential(`A server-side Supabase secret/service-role credential is required to delete from table '${table}'.`);
     }
-    const headers = useAdmin ? getAdminHeaders() : getHeaders();
+    let headers = useAdmin ? getAdminHeaders() : getHeaders();
+    if (options.userToken) {
+        headers = { ...headers, 'Authorization': `Bearer ${options.userToken}` };
+    }
     const url = `${SUPABASE_URL}/rest/v1/${table}?${filterKey}=eq.${encodeURIComponent(filterVal)}`;
     const res = await fetch(url, {
         method: 'DELETE',

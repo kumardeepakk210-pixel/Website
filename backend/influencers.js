@@ -1326,12 +1326,29 @@ export async function attributeOrderToInfluencer({
     if (!order_reference) {
         throw new Error('order_reference is required for order attribution');
     }
+    const cleanOrderRef = String(order_reference).trim();
+
+    // Database-first idempotency check across multiple server instances
+    if (hasServerAdminCredential()) {
+        const existingDbAttr = await dbQuery('influencer_order_attributions',
+            `order_reference=eq.${encodeURIComponent(cleanOrderRef)}&limit=1`,
+            { useAdmin: true }
+        ).catch(() => []);
+        if (existingDbAttr && existingDbAttr.length > 0) {
+            return {
+                ...existingDbAttr[0],
+                attributed: true,
+                already_attributed: true,
+                data: existingDbAttr[0]
+            };
+        }
+    }
 
     const local = readLocalStore();
     local.order_attributions = local.order_attributions || [];
 
-    // Idempotency: Verify order is not already attributed
-    const existing = local.order_attributions.find(oa => oa.order_reference === String(order_reference).trim());
+    // Idempotency: Verify order is not already attributed in local store
+    const existing = local.order_attributions.find(oa => oa.order_reference === cleanOrderRef);
     if (existing) {
         return {
             ...existing,
