@@ -376,7 +376,10 @@ function isTransientError(status, error) {
  */
 export async function dbQuery(table, queryParams = '', options = {}) {
     const useAdmin = Boolean(options.useAdmin);
-    const headers = useAdmin ? getAdminHeaders() : getHeaders();
+    let headers = useAdmin ? getAdminHeaders() : getHeaders();
+    if (options.userToken) {
+        headers = { ...headers, 'Authorization': `Bearer ${options.userToken}` };
+    }
     const url = `${SUPABASE_URL}/rest/v1/${table}${queryParams ? `?${queryParams}` : ''}`;
     let attempts = 0;
     const maxAttempts = 2;

@@ -1757,11 +1757,16 @@ export async function handleCustomerCreatorOnboard(req, res) {
         if (!existingCreator && SUPABASE_URL) {
             try {
                 let dbInfluencers = [];
+                const userToken = ident.token || (req.headers.authorization ? req.headers.authorization.replace(/^Bearer /i, '').trim() : null);
+                const queryOpts = {
+                    useAdmin: hasServerAdminCredential(),
+                    userToken: userToken
+                };
                 if (cleanEmail) {
-                    dbInfluencers = await dbQuery('influencers', `email_id=eq.${encodeURIComponent(cleanEmail)}&limit=1`);
+                    dbInfluencers = await dbQuery('influencers', `email_id=eq.${encodeURIComponent(cleanEmail)}&limit=1`, queryOpts);
                 }
                 if ((!Array.isArray(dbInfluencers) || dbInfluencers.length === 0) && ident.userId) {
-                    dbInfluencers = await dbQuery('influencers', `influencer_id=eq.${encodeURIComponent(ident.userId)}&limit=1`);
+                    dbInfluencers = await dbQuery('influencers', `influencer_id=eq.${encodeURIComponent(ident.userId)}&limit=1`, queryOpts);
                 }
                 if (Array.isArray(dbInfluencers) && dbInfluencers.length > 0) {
                     existingCreator = normalizeInfluencerRecord(dbInfluencers[0]);
