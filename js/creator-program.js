@@ -8,6 +8,38 @@ let currentCreatorData = null;
 let liveProductsCache = [];
 let creatorRealtimeChannel = null;
 
+// Safe, zero-network SVG data URIs for avatars and media thumbnails
+const DEFAULT_AVATAR_SVG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='50' fill='%23F4EBE6'/%3E%3Ccircle cx='50' cy='40' r='18' fill='%235E3435'/%3E%3Cpath d='M22 84c0-15.5 12.5-28 28-28s28 12.5 28 28' fill='%235E3435'/%3E%3C/svg%3E";
+const DEFAULT_MEDIA_THUMB_SVG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 240'%3E%3Crect width='180' height='240' fill='%235E3435'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%23FAF7F5' font-family='sans-serif' font-size='14'%3EWishRite Reel%3C/text%3E%3C/svg%3E";
+const DEFAULT_PRODUCT_THUMB_SVG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 80'%3E%3Crect width='80' height='80' fill='%23FAF7F5'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%235E3435' font-family='sans-serif' font-size='10'%3EWishRite%3C/text%3E%3C/svg%3E";
+
+function handleCreatorAvatarError(img) {
+    if (!img) return;
+    img.onerror = null;
+    if (img.dataset.fallbackApplied === 'true') return;
+    img.dataset.fallbackApplied = 'true';
+    img.src = DEFAULT_AVATAR_SVG;
+}
+window.handleCreatorAvatarError = handleCreatorAvatarError;
+
+function handleMediaThumbError(img) {
+    if (!img) return;
+    img.onerror = null;
+    if (img.dataset.fallbackApplied === 'true') return;
+    img.dataset.fallbackApplied = 'true';
+    img.src = DEFAULT_MEDIA_THUMB_SVG;
+}
+window.handleMediaThumbError = handleMediaThumbError;
+
+function handleProductThumbError(img) {
+    if (!img) return;
+    img.onerror = null;
+    if (img.dataset.fallbackApplied === 'true') return;
+    img.dataset.fallbackApplied = 'true';
+    img.src = DEFAULT_PRODUCT_THUMB_SVG;
+}
+window.handleProductThumbError = handleProductThumbError;
+
 /**
  * Initializes Supabase Realtime listener for creator financial & profile updates
  */
@@ -719,7 +751,16 @@ function renderCreatorDashboard(data) {
     const socialBadges = document.getElementById('creator-dash-socials') || document.getElementById('cd-social-badges');
 
     if (nameEl) nameEl.innerText = creator.name || creator.display_name || 'WishRite Creator';
-    if (avatarEl && creator.profile_image) avatarEl.src = creator.profile_image;
+    if (avatarEl) {
+        if (creator.profile_image && typeof creator.profile_image === 'string' && creator.profile_image.trim()) {
+            avatarEl.dataset.fallbackApplied = 'false';
+            avatarEl.onerror = function() { handleCreatorAvatarError(this); };
+            avatarEl.src = creator.profile_image.trim();
+        } else {
+            avatarEl.onerror = null;
+            avatarEl.src = DEFAULT_AVATAR_SVG;
+        }
+    }
     if (slugEl) slugEl.innerText = creator.influencer_code || `@${creator.public_slug}`;
     if (bioEl) bioEl.innerText = creator.bio || '';
 
@@ -1212,7 +1253,7 @@ function renderReelInsightsGrid() {
                     <span class="content-status-badge ${statusClass}">${statusLabel}</span>
                 </div>
                 <div class="reel-insights-card-main">
-                    <img src="${thumbImg}" alt="Reel Thumbnail" class="reel-insights-thumb" onerror="this.src='/images/default-avatar.png'">
+                    <img src="${thumbImg}" alt="Reel Thumbnail" class="reel-insights-thumb" onerror="handleMediaThumbError(this)">
                     <div class="reel-insights-meta">
                         <span class="reel-insights-title">${reel.caption ? (reel.caption.length > 50 ? reel.caption.slice(0, 50) + '…' : reel.caption) : 'WishRite Jewellery Reel'}</span>
                         <span class="reel-insights-sub">Submitted: ${dateStr}</span>
@@ -1707,7 +1748,7 @@ function renderCreatorContentList(items, container) {
                 <td>
                     <div class="content-col-media">
                         <a href="${safeUrl}" target="_blank" rel="noopener" title="Open on Instagram">
-                            <img src="${thumbImg}" alt="${typeLabel}" class="content-table-thumb" onerror="this.src='/images/default-avatar.png'" />
+                            <img src="${thumbImg}" alt="${typeLabel}" class="content-table-thumb" onerror="handleMediaThumbError(this)" />
                         </a>
                         <div>
                             <span class="content-table-type">Instagram ${typeLabel}</span>
@@ -1771,7 +1812,7 @@ function renderCreatorContentList(items, container) {
                 </div>
                 <div class="content-mobile-card-product">
                     <a href="${safeUrl}" target="_blank" rel="noopener">
-                        <img src="${thumbImg}" alt="${typeLabel}" class="content-mobile-thumb" onerror="this.src='/images/default-avatar.png'" />
+                        <img src="${thumbImg}" alt="${typeLabel}" class="content-mobile-thumb" onerror="handleMediaThumbError(this)" />
                     </a>
                     <div>
                         <div style="font-weight:600; font-size:0.9rem; color:var(--wr-text);">${safeName}</div>
@@ -1979,7 +2020,7 @@ function handleProductChange(type) {
 
     previewBox.style.display = 'flex';
     previewBox.innerHTML = `
-        <img src="${img || '/images/default-avatar.png'}" alt="${name}" class="product-preview-thumb" onerror="this.src='/images/default-avatar.png'">
+        <img src="${img || DEFAULT_PRODUCT_THUMB_SVG}" alt="${name}" class="product-preview-thumb" onerror="handleProductThumbError(this)">
         <div class="product-preview-info">
             <span class="product-preview-title">${name}</span>
             <span class="product-preview-code">Product Code: ${code}</span>
