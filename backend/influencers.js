@@ -214,7 +214,7 @@ export function normalizeInfluencerRecord(row) {
 async function getAllInfluencersFromDB() {
     let dbRows = [];
     try {
-        const rows = await dbQuery('influencers', 'order=created_at.desc');
+        const rows = await dbQuery('influencers', 'order=created_at.desc', { useAdmin: true });
         if (Array.isArray(rows)) {
             dbRows = rows.map(normalizeInfluencerRecord).filter(Boolean);
         }
