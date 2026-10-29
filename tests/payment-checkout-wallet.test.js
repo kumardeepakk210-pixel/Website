@@ -1,3 +1,4 @@
+process.env.NODE_ENV = 'test';
 const { test, describe, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 const http = require('node:http');
@@ -330,7 +331,7 @@ describe('WishRite Payment, Checkout & Wallet Production Verification Suite', ()
                 state: 'Rajasthan',
                 pin: '123' // Invalid PIN
             },
-            items: [{ id: 'prod-1', qty: 1 }],
+            items: [{ id: '10000000-0000-0000-0000-000000000001', qty: 1 }],
             payment_method: 'razorpay'
         });
 
@@ -355,7 +356,7 @@ describe('WishRite Payment, Checkout & Wallet Production Verification Suite', ()
             },
             items: [
                 {
-                    id: 'WR-RING-001',
+                    id: '10000000-0000-0000-0000-000000000001',
                     product_code: 'WR-RING-001',
                     name: 'Solitaire Silver Ring',
                     price: 1899,
@@ -418,7 +419,7 @@ describe('WishRite Payment, Checkout & Wallet Production Verification Suite', ()
             },
             items: [
                 {
-                    id: 'WR-EARRING-002',
+                    id: '10000000-0000-0000-0000-000000000002',
                     product_code: 'WR-EARRING-002',
                     name: 'Pure Silver Jhumkas',
                     price: 2499,

@@ -1,3 +1,5 @@
+process.env.NODE_ENV = 'test';
+process.env.CREATOR_USE_LOCAL_STORE = 'true';
 require('dotenv').config();
 const { test, describe, before, after } = require('node:test');
 const assert = require('node:assert/strict');
@@ -5,23 +7,16 @@ const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const PORT = process.env.PORT || 8085;
+let server = null;
+let serverPort = null;
 const STORE_PATH = path.join(__dirname, '..', 'data', 'influencers_store.json');
 let backupStoreRaw = null;
-
-before(() => {
-  if (fs.existsSync(STORE_PATH)) {
-    backupStoreRaw = fs.readFileSync(STORE_PATH, 'utf8');
-  }
-});
-
-
 
 function makeRequest(options, bodyData = null) {
   return new Promise((resolve, reject) => {
     const reqOptions = {
       hostname: '127.0.0.1',
-      port: PORT,
+      port: serverPort || process.env.PORT || 8085,
       path: options.path,
       method: options.method || 'GET',
       headers: options.headers || {}
@@ -58,45 +53,47 @@ function makeRequest(options, bodyData = null) {
   });
 }
 
-function makeCustomerAuthHeader(email, id) {
-  const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
-  const payload = Buffer.from(JSON.stringify({
-    sub: id,
-    email: email,
-    role: 'authenticated',
-    aud: 'authenticated',
-    exp: Math.floor(Date.now() / 1000) + 86400
-  })).toString('base64url');
-  const token = `${header}.${payload}.signature`;
-
-  return {
-    'Authorization': `Bearer ${token}`,
-    'x-customer-email': email,
-    'x-customer-id': id
-  };
-}
-
 describe('WishRite Creator — Instagram Content List & Official Insights Sync', () => {
   const testEmailA = `creator_insta_a_${Date.now()}@wishrite.test`;
-  const testIdA = `cust_insta_a_${Date.now()}`;
-  const authHeadersA = makeCustomerAuthHeader(testEmailA, testIdA);
+  const testIdA = '00000000-0000-0000-0000-0000000000c1';
+  const customerHeadersA = { 'x-customer-email': testEmailA, 'x-customer-id': testIdA };
 
   const testEmailB = `creator_insta_b_${Date.now()}@wishrite.test`;
-  const testIdB = `cust_insta_b_${Date.now()}`;
-  const authHeadersB = makeCustomerAuthHeader(testEmailB, testIdB);
+  const testIdB = '00000000-0000-0000-0000-0000000000c2';
+  const customerHeadersB = { 'x-customer-email': testEmailB, 'x-customer-id': testIdB };
 
+  let tokenA = null;
+  let tokenB = null;
   let creatorA = null;
   let creatorB = null;
   let reelItem1 = null;
   let reelItem2 = null;
   let postItem = null;
 
+  const authHeadersA = {
+    get Authorization() { return `Bearer ${tokenA}`; },
+    get authorization() { return `Bearer ${tokenA}`; }
+  };
+  const authHeadersB = {
+    get Authorization() { return `Bearer ${tokenB}`; },
+    get authorization() { return `Bearer ${tokenB}`; }
+  };
+
   before(async () => {
-    // 1. Onboard Creator A
+    if (fs.existsSync(STORE_PATH)) {
+      backupStoreRaw = fs.readFileSync(STORE_PATH, 'utf8');
+    }
+    const serverModule = require('../server.js');
+    const handler = serverModule.listeners('request')[0];
+    server = http.createServer(handler);
+    await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+    serverPort = server.address().port;
+
+    // 1. Onboard Creator A using customer identity
     const resA = await makeRequest({
       path: '/api/creator/onboard',
       method: 'POST',
-      headers: authHeadersA
+      headers: customerHeadersA
     }, {
       name: 'Priya Sharma',
       instagram: 'priyastylez',
@@ -105,13 +102,14 @@ describe('WishRite Creator — Instagram Content List & Official Insights Sync',
     });
     if (resA.data && resA.data.creator) {
       creatorA = resA.data.creator;
+      tokenA = resA.data.token;
     }
 
-    // 2. Onboard Creator B
+    // 2. Onboard Creator B using customer identity
     const resB = await makeRequest({
       path: '/api/creator/onboard',
       method: 'POST',
-      headers: authHeadersB
+      headers: customerHeadersB
     }, {
       name: 'Rohan Verma',
       instagram: 'rohanv_luxury',
@@ -120,6 +118,13 @@ describe('WishRite Creator — Instagram Content List & Official Insights Sync',
     });
     if (resB.data && resB.data.creator) {
       creatorB = resB.data.creator;
+      tokenB = resB.data.token;
+    }
+  });
+
+  after(async () => {
+    if (server) {
+      await new Promise((resolve) => server.close(resolve));
     }
   });
 

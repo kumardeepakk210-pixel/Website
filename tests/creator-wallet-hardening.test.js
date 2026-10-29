@@ -1,3 +1,5 @@
+process.env.NODE_ENV = 'test';
+process.env.CREATOR_USE_LOCAL_STORE = 'true';
 require('dotenv').config();
 const { test, describe, before, after } = require('node:test');
 const assert = require('node:assert/strict');
@@ -6,19 +8,25 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 
-const PORT = process.env.PORT || 8085;
+let server = null;
+let serverPort = null;
 const STORE_PATH = path.join(__dirname, '..', 'data', 'influencers_store.json');
 let backupStoreRaw = null;
 
-before(() => {
+before(async () => {
     if (fs.existsSync(STORE_PATH)) {
         backupStoreRaw = fs.readFileSync(STORE_PATH, 'utf8');
     }
+    const serverModule = require('../server.js');
+    const handler = serverModule.listeners('request')[0];
+    server = http.createServer(handler);
+    await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+    serverPort = server.address().port;
 });
 
-after(() => {
-    if (backupStoreRaw && fs.existsSync(STORE_PATH)) {
-        fs.writeFileSync(STORE_PATH, backupStoreRaw, 'utf8');
+after(async () => {
+    if (server) {
+        await new Promise((resolve) => server.close(resolve));
     }
 });
 
@@ -26,7 +34,7 @@ function makeRequest(options, bodyData = null) {
     return new Promise((resolve, reject) => {
         const reqOptions = {
             hostname: '127.0.0.1',
-            port: PORT,
+            port: serverPort || process.env.PORT || 8085,
             path: options.path,
             method: options.method || 'GET',
             headers: options.headers || {}
@@ -96,7 +104,7 @@ describe('WishRite Creator Wallet Hardening, Idempotency & Concurrency Suite', (
         });
 
         test('1. Sufficient balance: deduction succeeds and balance decreases correctly', async () => {
-            const testInfId = 'inf-deduct-test-1';
+            const testInfId = '00000000-0000-0000-0000-000000000001';
             const store = readLocalStore();
             let wallet = await getOrCreateInfluencerWallet(testInfId, store);
             wallet.available_balance = 500.00;
@@ -108,7 +116,7 @@ describe('WishRite Creator Wallet Hardening, Idempotency & Concurrency Suite', (
         });
 
         test('2. Insufficient balance: deduction rejected with INSUFFICIENT_BALANCE', async () => {
-            const testInfId = 'inf-deduct-test-2';
+            const testInfId = '00000000-0000-0000-0000-000000000002';
             const store = readLocalStore();
             let wallet = await getOrCreateInfluencerWallet(testInfId, store);
             wallet.available_balance = 50.00;
@@ -122,19 +130,19 @@ describe('WishRite Creator Wallet Hardening, Idempotency & Concurrency Suite', (
         });
 
         test('3. Zero amount: strictly rejected with INVALID_AMOUNT', async () => {
-            const result = await atomicDeductWalletBalance('inf-any', 0);
+            const result = await atomicDeductWalletBalance('00000000-0000-0000-0000-000000000003', 0);
             assert.equal(result.success, false);
             assert.equal(result.code, 'INVALID_AMOUNT');
         });
 
         test('4. Negative amount: strictly rejected with INVALID_AMOUNT', async () => {
-            const result = await atomicDeductWalletBalance('inf-any', -75.50);
+            const result = await atomicDeductWalletBalance('00000000-0000-0000-0000-000000000004', -75.50);
             assert.equal(result.success, false);
             assert.equal(result.code, 'INVALID_AMOUNT');
         });
 
         test('5. Missing wallet: automatically initializes or rejects safely without crashing', async () => {
-            const newInfId = 'inf-brand-new-' + Date.now();
+            const newInfId = '00000000-0000-0000-0000-000000000005';
             const result = await atomicDeductWalletBalance(newInfId, 50.00);
             // Since initial balance is 0, it must reject for insufficient balance, not throw unhandled exception
             assert.equal(result.success, false);
@@ -148,7 +156,7 @@ describe('WishRite Creator Wallet Hardening, Idempotency & Concurrency Suite', (
         });
 
         test('7. Successful debit returns success: true and updated wallet object', async () => {
-            const testInfId = 'inf-deduct-test-7';
+            const testInfId = '00000000-0000-0000-0000-000000000007';
             const store = readLocalStore();
             let wallet = await getOrCreateInfluencerWallet(testInfId, store);
             wallet.available_balance = 1000.00;
@@ -161,14 +169,16 @@ describe('WishRite Creator Wallet Hardening, Idempotency & Concurrency Suite', (
         });
 
         test('8. Debit transaction created and recorded in immutable ledger', async () => {
-            const testInfId = 'inf-deduct-test-8';
+            const testInfId = '00000000-0000-0000-0000-000000000008';
+            const testUserId = '00000000-0000-0000-0000-000000000089';
+            const testAccountId = '00000000-0000-0000-0000-000000000088';
             const store = readLocalStore();
             let wallet = await getOrCreateInfluencerWallet(testInfId, store);
             wallet.available_balance = 800.00;
             writeLocalStore(store);
 
             // Trigger withdrawal endpoint to test transaction recording
-            const token = generateMockJwt('user-deduct-8', 'deduct8@wishrite.test');
+            const token = generateMockJwt(testUserId, 'deduct8@wishrite.test');
             // Seed influencer account
             store.influencers = store.influencers || [];
             store.accounts = store.accounts || [];
@@ -179,9 +189,9 @@ describe('WishRite Creator Wallet Hardening, Idempotency & Concurrency Suite', (
                 created_at: new Date().toISOString()
             });
             store.accounts.push({
-                id: 'acct-deduct-8',
+                id: testAccountId,
                 influencer_id: testInfId,
-                auth_user_id: 'user-deduct-8',
+                auth_user_id: testUserId,
                 email: 'deduct8@wishrite.test',
                 is_active: true
             });
@@ -212,7 +222,7 @@ describe('WishRite Creator Wallet Hardening, Idempotency & Concurrency Suite', (
         });
 
         test('9. Balance calculation is exact with two decimal places', async () => {
-            const testInfId = 'inf-deduct-test-9';
+            const testInfId = '00000000-0000-0000-0000-000000000009';
             const store = readLocalStore();
             let wallet = await getOrCreateInfluencerWallet(testInfId, store);
             wallet.available_balance = 100.33;
@@ -224,7 +234,7 @@ describe('WishRite Creator Wallet Hardening, Idempotency & Concurrency Suite', (
         });
 
         test('10. Balance never becomes negative under any deduction', async () => {
-            const testInfId = 'inf-deduct-test-10';
+            const testInfId = '00000000-0000-0000-0000-000000000010';
             const store = readLocalStore();
             let wallet = await getOrCreateInfluencerWallet(testInfId, store);
             wallet.available_balance = 10.00;
@@ -258,7 +268,7 @@ describe('WishRite Creator Wallet Hardening, Idempotency & Concurrency Suite', (
 
         test('11. Same order reference cannot be debited twice', async () => {
             const { atomicDeductWalletBalance } = await import('../backend/creator-wallet.js');
-            const testInfId = 'inf-idemp-debit-11';
+            const testInfId = '00000000-0000-0000-0000-000000000011';
             const store = readLocalStore();
             let wallet = await getOrCreateInfluencerWallet(testInfId, store);
             wallet.available_balance = 500.00;
@@ -273,7 +283,7 @@ describe('WishRite Creator Wallet Hardening, Idempotency & Concurrency Suite', (
 
             // Record transaction in store to simulate existing reference
             store.wallet_transactions.push({
-                id: 'tx-ded-11',
+                id: '00000000-0000-0000-0000-000000000111',
                 influencer_id: testInfId,
                 transaction_type: 'debit',
                 reference_type: 'order_debit',
@@ -321,8 +331,8 @@ describe('WishRite Creator Wallet Hardening, Idempotency & Concurrency Suite', (
         });
 
         test('13. recordOrderCommissionInWallet is strictly idempotent for same order', async () => {
-            const testInfId = 'inf-idemp-comm-13';
-            const orderRef = 'WR-ORD-IDEMP-13';
+            const testInfId = '00000000-0000-0000-0000-000000000013';
+            const orderRef = 'WR-ORD-IDEMP-13-' + Date.now();
 
             const store = readLocalStore();
             let wallet = await getOrCreateInfluencerWallet(testInfId, store);
@@ -361,7 +371,7 @@ describe('WishRite Creator Wallet Hardening, Idempotency & Concurrency Suite', (
         });
 
         test('14. Repeated webhook / order attribution is safe and idempotent', async () => {
-            const testInfId = 'inf-idemp-attr-14';
+            const testInfId = '00000000-0000-0000-0000-000000000014';
             const store = readLocalStore();
             store.influencers = store.influencers || [];
             store.influencers.push({
@@ -372,7 +382,7 @@ describe('WishRite Creator Wallet Hardening, Idempotency & Concurrency Suite', (
             });
             writeLocalStore(store);
 
-            const orderRef = 'WR-ORD-WEBHOOK-14';
+            const orderRef = 'WR-ORD-WEBHOOK-14-' + Date.now();
 
             const attr1 = await attributeOrderToInfluencer({
                 order_reference: orderRef,
@@ -399,7 +409,7 @@ describe('WishRite Creator Wallet Hardening, Idempotency & Concurrency Suite', (
     describe('3. Concurrency Protection: Multi-Request Race Safety', () => {
         test('Simultaneous deductions: initial ₹100, two ₹80 requests -> one succeeds, one fails, final balance is ₹20 (never -₹60)', async () => {
             const { atomicDeductWalletBalance, getOrCreateInfluencerWallet, readLocalStore, writeLocalStore } = await import('../backend/creator-wallet.js');
-            const testInfId = 'inf-concurrency-deduct-' + Date.now();
+            const testInfId = '00000000-0000-0000-0000-000000000015';
             const store = readLocalStore();
             let wallet = await getOrCreateInfluencerWallet(testInfId, store);
             wallet.available_balance = 100.00;
@@ -425,7 +435,7 @@ describe('WishRite Creator Wallet Hardening, Idempotency & Concurrency Suite', (
 
         test('Simultaneous commission credits for the same order produce exactly one credit and one transaction', async () => {
             const { recordOrderCommissionInWallet, getOrCreateInfluencerWallet, readLocalStore, writeLocalStore } = await import('../backend/creator-wallet.js');
-            const testInfId = 'inf-concurrency-comm-' + Date.now();
+            const testInfId = '00000000-0000-0000-0000-000000000016';
             const orderRef = 'WR-ORD-RACE-' + Date.now();
 
             const store = readLocalStore();
@@ -462,10 +472,10 @@ describe('WishRite Creator Wallet Hardening, Idempotency & Concurrency Suite', (
     // SECTION 4: OWNERSHIP & CROSS-CREATOR AUTHORIZATION
     // =========================================================================
     describe('4. Cross-Creator Authorization & Ownership Protection', () => {
-        const creatorA_UserId = 'auth-user-creator-A';
-        const creatorA_InfId = 'inf-creator-A';
-        const creatorB_UserId = 'auth-user-creator-B';
-        const creatorB_InfId = 'inf-creator-B';
+        const creatorA_UserId = '00000000-0000-0000-0000-0000000000a2';
+        const creatorA_InfId = '00000000-0000-0000-0000-0000000000a1';
+        const creatorB_UserId = '00000000-0000-0000-0000-0000000000b2';
+        const creatorB_InfId = '00000000-0000-0000-0000-0000000000b1';
 
         let tokenA;
         let tokenB;
@@ -474,9 +484,9 @@ describe('WishRite Creator Wallet Hardening, Idempotency & Concurrency Suite', (
             const { readLocalStore, writeLocalStore } = await import('../backend/creator-wallet.js');
             const store = readLocalStore();
 
-            store.influencers = store.influencers || [];
-            store.accounts = store.accounts || [];
-            store.wallets = store.wallets || [];
+            store.influencers = (store.influencers || []).filter(i => i.id !== creatorA_InfId && i.id !== creatorB_InfId);
+            store.accounts = (store.accounts || []).filter(a => a.influencer_id !== creatorA_InfId && a.influencer_id !== creatorB_InfId);
+            store.wallets = (store.wallets || []).filter(w => w.influencer_id !== creatorA_InfId && w.influencer_id !== creatorB_InfId);
 
             // Seed Creator A
             store.influencers.push({
@@ -485,14 +495,14 @@ describe('WishRite Creator Wallet Hardening, Idempotency & Concurrency Suite', (
                 status: 'active'
             });
             store.accounts.push({
-                id: 'acct-creator-A',
+                id: '00000000-0000-0000-0000-0000000000a3',
                 influencer_id: creatorA_InfId,
                 auth_user_id: creatorA_UserId,
                 email: 'creatorA@wishrite.test',
                 is_active: true
             });
             store.wallets.push({
-                id: 'wallet-creator-A',
+                id: '00000000-0000-0000-0000-0000000000a4',
                 influencer_id: creatorA_InfId,
                 available_balance: 1000.00,
                 pending_balance: 0.00
@@ -505,14 +515,14 @@ describe('WishRite Creator Wallet Hardening, Idempotency & Concurrency Suite', (
                 status: 'active'
             });
             store.accounts.push({
-                id: 'acct-creator-B',
+                id: '00000000-0000-0000-0000-0000000000b3',
                 influencer_id: creatorB_InfId,
                 auth_user_id: creatorB_UserId,
                 email: 'creatorB@wishrite.test',
                 is_active: true
             });
             store.wallets.push({
-                id: 'wallet-creator-B',
+                id: '00000000-0000-0000-0000-0000000000b4',
                 influencer_id: creatorB_InfId,
                 available_balance: 2000.00,
                 pending_balance: 0.00

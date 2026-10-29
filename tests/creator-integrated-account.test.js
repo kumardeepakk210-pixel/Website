@@ -1,3 +1,5 @@
+process.env.NODE_ENV = 'test';
+process.env.CREATOR_USE_LOCAL_STORE = 'true';
 require('dotenv').config();
 const { test, describe, before, after } = require('node:test');
 const assert = require('node:assert/strict');
@@ -5,13 +7,25 @@ const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const PORT = process.env.PORT || 8085;
+let server = null;
+let PORT = process.env.PORT || 8085;
 const STORE_PATH = path.join(__dirname, '..', 'data', 'influencers_store.json');
 let backupStoreRaw = null;
 
-before(() => {
+before(async () => {
   if (fs.existsSync(STORE_PATH)) {
     backupStoreRaw = fs.readFileSync(STORE_PATH, 'utf8');
+  }
+  const serverModule = require('../server.js');
+  const handler = serverModule.listeners('request')[0];
+  server = http.createServer(handler);
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  PORT = server.address().port;
+});
+
+after(async () => {
+  if (server) {
+    await new Promise((resolve) => server.close(resolve));
   }
 });
 
@@ -303,7 +317,7 @@ describe('WishRite — Integrated Creator Program Inside My Account', () => {
       const res = await makeRequest({
         path: '/api/creator/content',
         method: 'POST',
-        headers: { 'Authorization': testCreatorAuthHeader }
+        headers: { 'Authorization': `Bearer ${testCreatorToken}` }
       }, postPayload);
 
       assert.equal(res.statusCode, 200);
@@ -327,7 +341,7 @@ describe('WishRite — Integrated Creator Program Inside My Account', () => {
       const res = await makeRequest({
         path: '/api/creator/content',
         method: 'POST',
-        headers: { 'Authorization': testCreatorAuthHeader }
+        headers: { 'Authorization': `Bearer ${testCreatorToken}` }
       }, reelPayload);
 
       assert.equal(res.statusCode, 200);
@@ -347,7 +361,7 @@ describe('WishRite — Integrated Creator Program Inside My Account', () => {
       const res = await makeRequest({
         path: '/api/creator/content',
         method: 'POST',
-        headers: { 'Authorization': testCreatorAuthHeader }
+        headers: { 'Authorization': `Bearer ${testCreatorToken}` }
       }, badPayload);
 
       assert.equal(res.statusCode, 400);
@@ -359,7 +373,7 @@ describe('WishRite — Integrated Creator Program Inside My Account', () => {
       await makeRequest({
         path: '/api/creator/content',
         method: 'POST',
-        headers: { 'Authorization': testCreatorAuthHeader }
+        headers: { 'Authorization': `Bearer ${testCreatorToken}` }
       }, {
         content_type: 'post',
         platform: 'Instagram',
@@ -369,7 +383,7 @@ describe('WishRite — Integrated Creator Program Inside My Account', () => {
 
       const res = await makeRequest({
         path: '/api/creator/content',
-        headers: { 'Authorization': testCreatorAuthHeader }
+        headers: { 'Authorization': `Bearer ${testCreatorToken}` }
       });
 
       assert.equal(res.statusCode, 200);
@@ -382,7 +396,7 @@ describe('WishRite — Integrated Creator Program Inside My Account', () => {
       const itemSub = await makeRequest({
         path: '/api/creator/content',
         method: 'POST',
-        headers: { 'Authorization': testCreatorAuthHeader }
+        headers: { 'Authorization': `Bearer ${testCreatorToken}` }
       }, {
         content_type: 'reel',
         platform: 'Instagram',
@@ -429,17 +443,18 @@ describe('WishRite — Integrated Creator Program Inside My Account', () => {
       const authHeaderB = makeCustomerAuthHeader(`userB_${Date.now()}@example.com`, `userB_${Date.now()}`);
 
       // Onboard user A
-      await makeRequest({
+      const obA = await makeRequest({
         path: '/api/creator/onboard',
         method: 'POST',
         headers: { 'Authorization': authHeaderA }
       }, { name: 'User A', city: 'Delhi', state: 'Delhi', instagram: '@usera', agreement_accepted: true });
+      const tokenA = obA.data && obA.data.token ? obA.data.token : null;
 
       // User A submits content
       await makeRequest({
         path: '/api/creator/content',
         method: 'POST',
-        headers: { 'Authorization': authHeaderA }
+        headers: { 'Authorization': `Bearer ${tokenA}` }
       }, {
         content_type: 'post',
         platform: 'Instagram',
@@ -448,16 +463,17 @@ describe('WishRite — Integrated Creator Program Inside My Account', () => {
       });
 
       // Onboard user B
-      await makeRequest({
+      const obB = await makeRequest({
         path: '/api/creator/onboard',
         method: 'POST',
         headers: { 'Authorization': authHeaderB }
       }, { name: 'User B', city: 'Mumbai', state: 'Maharashtra', instagram: '@userb', agreement_accepted: true });
+      const tokenB = obB.data && obB.data.token ? obB.data.token : null;
 
       // User B fetches their content
       const resB = await makeRequest({
         path: '/api/creator/content',
-        headers: { 'Authorization': authHeaderB }
+        headers: { 'Authorization': `Bearer ${tokenB}` }
       });
 
       assert.equal(resB.statusCode, 200);
@@ -474,11 +490,12 @@ describe('WishRite — Integrated Creator Program Inside My Account', () => {
         method: 'POST',
         headers: { 'Authorization': auth }
       }, { name: 'Self Mod', city: 'Pune', state: 'MH', instagram: '@selfmod', agreement_accepted: true });
+      const token = onboard.data && onboard.data.token ? onboard.data.token : null;
 
       const sub = await makeRequest({
         path: '/api/creator/content',
         method: 'POST',
-        headers: { 'Authorization': auth }
+        headers: { 'Authorization': `Bearer ${token}` }
       }, {
         content_type: 'post',
         platform: 'Instagram',
@@ -491,11 +508,11 @@ describe('WishRite — Integrated Creator Program Inside My Account', () => {
         path: '/api/creator/admin/content/moderate',
         method: 'POST',
         headers: {
-          'Authorization': auth,
+          'Authorization': `Bearer ${token}`,
           'x-admin-role': 'true'
         }
       }, {
-        contentId: sub.data.data.id,
+        contentId: sub.data && sub.data.data ? sub.data.data.id : 'unknown',
         action: 'approve'
       });
 
