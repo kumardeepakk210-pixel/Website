@@ -249,8 +249,11 @@ export const tableColumnsCache = {
         'views', 'clicks', 'orders', 'commission_amount', 'created_at', 'updated_at'
     ]),
     influencers: new Set([
-        'influencer_id', 'influencer_name', 'email_id', 'phone_number',
+        'influencer_id', 'influencer_name', 'name', 'email_id', 'phone_number',
         'instagram_id', 'address', 'city', 'state', 'country',
+        'bio', 'profile_image', 'category', 'commission_rate', 'tier', 'status',
+        'public_slug', 'public_profile_url', 'instagram_url', 'youtube_url',
+        'facebook_url', 'other_url', 'content_preferences', 'instagram_connection',
         'created_at', 'updated_at'
     ]),
     influencer_accounts: new Set([

@@ -1188,10 +1188,15 @@ export async function handleGetCreatorProfile(req, res) {
 export async function handleUpdateCreatorProfile(req, res) {
     const creator = req.creator;
     const body = req.body || {};
+    const creatorId = creator.influencer_id || creator.id;
+    const authUserId = req.creatorAccount?.auth_user_id || null;
 
     const permittedUpdates = {};
     if (body.display_name !== undefined) permittedUpdates.name = sanitizeText(body.display_name);
     if (body.name !== undefined) permittedUpdates.name = sanitizeText(body.name);
+    if (permittedUpdates.name !== undefined && permittedUpdates.name.trim()) {
+        permittedUpdates.influencer_name = permittedUpdates.name;
+    }
     if (body.bio !== undefined) permittedUpdates.bio = sanitizeText(body.bio);
     if (body.city !== undefined) permittedUpdates.city = sanitizeText(body.city);
     if (body.state !== undefined) permittedUpdates.state = sanitizeText(body.state);
@@ -1287,7 +1292,7 @@ export async function handleUpdateCreatorProfile(req, res) {
     permittedUpdates.updated_at = new Date().toISOString();
 
     const local = readLocalStore();
-    const idx = local.influencers.findIndex(i => i.id === creator.id);
+    const idx = local.influencers.findIndex(i => (i.influencer_id || i.id) === creatorId);
     if (idx !== -1) {
         Object.assign(local.influencers[idx], permittedUpdates);
         writeLocalStore(local);
@@ -1295,9 +1300,21 @@ export async function handleUpdateCreatorProfile(req, res) {
     }
 
     try {
-        await dbUpdate('influencers', 'id', creator.id, permittedUpdates, { useAdmin: true });
+        await dbUpdate('influencers', 'influencer_id', creatorId, permittedUpdates, { useAdmin: true });
     } catch (e) {
         // local persistence fallback
+    }
+
+    // Keep customer record in sync if name was updated, or pull latest customer name if omitted
+    if (permittedUpdates.name && authUserId) {
+        try {
+            await dbUpdate('customers', 'user_id', authUserId, {
+                customer_name: permittedUpdates.name,
+                updated_at: permittedUpdates.updated_at
+            }, { useAdmin: true });
+        } catch (_) {}
+    } else if (!permittedUpdates.name) {
+        await syncInfluencerNameFromCustomer(creatorId, authUserId, creator.email || req.creatorAccount?.email);
     }
 
     return res.json({
@@ -1513,6 +1530,92 @@ export async function handleCreatorPhotoDelete(req, res) {
             error: { message: err.message || 'Error removing profile photo.' }
         });
     }
+}
+
+/**
+ * Synchronizes Creator name from customer record (public.customers) into public.influencers.
+ * Architecture flow:
+ * Authenticated customer/user -> Find customer record (user_id/email) -> Read customer_name -> Update public.influencers.name
+ *
+ * Safe condition:
+ * - Only updates when a valid non-empty customer name exists.
+ * - Does NOT overwrite an existing Creator name with null, undefined, "" or whitespace.
+ * - Updates canonical public.influencers.influencer_id.
+ * - Does NOT overwrite status, commission, wallet, attribution, or public_slug.
+ */
+export async function syncInfluencerNameFromCustomer(influencerId, authUserId = null, email = null, fallbackName = null) {
+    if (!influencerId) return null;
+
+    let customer = null;
+
+    // 1. Authoritative lookup in public.customers by user_id
+    if (authUserId) {
+        try {
+            const rows = await dbQuery('customers', `user_id=eq.${encodeURIComponent(authUserId)}&limit=1`, { useAdmin: true });
+            if (Array.isArray(rows) && rows.length > 0) {
+                customer = rows[0];
+            }
+        } catch (err) {
+            console.warn('[Creator Name Sync] Customer query by user_id notice:', err.message);
+        }
+    }
+
+    // 2. Fallback lookup in public.customers by customer_email
+    if (!customer && email) {
+        try {
+            const cleanEmail = String(email).trim().toLowerCase();
+            const rows = await dbQuery('customers', `customer_email=eq.${encodeURIComponent(cleanEmail)}&limit=1`, { useAdmin: true });
+            if (Array.isArray(rows) && rows.length > 0) {
+                customer = rows[0];
+            }
+        } catch (err) {
+            console.warn('[Creator Name Sync] Customer query by email notice:', err.message);
+        }
+    }
+
+    // 3. Resolve customer name from existing schema (customer.customer_name)
+    let customerName = '';
+    if (customer) {
+        customerName = String(customer.customer_name || customer.name || '').trim();
+    }
+
+    // If no customer record name found, fallback to provided non-empty name
+    if (!customerName && fallbackName) {
+        customerName = String(fallbackName).trim();
+    }
+
+    // 4. Safe condition: only update when valid non-empty customer name exists
+    if (customerName && customerName.length > 0) {
+        try {
+            const now = new Date().toISOString();
+            const updatePayload = {
+                name: customerName,
+                influencer_name: customerName,
+                updated_at: now
+            };
+
+            await dbUpdate('influencers', 'influencer_id', influencerId, updatePayload, { useAdmin: true });
+            console.log(`[Creator Name Sync] Synchronized name="${customerName}" to influencers (influencer_id=${influencerId.slice(0, 8)}...)`);
+
+            // Also keep local store mirror aligned if active or in test
+            if (CREATOR_USE_LOCAL_STORE || process.env.NODE_ENV === 'test') {
+                const local = readLocalStore();
+                const inf = (local.influencers || []).find(i => (i.influencer_id || i.id) === influencerId);
+                if (inf) {
+                    inf.name = customerName;
+                    inf.influencer_name = customerName;
+                    inf.updated_at = now;
+                    writeLocalStore(local);
+                }
+            }
+
+            return customerName;
+        } catch (err) {
+            console.warn('[Creator Name Sync] dbUpdate error:', err.message);
+        }
+    }
+
+    return customerName || null;
 }
 
 /**
@@ -1893,18 +1996,32 @@ export async function handleCustomerCreatorOnboard(req, res) {
 
         // 5. If already exists -> return existing Creator
         if (existingCreator) {
+            const creatorId = existingCreator.influencer_id || existingCreator.id;
             if (!existingAccount) {
                 existingAccount = {
                     id: randomUUID(),
-                    influencer_id: existingCreator.id,
+                    influencer_id: creatorId,
                     auth_user_id: ident.userId || null,
                     email: cleanEmail,
                     is_active: true,
                     created_at: new Date().toISOString()
                 };
             }
+
+            // Authoritatively synchronize Creator name from customer record upon onboarding submission
+            const syncedName = await syncInfluencerNameFromCustomer(
+                creatorId,
+                ident.userId,
+                cleanEmail,
+                body.display_name || body.name
+            );
+            if (syncedName) {
+                existingCreator.name = syncedName;
+                existingCreator.influencer_name = syncedName;
+            }
+
             const sess = issueCreatorSession(existingAccount, existingCreator);
-            console.log(`[CREATOR ONBOARD] Creator already exists id=${existingCreator.id.slice(0, 8)}...`);
+            console.log(`[CREATOR ONBOARD] Creator already exists id=${creatorId.slice(0, 8)}...`);
             return res.json({
                 success: true,
                 message: 'Creator profile is already active for your account.',
@@ -1916,7 +2033,26 @@ export async function handleCustomerCreatorOnboard(req, res) {
         }
 
         // 6. Build new Creator records
-        const displayName = sanitizeText(body.display_name || body.name || cleanEmail.split('@')[0]);
+        // Read customer's name from customer record if available
+        let customerName = null;
+        if (ident.userId) {
+            try {
+                const custRows = await dbQuery('customers', `user_id=eq.${encodeURIComponent(ident.userId)}&limit=1`, queryOpts);
+                if (Array.isArray(custRows) && custRows.length > 0) {
+                    customerName = (custRows[0].customer_name || custRows[0].name || '').trim();
+                }
+            } catch (_) {}
+        }
+        if (!customerName && cleanEmail) {
+            try {
+                const custRows = await dbQuery('customers', `customer_email=eq.${encodeURIComponent(cleanEmail)}&limit=1`, queryOpts);
+                if (Array.isArray(custRows) && custRows.length > 0) {
+                    customerName = (custRows[0].customer_name || custRows[0].name || '').trim();
+                }
+            } catch (_) {}
+        }
+
+        const displayName = sanitizeText(customerName || body.display_name || body.name || cleanEmail.split('@')[0]);
         const slugBase = displayName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || `creator-${randomUUID().slice(0, 6)}`;
         const publicSlug = `${slugBase}-${randomUUID().slice(0, 4)}`;
 
@@ -2054,6 +2190,9 @@ export async function handleCustomerCreatorOnboard(req, res) {
 
         console.log('[CREATOR DB] INSERT success');
         console.log('[CREATOR ONBOARD] Creator created successfully');
+
+        // Synchronize customer name to ensure name and influencer_name are populated
+        await syncInfluencerNameFromCustomer(creatorId, ident.userId, cleanEmail, displayName);
 
         // 8. If CREATOR_USE_LOCAL_STORE is explicitly true or in test runner, mirror locally
         if (CREATOR_USE_LOCAL_STORE || process.env.NODE_ENV === 'test') {
