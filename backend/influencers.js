@@ -1156,10 +1156,27 @@ export async function trackInfluencerClick({
     stat.updated_at = new Date().toISOString();
 
     try {
-        await dbUpdate('influencer_stats', 'influencer_id', influencer_id, {
-            total_clicks: stat.total_clicks,
-            updated_at: stat.updated_at
-        }, { useAdmin: true });
+        const existingStats = await dbQuery('influencer_stats', `influencer_id=eq.${encodeURIComponent(influencer_id)}&limit=1`, { useAdmin: true });
+        if (existingStats && existingStats.length > 0) {
+            await dbUpdate('influencer_stats', 'influencer_id', influencer_id, {
+                total_clicks: (Number(existingStats[0].total_clicks) || 0) + 1,
+                updated_at: stat.updated_at
+            }, { useAdmin: true });
+        } else {
+            await dbInsert('influencer_stats', {
+                id: randomUUID(),
+                influencer_id,
+                total_clicks: 1,
+                total_orders: 0,
+                total_sales: 0,
+                total_views: 0,
+                total_earnings: 0,
+                available_earnings: 0,
+                pending_earnings: 0,
+                total_points: 0,
+                updated_at: stat.updated_at
+            }, { useAdmin: true });
+        }
     } catch (e) {}
 
     writeLocalStore(local);
@@ -1368,7 +1385,7 @@ export async function attributeOrderToInfluencer({
 
     if (targetInfId) {
         const { data: all } = await getAllInfluencersFromDB();
-        targetCreator = all.find(i => i.id === targetInfId);
+        targetCreator = all.find(i => i.id === targetInfId || i.influencer_id === targetInfId);
     } else if (targetAttrId || targetSessId) {
         const resolved = await resolveOrderInfluencer(targetAttrId, targetSessId);
         if (resolved) {
@@ -1389,13 +1406,14 @@ export async function attributeOrderToInfluencer({
     const { commission_rate, commission_amount } = calculateInfluencerCommission(sales_amount, targetCreator.commission_rate);
     const nowIso = new Date().toISOString();
 
+    const isUuid = (val) => typeof val === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
     const orderAttrRecord = {
         id: randomUUID(),
-        influencer_id: targetCreator.id,
-        order_id: order_id || null,
+        influencer_id: targetCreator.id || targetCreator.influencer_id,
+        order_id: isUuid(order_id) ? order_id : null,
         order_reference: String(order_reference).trim(),
         attribution_id: activeAttr?.id || attribution_id || null,
-        influencer_link_id: activeAttr?.influencer_link_id || null,
+        influencer_link_id: (activeAttr?.influencer_link_id && isUuid(activeAttr.influencer_link_id)) ? activeAttr.influencer_link_id : null,
         sales_amount: Number(sales_amount) || 0,
         commission_rate,
         commission_amount,
@@ -1407,7 +1425,16 @@ export async function attributeOrderToInfluencer({
     try {
         await dbInsert('influencer_order_attributions', orderAttrRecord, { useAdmin: true });
     } catch (e) {
-        console.warn('[Influencers API] dbInsert influencer_order_attributions notice:', e.message);
+        if (orderAttrRecord.order_id && (e.message?.includes('foreign key') || e.message?.includes('violates foreign key') || e.message?.includes('invalid input syntax for type uuid'))) {
+            try {
+                const fallbackRecord = { ...orderAttrRecord, order_id: null };
+                await dbInsert('influencer_order_attributions', fallbackRecord, { useAdmin: true });
+            } catch (retryErr) {
+                console.warn('[Influencers API] dbInsert fallback notice:', retryErr.message);
+            }
+        } else {
+            console.warn('[Influencers API] dbInsert influencer_order_attributions notice:', e.message);
+        }
     }
 
     local.order_attributions.unshift(orderAttrRecord);
@@ -1438,13 +1465,30 @@ export async function attributeOrderToInfluencer({
     stat.updated_at = nowIso;
 
     try {
-        await dbUpdate('influencer_stats', 'influencer_id', targetCreator.id, {
-            total_orders: stat.total_orders,
-            total_sales: stat.total_sales,
-            pending_earnings: stat.pending_earnings,
-            total_earnings: stat.total_earnings,
-            updated_at: stat.updated_at
-        }, { useAdmin: true });
+        const existingStats = await dbQuery('influencer_stats', `influencer_id=eq.${encodeURIComponent(targetCreator.id)}&limit=1`, { useAdmin: true });
+        if (existingStats && existingStats.length > 0) {
+            await dbUpdate('influencer_stats', 'influencer_id', targetCreator.id, {
+                total_orders: (Number(existingStats[0].total_orders) || 0) + 1,
+                total_sales: Number(((Number(existingStats[0].total_sales) || 0) + Number(sales_amount)).toFixed(2)),
+                pending_earnings: Number(((Number(existingStats[0].pending_earnings) || 0) + commission_amount).toFixed(2)),
+                total_earnings: Number(((Number(existingStats[0].total_earnings) || 0) + commission_amount).toFixed(2)),
+                updated_at: stat.updated_at
+            }, { useAdmin: true });
+        } else {
+            await dbInsert('influencer_stats', {
+                id: randomUUID(),
+                influencer_id: targetCreator.id,
+                total_clicks: 0,
+                total_orders: 1,
+                total_sales: Number(Number(sales_amount).toFixed(2)),
+                total_views: 0,
+                total_earnings: commission_amount,
+                available_earnings: 0,
+                pending_earnings: commission_amount,
+                total_points: Math.floor(Number(sales_amount) / 100),
+                updated_at: stat.updated_at
+            }, { useAdmin: true });
+        }
     } catch (e) {}
 
     writeLocalStore(local);

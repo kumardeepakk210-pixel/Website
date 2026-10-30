@@ -403,6 +403,34 @@ export async function requireCreatorAuth(req, res, next) {
             matchedCreator = local.influencers.find(i => i.id === session.influencerId);
         }
 
+        // 1b. Local E2E Development Auth Guard (requires E2E_LOCAL_AUTH=true AND localhost)
+        const isLocalE2EAuthEnabled = process.env.E2E_LOCAL_AUTH === 'true';
+        const reqHost = (req.headers['host'] || req.headers['x-forwarded-host'] || '').toLowerCase();
+        const isLocalRequest = reqHost.startsWith('localhost') || reqHost.startsWith('127.0.0.1') || reqHost.startsWith('::1');
+
+        if (!matchedCreator && isLocalE2EAuthEnabled && isLocalRequest) {
+            const clientEmail = (req.headers['x-customer-email'] || req.query?.email || '').trim().toLowerCase();
+            const clientId = (req.headers['x-customer-id'] || '').trim();
+
+            if (token === 'local-e2e-customer-token' || clientEmail === 'e2e.creator.customer@wishrite.local' || clientId === 'local-e2e-customer-id') {
+                const queryOpts = { useAdmin: hasServerAdminCredential() };
+                const e2eInfId = 'bc16eb55-99f8-408a-a6a8-bdc85fc0882d';
+                try {
+                    const dbInfs = await dbQuery('influencers', `influencer_id=eq.${encodeURIComponent(e2eInfId)}&limit=1`, queryOpts);
+                    if (Array.isArray(dbInfs) && dbInfs.length > 0) {
+                        matchedCreator = normalizeInfluencerRecord(dbInfs[0]);
+                    }
+                } catch (_) {}
+                if (matchedCreator) {
+                    matchedAccount = {
+                        id: 'local-e2e-customer-id',
+                        influencer_id: matchedCreator.id,
+                        email: 'e2e.creator.customer@wishrite.local'
+                    };
+                }
+            }
+        }
+
         // 2. If not found in memory, check if it's a Supabase JWT or token with claims
         if (!matchedAccount && (token.startsWith('ey') || token.includes('.'))) {
             let authUserId = null;
@@ -1633,6 +1661,26 @@ export async function resolveCustomerIdentity(req) {
     let authUserId = null;
     let authEmail = null;
 
+    // Development-only Local E2E Authentication Guard (requires E2E_LOCAL_AUTH=true AND localhost)
+    const isLocalE2EAuthEnabled = process.env.E2E_LOCAL_AUTH === 'true';
+    const reqHost = (req.headers['host'] || req.headers['x-forwarded-host'] || '').toLowerCase();
+    const isLocalRequest = reqHost.startsWith('localhost') || reqHost.startsWith('127.0.0.1') || reqHost.startsWith('::1');
+
+    if (isLocalE2EAuthEnabled && isLocalRequest) {
+        const clientEmail = (req.headers['x-customer-email'] || req.query?.email || '').trim().toLowerCase();
+        const clientId = (req.headers['x-customer-id'] || '').trim();
+
+        if (clientEmail === 'e2e.creator.customer@wishrite.local' || clientId === 'local-e2e-customer-id' || token === 'local-e2e-customer-token') {
+            return {
+                userId: 'local-e2e-customer-id',
+                email: 'e2e.creator.customer@wishrite.local',
+                influencerId: 'bc16eb55-99f8-408a-a6a8-bdc85fc0882d',
+                token: token || 'local-e2e-customer-token',
+                isLocalE2E: true
+            };
+        }
+    }
+
     if (token && creatorSessions.has(token)) {
         const sess = creatorSessions.get(token);
         if (sess.expiresAt > Date.now()) {
@@ -1688,6 +1736,12 @@ export async function resolveCustomerIdentity(req) {
         authEmail = String(req.query.email).trim().toLowerCase();
     }
 
+    // Security guard: never honor .local test emails or local-e2e IDs on non-local requests
+    if (!isLocalRequest) {
+        if (authEmail && authEmail.endsWith('.local')) authEmail = null;
+        if (authUserId && authUserId.startsWith('local-e2e-')) authUserId = null;
+    }
+
     let matchedInfluencerId = null;
 
     // 1. Authoritative lookup in Supabase
@@ -1733,6 +1787,24 @@ export async function resolveCustomerIdentity(req) {
  */
 export async function handleCustomerCreatorStatus(req, res) {
     try {
+        const reqHost = (req.headers['host'] || req.headers['x-forwarded-host'] || '').toLowerCase();
+        const isLocalHost = reqHost.startsWith('localhost') || reqHost.startsWith('127.0.0.1') || reqHost.startsWith('::1');
+
+        // Security Guard: Strictly reject .local test emails and local-e2e test IDs on non-local hostnames
+        if (!isLocalHost) {
+            const clientEmail = (req.headers['x-customer-email'] || req.query?.email || '').trim().toLowerCase();
+            const clientId = (req.headers['x-customer-id'] || '').trim();
+            if (clientEmail.endsWith('.local') || clientId.startsWith('local-e2e-')) {
+                return res.status(403).json({
+                    success: false,
+                    error: {
+                        code: 'FORBIDDEN_TEST_IDENTITY',
+                        message: 'Local test credentials and identities are strictly prohibited on production domains.'
+                    }
+                });
+            }
+        }
+
         const ident = await resolveCustomerIdentity(req);
         if (!ident.email && !ident.userId && !ident.influencerId) {
             return res.json({
@@ -1748,14 +1820,15 @@ export async function handleCustomerCreatorStatus(req, res) {
         let matchedAccount = null;
         let matchedCreator = null;
 
-        const userToken = ident.token || (req.headers.authorization ? req.headers.authorization.replace(/^Bearer /i, '').trim() : null);
+        const rawToken = ident.token || (req.headers.authorization ? req.headers.authorization.replace(/^Bearer /i, '').trim() : null);
+        const validJwtToken = (rawToken && (rawToken.startsWith('ey') || rawToken.includes('.'))) ? rawToken : null;
         const queryOpts = {
             useAdmin: hasServerAdminCredential(),
-            userToken: userToken
+            userToken: validJwtToken
         };
 
         // 1. Authoritative lookup in Supabase
-        if (ident.userId) {
+        if (ident.userId && !ident.isLocalE2E) {
             try {
                 const dbAccounts = await dbQuery('influencer_accounts', `auth_user_id=eq.${encodeURIComponent(ident.userId)}&limit=1`, queryOpts);
                 if (Array.isArray(dbAccounts) && dbAccounts.length > 0) {
@@ -1820,14 +1893,22 @@ export async function handleCustomerCreatorStatus(req, res) {
         }
 
         // Fetch wallet from Supabase
-        let walletData = { available_balance: 0, pending_balance: 0, lifetime_earned: 0 };
+        let walletData = { available_balance: 0, pending_balance: 0, paid_balance: 0, lifetime_earned: 0 };
         try {
             const dbWallets = await dbQuery('influencer_wallets', `influencer_id=eq.${encodeURIComponent(matchedCreator.id)}&limit=1`, queryOpts);
             if (Array.isArray(dbWallets) && dbWallets.length > 0) {
+                const w = dbWallets[0];
+                const avail = Number(w.available_balance || 0);
+                const pend = Number(w.pending_balance || 0);
+                const paid = Number(w.paid_balance || 0);
+                const storedLifetime = Number(w.lifetime_earned || 0);
+                const computedLifetime = Math.max(storedLifetime, Number((avail + paid + pend).toFixed(2)));
+
                 walletData = {
-                    available_balance: Number(dbWallets[0].available_balance || 0),
-                    pending_balance: Number(dbWallets[0].pending_balance || 0),
-                    lifetime_earned: 0
+                    available_balance: avail,
+                    pending_balance: pend,
+                    paid_balance: paid,
+                    lifetime_earned: computedLifetime
                 };
             }
         } catch (_) {}
@@ -1836,19 +1917,58 @@ export async function handleCustomerCreatorStatus(req, res) {
             total_clicks: 0,
             total_orders: 0,
             total_sales: 0,
-            total_earnings: 0,
+            total_earnings: walletData.lifetime_earned,
             available_earnings: walletData.available_balance,
             pending_earnings: walletData.pending_balance,
             total_points: 0
         };
 
-        const pointsData = { balance: 0 };
+        try {
+            const dbStats = await dbQuery('influencer_stats', `influencer_id=eq.${encodeURIComponent(matchedCreator.id)}&limit=1`, queryOpts);
+            if (Array.isArray(dbStats) && dbStats.length > 0) {
+                stats.total_clicks = Number(dbStats[0].total_clicks || 0);
+                stats.total_orders = Number(dbStats[0].total_orders || 0);
+                stats.total_sales = Number(dbStats[0].total_sales || 0);
+                stats.total_earnings = Number(dbStats[0].total_earnings || walletData.lifetime_earned || 0);
+                stats.total_points = Number(dbStats[0].total_points || 0);
+            }
+        } catch (_) {}
+
+        // Verify ground-truth order count and sales from live attributions
+        try {
+            const dbAttrs = await dbQuery('influencer_order_attributions', `influencer_id=eq.${encodeURIComponent(matchedCreator.id)}&status=neq.cancelled`, queryOpts);
+            if (Array.isArray(dbAttrs) && dbAttrs.length > 0) {
+                if (stats.total_orders === 0) stats.total_orders = dbAttrs.length;
+                if (stats.total_sales === 0) {
+                    stats.total_sales = Number(dbAttrs.reduce((sum, a) => sum + (Number(a.sales_amount) || 0), 0).toFixed(2));
+                }
+            }
+        } catch (_) {}
+
+        const pointsData = { balance: stats.total_points || 0 };
 
         let sessionToken = null;
+        if (!matchedAccount && ident.isLocalE2E && ident.influencerId) {
+            try {
+                const dbAccts = await dbQuery('influencer_accounts', `influencer_id=eq.${encodeURIComponent(ident.influencerId)}&limit=1`, queryOpts);
+                if (Array.isArray(dbAccts) && dbAccts.length > 0) {
+                    matchedAccount = dbAccts[0];
+                }
+            } catch (_) {}
+        }
+
         if (matchedAccount) {
             const sess = issueCreatorSession(matchedAccount, matchedCreator);
             sessionToken = sess.token;
+        } else if (ident.isLocalE2E && matchedCreator) {
+            const mockAcct = { id: 'local-e2e-account-id', influencer_id: matchedCreator.id, email: ident.email };
+            const sess = issueCreatorSession(mockAcct, matchedCreator);
+            sessionToken = sess.token;
         }
+
+        const baseUrl = isLocalHost ? `http://${req.headers['host']}` : 'https://wishrite.in';
+        const publicSlug = matchedCreator.public_slug || matchedCreator.instagram_id || matchedCreator.influencer_code;
+        const referralUrl = `${baseUrl}/creator/${publicSlug}`;
 
         return res.json({
             success: true,
@@ -1873,9 +1993,10 @@ export async function handleCustomerCreatorStatus(req, res) {
                 other_url: matchedCreator.other_url || '',
                 category: matchedCreator.category || 'Jewellery styling',
                 content_preferences: matchedCreator.content_preferences || [],
-                public_slug: matchedCreator.public_slug,
-                referral_url: `https://wishrite.in/creator/${matchedCreator.public_slug}`,
-                tier: matchedCreator.tier || 'starter'
+                public_slug: publicSlug,
+                referral_url: referralUrl,
+                tier: matchedCreator.tier || 'starter',
+                commission_rate: matchedCreator.commission_rate || 10
             },
             stats,
             wallet: walletData,
@@ -1941,10 +2062,11 @@ export async function handleCustomerCreatorOnboard(req, res) {
         }
         onboardingLocks.add(lockKey);
 
-        const userToken = ident.token || (req.headers.authorization ? req.headers.authorization.replace(/^Bearer /i, '').trim() : null);
+        const rawToken = ident.token || (req.headers.authorization ? req.headers.authorization.replace(/^Bearer /i, '').trim() : null);
+        const validJwtToken = (rawToken && (rawToken.startsWith('ey') || rawToken.includes('.'))) ? rawToken : null;
         const queryOpts = {
             useAdmin: hasServerAdminCredential(),
-            userToken: userToken
+            userToken: validJwtToken
         };
 
         // 4. Search existing Creator in Supabase by auth_user_id, influencer_id, or email
@@ -2139,7 +2261,7 @@ export async function handleCustomerCreatorOnboard(req, res) {
         const insertOptions = {
             useAdmin: hasServerAdminCredential(),
             returnMinimal: true,
-            userToken: userToken
+            userToken: validJwtToken
         };
 
         console.log(`[CREATOR DB] inserting into influencers id=${creatorId}`);

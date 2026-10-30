@@ -113,6 +113,16 @@ const server = http.createServer(async (req, res) => {
             res.setHeader('Cache-Control', 'public, max-age=0, must-revalidate');
         }
 
+        // Dynamically expose E2E_LOCAL_AUTH to local browser runtime via config.js
+        if (pathname === '/config.js') {
+            let configJs = fs.readFileSync(safeFilePath, 'utf8');
+            const isLocalE2E = process.env.E2E_LOCAL_AUTH === 'true';
+            configJs += `\nwindow.E2E_LOCAL_AUTH = ${isLocalE2E};\n`;
+            res.statusCode = 200;
+            res.setHeader('Content-Type', contentType);
+            return res.end(configJs);
+        }
+
         res.statusCode = 200;
         res.setHeader('Content-Type', contentType);
         return fs.createReadStream(safeFilePath).pipe(res);

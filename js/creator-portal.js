@@ -289,7 +289,7 @@
                     const w = walletRes.data;
                     this.state.wallet = w;
                     document.getElementById('metric-available-bal').textContent = this.formatINR(w.available_balance);
-                    document.getElementById('metric-lifetime').textContent = this.formatINR(w.lifetime_earnings);
+                    document.getElementById('metric-lifetime').textContent = this.formatINR(w.lifetime_earned || w.lifetime_earnings);
                     const topBal = document.getElementById('top-bar-bal');
                     if (topBal) topBal.textContent = this.formatINR(w.available_balance);
                 }
@@ -426,7 +426,7 @@
                     this.state.wallet = w;
                     document.getElementById('wallet-avail-bal').textContent = this.formatINR(w.available_balance);
                     document.getElementById('wallet-pending-bal').textContent = this.formatINR(w.pending_balance);
-                    document.getElementById('wallet-lifetime-bal').textContent = this.formatINR(w.lifetime_earnings);
+                    document.getElementById('wallet-lifetime-bal').textContent = this.formatINR(w.lifetime_earned || w.lifetime_earnings);
                 }
 
                 if (txRes?.data) {

@@ -244,15 +244,6 @@ async function handleLogin(e) {
 
     setAuthMessage('login-message', '');
 
-    if (!supabaseClient) {
-        setAuthMessage(
-            'login-message',
-            'Authentication service is unavailable.',
-            'error'
-        );
-        return;
-    }
-
     const emailMode =
         document.getElementById('email-login-field')
             ?.style.display !== 'none';
@@ -300,6 +291,68 @@ async function handleLogin(e) {
             email,
             password
         };
+
+        // --- LOCAL E2E LOGIN INTERCEPTOR ---
+        const isLocalHost = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+        const isE2EAuthEnabled = (window.E2E_LOCAL_AUTH === true || window.E2E_LOCAL_AUTH === 'true');
+
+        if (isLocalHost && isE2EAuthEnabled && email === 'e2e.creator.customer@wishrite.local') {
+            if (password !== 'WishRiteE2E@2026!') {
+                setAuthMessage(
+                    'login-message',
+                    'Invalid email/mobile number or password.',
+                    'error'
+                );
+                return;
+            }
+
+            const localE2ESession = {
+                auth_mode: 'local_e2e',
+                customer_id: 'local-e2e-customer-id',
+                customer_name: 'E2E Creator Customer',
+                customer_email: 'e2e.creator.customer@wishrite.local'
+            };
+
+            try {
+                localStorage.setItem('wishrite_local_e2e_session', JSON.stringify(localE2ESession));
+                sessionStorage.setItem('wishrite_local_e2e_session', JSON.stringify(localE2ESession));
+            } catch (_) {}
+
+            currentUser = {
+                id: localE2ESession.customer_id,
+                email: localE2ESession.customer_email,
+                phone: '',
+                auth_mode: 'local_e2e',
+                user_metadata: {
+                    full_name: localE2ESession.customer_name
+                }
+            };
+            isLoggedIn = true;
+
+            window.currentCustomerProfile = {
+                id: localE2ESession.customer_id,
+                customerId: localE2ESession.customer_id,
+                name: localE2ESession.customer_name,
+                phone: '',
+                email: localE2ESession.customer_email,
+                auth_mode: 'local_e2e'
+            };
+
+            updateAuthDropdown();
+            setAuthMessage('login-message', '');
+
+            if (typeof showToast === 'function') {
+                showToast(
+                    'Welcome back, E2E Creator Customer!',
+                    'success'
+                );
+            }
+
+            if (typeof navigateTo === 'function') {
+                navigateTo('profile');
+            }
+            return;
+        }
     }
 
 
@@ -325,6 +378,16 @@ async function handleLogin(e) {
             phone: mobileData.phone,
             password
         };
+    }
+
+
+    if (!supabaseClient) {
+        setAuthMessage(
+            'login-message',
+            'Authentication service is unavailable.',
+            'error'
+        );
+        return;
     }
 
 
@@ -975,7 +1038,11 @@ function renderProfileAccountDetails() {
 
     // Render WishRite Wallet, Points & Referral system
     if (typeof WishRiteWalletRewards !== 'undefined' && currentUser) {
-        WishRiteWalletRewards.syncUser(currentUser);
+        if (currentUser.auth_mode === 'local_e2e') {
+            WishRiteWalletRewards.resetState();
+        } else {
+            WishRiteWalletRewards.syncUser(currentUser);
+        }
         WishRiteWalletRewards.renderAccountSection();
     }
 
@@ -1089,10 +1156,17 @@ async function renderCustomerOrderHistory(user) {
 // ─────────────────────────────────────────────
 
 async function handleLogout() {
+    const isLocalE2E = (currentUser?.auth_mode === 'local_e2e');
+    try {
+        localStorage.removeItem('wishrite_local_e2e_session');
+        sessionStorage.removeItem('wishrite_local_e2e_session');
+        localStorage.removeItem('wishrite_creator_token');
+        window.currentCustomerProfile = null;
+    } catch (_) {}
 
     try {
 
-        if (supabaseClient) {
+        if (!isLocalE2E && supabaseClient) {
             await supabaseClient.auth.signOut();
         }
 
@@ -1122,7 +1196,9 @@ async function handleLogout() {
     }
 
 
-    navigateTo('home');
+    if (typeof navigateTo === 'function') {
+        navigateTo('home');
+    }
 }
 
 
@@ -1131,6 +1207,46 @@ async function handleLogout() {
 // ─────────────────────────────────────────────
 
 async function initAuthSystem() {
+    // Check Local E2E session on localhost
+    const isLocalHost = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+    const isE2EAuthEnabled = (window.E2E_LOCAL_AUTH === true || window.E2E_LOCAL_AUTH === 'true');
+
+    if (isLocalHost && isE2EAuthEnabled) {
+        let storedE2E = null;
+        try {
+            storedE2E = localStorage.getItem('wishrite_local_e2e_session') || sessionStorage.getItem('wishrite_local_e2e_session');
+        } catch (_) {}
+
+        if (storedE2E) {
+            try {
+                const parsed = JSON.parse(storedE2E);
+                if (parsed && parsed.auth_mode === 'local_e2e' && parsed.customer_email === 'e2e.creator.customer@wishrite.local') {
+                    currentUser = {
+                        id: parsed.customer_id,
+                        email: parsed.customer_email,
+                        phone: '',
+                        auth_mode: 'local_e2e',
+                        user_metadata: {
+                            full_name: parsed.customer_name
+                        }
+                    };
+                    isLoggedIn = true;
+
+                    window.currentCustomerProfile = {
+                        id: parsed.customer_id,
+                        customerId: parsed.customer_id,
+                        name: parsed.customer_name,
+                        phone: '',
+                        email: parsed.customer_email,
+                        auth_mode: 'local_e2e'
+                    };
+
+                    updateAuthDropdown();
+                    return;
+                }
+            } catch (_) {}
+        }
+    }
 
     if (!supabaseClient) {
         updateAuthDropdown();
@@ -1165,6 +1281,9 @@ async function initAuthSystem() {
 
         supabaseClient.auth.onAuthStateChange(
             async (event, session) => {
+                if (currentUser?.auth_mode === 'local_e2e') {
+                    return;
+                }
 
                 if (session?.user) {
 

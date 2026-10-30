@@ -264,7 +264,8 @@ export const tableColumnsCache = {
         'id', 'influencer_id', 'available_balance', 'pending_balance', 'paid_balance', 'lifetime_earned', 'lifetime_paid', 'currency', 'created_at', 'updated_at'
     ]),
     influencer_wallet_transactions: new Set([
-        'id', 'influencer_id', 'wallet_id', 'amount', 'currency', 'transaction_type', 'status', 'description', 'reference_id', 'created_at'
+        'id', 'influencer_id', 'wallet_id', 'transaction_type', 'amount', 'currency',
+        'direction', 'status', 'reference_type', 'reference_id', 'description', 'metadata', 'created_at'
     ]),
     influencer_links: new Set([
         'id', 'influencer_id', 'link_type', 'url', 'campaign_id', 'is_default', 'created_at'

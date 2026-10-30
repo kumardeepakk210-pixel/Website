@@ -481,7 +481,8 @@ export async function recordOrderCommissionInWallet({
 
         // Update wallet balances atomically
         wallet.pending_balance = Number((Number(wallet.pending_balance) + commAmount).toFixed(2));
-        wallet.lifetime_earned = Number((Number(wallet.lifetime_earned) + commAmount).toFixed(2));
+        const baseLifetime = Math.max(Number(wallet.lifetime_earned || 0), Number((Number(wallet.available_balance || 0) + Number(wallet.paid_balance || 0)).toFixed(2)));
+        wallet.lifetime_earned = Number((baseLifetime + commAmount).toFixed(2));
         wallet.updated_at = nowIso;
 
         writeLocalStore(local);
@@ -665,6 +666,10 @@ export async function recordOrderCommissionReversalInWallet({
                 lifetime_earned: wallet.lifetime_earned,
                 updated_at: wallet.updated_at
             }, { useAdmin: true });
+            if (origTx && origTx.id) {
+                origTx.status = 'cancelled';
+                await dbUpdate('influencer_wallet_transactions', 'id', origTx.id, { status: 'cancelled' }, { useAdmin: true });
+            }
         } catch (e) {}
 
         // Reverse points awarded for this order
@@ -799,16 +804,23 @@ export async function handleGetCreatorWallet(req, res) {
         const creator = req.creator;
         const wallet = await getOrCreateInfluencerWallet(creator.id);
 
+        const avail = Number(wallet.available_balance || 0);
+        const pend = Number(wallet.pending_balance || 0);
+        const paid = Number(wallet.paid_balance || 0);
+        const storedLifetime = Number(wallet.lifetime_earned || 0);
+        const computedLifetime = Math.max(storedLifetime, Number((avail + paid + pend).toFixed(2)));
+
         return res.json({
             success: true,
             data: {
                 wallet_id: wallet.id,
                 currency: wallet.currency || DEFAULT_CURRENCY,
-                available_balance: Number(wallet.available_balance || 0),
-                pending_balance: Number(wallet.pending_balance || 0),
-                paid_balance: Number(wallet.paid_balance || 0),
-                lifetime_earned: Number(wallet.lifetime_earned || 0),
-                lifetime_paid: Number(wallet.lifetime_paid || 0),
+                available_balance: avail,
+                pending_balance: pend,
+                paid_balance: paid,
+                lifetime_earned: computedLifetime,
+                lifetime_earnings: computedLifetime,
+                lifetime_paid: Number(wallet.lifetime_paid || paid),
                 minimum_withdrawal_amount: MIN_WITHDRAWAL_AMOUNT,
                 maximum_withdrawal_amount: MAX_WITHDRAWAL_AMOUNT,
                 updated_at: wallet.updated_at

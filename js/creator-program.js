@@ -158,6 +158,16 @@ if (document.readyState === 'loading') {
 async function getAuthHeaders() {
     const headers = { 'Content-Type': 'application/json' };
     
+    // Check Local E2E customer session
+    const authUser = (typeof window.getWishriteAuthUser === 'function') ? window.getWishriteAuthUser() : (window.currentUser || null);
+    if (authUser?.auth_mode === 'local_e2e') {
+        headers['x-customer-email'] = 'e2e.creator.customer@wishrite.local';
+        headers['x-customer-id'] = 'local-e2e-customer-id';
+        const creatorToken = localStorage.getItem('wishrite_creator_token');
+        headers['Authorization'] = creatorToken ? `Bearer ${creatorToken}` : 'Bearer local-e2e-customer-token';
+        return headers;
+    }
+
     // Check Supabase customer session
     const client = window.supabaseClient || (typeof supabaseClient !== 'undefined' ? supabaseClient : null);
     if (client && client.auth) {
@@ -761,10 +771,17 @@ function renderCreatorDashboard(data) {
             avatarEl.src = DEFAULT_AVATAR_SVG;
         }
     }
-    if (slugEl) slugEl.innerText = creator.influencer_code || `@${creator.public_slug}`;
+    if (slugEl) {
+        const baseSlug = creator.influencer_code || `@${creator.public_slug}`;
+        const commRate = creator.commission_rate || 10;
+        slugEl.innerText = `${baseSlug} • ${commRate}% Commission`;
+    }
     if (bioEl) bioEl.innerText = creator.bio || '';
 
-    const referralUrl = creator.referral_url || `https://wishrite.in/creator/${creator.public_slug || creator.influencer_code}`;
+    const isLocal = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+    const referralUrl = creator.referral_url || (isLocal
+        ? `http://${window.location.host}/creator/${creator.public_slug || creator.influencer_code}`
+        : `https://wishrite.in/creator/${creator.public_slug || creator.influencer_code}`);
     if (linkInput) linkInput.value = referralUrl;
 
     if (socialBadges) {
@@ -794,7 +811,7 @@ function renderCreatorDashboard(data) {
     if (ordersEl) ordersEl.innerText = Number(stats.total_orders || 0).toLocaleString();
     if (availEl) availEl.innerText = `₹${Number(wallet.available_balance || stats.available_earnings || 0).toLocaleString()}`;
     if (pendEl) pendEl.innerText = `₹${Number(wallet.pending_balance || stats.pending_earnings || 0).toLocaleString()}`;
-    if (totalEl) totalEl.innerText = `₹${Number(wallet.lifetime_earned || stats.total_sales || 0).toLocaleString()}`;
+    if (totalEl) totalEl.innerText = `₹${Number(wallet.lifetime_earned !== undefined && wallet.lifetime_earned !== null ? wallet.lifetime_earned : (stats.total_earnings || 0)).toLocaleString()}`;
     if (pointsEl) pointsEl.innerText = Number(points.balance || stats.total_points || 0).toLocaleString();
 
     // 3. Load Submitted Content
