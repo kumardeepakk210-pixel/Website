@@ -2092,6 +2092,29 @@ function populateCategoryAndProductPickers() {
 }
 window.populateCategoryAndProductPickers = populateCategoryAndProductPickers;
 
+function getSelectedProductOption(selectEl) {
+    if (!selectEl) return null;
+    // 1. Try selectedOptions collection
+    if (selectEl.selectedOptions && selectEl.selectedOptions.length > 0) {
+        const opt = selectEl.selectedOptions[0];
+        if (opt && (opt.value || (typeof opt.getAttribute === 'function' && opt.getAttribute('data-name')))) return opt;
+    }
+    // 2. Try selectedIndex
+    if (typeof selectEl.selectedIndex === 'number' && selectEl.selectedIndex >= 0 && selectEl.options) {
+        const opt = selectEl.options[selectEl.selectedIndex];
+        if (opt && (opt.value || (typeof opt.getAttribute === 'function' && opt.getAttribute('data-name')))) return opt;
+    }
+    // 3. Try selectEl.value match against options
+    const val = (selectEl.value || '').trim();
+    if (val && selectEl.options) {
+        for (let i = 0; i < selectEl.options.length; i++) {
+            if (selectEl.options[i].value === val) return selectEl.options[i];
+        }
+    }
+    return null;
+}
+window.getSelectedProductOption = getSelectedProductOption;
+
 function handleCategoryChange(type) {
     const catSelect = document.getElementById(`share-${type}-category`);
     const prodSelect = document.getElementById(`share-${type}-product`) || document.getElementById(`share-${type}-product-select`);
@@ -2128,8 +2151,8 @@ function handleCategoryChange(type) {
     prodSelect.innerHTML = `<option value="">Select Product ▼</option>` +
         matchingProducts.map(p => {
             const imgUrl = p.image_url || (Array.isArray(p.images) ? p.images[0] : '') || '';
-            const code = p.product_code || '';
-            const name = p.product_name || '';
+            const code = (p.product_code || p.id || '').trim();
+            const name = (p.product_name || p.title || '').trim();
             return `<option value="${code}" data-name="${name}" data-img="${imgUrl}" data-category="${selectedCategory}">${name} — ${code}</option>`;
         }).join('');
 }
@@ -2140,10 +2163,19 @@ function handleProductChange(type) {
     const previewBox = document.getElementById(`share-${type}-product-preview`);
     if (!previewBox) return;
 
-    const selectedOption = prodSelect?.selectedOptions?.[0];
-    const code = selectedOption?.value || '';
-    const name = selectedOption?.getAttribute('data-name') || '';
-    const img = selectedOption?.getAttribute('data-img') || '';
+    const selectedOption = getSelectedProductOption(prodSelect);
+    let code = selectedOption?.value || prodSelect?.value || '';
+    let name = selectedOption?.getAttribute('data-name') || '';
+    let img = selectedOption?.getAttribute('data-img') || '';
+
+    // Cache fallback if attributes are missing
+    if (code && (!name || !img) && Array.isArray(liveProductsCache)) {
+        const cached = liveProductsCache.find(p => (p.product_code || '').trim() === code.trim() || (p.id || '').trim() === code.trim());
+        if (cached) {
+            if (!name) name = cached.product_name || cached.title || '';
+            if (!img) img = cached.image_url || (Array.isArray(cached.images) ? cached.images[0] : '') || '';
+        }
+    }
 
     if (!code || !name) {
         previewBox.style.display = 'none';
@@ -2242,10 +2274,19 @@ async function handleSharePostSubmit(e) {
         return;
     }
 
-    const selectedOption = productSelect?.selectedOptions?.[0];
-    const productCode = selectedOption?.value || '';
-    const productName = selectedOption?.getAttribute('data-name') || '';
-    const productImg = selectedOption?.getAttribute('data-img') || '';
+    const selectedOption = getSelectedProductOption(productSelect);
+    let productCode = (selectedOption?.value || productSelect?.value || '').trim();
+    let productName = selectedOption?.getAttribute('data-name') || '';
+    let productImg = selectedOption?.getAttribute('data-img') || '';
+
+    // Cache fallback if attributes are missing
+    if (productCode && (!productName || !productImg) && Array.isArray(liveProductsCache)) {
+        const cached = liveProductsCache.find(p => (p.product_code || '').trim() === productCode || (p.id || '').trim() === productCode);
+        if (cached) {
+            if (!productName) productName = cached.product_name || cached.title || '';
+            if (!productImg) productImg = cached.image_url || (Array.isArray(cached.images) ? cached.images[0] : '') || '';
+        }
+    }
 
     if (!productCode) {
         if (errorEl) {
@@ -2362,10 +2403,19 @@ async function handleShareReelSubmit(e) {
         return;
     }
 
-    const selectedOption = productSelect?.selectedOptions?.[0];
-    const productCode = selectedOption?.value || '';
-    const productName = selectedOption?.getAttribute('data-name') || '';
-    const productImg = selectedOption?.getAttribute('data-img') || '';
+    const selectedOption = getSelectedProductOption(productSelect);
+    let productCode = (selectedOption?.value || productSelect?.value || '').trim();
+    let productName = selectedOption?.getAttribute('data-name') || '';
+    let productImg = selectedOption?.getAttribute('data-img') || '';
+
+    // Cache fallback if attributes are missing
+    if (productCode && (!productName || !productImg) && Array.isArray(liveProductsCache)) {
+        const cached = liveProductsCache.find(p => (p.product_code || '').trim() === productCode || (p.id || '').trim() === productCode);
+        if (cached) {
+            if (!productName) productName = cached.product_name || cached.title || '';
+            if (!productImg) productImg = cached.image_url || (Array.isArray(cached.images) ? cached.images[0] : '') || '';
+        }
+    }
 
     if (!productCode) {
         if (errorEl) {
