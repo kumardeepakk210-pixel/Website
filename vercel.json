@@ -1,4 +1,10 @@
 {
+  "crons": [
+    {
+      "path": "/api/creator/instagram/cron-sync",
+      "schedule": "*/20 * * * *"
+    }
+  ],
   "rewrites": [
     {
       "source": "/api/creator/:path*",

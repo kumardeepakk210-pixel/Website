@@ -25,6 +25,11 @@ import {
     buildInfluencerProductUrl,
     normalizeInfluencerRecord
 } from './influencers.js';
+import {
+    encryptToken,
+    decryptToken,
+    syncCreatorInstagram
+} from './services/instagram-sync.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -399,8 +404,28 @@ export async function requireCreatorAuth(req, res, next) {
             }
 
             const local = readLocalStore();
-            matchedAccount = local.accounts.find(a => a.id === session.accountId);
-            matchedCreator = local.influencers.find(i => i.id === session.influencerId);
+            matchedAccount = (local.accounts || []).find(a => a.id === session.accountId);
+            matchedCreator = (local.influencers || []).find(i => i.id === session.influencerId);
+
+            // If creator exists in Supabase but not in local fallback store, resolve from Supabase
+            if (!matchedCreator && session.influencerId) {
+                try {
+                    const queryOpts = { useAdmin: hasServerAdminCredential() };
+                    const dbInfs = await dbQuery('influencers', `influencer_id=eq.${encodeURIComponent(session.influencerId)}&limit=1`, queryOpts);
+                    if (Array.isArray(dbInfs) && dbInfs.length > 0) {
+                        matchedCreator = normalizeInfluencerRecord(dbInfs[0]);
+                    }
+                } catch (_) {}
+            }
+
+            if (!matchedAccount && session.accountId) {
+                matchedAccount = {
+                    id: session.accountId,
+                    influencer_id: session.influencerId,
+                    email: session.email,
+                    is_active: true
+                };
+            }
         }
 
         // 1b. Local E2E Development Auth Guard (requires E2E_LOCAL_AUTH=true AND localhost)
@@ -3003,6 +3028,8 @@ export function sanitizeContentItem(item) {
     };
 }
 
+const META_GRAPH_API_VERSION = process.env.META_GRAPH_API_VERSION || 'v26.0';
+
 /**
  * Queries official Meta Graph API to sync metrics for an Instagram media item
  */
@@ -3029,7 +3056,7 @@ export async function syncInstagramMediaMetrics(contentItem, creator) {
     if (!targetMediaId && igConn.account_id) {
         try {
             const mediaListRes = await fetch(
-                `https://graph.facebook.com/v21.0/${igConn.account_id}/media?fields=id,caption,media_type,media_product_type,permalink,thumbnail_url,like_count,comments_count&access_token=${encodeURIComponent(accessToken)}`
+                `https://graph.facebook.com/${META_GRAPH_API_VERSION}/${igConn.account_id}/media?fields=id,caption,media_type,media_product_type,permalink,thumbnail_url,like_count,comments_count&access_token=${encodeURIComponent(accessToken)}`
             );
             const mediaListData = await mediaListRes.json();
             if (mediaListData.data && Array.isArray(mediaListData.data)) {
@@ -3068,8 +3095,8 @@ export async function syncInstagramMediaMetrics(contentItem, creator) {
             : 'reach,likes,comments,shares,saved,total_interactions';
 
         const [insightsRes, mediaObjRes] = await Promise.all([
-            fetch(`https://graph.facebook.com/v21.0/${targetMediaId}/insights?metric=${metricsToQuery}&access_token=${encodeURIComponent(accessToken)}`),
-            fetch(`https://graph.facebook.com/v21.0/${targetMediaId}?fields=id,media_type,media_product_type,like_count,comments_count,permalink,thumbnail_url&access_token=${encodeURIComponent(accessToken)}`)
+            fetch(`https://graph.facebook.com/${META_GRAPH_API_VERSION}/${targetMediaId}/insights?metric=${metricsToQuery}&access_token=${encodeURIComponent(accessToken)}`),
+            fetch(`https://graph.facebook.com/${META_GRAPH_API_VERSION}/${targetMediaId}?fields=id,media_type,media_product_type,like_count,comments_count,permalink,thumbnail_url&access_token=${encodeURIComponent(accessToken)}`)
         ]);
 
         const insightsData = await insightsRes.json();
@@ -3144,7 +3171,7 @@ export async function syncInstagramMediaMetrics(contentItem, creator) {
 
 /**
  * GET /api/creator/instagram/status
- * Returns current Instagram account connection status
+ * Returns current Instagram account connection status for the canonical creator
  */
 export async function handleGetInstagramStatus(req, res) {
     try {
@@ -3153,9 +3180,29 @@ export async function handleGetInstagramStatus(req, res) {
             return res.status(401).json({ success: false, error: { message: 'Creator authentication required.' } });
         }
 
-        const local = readLocalStore();
-        const influencer = (local.influencers || []).find(i => i.id === creator.id) || creator;
-        const conn = influencer.instagram_connection || null;
+        const creatorId = creator.id || creator.influencer_id;
+        let conn = creator.instagram_connection || null;
+
+        // If not already on req.creator, look up in Supabase
+        if (!conn && creatorId) {
+            try {
+                const queryOpts = { useAdmin: hasServerAdminCredential() };
+                const dbInfs = await dbQuery('influencers', `influencer_id=eq.${encodeURIComponent(creatorId)}&limit=1`, queryOpts);
+                if (Array.isArray(dbInfs) && dbInfs.length > 0 && dbInfs[0].instagram_connection) {
+                    conn = dbInfs[0].instagram_connection;
+                    creator.instagram_connection = conn;
+                }
+            } catch (_) {}
+        }
+
+        // Also check local store if still null
+        if (!conn) {
+            const local = readLocalStore();
+            const localInf = (local.influencers || []).find(i => i.id === creatorId);
+            if (localInf?.instagram_connection) {
+                conn = localInf.instagram_connection;
+            }
+        }
 
         const isConnected = !!(conn && conn.username);
         return res.json({
@@ -3178,7 +3225,7 @@ export async function handleGetInstagramStatus(req, res) {
 
 /**
  * POST /api/creator/instagram/connect
- * Connects or updates a creator's professional Instagram account
+ * Connects or updates a creator's professional Instagram account using canonical Creator identity
  */
 export async function handleConnectInstagram(req, res) {
     try {
@@ -3198,9 +3245,8 @@ export async function handleConnectInstagram(req, res) {
             });
         }
 
-        const local = readLocalStore();
-        const influencer = (local.influencers || []).find(i => i.id === creator.id);
-        if (!influencer) {
+        const creatorId = creator.id || creator.influencer_id;
+        if (!creatorId) {
             return res.status(404).json({ success: false, error: { message: 'Creator profile not found.' } });
         }
 
@@ -3210,7 +3256,7 @@ export async function handleConnectInstagram(req, res) {
         // If access token is provided, test against official Meta Graph API
         if (accessToken) {
             try {
-                const metaTestRes = await fetch(`https://graph.facebook.com/v21.0/me?fields=id,name&access_token=${encodeURIComponent(accessToken)}`);
+                const metaTestRes = await fetch(`https://graph.facebook.com/${META_GRAPH_API_VERSION}/me?fields=id,name&access_token=${encodeURIComponent(accessToken)}`);
                 const metaTestData = await metaTestRes.json();
                 if (metaTestData && metaTestData.id) {
                     verifiedWithMeta = true;
@@ -3221,23 +3267,43 @@ export async function handleConnectInstagram(req, res) {
             }
         }
 
-        influencer.instagram_connection = {
+        const instagramConnPayload = {
             connected: true,
             username: handle,
             account_id: accountId,
             account_type: 'professional',
-            access_token: accessToken, // Kept server-side only
+            access_token: accessToken ? encryptToken(accessToken) : null, // Encrypted before storage, never exposed
             last_synced_at: new Date().toISOString(),
             insights_status: verifiedWithMeta ? 'connected' : (accessToken ? 'connected' : 'api_permission_required'),
             updated_at: new Date().toISOString()
         };
 
-        writeLocalStore(local);
+        // 1. Update in-memory / attached creator
+        creator.instagram_connection = instagramConnPayload;
 
+        // 2. Authoritative update in Supabase
         try {
-            await dbUpdate('influencers', influencer.id, {
-                instagram_connection: influencer.instagram_connection
-            }, { useAdmin: true }).catch(() => {});
+            await dbUpdate('influencers', 'influencer_id', creatorId, {
+                instagram_connection: instagramConnPayload
+            }, { useAdmin: true });
+        } catch (dbErr) {
+            console.warn('[handleConnectInstagram] Supabase update notice:', dbErr.message);
+        }
+
+        // 3. Keep local store in sync if present
+        try {
+            const local = readLocalStore();
+            let localInf = (local.influencers || []).find(i => i.id === creatorId);
+            if (localInf) {
+                localInf.instagram_connection = instagramConnPayload;
+            } else if (local.influencers) {
+                local.influencers.push({
+                    ...creator,
+                    id: creatorId,
+                    instagram_connection: instagramConnPayload
+                });
+            }
+            writeLocalStore(local);
         } catch (_) {}
 
         return res.json({
@@ -3247,8 +3313,8 @@ export async function handleConnectInstagram(req, res) {
                 connected: true,
                 username: handle,
                 account_type: 'professional',
-                insights_status: influencer.instagram_connection.insights_status,
-                last_synced_at: influencer.instagram_connection.last_synced_at
+                insights_status: instagramConnPayload.insights_status,
+                last_synced_at: instagramConnPayload.last_synced_at
             }
         });
     } catch (err) {
@@ -3259,7 +3325,7 @@ export async function handleConnectInstagram(req, res) {
 
 /**
  * POST /api/creator/instagram/disconnect
- * Disconnects the creator's Instagram account
+ * Disconnects the canonical creator's Instagram account
  */
 export async function handleDisconnectInstagram(req, res) {
     try {
@@ -3268,15 +3334,29 @@ export async function handleDisconnectInstagram(req, res) {
             return res.status(401).json({ success: false, error: { message: 'Creator authentication required.' } });
         }
 
-        const local = readLocalStore();
-        const influencer = (local.influencers || []).find(i => i.id === creator.id);
-        if (influencer) {
-            influencer.instagram_connection = null;
-            writeLocalStore(local);
+        const creatorId = creator.id || creator.influencer_id;
+        creator.instagram_connection = null;
+
+        // 1. Authoritative update in Supabase
+        if (creatorId) {
             try {
-                await dbUpdate('influencers', influencer.id, { instagram_connection: null }, { useAdmin: true }).catch(() => {});
-            } catch (_) {}
+                await dbUpdate('influencers', 'influencer_id', creatorId, {
+                    instagram_connection: null
+                }, { useAdmin: true });
+            } catch (dbErr) {
+                console.warn('[handleDisconnectInstagram] Supabase update notice:', dbErr.message);
+            }
         }
+
+        // 2. Keep local store in sync
+        try {
+            const local = readLocalStore();
+            const localInf = (local.influencers || []).find(i => i.id === creatorId);
+            if (localInf) {
+                localInf.instagram_connection = null;
+                writeLocalStore(local);
+            }
+        } catch (_) {}
 
         return res.json({
             success: true,
@@ -3331,7 +3411,7 @@ export async function handleSyncCreatorContent(req, res, contentId) {
 
 /**
  * POST /api/creator/instagram/sync
- * Batch synchronizes all Instagram content for the authenticated creator
+ * Batch synchronizes all Instagram content and media insights for the authenticated creator
  */
 export async function handleSyncAllInstagramContent(req, res) {
     try {
@@ -3340,25 +3420,28 @@ export async function handleSyncAllInstagramContent(req, res) {
             return res.status(401).json({ success: false, error: { message: 'Creator authentication required.' } });
         }
 
-        const local = readLocalStore();
-        if (!local.creator_content) local.creator_content = [];
+        const syncResult = await syncCreatorInstagram(creator);
 
-        const creatorItems = local.creator_content.filter(c => c.influencer_id === creator.id && c.platform === 'instagram');
-        let syncedCount = 0;
+        // Also query current creator content to return sanitized updated list
+        const creatorId = creator.id || creator.influencer_id;
+        let contentList = [];
+        try {
+            const rows = await dbQuery('creator_content', `influencer_id=eq.${encodeURIComponent(creatorId)}&order=created_at.desc`, { useAdmin: hasServerAdminCredential() });
+            if (Array.isArray(rows)) contentList = rows;
+        } catch (_) {}
 
-        for (const item of creatorItems) {
-            const syncRes = await syncInstagramMediaMetrics(item, creator);
-            if (syncRes.synced) syncedCount++;
+        if (contentList.length === 0) {
+            const local = readLocalStore();
+            contentList = (local.creator_content || []).filter(c => c.influencer_id === creatorId);
         }
 
-        writeLocalStore(local);
-
         return res.json({
-            success: true,
-            message: `Synchronized ${syncedCount} of ${creatorItems.length} Instagram items.`,
-            synced_count: syncedCount,
-            total_items: creatorItems.length,
-            items: creatorItems.map(sanitizeContentItem)
+            success: syncResult.success,
+            message: syncResult.message,
+            synced_count: syncResult.synced_count || 0,
+            discovered_count: syncResult.discovered_count || 0,
+            last_synced_at: syncResult.last_synced_at || new Date().toISOString(),
+            items: contentList.map(sanitizeContentItem)
         });
     } catch (err) {
         return res.status(500).json({ success: false, error: { message: err.message } });

@@ -181,6 +181,18 @@ if (require.main === module) {
         console.log(`📦 Serving files from: ${ROOT_DIR}`);
         console.log(`⚡ SPA Routing & API Routes Enabled`);
         console.log(`==================================================\n`);
+
+        // Initialize background sync timer for development server (every 20 mins)
+        try {
+            import('./backend/services/instagram-sync.js').then(syncService => {
+                const TWENTY_MINS = 20 * 60 * 1000;
+                setInterval(() => {
+                    syncService.runScheduledInstagramSync().catch(err => {
+                        console.error('[Server Cron] Background sync error:', err.message);
+                    });
+                }, TWENTY_MINS);
+            }).catch(() => {});
+        } catch (_) {}
     });
 }
 

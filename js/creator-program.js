@@ -1536,6 +1536,34 @@ function renderInstagramConnectionCard(conn) {
 window.renderInstagramConnectionCard = renderInstagramConnectionCard;
 
 function openInstagramConnectModal() {
+    // 1. Check if user is signed in
+    const authUser = (typeof getWishriteAuthUser === 'function') ? getWishriteAuthUser() : window.currentUser;
+    const custProfile = (typeof getWishriteCustomerProfile === 'function') ? getWishriteCustomerProfile() : null;
+    const isUserLoggedIn = !!(authUser || custProfile || window.isLoggedIn);
+
+    if (!isUserLoggedIn) {
+        if (typeof showToast === 'function') {
+            showToast('Please login to continue.', 'warning');
+        } else {
+            alert('Please login to continue.');
+        }
+        if (typeof navigateTo === 'function') {
+            navigateTo('login');
+        }
+        return;
+    }
+
+    // 2. Check if active Creator profile exists
+    const isCreator = !!(currentCreatorData && currentCreatorData.is_creator && currentCreatorData.creator);
+    if (!isCreator) {
+        if (typeof showToast === 'function') {
+            showToast('Please complete your Creator profile before connecting Instagram.', 'warning');
+        } else {
+            alert('Please complete your Creator profile before connecting Instagram.');
+        }
+        return;
+    }
+
     const modal = document.getElementById('modal-connect-instagram');
     if (modal) modal.style.display = 'flex';
 }
@@ -1680,8 +1708,14 @@ window.syncContentInsights = syncContentInsights;
 async function syncAllInstagramInsights() {
     const icon = document.getElementById('icon-sync-all-ig');
     const btn = document.getElementById('btn-sync-all-ig');
+    const btnText = btn ? btn.querySelector('span') : null;
+    const originalText = btnText ? btnText.innerText : 'SYNC NOW';
+
+    if (btn && btn.disabled) return; // Prevent double-trigger
+
     if (icon) icon.classList.add('rotating');
     if (btn) btn.disabled = true;
+    if (btnText) btnText.innerText = 'Syncing Instagram...';
 
     try {
         const headers = await getAuthHeaders();
@@ -1692,20 +1726,24 @@ async function syncAllInstagramInsights() {
         const json = await res.json();
         if (json.success) {
             if (typeof showToast === 'function') {
-                showToast(json.message || 'Instagram metrics synchronized.', 'success');
+                showToast(json.message || 'Instagram synced successfully', 'success');
             }
             loadCreatorContent(currentContentFilter);
             loadInstagramConnection();
         } else {
             if (typeof showToast === 'function') {
-                showToast('Instagram insights temporarily unavailable.', 'info');
+                showToast(json.message || 'Instagram insights temporarily unavailable.', 'info');
             }
         }
     } catch (e) {
         console.error('Error syncing all Instagram insights:', e);
+        if (typeof showToast === 'function') {
+            showToast('Instagram synchronization encountered a temporary network issue.', 'error');
+        }
     } finally {
         if (icon) icon.classList.remove('rotating');
         if (btn) btn.disabled = false;
+        if (btnText) btnText.innerText = originalText;
     }
 }
 window.syncAllInstagramInsights = syncAllInstagramInsights;
@@ -1806,8 +1844,10 @@ function renderCreatorContentList(items, container) {
                         <th>Category</th>
                         <th>Status</th>
                         <th style="text-align:right;">Views</th>
+                        <th style="text-align:right;">Reach</th>
                         <th style="text-align:right;">Likes</th>
                         <th style="text-align:right;">Comments</th>
+                        <th style="text-align:right;">Saves</th>
                         <th style="text-align:right;">Shares</th>
                         <th>Submitted</th>
                         <th style="text-align:right; min-width:130px;">Link / Actions</th>
@@ -1853,8 +1893,10 @@ function renderCreatorContentList(items, container) {
                     <span class="content-status-badge ${statusClass}">${statusLabel}</span>
                 </td>
                 <td>${formatContentMetric(item.views_count)}</td>
+                <td>${formatContentMetric(item.reach_count)}</td>
                 <td>${formatContentMetric(item.likes_count)}</td>
                 <td>${formatContentMetric(item.comments_count)}</td>
+                <td>${formatContentMetric(item.saves_count)}</td>
                 <td>${formatContentMetric(item.shares_count)}</td>
                 <td>
                     <span style="font-size:0.78rem; color:var(--wr-text-muted);">${formatSubmissionDate(item.created_at)}</span>
@@ -1911,12 +1953,20 @@ function renderCreatorContentList(items, container) {
                         <span>Views</span>
                     </div>
                     <div class="content-mobile-metric-item">
+                        <span>${formatMobileMetricText(item.reach_count)}</span>
+                        <span>Reach</span>
+                    </div>
+                    <div class="content-mobile-metric-item">
                         <span>${formatMobileMetricText(item.likes_count)}</span>
                         <span>Likes</span>
                     </div>
                     <div class="content-mobile-metric-item">
                         <span>${formatMobileMetricText(item.comments_count)}</span>
                         <span>Comments</span>
+                    </div>
+                    <div class="content-mobile-metric-item">
+                        <span>${formatMobileMetricText(item.saves_count)}</span>
+                        <span>Saves</span>
                     </div>
                     <div class="content-mobile-metric-item">
                         <span>${formatMobileMetricText(item.shares_count)}</span>

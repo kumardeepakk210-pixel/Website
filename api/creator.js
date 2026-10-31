@@ -208,6 +208,21 @@ module.exports = async function handler(req, res) {
         }
 
         // 8. Instagram Insights & Content Sync
+        if (subPath === '/instagram/cron-sync' && (method === 'GET' || method === 'POST')) {
+            const authHeader = req.headers['authorization'] || '';
+            const cronSecret = process.env.CRON_SECRET;
+            // Allow Vercel cron invocation via Authorization header or Vercel cron internal header
+            const isVercelCron = req.headers['x-vercel-cron'] === '1';
+            const isAuthorized = !cronSecret || authHeader === `Bearer ${cronSecret}` || isVercelCron;
+
+            if (!isAuthorized) {
+                return res.status(401).json({ success: false, error: { message: 'Unauthorized cron request.' } });
+            }
+
+            const syncService = await import('../backend/services/instagram-sync.js');
+            const cronResult = await syncService.runScheduledInstagramSync();
+            return res.json({ success: true, cron: cronResult });
+        }
         if (subPath === '/instagram/status' && method === 'GET') {
             return await withAuth(creator.handleGetInstagramStatus);
         }
