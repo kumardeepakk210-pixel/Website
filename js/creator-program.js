@@ -292,6 +292,7 @@ async function loadCustomerCreatorStatus() {
                 if (dashboardState) dashboardState.style.display = 'block';
                 renderCreatorDashboard(data);
             }
+            updateCreatorHeroCTA(true);
         } else {
             // Not a creator yet -> show Onboard invite & details form
             currentCreatorData = null;
@@ -300,11 +301,7 @@ async function loadCustomerCreatorStatus() {
             const formCard = document.getElementById('creator-onboard-form-card');
             if (heroCard) heroCard.style.display = 'block';
             if (formCard) formCard.style.display = 'none';
-            const becomeBtn = document.getElementById('btn-become-creator');
-            if (becomeBtn && !becomeBtn._boundClick) {
-                becomeBtn._boundClick = true;
-                becomeBtn.addEventListener('click', showCreatorOnboardForm);
-            }
+            updateCreatorHeroCTA(false);
             prefillOnboardingForm();
         }
     } catch (err) {
@@ -314,6 +311,7 @@ async function loadCustomerCreatorStatus() {
         const formCard = document.getElementById('creator-onboard-form-card');
         if (heroCard) heroCard.style.display = 'block';
         if (formCard) formCard.style.display = 'none';
+        updateCreatorHeroCTA(false);
         prefillOnboardingForm();
     } finally {
         if (timeoutId) clearTimeout(timeoutId);
@@ -321,6 +319,40 @@ async function loadCustomerCreatorStatus() {
     }
 }
 window.loadCustomerCreatorStatus = loadCustomerCreatorStatus;
+
+/**
+ * Dynamically updates the Creator Hero CTA button based on authoritative Creator status
+ * Case 1: Non-Creator -> "BECOME A CREATOR" (triggers showCreatorOnboardForm)
+ * Case 2: Active Creator -> "MANAGE CREATOR PROFILE" (scrolls to dashboard / opens edit profile)
+ */
+function updateCreatorHeroCTA(isCreator) {
+    const btn = document.getElementById('btn-become-creator');
+    if (!btn) return;
+
+    if (isCreator) {
+        btn.innerText = 'MANAGE CREATOR PROFILE';
+        btn.setAttribute('aria-label', 'Manage Creator Profile');
+        btn.onclick = function(e) {
+            if (e) e.preventDefault();
+            const dashState = document.getElementById('creator-dashboard-state');
+            if (dashState) {
+                dashState.style.display = 'block';
+                dashState.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+            if (typeof openEditCreatorProfileModal === 'function') {
+                openEditCreatorProfileModal();
+            }
+        };
+    } else {
+        btn.innerText = 'BECOME A CREATOR';
+        btn.setAttribute('aria-label', 'Become a Creator');
+        btn.onclick = function(e) {
+            if (e) e.preventDefault();
+            showCreatorOnboardForm();
+        };
+    }
+}
+window.updateCreatorHeroCTA = updateCreatorHeroCTA;
 
 /**
  * Opens the Creator Onboarding Form inside My Account

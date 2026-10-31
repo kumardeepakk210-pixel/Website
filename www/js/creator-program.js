@@ -113,8 +113,17 @@ function switchProfileTab(tabId) {
             }
         } catch (_) {}
 
-        loadCustomerCreatorStatus();
-        fetchLiveProductsForPicker();
+        try {
+            loadCustomerCreatorStatus();
+        } catch (e) {
+            console.error('Error starting creator status load:', e);
+        }
+
+        try {
+            fetchLiveProductsForPicker();
+        } catch (e) {
+            console.error('Error fetching products for picker:', e);
+        }
     } else {
         btnCreator?.classList.remove('active');
         btnCreator?.setAttribute('aria-selected', 'false');
@@ -133,19 +142,45 @@ function switchProfileTab(tabId) {
 }
 window.switchProfileTab = switchProfileTab;
 
-// Bind direct DOM event listeners as backup to inline onclick
+// Bind direct DOM event listeners and document delegation for robust tab switching
 function initCreatorTabListeners() {
     const btnAccount = document.getElementById('tab-btn-account');
     const btnCreator = document.getElementById('tab-btn-creator');
     if (btnAccount && !btnAccount._hasTabListener) {
         btnAccount._hasTabListener = true;
-        btnAccount.addEventListener('click', () => switchProfileTab('account'));
+        btnAccount.addEventListener('click', (e) => {
+            e.preventDefault();
+            switchProfileTab('account');
+        });
     }
     if (btnCreator && !btnCreator._hasTabListener) {
         btnCreator._hasTabListener = true;
-        btnCreator.addEventListener('click', () => switchProfileTab('creator'));
+        btnCreator.addEventListener('click', (e) => {
+            e.preventDefault();
+            switchProfileTab('creator');
+        });
     }
 }
+
+// Global click delegation as bulletproof fallback
+if (!window._creatorTabDelegationInitialized) {
+    window._creatorTabDelegationInitialized = true;
+    document.addEventListener('click', (e) => {
+        const creatorBtn = e.target.closest('#tab-btn-creator, .creator-profile-portal-link');
+        if (creatorBtn) {
+            e.preventDefault();
+            switchProfileTab('creator');
+            return;
+        }
+        const accountBtn = e.target.closest('#tab-btn-account');
+        if (accountBtn) {
+            e.preventDefault();
+            switchProfileTab('account');
+            return;
+        }
+    });
+}
+
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initCreatorTabListeners);
 } else {
@@ -158,6 +193,16 @@ if (document.readyState === 'loading') {
 async function getAuthHeaders() {
     const headers = { 'Content-Type': 'application/json' };
     
+    // Check Local E2E customer session
+    const authUser = (typeof window.getWishriteAuthUser === 'function') ? window.getWishriteAuthUser() : (window.currentUser || null);
+    if (authUser?.auth_mode === 'local_e2e') {
+        headers['x-customer-email'] = 'e2e.creator.customer@wishrite.local';
+        headers['x-customer-id'] = 'local-e2e-customer-id';
+        const creatorToken = localStorage.getItem('wishrite_creator_token');
+        headers['Authorization'] = creatorToken ? `Bearer ${creatorToken}` : 'Bearer local-e2e-customer-token';
+        return headers;
+    }
+
     // Check Supabase customer session
     const client = window.supabaseClient || (typeof supabaseClient !== 'undefined' ? supabaseClient : null);
     if (client && client.auth) {
@@ -186,7 +231,6 @@ async function getAuthHeaders() {
     }
 
     // Customer email & id from getWishriteAuthUser / getWishriteCustomerProfile / window.currentUser
-    const authUser = (typeof window.getWishriteAuthUser === 'function') ? window.getWishriteAuthUser() : (window.currentUser || null);
     const custProfile = (typeof window.getWishriteCustomerProfile === 'function') ? window.getWishriteCustomerProfile() : null;
 
     if (!headers['x-customer-email']) {
@@ -248,6 +292,7 @@ async function loadCustomerCreatorStatus() {
                 if (dashboardState) dashboardState.style.display = 'block';
                 renderCreatorDashboard(data);
             }
+            updateCreatorHeroCTA(true);
         } else {
             // Not a creator yet -> show Onboard invite & details form
             currentCreatorData = null;
@@ -256,11 +301,7 @@ async function loadCustomerCreatorStatus() {
             const formCard = document.getElementById('creator-onboard-form-card');
             if (heroCard) heroCard.style.display = 'block';
             if (formCard) formCard.style.display = 'none';
-            const becomeBtn = document.getElementById('btn-become-creator');
-            if (becomeBtn && !becomeBtn._boundClick) {
-                becomeBtn._boundClick = true;
-                becomeBtn.addEventListener('click', showCreatorOnboardForm);
-            }
+            updateCreatorHeroCTA(false);
             prefillOnboardingForm();
         }
     } catch (err) {
@@ -270,6 +311,7 @@ async function loadCustomerCreatorStatus() {
         const formCard = document.getElementById('creator-onboard-form-card');
         if (heroCard) heroCard.style.display = 'block';
         if (formCard) formCard.style.display = 'none';
+        updateCreatorHeroCTA(false);
         prefillOnboardingForm();
     } finally {
         if (timeoutId) clearTimeout(timeoutId);
@@ -277,6 +319,40 @@ async function loadCustomerCreatorStatus() {
     }
 }
 window.loadCustomerCreatorStatus = loadCustomerCreatorStatus;
+
+/**
+ * Dynamically updates the Creator Hero CTA button based on authoritative Creator status
+ * Case 1: Non-Creator -> "BECOME A CREATOR" (triggers showCreatorOnboardForm)
+ * Case 2: Active Creator -> "MANAGE CREATOR PROFILE" (scrolls to dashboard / opens edit profile)
+ */
+function updateCreatorHeroCTA(isCreator) {
+    const btn = document.getElementById('btn-become-creator');
+    if (!btn) return;
+
+    if (isCreator) {
+        btn.innerText = 'MANAGE CREATOR PROFILE';
+        btn.setAttribute('aria-label', 'Manage Creator Profile');
+        btn.onclick = function(e) {
+            if (e) e.preventDefault();
+            const dashState = document.getElementById('creator-dashboard-state');
+            if (dashState) {
+                dashState.style.display = 'block';
+                dashState.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+            if (typeof openEditCreatorProfileModal === 'function') {
+                openEditCreatorProfileModal();
+            }
+        };
+    } else {
+        btn.innerText = 'BECOME A CREATOR';
+        btn.setAttribute('aria-label', 'Become a Creator');
+        btn.onclick = function(e) {
+            if (e) e.preventDefault();
+            showCreatorOnboardForm();
+        };
+    }
+}
+window.updateCreatorHeroCTA = updateCreatorHeroCTA;
 
 /**
  * Opens the Creator Onboarding Form inside My Account
@@ -761,10 +837,17 @@ function renderCreatorDashboard(data) {
             avatarEl.src = DEFAULT_AVATAR_SVG;
         }
     }
-    if (slugEl) slugEl.innerText = creator.influencer_code || `@${creator.public_slug}`;
+    if (slugEl) {
+        const baseSlug = creator.influencer_code || `@${creator.public_slug}`;
+        const commRate = creator.commission_rate || 10;
+        slugEl.innerText = `${baseSlug} • ${commRate}% Commission`;
+    }
     if (bioEl) bioEl.innerText = creator.bio || '';
 
-    const referralUrl = creator.referral_url || `https://wishrite.in/creator/${creator.public_slug || creator.influencer_code}`;
+    const isLocal = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+    const referralUrl = creator.referral_url || (isLocal
+        ? `http://${window.location.host}/creator/${creator.public_slug || creator.influencer_code}`
+        : `https://wishrite.in/creator/${creator.public_slug || creator.influencer_code}`);
     if (linkInput) linkInput.value = referralUrl;
 
     if (socialBadges) {
@@ -794,7 +877,7 @@ function renderCreatorDashboard(data) {
     if (ordersEl) ordersEl.innerText = Number(stats.total_orders || 0).toLocaleString();
     if (availEl) availEl.innerText = `₹${Number(wallet.available_balance || stats.available_earnings || 0).toLocaleString()}`;
     if (pendEl) pendEl.innerText = `₹${Number(wallet.pending_balance || stats.pending_earnings || 0).toLocaleString()}`;
-    if (totalEl) totalEl.innerText = `₹${Number(wallet.lifetime_earned || stats.total_sales || 0).toLocaleString()}`;
+    if (totalEl) totalEl.innerText = `₹${Number(wallet.lifetime_earned !== undefined && wallet.lifetime_earned !== null ? wallet.lifetime_earned : (stats.total_earnings || 0)).toLocaleString()}`;
     if (pointsEl) pointsEl.innerText = Number(points.balance || stats.total_points || 0).toLocaleString();
 
     // 3. Load Submitted Content
