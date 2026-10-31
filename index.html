@@ -1982,72 +1982,129 @@
 
                 </div>
 
-                <form onsubmit="handleLogin(event)">
+                <!-- EMAIL LOGIN FORM (PASSWORDLESS OTP) -->
+                <div id="email-login-container">
+                    <!-- Step 1: Request OTP -->
+                    <form id="email-otp-request-form" onsubmit="handleSendEmailOTP(event)">
+                        <div class="form-group" id="email-login-field">
+                            <label for="login-email">
+                                Email Address
+                            </label>
+                            <input id="login-email" class="form-input" type="email" autocomplete="email"
+                                placeholder="Enter your email" required>
+                        </div>
 
-                    <!-- EMAIL -->
-                    <div class="form-group" id="email-login-field">
+                        <button type="submit" class="btn btn-primary btn-full" id="email-send-otp-btn">
+                            Send OTP
+                        </button>
+                    </form>
 
-                        <label for="login-email">
-                            Email Address
-                        </label>
+                    <!-- Step 2: Verify OTP (Initially hidden) -->
+                    <form id="email-otp-verify-form" style="display: none;" onsubmit="handleVerifyEmailOTP(event)">
+                        <div class="otp-sent-banner" id="otp-sent-banner">
+                            Verification code sent to <strong id="otp-masked-email">your email</strong>
+                        </div>
 
-                        <input id="login-email" class="form-input" type="email" autocomplete="email"
-                            placeholder="Enter your email" required>
+                        <div class="form-group">
+                            <label for="otp-digit-1" style="font-size: var(--text-sm); color: var(--wr-text-muted);">
+                                Enter 6-Digit Code
+                            </label>
+                            <div class="otp-input-group" role="group" aria-label="6-digit verification code">
+                                <input type="text" id="otp-digit-1" class="otp-box" inputmode="numeric" pattern="[0-9]" maxlength="1" autocomplete="one-time-code" aria-label="Digit 1" required>
+                                <input type="text" id="otp-digit-2" class="otp-box" inputmode="numeric" pattern="[0-9]" maxlength="1" aria-label="Digit 2" required>
+                                <input type="text" id="otp-digit-3" class="otp-box" inputmode="numeric" pattern="[0-9]" maxlength="1" aria-label="Digit 3" required>
+                                <input type="text" id="otp-digit-4" class="otp-box" inputmode="numeric" pattern="[0-9]" maxlength="1" aria-label="Digit 4" required>
+                                <input type="text" id="otp-digit-5" class="otp-box" inputmode="numeric" pattern="[0-9]" maxlength="1" aria-label="Digit 5" required>
+                                <input type="text" id="otp-digit-6" class="otp-box" inputmode="numeric" pattern="[0-9]" maxlength="1" aria-label="Digit 6" required>
+                            </div>
+                        </div>
 
+                        <button type="submit" class="btn btn-primary btn-full" id="email-verify-otp-btn">
+                            Verify & Sign In
+                        </button>
+
+                        <div class="otp-resend-row">
+                            <button type="button" class="otp-resend-link" id="email-resend-otp-btn" onclick="resendEmailOTP()" disabled>
+                                Resend OTP
+                            </button>
+                            <span id="otp-timer-text" style="font-variant-numeric: tabular-nums;">Resend in 45s</span>
+                        </div>
+
+                        <button type="button" class="otp-change-email" onclick="resetEmailOTPFlow()">
+                            ← Change email address
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Step 3: Post-OTP Onboarding for new users (Initially hidden) -->
+                <div id="email-onboarding-container" style="display: none; text-align: left;">
+                    <div style="text-align: center; margin-bottom: 1.25rem;">
+                        <h3 style="font-size: var(--text-xl); margin-bottom: 0.25rem;">Complete Your Profile</h3>
+                        <p style="color: var(--wr-text-muted); font-size: var(--text-sm);">Almost there! Tell us a little about yourself.</p>
                     </div>
 
+                    <form id="email-onboarding-form" onsubmit="handleEmailOnboardingSubmit(event)">
+                        <div class="form-group">
+                            <label for="onboarding-name">Full Name</label>
+                            <input id="onboarding-name" class="form-input" type="text" autocomplete="name" placeholder="Enter your full name" required>
+                        </div>
 
+                        <div class="form-group">
+                            <label for="onboarding-mobile">Mobile Number</label>
+                            <div class="phone-input">
+                                <select id="onboarding-country-code" aria-label="Country code">
+                                    <option value="+91">+91</option>
+                                </select>
+                                <input id="onboarding-mobile" class="form-input" type="tel" inputmode="numeric" pattern="[0-9]{10}" maxlength="10" placeholder="10-digit mobile number" autocomplete="tel">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="onboarding-referral-code">Referral Code (Optional)</label>
+                            <input id="onboarding-referral-code" class="form-input" type="text" placeholder="e.g. WR8K4P" style="text-transform:uppercase; letter-spacing:1px;" maxlength="20">
+                        </div>
+
+                        <button type="submit" class="btn btn-primary btn-full" id="onboarding-submit-btn">
+                            Save & Continue
+                        </button>
+                    </form>
+                </div>
+
+                <!-- MOBILE LOGIN FORM (PASSWORD-BASED, UNCHANGED) -->
+                <form id="mobile-login-form" style="display: none;" onsubmit="handleLogin(event)">
                     <!-- MOBILE -->
-                    <div class="form-group" id="mobile-login-field" style="display: none;">
-
+                    <div class="form-group" id="mobile-login-field">
                         <label for="login-mobile">
                             Mobile Number
                         </label>
-
                         <div class="phone-input">
-
                             <select id="login-country-code" aria-label="Country code">
-
                                 <option value="+91">
                                     +91
                                 </option>
-
                             </select>
-
                             <input id="login-mobile" class="form-input" type="tel" inputmode="numeric"
                                 pattern="[0-9]{10}" maxlength="10" placeholder="10-digit mobile number"
                                 autocomplete="tel">
-
                         </div>
-
                     </div>
-
 
                     <!-- PASSWORD -->
                     <div class="form-group">
-
                         <label for="login-password">
                             Password
                         </label>
-
                         <input id="login-password" class="form-input" type="password" autocomplete="current-password"
-                            placeholder="Enter your password" required>
-
+                            placeholder="Enter your password">
                     </div>
 
-
                     <button type="submit" class="btn btn-primary btn-full" id="login-submit-btn">
-
                         Sign In
-
                     </button>
-
-
-                    <p id="login-message" class="auth-message" role="alert">
-                    </p>
-
                 </form>
 
+                <p id="login-message" class="auth-message" role="alert">
+                </p>
 
                 <div class="auth-links">
                     Don't have an account?
@@ -2073,7 +2130,7 @@
             margin-bottom: var(--space-8);
         ">
                     Create your WishRite account with email,
-                    mobile number and password.
+                    mobile number and password. (You can also sign in directly using passwordless Email OTP!)
                 </p>
 
 
@@ -3102,8 +3159,8 @@
     <script src="/js/occasion.js?v=20261003-v1"></script>
     <script src="/js/wallet-rewards.js"></script>
     <script src="/js/attribution.js?v=20261025-v1"></script>
-    <script src="/js/creator-program.js?v=20261026-v2"></script>
-    <script src="/js/app.js?v=20261026-v2"></script>
+    <script src="/js/creator-program.js?v=20261031-v1"></script>
+    <script src="/js/app.js?v=20261031-v1"></script>
 
 </body>
 

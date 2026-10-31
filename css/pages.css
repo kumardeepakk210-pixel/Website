@@ -2783,6 +2783,92 @@
     text-align: center;
 }
 
+/* ─── EMAIL OTP & ONBOARDING STYLES ─── */
+.otp-input-group {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin: 1.25rem 0 1rem;
+}
+
+.otp-box {
+    width: 46px;
+    height: 52px;
+    font-size: 1.35rem;
+    font-weight: 600;
+    text-align: center;
+    border: 1.5px solid var(--wr-border);
+    border-radius: var(--radius-sm, 4px);
+    background: var(--wr-white);
+    color: var(--wr-text);
+    transition: all 0.2s ease;
+    outline: none;
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+.otp-box:focus {
+    border-color: var(--wr-primary, #b76e79);
+    box-shadow: 0 0 0 3px rgba(183, 110, 121, 0.15);
+}
+
+.otp-box.filled {
+    border-color: var(--wr-text, #1a1a1a);
+}
+
+.otp-resend-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 1rem;
+    font-size: var(--text-sm);
+    color: var(--wr-text-muted);
+}
+
+.otp-resend-link {
+    background: none;
+    border: none;
+    color: var(--wr-primary);
+    cursor: pointer;
+    font-size: var(--text-sm);
+    text-decoration: underline;
+    padding: 0;
+}
+
+.otp-resend-link:disabled {
+    color: var(--wr-text-muted);
+    text-decoration: none;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.otp-change-email {
+    display: inline-block;
+    margin-top: 0.75rem;
+    font-size: var(--text-xs, 0.8rem);
+    color: var(--wr-primary);
+    cursor: pointer;
+    text-decoration: underline;
+    background: none;
+    border: none;
+    padding: 0;
+}
+
+.otp-sent-banner {
+    background: rgba(183, 110, 121, 0.08);
+    border: 1px solid rgba(183, 110, 121, 0.2);
+    border-radius: var(--radius-sm, 4px);
+    padding: 10px 14px;
+    margin-bottom: 1rem;
+    font-size: var(--text-sm);
+    color: var(--wr-text);
+    line-height: 1.4;
+}
+
+.otp-sent-banner strong {
+    color: var(--wr-primary, #b76e79);
+}
+
 .auth-card h2 {
     font-size: var(--text-3xl);
     margin-bottom: var(--space-8);

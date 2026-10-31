@@ -12,7 +12,8 @@ let currentUser = null;
 // ─────────────────────────────────────────────
 
 window.supabaseClient =
-    (window.supabase &&
+    window.supabaseClient ||
+    ((window.supabase &&
         (window.SUPABASE_URL || typeof SUPABASE_URL !== 'undefined') &&
         (window.SUPABASE_ANON_KEY || typeof SUPABASE_ANON_KEY !== 'undefined'))
         ? window.supabase.createClient(
@@ -34,7 +35,7 @@ window.supabaseClient =
                 }
             }
         )
-        : null;
+        : null);
 
 const supabaseClient = window.supabaseClient;
 
@@ -69,6 +70,31 @@ function getFriendlyAuthErrorMessage(rawMessage) {
         msg.includes('weak password')
     ) {
         return 'Password must be at least 6 characters long.';
+    }
+
+    if (
+        msg.includes('token has expired') ||
+        msg.includes('otp expired') ||
+        msg.includes('token is expired')
+    ) {
+        return 'Your verification code has expired. Please request a new code.';
+    }
+
+    if (
+        msg.includes('invalid token') ||
+        msg.includes('token is invalid') ||
+        msg.includes('otp is invalid') ||
+        msg.includes('token has expired or is invalid')
+    ) {
+        return 'Invalid verification code. Please try again.';
+    }
+
+    if (
+        msg.includes('rate limit') ||
+        msg.includes('too many requests') ||
+        msg.includes('over_email_send_rate_limit')
+    ) {
+        return 'Too many requests. Please wait a moment before trying again.';
     }
 
     if (
@@ -111,47 +137,47 @@ function getPhoneNumber(countryCode, inputId) {
 
 
 // ─────────────────────────────────────────────
+// Email Masking Helper
+// ─────────────────────────────────────────────
+
+function maskEmail(email) {
+    if (!email || typeof email !== 'string' || !email.includes('@')) {
+        return email || '';
+    }
+    const [localPart, domain] = email.split('@');
+    if (!localPart) return email;
+    if (localPart.length <= 1) {
+        return `${localPart}*****@${domain}`;
+    }
+    const firstChar = localPart[0];
+    return `${firstChar}*****@${domain}`;
+}
+window.maskEmail = maskEmail;
+
+
+// ─────────────────────────────────────────────
 // Login Method Switch
 // ─────────────────────────────────────────────
 
 function switchLoginMethod(method) {
     const emailMode = method === 'email';
 
-    const emailField =
-        document.getElementById('email-login-field');
+    const emailContainer = document.getElementById('email-login-container');
+    const mobileForm = document.getElementById('mobile-login-form');
+    const emailTab = document.getElementById('email-login-tab');
+    const mobileTab = document.getElementById('mobile-login-tab');
+    const onboardingContainer = document.getElementById('email-onboarding-container');
 
-    const mobileField =
-        document.getElementById('mobile-login-field');
-
-    const emailInput =
-        document.getElementById('login-email');
-
-    const mobileInput =
-        document.getElementById('login-mobile');
-
-    const emailTab =
-        document.getElementById('email-login-tab');
-
-    const mobileTab =
-        document.getElementById('mobile-login-tab');
-
-
-    if (emailField) {
-        emailField.style.display =
-            emailMode ? 'block' : 'none';
+    if (emailContainer) {
+        emailContainer.style.display = emailMode ? 'block' : 'none';
     }
 
-    if (mobileField) {
-        mobileField.style.display =
-            emailMode ? 'none' : 'block';
+    if (mobileForm) {
+        mobileForm.style.display = emailMode ? 'none' : 'block';
     }
 
-    if (emailInput) {
-        emailInput.required = emailMode;
-    }
-
-    if (mobileInput) {
-        mobileInput.required = !emailMode;
+    if (onboardingContainer) {
+        onboardingContainer.style.display = 'none';
     }
 
     if (emailTab) {
@@ -164,6 +190,7 @@ function switchLoginMethod(method) {
 
     setAuthMessage('login-message', '');
 }
+window.switchLoginMethod = switchLoginMethod;
 
 
 // ─────────────────────────────────────────────
@@ -236,7 +263,546 @@ function toggleUserDropdown(event) {
 
 
 // ─────────────────────────────────────────────
-// LOGIN
+// EMAIL OTP AUTHENTICATION SYSTEM
+// ─────────────────────────────────────────────
+
+let otpTimerInterval = null;
+let otpTimerSeconds = 0;
+let pendingOTPEmail = '';
+
+function startOTPTimer(duration = 45) {
+    if (otpTimerInterval) {
+        clearInterval(otpTimerInterval);
+        otpTimerInterval = null;
+    }
+
+    otpTimerSeconds = duration;
+    const resendBtn = document.getElementById('email-resend-otp-btn');
+    const timerText = document.getElementById('otp-timer-text');
+
+    if (resendBtn) resendBtn.disabled = true;
+    if (timerText) {
+        timerText.style.display = 'inline';
+        timerText.innerText = `Resend in ${otpTimerSeconds}s`;
+    }
+
+    otpTimerInterval = setInterval(() => {
+        otpTimerSeconds--;
+        if (otpTimerSeconds <= 0) {
+            clearInterval(otpTimerInterval);
+            otpTimerInterval = null;
+            if (resendBtn) resendBtn.disabled = false;
+            if (timerText) {
+                timerText.innerText = '';
+                timerText.style.display = 'none';
+            }
+        } else {
+            if (timerText) {
+                timerText.innerText = `Resend in ${otpTimerSeconds}s`;
+            }
+        }
+    }, 1000);
+}
+
+function resetEmailOTPFlow() {
+    if (otpTimerInterval) {
+        clearInterval(otpTimerInterval);
+        otpTimerInterval = null;
+    }
+
+    const requestForm = document.getElementById('email-otp-request-form');
+    const verifyForm = document.getElementById('email-otp-verify-form');
+    const onboardingContainer = document.getElementById('email-onboarding-container');
+    const emailInput = document.getElementById('login-email');
+
+    if (requestForm) requestForm.style.display = 'block';
+    if (verifyForm) verifyForm.style.display = 'none';
+    if (onboardingContainer) onboardingContainer.style.display = 'none';
+
+    // Clear OTP inputs
+    for (let i = 1; i <= 6; i++) {
+        const box = document.getElementById(`otp-digit-${i}`);
+        if (box) {
+            box.value = '';
+            box.classList.remove('filled');
+        }
+    }
+
+    setAuthMessage('login-message', '');
+    if (emailInput) {
+        emailInput.disabled = false;
+        emailInput.focus();
+    }
+}
+window.resetEmailOTPFlow = resetEmailOTPFlow;
+
+function setupOTPInputListeners() {
+    const boxes = [];
+    for (let i = 1; i <= 6; i++) {
+        const box = document.getElementById(`otp-digit-${i}`);
+        if (box) boxes.push(box);
+    }
+
+    boxes.forEach((box, index) => {
+        // Handle input (numeric only, auto-focus next)
+        box.addEventListener('input', (e) => {
+            const val = box.value.replace(/\D/g, '');
+            box.value = val ? val[0] : '';
+            if (box.value) {
+                box.classList.add('filled');
+                if (index < boxes.length - 1) {
+                    boxes[index + 1].focus();
+                }
+            } else {
+                box.classList.remove('filled');
+            }
+        });
+
+        // Handle Backspace navigation
+        box.addEventListener('keydown', (e) => {
+            if (e.key === 'Backspace' && !box.value && index > 0) {
+                boxes[index - 1].focus();
+            }
+        });
+
+        // Handle Paste of complete 6-digit OTP
+        box.addEventListener('paste', (e) => {
+            e.preventDefault();
+            const pasteData = (e.clipboardData || window.clipboardData).getData('text');
+            const digits = pasteData.replace(/\D/g, '').slice(0, 6);
+            if (digits) {
+                for (let i = 0; i < digits.length; i++) {
+                    if (boxes[i]) {
+                        boxes[i].value = digits[i];
+                        boxes[i].classList.add('filled');
+                    }
+                }
+                const nextIndex = Math.min(digits.length, boxes.length - 1);
+                boxes[nextIndex].focus();
+            }
+        });
+    });
+}
+
+function getEnteredOTP() {
+    let otp = '';
+    for (let i = 1; i <= 6; i++) {
+        const box = document.getElementById(`otp-digit-${i}`);
+        if (box) {
+            otp += box.value.trim();
+        }
+    }
+    return otp;
+}
+
+async function sendEmailOTP() {
+    const emailInput = document.getElementById('login-email');
+    const sendBtn = document.getElementById('email-send-otp-btn');
+    const email = emailInput?.value?.trim().toLowerCase();
+
+    setAuthMessage('login-message', '');
+
+    if (!email || !email.includes('@') || !email.includes('.')) {
+        setAuthMessage('login-message', 'Please enter a valid email address.', 'error');
+        return false;
+    }
+
+    // --- LOCAL E2E TEST LOGIN INTERCEPTOR ---
+    const isLocalHost = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+    const isE2EAuthEnabled = (window.E2E_LOCAL_AUTH === true || window.E2E_LOCAL_AUTH === 'true');
+
+    if (isLocalHost && isE2EAuthEnabled && email === 'e2e.creator.customer@wishrite.local') {
+        const localE2ESession = {
+            auth_mode: 'local_e2e',
+            customer_id: 'local-e2e-customer-id',
+            customer_name: 'E2E Creator Customer',
+            customer_email: 'e2e.creator.customer@wishrite.local'
+        };
+
+        try {
+            localStorage.setItem('wishrite_local_e2e_session', JSON.stringify(localE2ESession));
+            sessionStorage.setItem('wishrite_local_e2e_session', JSON.stringify(localE2ESession));
+        } catch (_) {}
+
+        currentUser = {
+            id: localE2ESession.customer_id,
+            email: localE2ESession.customer_email,
+            phone: '',
+            auth_mode: 'local_e2e',
+            user_metadata: {
+                full_name: localE2ESession.customer_name
+            }
+        };
+        isLoggedIn = true;
+
+        window.currentCustomerProfile = {
+            id: localE2ESession.customer_id,
+            customerId: localE2ESession.customer_id,
+            name: localE2ESession.customer_name,
+            phone: '',
+            email: localE2ESession.customer_email,
+            auth_mode: 'local_e2e'
+        };
+
+        updateAuthDropdown();
+        setAuthMessage('login-message', '');
+
+        if (typeof showToast === 'function') {
+            showToast('Welcome back, E2E Creator Customer!', 'success');
+        }
+
+        if (typeof navigateTo === 'function') {
+            if (typeof navigateTo === 'function') {
+            navigateTo('profile');
+        } else if (typeof window !== 'undefined' && typeof window.navigateTo === 'function') {
+            window.navigateTo('profile');
+        }
+        } else if (typeof window !== 'undefined' && typeof window.navigateTo === 'function') {
+            window.navigateTo('profile');
+        }
+        return true;
+    }
+
+    if (!supabaseClient) {
+        setAuthMessage('login-message', 'Authentication service is unavailable.', 'error');
+        return false;
+    }
+
+    try {
+        if (sendBtn) {
+            sendBtn.disabled = true;
+            sendBtn.innerText = 'Sending Code...';
+        }
+
+        const { data, error } = await supabaseClient.auth.signInWithOtp({
+            email,
+            options: {
+                shouldCreateUser: true
+            }
+        });
+
+        if (error) {
+            setAuthMessage('login-message', getFriendlyAuthErrorMessage(error.message), 'error');
+            return false;
+        }
+
+        pendingOTPEmail = email;
+
+        // Transition to OTP verification state
+        const requestForm = document.getElementById('email-otp-request-form');
+        const verifyForm = document.getElementById('email-otp-verify-form');
+        const maskedEmailSpan = document.getElementById('otp-masked-email');
+
+        if (requestForm) requestForm.style.display = 'none';
+        if (verifyForm) verifyForm.style.display = 'block';
+        if (maskedEmailSpan) maskedEmailSpan.innerText = maskEmail(email);
+
+        startOTPTimer(45);
+        setupOTPInputListeners();
+
+        // Focus first OTP input
+        const firstBox = document.getElementById('otp-digit-1');
+        if (firstBox) firstBox.focus();
+
+        setAuthMessage('login-message', `Verification code sent to ${maskEmail(email)}`, 'success');
+        return true;
+
+    } catch (err) {
+        console.error('sendEmailOTP exception:', err);
+        setAuthMessage('login-message', getFriendlyAuthErrorMessage(err.message), 'error');
+        return false;
+    } finally {
+        if (sendBtn) {
+            sendBtn.disabled = false;
+            sendBtn.innerText = 'Send OTP';
+        }
+    }
+}
+window.sendEmailOTP = sendEmailOTP;
+
+async function handleSendEmailOTP(e) {
+    if (e) e.preventDefault();
+    await sendEmailOTP();
+}
+window.handleSendEmailOTP = handleSendEmailOTP;
+
+async function resendEmailOTP() {
+    const email = pendingOTPEmail || document.getElementById('login-email')?.value?.trim().toLowerCase();
+    if (!email) {
+        setAuthMessage('login-message', 'Please enter your email address first.', 'error');
+        return;
+    }
+
+    const resendBtn = document.getElementById('email-resend-otp-btn');
+    if (resendBtn) resendBtn.disabled = true;
+
+    setAuthMessage('login-message', 'Sending new code...');
+
+    try {
+        const { error } = await supabaseClient.auth.signInWithOtp({
+            email,
+            options: {
+                shouldCreateUser: true
+            }
+        });
+
+        if (error) {
+            setAuthMessage('login-message', getFriendlyAuthErrorMessage(error.message), 'error');
+            if (resendBtn) resendBtn.disabled = false;
+            return;
+        }
+
+        startOTPTimer(45);
+        setAuthMessage('login-message', `New code sent to ${maskEmail(email)}`, 'success');
+
+        // Clear boxes & focus first
+        for (let i = 1; i <= 6; i++) {
+            const box = document.getElementById(`otp-digit-${i}`);
+            if (box) {
+                box.value = '';
+                box.classList.remove('filled');
+            }
+        }
+        const firstBox = document.getElementById('otp-digit-1');
+        if (firstBox) firstBox.focus();
+
+    } catch (err) {
+        setAuthMessage('login-message', getFriendlyAuthErrorMessage(err.message), 'error');
+        if (resendBtn) resendBtn.disabled = false;
+    }
+}
+window.resendEmailOTP = resendEmailOTP;
+
+async function verifyEmailOTP() {
+    const email = pendingOTPEmail || document.getElementById('login-email')?.value?.trim().toLowerCase();
+    const otp = getEnteredOTP();
+    const verifyBtn = document.getElementById('email-verify-otp-btn');
+
+    setAuthMessage('login-message', '');
+
+    if (!email) {
+        setAuthMessage('login-message', 'Missing email address. Please start over.', 'error');
+        return false;
+    }
+
+    if (!otp || otp.length !== 6) {
+        setAuthMessage('login-message', 'Please enter the complete 6-digit code.', 'error');
+        return false;
+    }
+
+    if (!supabaseClient) {
+        setAuthMessage('login-message', 'Authentication service is unavailable.', 'error');
+        return false;
+    }
+
+    try {
+        if (verifyBtn) {
+            verifyBtn.disabled = true;
+            verifyBtn.innerText = 'Verifying...';
+        }
+
+        setAuthMessage('login-message', 'Verifying code...');
+
+        const { data, error } = await supabaseClient.auth.verifyOtp({
+            email,
+            token: otp,
+            type: 'email'
+        });
+
+        if (error) {
+            setAuthMessage('login-message', getFriendlyAuthErrorMessage(error.message), 'error');
+            return false;
+        }
+
+        currentUser = data?.user || null;
+        isLoggedIn = !!currentUser;
+
+        if (!currentUser) {
+            setAuthMessage('login-message', 'Verification succeeded, but session could not be established.', 'error');
+            return false;
+        }
+
+        if (otpTimerInterval) {
+            clearInterval(otpTimerInterval);
+            otpTimerInterval = null;
+        }
+
+        updateAuthDropdown();
+
+        // Check if customer profile exists
+        let customerRecord = null;
+        if (currentUser.id) {
+            const { data: byUid } = await supabaseClient
+                .from('customers')
+                .select('id, user_id, customer_email, customer_phone, customer_name')
+                .eq('user_id', currentUser.id)
+                .maybeSingle();
+            customerRecord = byUid;
+        }
+
+        if (!customerRecord && email) {
+            const { data: byEmail } = await supabaseClient
+                .from('customers')
+                .select('id, user_id, customer_email, customer_phone, customer_name')
+                .ilike('customer_email', email)
+                .maybeSingle();
+            customerRecord = byEmail;
+        }
+
+        // If user is brand new and has no customer record or missing name/phone, show onboarding step
+        const isNewUser = !customerRecord || (!customerRecord.customer_name || customerRecord.customer_name === 'Valued Customer');
+
+        if (isNewUser) {
+            // Show Onboarding step
+            const emailContainer = document.getElementById('email-login-container');
+            const onboardingContainer = document.getElementById('email-onboarding-container');
+
+            if (emailContainer) emailContainer.style.display = 'none';
+            if (onboardingContainer) {
+                onboardingContainer.style.display = 'block';
+                const nameInput = document.getElementById('onboarding-name');
+                if (nameInput) {
+                    nameInput.value = currentUser.user_metadata?.full_name || '';
+                    nameInput.focus();
+                }
+                const phoneInput = document.getElementById('onboarding-mobile');
+                if (phoneInput) {
+                    phoneInput.value = (currentUser.phone || currentUser.user_metadata?.phone || '').replace(/^\+91/, '');
+                }
+            }
+            setAuthMessage('login-message', '');
+            return true;
+        }
+
+        // Existing customer: sync customer profile directly without onboarding
+        await syncCustomerProfile(currentUser);
+
+        setAuthMessage('login-message', '');
+
+        if (typeof showToast === 'function') {
+            showToast('Welcome back to WishRite!', 'success');
+        }
+
+        if (typeof navigateTo === 'function') {
+            if (typeof navigateTo === 'function') {
+            navigateTo('profile');
+        } else if (typeof window !== 'undefined' && typeof window.navigateTo === 'function') {
+            window.navigateTo('profile');
+        }
+        } else if (typeof window !== 'undefined' && typeof window.navigateTo === 'function') {
+            window.navigateTo('profile');
+        }
+
+        return true;
+
+    } catch (err) {
+        console.error('verifyEmailOTP error:', err);
+        setAuthMessage('login-message', getFriendlyAuthErrorMessage(err.message), 'error');
+        return false;
+    } finally {
+        if (verifyBtn) {
+            verifyBtn.disabled = false;
+            verifyBtn.innerText = 'Verify & Sign In';
+        }
+    }
+}
+window.verifyEmailOTP = verifyEmailOTP;
+
+async function handleVerifyEmailOTP(e) {
+    if (e) e.preventDefault();
+    await verifyEmailOTP();
+}
+window.handleVerifyEmailOTP = handleVerifyEmailOTP;
+
+async function handleEmailOnboardingSubmit(e) {
+    if (e) e.preventDefault();
+    if (!currentUser) {
+        setAuthMessage('login-message', 'Authentication session expired. Please sign in again.', 'error');
+        return;
+    }
+
+    const name = document.getElementById('onboarding-name')?.value?.trim();
+    const countryCode = document.getElementById('onboarding-country-code')?.value || '+91';
+    const mobileRaw = document.getElementById('onboarding-mobile')?.value?.trim().replace(/\D/g, '') || '';
+    const referralCode = document.getElementById('onboarding-referral-code')?.value?.trim().toUpperCase() || '';
+    const submitBtn = document.getElementById('onboarding-submit-btn');
+
+    if (!name) {
+        setAuthMessage('login-message', 'Please enter your full name.', 'error');
+        return;
+    }
+
+    const phone = mobileRaw.length === 10 ? `${countryCode}${mobileRaw}` : '';
+
+    try {
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.innerText = 'Saving Profile...';
+        }
+
+        // Update auth metadata if available
+        try {
+            await supabaseClient.auth.updateUser({
+                data: {
+                    full_name: name,
+                    ...(phone ? { phone } : {})
+                }
+            });
+        } catch (_) {}
+
+        // Sync customer profile with provided full name & phone
+        await syncCustomerProfile(currentUser, {
+            fullName: name,
+            phone: phone
+        });
+
+        // Record referral if provided
+        if (referralCode && currentUser?.id) {
+            try {
+                await supabaseClient.rpc('record_customer_referral', {
+                    p_referred_user_id: currentUser.id,
+                    p_referral_code: referralCode
+                });
+            } catch (refEx) {
+                console.warn('[Referral Onboarding] Exception:', refEx);
+            }
+        }
+
+        if (typeof WishRiteWalletRewards !== 'undefined') {
+            await WishRiteWalletRewards.syncUser(currentUser);
+        }
+
+        updateAuthDropdown();
+
+        if (typeof showToast === 'function') {
+            showToast('Welcome to WishRite!', 'success');
+        }
+
+        if (typeof navigateTo === 'function') {
+            if (typeof navigateTo === 'function') {
+            navigateTo('profile');
+        } else if (typeof window !== 'undefined' && typeof window.navigateTo === 'function') {
+            window.navigateTo('profile');
+        }
+        } else if (typeof window !== 'undefined' && typeof window.navigateTo === 'function') {
+            window.navigateTo('profile');
+        }
+
+    } catch (err) {
+        console.error('handleEmailOnboardingSubmit error:', err);
+        setAuthMessage('login-message', getFriendlyAuthErrorMessage(err.message), 'error');
+    } finally {
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerText = 'Save & Continue';
+        }
+    }
+}
+window.handleEmailOnboardingSubmit = handleEmailOnboardingSubmit;
+
+
+// ─────────────────────────────────────────────
+// MOBILE LOGIN (PASSWORD-BASED)
 // ─────────────────────────────────────────────
 
 async function handleLogin(e) {
@@ -244,17 +810,12 @@ async function handleLogin(e) {
 
     setAuthMessage('login-message', '');
 
-    const emailMode =
-        document.getElementById('email-login-field')
-            ?.style.display !== 'none';
-
     const password =
         document.getElementById('login-password')
             ?.value || '';
 
     const submitBtn =
         document.getElementById('login-submit-btn');
-
 
     if (!password) {
         setAuthMessage(
@@ -265,121 +826,25 @@ async function handleLogin(e) {
         return;
     }
 
+    const mobileData = getPhoneNumber(
+        document.getElementById('login-country-code')
+            ?.value || '+91',
+        'login-mobile'
+    );
 
-    let credentials;
-
-
-    // EMAIL LOGIN
-    if (emailMode) {
-
-        const email =
-            document.getElementById('login-email')
-                ?.value
-                ?.trim()
-                .toLowerCase();
-
-        if (!email) {
-            setAuthMessage(
-                'login-message',
-                'Please enter your email address.',
-                'error'
-            );
-            return;
-        }
-
-        credentials = {
-            email,
-            password
-        };
-
-        // --- LOCAL E2E LOGIN INTERCEPTOR ---
-        const isLocalHost = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-        const isE2EAuthEnabled = (window.E2E_LOCAL_AUTH === true || window.E2E_LOCAL_AUTH === 'true');
-
-        if (isLocalHost && isE2EAuthEnabled && email === 'e2e.creator.customer@wishrite.local') {
-            if (password !== 'WishRiteE2E@2026!') {
-                setAuthMessage(
-                    'login-message',
-                    'Invalid email/mobile number or password.',
-                    'error'
-                );
-                return;
-            }
-
-            const localE2ESession = {
-                auth_mode: 'local_e2e',
-                customer_id: 'local-e2e-customer-id',
-                customer_name: 'E2E Creator Customer',
-                customer_email: 'e2e.creator.customer@wishrite.local'
-            };
-
-            try {
-                localStorage.setItem('wishrite_local_e2e_session', JSON.stringify(localE2ESession));
-                sessionStorage.setItem('wishrite_local_e2e_session', JSON.stringify(localE2ESession));
-            } catch (_) {}
-
-            currentUser = {
-                id: localE2ESession.customer_id,
-                email: localE2ESession.customer_email,
-                phone: '',
-                auth_mode: 'local_e2e',
-                user_metadata: {
-                    full_name: localE2ESession.customer_name
-                }
-            };
-            isLoggedIn = true;
-
-            window.currentCustomerProfile = {
-                id: localE2ESession.customer_id,
-                customerId: localE2ESession.customer_id,
-                name: localE2ESession.customer_name,
-                phone: '',
-                email: localE2ESession.customer_email,
-                auth_mode: 'local_e2e'
-            };
-
-            updateAuthDropdown();
-            setAuthMessage('login-message', '');
-
-            if (typeof showToast === 'function') {
-                showToast(
-                    'Welcome back, E2E Creator Customer!',
-                    'success'
-                );
-            }
-
-            if (typeof navigateTo === 'function') {
-                navigateTo('profile');
-            }
-            return;
-        }
-    }
-
-
-    // MOBILE LOGIN
-    else {
-
-        const mobileData = getPhoneNumber(
-            document.getElementById('login-country-code')
-                ?.value || '+91',
-            'login-mobile'
+    if (mobileData.number.length !== 10) {
+        setAuthMessage(
+            'login-message',
+            'Enter a valid 10-digit mobile number.',
+            'error'
         );
-
-        if (mobileData.number.length !== 10) {
-            setAuthMessage(
-                'login-message',
-                'Enter a valid 10-digit mobile number.',
-                'error'
-            );
-            return;
-        }
-
-        credentials = {
-            phone: mobileData.phone,
-            password
-        };
+        return;
     }
 
+    const credentials = {
+        phone: mobileData.phone,
+        password
+    };
 
     if (!supabaseClient) {
         setAuthMessage(
@@ -390,9 +855,7 @@ async function handleLogin(e) {
         return;
     }
 
-
     try {
-
         if (submitBtn) {
             submitBtn.disabled = true;
             submitBtn.innerText = 'Signing In...';
@@ -403,14 +866,12 @@ async function handleLogin(e) {
             'Signing you in...'
         );
 
-
         const {
             data,
             error
         } = await supabaseClient.auth.signInWithPassword(
             credentials
         );
-
 
         if (error) {
             setAuthMessage(
@@ -420,7 +881,6 @@ async function handleLogin(e) {
             );
             return;
         }
-
 
         currentUser = data?.user || null;
         isLoggedIn = !!currentUser;
@@ -440,26 +900,29 @@ async function handleLogin(e) {
             );
         }
 
-        navigateTo('profile');
+        if (typeof navigateTo === 'function') {
+            if (typeof navigateTo === 'function') {
+            navigateTo('profile');
+        } else if (typeof window !== 'undefined' && typeof window.navigateTo === 'function') {
+            window.navigateTo('profile');
+        }
+        }
 
     } catch (err) {
-
         console.error('Login error:', err);
-
         setAuthMessage(
             'login-message',
             getFriendlyAuthErrorMessage(err.message),
             'error'
         );
-
     } finally {
-
         if (submitBtn) {
             submitBtn.disabled = false;
             submitBtn.innerText = 'Sign In';
         }
     }
 }
+window.handleLogin = handleLogin;
 
 
 // ─────────────────────────────────────────────
@@ -708,7 +1171,13 @@ async function handleRegister(e) {
         }
 
 
-        navigateTo('profile');
+        if (typeof navigateTo === 'function') {
+            if (typeof navigateTo === 'function') {
+            navigateTo('profile');
+        } else if (typeof window !== 'undefined' && typeof window.navigateTo === 'function') {
+            window.navigateTo('profile');
+        }
+        }
 
 
     } catch (err) {
@@ -779,7 +1248,13 @@ async function handleAuthCallback() {
                 session.user
             );
 
+            if (typeof navigateTo === 'function') {
+            if (typeof navigateTo === 'function') {
             navigateTo('profile');
+        } else if (typeof window !== 'undefined' && typeof window.navigateTo === 'function') {
+            window.navigateTo('profile');
+        }
+        }
 
         } else {
 
@@ -1185,6 +1660,10 @@ async function handleLogout() {
     isLoggedIn = false;
     currentUser = null;
 
+    if (typeof resetEmailOTPFlow === 'function') {
+        resetEmailOTPFlow();
+    }
+
     updateAuthDropdown();
 
 
@@ -1198,6 +1677,8 @@ async function handleLogout() {
 
     if (typeof navigateTo === 'function') {
         navigateTo('home');
+    } else if (typeof window !== 'undefined' && typeof window.navigateTo === 'function') {
+        window.navigateTo('home');
     }
 }
 
@@ -1400,3 +1881,14 @@ window.getWishriteCustomerProfile = function() {
         email: email
     };
 };
+
+window.handleLogout = handleLogout;
+window.initAuthSystem = initAuthSystem;
+window.syncCustomerProfile = syncCustomerProfile;
+try {
+    Object.defineProperty(window, 'isLoggedIn', {
+        get: () => isLoggedIn,
+        set: (val) => { isLoggedIn = val; },
+        configurable: true
+    });
+} catch (_) {}

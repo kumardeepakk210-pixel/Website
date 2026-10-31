@@ -113,8 +113,17 @@ function switchProfileTab(tabId) {
             }
         } catch (_) {}
 
-        loadCustomerCreatorStatus();
-        fetchLiveProductsForPicker();
+        try {
+            loadCustomerCreatorStatus();
+        } catch (e) {
+            console.error('Error starting creator status load:', e);
+        }
+
+        try {
+            fetchLiveProductsForPicker();
+        } catch (e) {
+            console.error('Error fetching products for picker:', e);
+        }
     } else {
         btnCreator?.classList.remove('active');
         btnCreator?.setAttribute('aria-selected', 'false');
@@ -133,19 +142,45 @@ function switchProfileTab(tabId) {
 }
 window.switchProfileTab = switchProfileTab;
 
-// Bind direct DOM event listeners as backup to inline onclick
+// Bind direct DOM event listeners and document delegation for robust tab switching
 function initCreatorTabListeners() {
     const btnAccount = document.getElementById('tab-btn-account');
     const btnCreator = document.getElementById('tab-btn-creator');
     if (btnAccount && !btnAccount._hasTabListener) {
         btnAccount._hasTabListener = true;
-        btnAccount.addEventListener('click', () => switchProfileTab('account'));
+        btnAccount.addEventListener('click', (e) => {
+            e.preventDefault();
+            switchProfileTab('account');
+        });
     }
     if (btnCreator && !btnCreator._hasTabListener) {
         btnCreator._hasTabListener = true;
-        btnCreator.addEventListener('click', () => switchProfileTab('creator'));
+        btnCreator.addEventListener('click', (e) => {
+            e.preventDefault();
+            switchProfileTab('creator');
+        });
     }
 }
+
+// Global click delegation as bulletproof fallback
+if (!window._creatorTabDelegationInitialized) {
+    window._creatorTabDelegationInitialized = true;
+    document.addEventListener('click', (e) => {
+        const creatorBtn = e.target.closest('#tab-btn-creator, .creator-profile-portal-link');
+        if (creatorBtn) {
+            e.preventDefault();
+            switchProfileTab('creator');
+            return;
+        }
+        const accountBtn = e.target.closest('#tab-btn-account');
+        if (accountBtn) {
+            e.preventDefault();
+            switchProfileTab('account');
+            return;
+        }
+    });
+}
+
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initCreatorTabListeners);
 } else {
@@ -196,7 +231,6 @@ async function getAuthHeaders() {
     }
 
     // Customer email & id from getWishriteAuthUser / getWishriteCustomerProfile / window.currentUser
-    const authUser = (typeof window.getWishriteAuthUser === 'function') ? window.getWishriteAuthUser() : (window.currentUser || null);
     const custProfile = (typeof window.getWishriteCustomerProfile === 'function') ? window.getWishriteCustomerProfile() : null;
 
     if (!headers['x-customer-email']) {
