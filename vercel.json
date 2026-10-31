@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/creator/instagram/cron-sync",
-      "schedule": "*/20 * * * *"
+      "schedule": "0 2 * * *"
     }
   ],
   "rewrites": [
