@@ -27,6 +27,10 @@
       "destination": "/api/wallet.js"
     },
     {
+      "source": "/api/whatsapp/:path*",
+      "destination": "/api/whatsapp.js"
+    },
+    {
       "source": "/inventory",
       "destination": "/index.html"
     },

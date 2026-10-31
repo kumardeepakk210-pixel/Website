@@ -52,6 +52,18 @@ function adaptResponse(res) {
         res.statusCode = code;
         return res;
     };
+    res.send = function(data) {
+        if (typeof data === 'object') {
+            res.setHeader('Content-Type', 'application/json; charset=utf-8');
+            res.end(JSON.stringify(data));
+        } else {
+            if (!res.getHeader('Content-Type')) {
+                res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+            }
+            res.end(String(data));
+        }
+        return res;
+    };
     res.json = function(data) {
         res.setHeader('Content-Type', 'application/json; charset=utf-8');
         res.end(JSON.stringify(data));
