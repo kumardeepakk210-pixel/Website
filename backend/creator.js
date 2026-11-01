@@ -3499,33 +3499,82 @@ export async function handleInstagramOAuthCallback(req, res) {
         }
 
         // 3. Resolve Connected Instagram Business / Creator Account
-        // Inspect /me/accounts to find Facebook pages connected to Instagram Business Accounts
         let instagramAccountId = null;
         let instagramUsername = null;
         let resolvedPageAccessToken = null;
 
+        // Resolve existing creator profile upfront to aid username matching
+        let existingCreator = null;
         try {
-            const pagesUrl = `https://graph.facebook.com/${META_GRAPH_API_VERSION}/me/accounts?fields=id,name,access_token,instagram_business_account{id,username,name}&access_token=${encodeURIComponent(accessToken)}`;
-            const pagesRes = await fetch(pagesUrl);
-            const pagesData = await pagesRes.json();
+            const queryOpts = { useAdmin: hasServerAdminCredential() };
+            const dbInfs = await dbQuery('influencers', `influencer_id=eq.${encodeURIComponent(creatorId)}&limit=1`, queryOpts);
+            if (Array.isArray(dbInfs) && dbInfs.length > 0) {
+                existingCreator = dbInfs[0];
+            }
+        } catch (_) {}
 
-            if (pagesData.data && Array.isArray(pagesData.data)) {
-                for (const page of pagesData.data) {
-                    if (page.instagram_business_account?.id) {
-                        instagramAccountId = page.instagram_business_account.id;
-                        instagramUsername = page.instagram_business_account.username || null;
-                        if (page.access_token) {
-                            resolvedPageAccessToken = page.access_token;
-                        }
-                        break;
+        if (!existingCreator) {
+            const local = readLocalStore();
+            existingCreator = (local.influencers || []).find(i => i.id === creatorId);
+        }
+
+        const targetUsername = (existingCreator?.instagram_connection?.username || existingCreator?.instagram_id || '').replace(/^@/, '').toLowerCase().trim();
+
+        // 3a. Meta Facebook Login for Business: Assigned Instagram Accounts (/me/assigned_instagram_accounts)
+        try {
+            const assignedUrl = `https://graph.facebook.com/${META_GRAPH_API_VERSION}/me/assigned_instagram_accounts?fields=id,username,name&access_token=${encodeURIComponent(accessToken)}`;
+            const assignedRes = await fetch(assignedUrl);
+            const assignedData = await assignedRes.json();
+
+            if (assignedData.data && Array.isArray(assignedData.data) && assignedData.data.length > 0) {
+                const accounts = assignedData.data;
+                let selectedAccount = null;
+
+                if (targetUsername) {
+                    selectedAccount = accounts.find(a => (a.username || '').toLowerCase().trim() === targetUsername);
+                }
+
+                // If exactly 1 account assigned and no direct username match, use that account
+                if (!selectedAccount && accounts.length === 1) {
+                    selectedAccount = accounts[0];
+                }
+
+                if (selectedAccount && selectedAccount.id) {
+                    instagramAccountId = selectedAccount.id;
+                    if (selectedAccount.username) {
+                        instagramUsername = selectedAccount.username;
                     }
                 }
             }
-        } catch (pageErr) {
-            console.warn('[Meta OAuth Callback] Pages query warning:', pageErr.message);
+        } catch (assignedErr) {
+            console.warn('[Meta OAuth Callback] Assigned accounts query warning:', assignedErr.message);
         }
 
-        // If not found through pages, inspect /me for Instagram professional / direct ID
+        // 3b. Fallback: Facebook Pages connected to Instagram Business Accounts (/me/accounts)
+        if (!instagramAccountId) {
+            try {
+                const pagesUrl = `https://graph.facebook.com/${META_GRAPH_API_VERSION}/me/accounts?fields=id,name,access_token,instagram_business_account{id,username,name}&access_token=${encodeURIComponent(accessToken)}`;
+                const pagesRes = await fetch(pagesUrl);
+                const pagesData = await pagesRes.json();
+
+                if (pagesData.data && Array.isArray(pagesData.data)) {
+                    for (const page of pagesData.data) {
+                        if (page.instagram_business_account?.id) {
+                            instagramAccountId = page.instagram_business_account.id;
+                            instagramUsername = page.instagram_business_account.username || null;
+                            if (page.access_token) {
+                                resolvedPageAccessToken = page.access_token;
+                            }
+                            break;
+                        }
+                    }
+                }
+            } catch (pageErr) {
+                console.warn('[Meta OAuth Callback] Pages query warning:', pageErr.message);
+            }
+        }
+
+        // 3c. Fallback: Inspect /me for Instagram professional / direct ID
         if (!instagramAccountId) {
             try {
                 const meRes = await fetch(`https://graph.facebook.com/${META_GRAPH_API_VERSION}/me?fields=id,name,username&access_token=${encodeURIComponent(accessToken)}`);
@@ -3541,21 +3590,7 @@ export async function handleInstagramOAuthCallback(req, res) {
 
         const finalToken = resolvedPageAccessToken || accessToken;
 
-        // 4. Resolve current creator profile to preserve handle if username not in token
-        let existingCreator = null;
-        try {
-            const queryOpts = { useAdmin: hasServerAdminCredential() };
-            const dbInfs = await dbQuery('influencers', `influencer_id=eq.${encodeURIComponent(creatorId)}&limit=1`, queryOpts);
-            if (Array.isArray(dbInfs) && dbInfs.length > 0) {
-                existingCreator = dbInfs[0];
-            }
-        } catch (_) {}
-
-        if (!existingCreator) {
-            const local = readLocalStore();
-            existingCreator = (local.influencers || []).find(i => i.id === creatorId);
-        }
-
+        // 4. Resolve final username
         const finalUsername = (instagramUsername || existingCreator?.instagram_connection?.username || existingCreator?.instagram_id || 'creator').replace(/^@/, '');
 
         const instagramConnPayload = {

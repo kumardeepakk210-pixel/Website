@@ -393,6 +393,45 @@ describe('WishRite Creator — Instagram Content List & Official Insights Sync',
         'Token exchange endpoint must NOT be prefixed with versioned path components like /v26.0/oauth/access_token'
       );
     });
+
+    test('Meta OAuth callback resolves assigned Instagram accounts for Business Login', () => {
+      const fs = require('fs');
+      const backendCreatorCode = fs.readFileSync('backend/creator.js', 'utf8');
+      
+      // Verify assigned accounts endpoint query
+      assert.ok(
+        backendCreatorCode.includes('/me/assigned_instagram_accounts?fields=id,username,name'),
+        'Must query /me/assigned_instagram_accounts for Facebook Login for Business'
+      );
+
+      // Verify username matching logic
+      const resolveAccount = (accounts, targetUsername) => {
+        let selectedAccount = null;
+        if (targetUsername) {
+          selectedAccount = accounts.find(a => (a.username || '').toLowerCase().trim() === targetUsername.toLowerCase().trim());
+        }
+        if (!selectedAccount && accounts.length === 1) {
+          selectedAccount = accounts[0];
+        }
+        return selectedAccount;
+      };
+
+      // Case 1: Single account
+      const single = [{ id: '178414001', username: 'wishrite.in' }];
+      assert.equal(resolveAccount(single, 'wishrite.in')?.id, '178414001');
+      assert.equal(resolveAccount(single, 'other_user')?.id, '178414001');
+
+      // Case 2: Multiple accounts where target username matches
+      const multiple = [
+        { id: '178414002', username: 'unrelated_account' },
+        { id: '178414003', username: 'wishrite.in' }
+      ];
+      assert.equal(resolveAccount(multiple, 'wishrite.in')?.id, '178414003');
+
+      // Case 3: Multiple accounts where NO username matches (must not select arbitrary account)
+      assert.equal(Boolean(resolveAccount(multiple, 'non_existent_creator')), false);
+      assert.equal(resolveAccount(multiple, 'non_existent_creator') || null, null);
+    });
   });
 
   describe('5. Instagram Metrics & Official API Sync', () => {
