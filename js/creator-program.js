@@ -1469,6 +1469,28 @@ async function loadInstagramConnection() {
     if (!cardEl) return;
 
     try {
+        // Check URL params for oauth return
+        try {
+            const urlParams = new URLSearchParams(window.location.search);
+            const igParam = urlParams.get('instagram');
+            if (igParam === 'connected') {
+                if (typeof showToast === 'function') {
+                    showToast('Instagram connected successfully!', 'success');
+                }
+                const newUrl = window.location.pathname + '?tab=creator';
+                window.history.replaceState({}, document.title, newUrl);
+            } else if (igParam === 'error') {
+                const msg = urlParams.get('msg') || 'Failed to authorize with Meta.';
+                if (typeof showToast === 'function') {
+                    showToast(decodeURIComponent(msg), 'error');
+                } else {
+                    alert('Meta Authorization Notice: ' + decodeURIComponent(msg));
+                }
+                const newUrl = window.location.pathname + '?tab=creator';
+                window.history.replaceState({}, document.title, newUrl);
+            }
+        } catch (_) {}
+
         const headers = await getAuthHeaders();
         const res = await fetch('/api/creator/instagram/status', { headers });
         const json = await res.json();
@@ -1532,12 +1554,12 @@ function renderInstagramConnectionCard(conn) {
                     <div class="ig-conn-body">
                         <div>
                             <div class="ig-conn-handle">@${conn.username}</div>
-                            <div class="ig-conn-sub" style="color:#b45309; font-weight:500;">Connect Meta API Token to enable live Instagram insights</div>
+                            <div class="ig-conn-sub" style="color:#b45309; font-weight:500;">Instagram authorization needs to be renewed to sync Reel insights</div>
                             <div class="ig-conn-synced">${syncText}</div>
                         </div>
                         <div class="ig-conn-actions">
-                            <button type="button" class="btn btn-primary btn-sm" onclick="openInstagramConnectModal()" style="display:inline-flex; align-items:center; gap:6px; padding:6px 14px; font-size:0.75rem;">
-                                <span>CONNECT TOKEN</span>
+                            <button type="button" class="btn btn-primary btn-sm" onclick="startInstagramOAuthFlow()" style="display:inline-flex; align-items:center; gap:6px; padding:6px 14px; font-size:0.75rem;">
+                                <span>RECONNECT INSTAGRAM</span>
                             </button>
                             <button type="button" class="btn btn-ghost btn-sm" onclick="disconnectInstagramAccount()" style="padding:6px 12px; font-size:0.75rem; color:#dc2626;">
                                 <span>DISCONNECT</span>
@@ -1559,7 +1581,7 @@ function renderInstagramConnectionCard(conn) {
                 </div>
                 <div class="ig-conn-body">
                     <div style="max-width:540px;">
-                        <p style="margin:0 0 4px 0; font-weight:600; font-size:0.88rem; color:var(--wr-text);">Connect your Instagram account to automatically receive Reel and Post performance insights.</p>
+                        <p style="margin:0 0 4px 0; font-weight:600; font-size:0.88rem; color:var(--wr-text);">Connect your Instagram account to enable automatic Reel insights.</p>
                         <span style="font-size:0.78rem; color:var(--wr-text-muted);">Instagram insights require an eligible Instagram professional account connected to WishRite.</span>
                     </div>
                     <div class="ig-conn-actions">
@@ -1574,7 +1596,7 @@ function renderInstagramConnectionCard(conn) {
 }
 window.renderInstagramConnectionCard = renderInstagramConnectionCard;
 
-function openInstagramConnectModal() {
+async function startInstagramOAuthFlow() {
     // 1. Check if user is signed in
     const authUser = (typeof getWishriteAuthUser === 'function') ? getWishriteAuthUser() : window.currentUser;
     const custProfile = (typeof getWishriteCustomerProfile === 'function') ? getWishriteCustomerProfile() : null;
@@ -1603,6 +1625,57 @@ function openInstagramConnectModal() {
         return;
     }
 
+    try {
+        const headers = await getAuthHeaders();
+        const res = await fetch('/api/creator/instagram/oauth/start?json=true', { headers });
+        const json = await res.json();
+        if (json.success && json.redirect_url) {
+            window.location.href = json.redirect_url;
+        } else {
+            alert(json.error?.message || 'Unable to initiate Meta authorization flow.');
+        }
+    } catch (e) {
+        alert('Error starting Meta authorization: ' + e.message);
+    }
+}
+window.startInstagramOAuthFlow = startInstagramOAuthFlow;
+
+function openInstagramConnectModal() {
+    // If handle is already connected or configured, we can launch OAuth directly
+    const creator = currentCreatorData?.creator;
+    const existingHandle = currentInstagramConnection?.username || creator?.instagram_id || '';
+    const handleInput = document.getElementById('ig-connect-handle');
+    if (handleInput && existingHandle) {
+        handleInput.value = existingHandle.replace(/^@/, '');
+    }
+
+    // Check login and profile
+    const authUser = (typeof getWishriteAuthUser === 'function') ? getWishriteAuthUser() : window.currentUser;
+    const custProfile = (typeof getWishriteCustomerProfile === 'function') ? getWishriteCustomerProfile() : null;
+    const isUserLoggedIn = !!(authUser || custProfile || window.isLoggedIn);
+
+    if (!isUserLoggedIn) {
+        if (typeof showToast === 'function') {
+            showToast('Please login to continue.', 'warning');
+        } else {
+            alert('Please login to continue.');
+        }
+        if (typeof navigateTo === 'function') {
+            navigateTo('login');
+        }
+        return;
+    }
+
+    const isCreator = !!(currentCreatorData && currentCreatorData.is_creator && currentCreatorData.creator);
+    if (!isCreator) {
+        if (typeof showToast === 'function') {
+            showToast('Please complete your Creator profile before connecting Instagram.', 'warning');
+        } else {
+            alert('Please complete your Creator profile before connecting Instagram.');
+        }
+        return;
+    }
+
     const modal = document.getElementById('modal-connect-instagram');
     if (modal) modal.style.display = 'flex';
 }
@@ -1617,11 +1690,9 @@ window.closeInstagramConnectModal = closeInstagramConnectModal;
 async function handleInstagramConnectSubmit(event) {
     if (event && event.preventDefault) event.preventDefault();
     const handleInput = document.getElementById('ig-connect-handle');
-    const tokenInput = document.getElementById('ig-connect-token');
     const submitBtn = document.getElementById('btn-submit-ig-connect');
 
-    const handle = handleInput ? handleInput.value.trim() : '';
-    const token = tokenInput ? tokenInput.value.trim() : '';
+    const handle = handleInput ? handleInput.value.trim().replace(/^@/, '') : '';
 
     if (!handle) {
         alert('Please enter your Instagram username.');
@@ -1637,29 +1708,39 @@ async function handleInstagramConnectSubmit(event) {
         const headers = await getAuthHeaders();
         headers['Content-Type'] = 'application/json';
 
-        const res = await fetch('/api/creator/instagram/connect', {
+        // 1. Save handle to creator profile first
+        await fetch('/api/creator/instagram/connect', {
             method: 'POST',
             headers,
-            body: JSON.stringify({ instagram_handle: handle, access_token: token })
+            body: JSON.stringify({ instagram_handle: handle })
         });
-        const json = await res.json();
 
-        if (json.success) {
-            if (typeof showToast === 'function') {
-                showToast(json.message || 'Instagram account connected successfully!', 'success');
-            }
+        // 2. Fetch OAuth redirect URL
+        const authRes = await fetch('/api/creator/instagram/oauth/start?json=true', { headers });
+        const authJson = await authRes.json();
+
+        if (authJson.success && authJson.redirect_url) {
             closeInstagramConnectModal();
-            loadInstagramConnection();
-            loadCreatorContent();
+            window.location.href = authJson.redirect_url;
+            return;
         } else {
-            alert(json.error?.message || 'Failed to connect Instagram account.');
+            // If Meta App ID is not yet configured, notify creator handle was saved
+            closeInstagramConnectModal();
+            if (typeof showToast === 'function') {
+                showToast(`Instagram handle @${handle} saved.`, 'info');
+            }
+            await loadInstagramConnection();
+            await loadCreatorContent();
+            if (authJson.error?.message) {
+                alert(authJson.error.message);
+            }
         }
     } catch (e) {
         alert('Error connecting Instagram: ' + e.message);
     } finally {
         if (submitBtn) {
             submitBtn.disabled = false;
-            submitBtn.innerText = 'Connect Account';
+            submitBtn.innerText = 'Authorize via Meta';
         }
     }
 }

@@ -2968,29 +2968,25 @@
                 </div>
                 <div>
                     <h3 id="connect-ig-modal-title" style="margin:0; font-family:var(--wr-font-heading); font-size:1.35rem; color:#5E3435;">Connect Instagram Account</h3>
-                    <span style="font-size:0.78rem; color:var(--wr-text-muted);">Official Meta / Instagram Insights Sync</span>
+                    <span style="font-size:0.78rem; color:var(--wr-text-muted);">Official Meta / Instagram OAuth Connection</span>
                 </div>
             </div>
             <div style="background:rgba(94,52,53,0.04); border:1px solid rgba(94,52,53,0.12); border-radius:6px; padding:12px; margin:14px 0; font-size:0.8rem; line-height:1.45; color:var(--wr-text);">
                 <strong>Professional Account Notice:</strong>
-                <p style="margin:4px 0 0 0; color:var(--wr-text-muted);">Instagram insights require an eligible <strong>Instagram professional account (Creator or Business)</strong> connected to WishRite.</p>
+                <p style="margin:4px 0 0 0; color:var(--wr-text-muted);">Instagram insights require an eligible <strong>Instagram professional account (Creator or Business)</strong> connected to WishRite via official Meta authorization.</p>
             </div>
             <form id="form-connect-instagram" onsubmit="handleInstagramConnectSubmit(event)">
-                <div class="form-group" style="margin-bottom:14px;">
+                <div class="form-group" style="margin-bottom:18px;">
                     <label for="ig-connect-handle" style="display:block; font-size:0.82rem; font-weight:600; color:#5E3435; margin-bottom:4px;">Instagram Username / Handle</label>
                     <div style="position:relative;">
                         <span style="position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--wr-text-muted); font-weight:600;">@</span>
                         <input type="text" id="ig-connect-handle" required placeholder="yourusername" style="width:100%; padding:9px 12px 9px 28px; border:1px solid var(--wr-border, #E4E4E7); border-radius:6px; font-size:0.9rem;" />
                     </div>
-                </div>
-                <div class="form-group" style="margin-bottom:18px;">
-                    <label for="ig-connect-token" style="display:block; font-size:0.82rem; font-weight:600; color:#5E3435; margin-bottom:4px;">Meta Graph API User Token <span style="font-weight:400; color:var(--wr-text-muted);">(Optional for direct integration)</span></label>
-                    <input type="password" id="ig-connect-token" placeholder="EAA..." autocomplete="off" style="width:100%; padding:9px 12px; border:1px solid var(--wr-border, #E4E4E7); border-radius:6px; font-size:0.85rem;" />
-                    <span style="font-size:0.72rem; color:var(--wr-text-muted); display:block; margin-top:4px;">Tokens are encrypted server-side and never exposed to browser JavaScript.</span>
+                    <span style="font-size:0.75rem; color:var(--wr-text-muted); display:block; margin-top:6px;">You will be securely redirected to Meta to authorize Instagram Insights for WishRite.</span>
                 </div>
                 <div style="display:flex; justify-content:flex-end; gap:8px;">
                     <button type="button" class="btn btn-ghost btn-sm" onclick="closeInstagramConnectModal()">Cancel</button>
-                    <button type="submit" class="btn btn-primary btn-sm" id="btn-submit-ig-connect">Connect Account</button>
+                    <button type="submit" class="btn btn-primary btn-sm" id="btn-submit-ig-connect">Authorize via Meta</button>
                 </div>
             </form>
         </div>

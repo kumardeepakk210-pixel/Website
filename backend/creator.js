@@ -3091,6 +3091,15 @@ export async function syncInstagramMediaMetrics(contentItem, creator) {
 
     if (!targetMediaId) {
         contentItem.last_synced_at = new Date().toISOString();
+        if (!igConn.account_id) {
+            contentItem.insights_status = 'auth_expired';
+            contentItem.insights_error = 'Instagram account connection requires reauthorization. Please reconnect your Instagram token.';
+            return {
+                synced: false,
+                insights_status: 'auth_expired',
+                message: contentItem.insights_error
+            };
+        }
         contentItem.insights_status = 'media_not_found';
         contentItem.insights_error = "We couldn't retrieve insights for this Reel. Please verify that the Reel belongs to the connected Instagram account.";
         return {
@@ -3217,7 +3226,11 @@ export async function handleGetInstagramStatus(req, res) {
         }
 
         const isConnected = !!(conn && conn.username);
-        const isApiAuthorized = Boolean(conn && (conn.access_token || conn.account_id));
+        const isApiAuthorized = Boolean(conn && conn.account_id);
+        const insightsStatus = isConnected
+            ? (conn?.insights_status || (isApiAuthorized ? 'connected' : 'auth_expired'))
+            : 'not_connected';
+
         return res.json({
             success: true,
             connected: isConnected,
@@ -3226,7 +3239,7 @@ export async function handleGetInstagramStatus(req, res) {
             account_id: conn?.account_id || null,
             account_type: conn?.account_type || 'professional',
             last_synced_at: conn?.last_synced_at || null,
-            insights_status: isConnected ? (conn?.insights_status || 'connected') : 'not_connected',
+            insights_status: insightsStatus,
             meta_configured: !!(process.env.META_APP_ID && process.env.META_APP_SECRET),
             message: isConnected
                 ? `Connected as @${conn.username}`
@@ -3334,6 +3347,243 @@ export async function handleConnectInstagram(req, res) {
     } catch (err) {
         console.error('[handleConnectInstagram Error]:', err);
         return res.status(500).json({ success: false, error: { message: err.message } });
+    }
+}
+
+/**
+ * Generates HMAC-signed state parameter for CSRF protection during OAuth
+ */
+function createOAuthState(creatorId, redirectUri) {
+    const timestamp = Date.now();
+    const nonce = crypto.randomBytes(16).toString('hex');
+    const payload = JSON.stringify({ creatorId, redirectUri, timestamp, nonce });
+    const payloadB64 = Buffer.from(payload).toString('base64url');
+    const secret = process.env.META_APP_SECRET || process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || 'wishrite-meta-sec-fallback-key-32b';
+    const sig = crypto.createHmac('sha256', secret).update(payloadB64).digest('hex');
+    return `${payloadB64}.${sig}`;
+}
+
+/**
+ * Validates HMAC-signed state parameter returned by Meta OAuth callback
+ */
+function verifyOAuthState(stateStr) {
+    if (!stateStr || typeof stateStr !== 'string' || !stateStr.includes('.')) return null;
+    const [payloadB64, sig] = stateStr.split('.');
+    const secret = process.env.META_APP_SECRET || process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || 'wishrite-meta-sec-fallback-key-32b';
+    const expectedSig = crypto.createHmac('sha256', secret).update(payloadB64).digest('hex');
+    if (sig !== expectedSig) return null;
+
+    try {
+        const json = Buffer.from(payloadB64, 'base64url').toString('utf8');
+        const data = JSON.parse(json);
+        // Expire state after 30 minutes
+        if (Date.now() - data.timestamp > 30 * 60 * 1000) return null;
+        return data;
+    } catch (_) {
+        return null;
+    }
+}
+
+/**
+ * GET /api/creator/instagram/oauth/start
+ * Initiates the Meta/Instagram OAuth authorization flow
+ */
+export async function handleInstagramOAuthStart(req, res) {
+    try {
+        const creator = req.creator;
+        if (!creator) {
+            return res.status(401).json({ success: false, error: { message: 'Creator authentication required.' } });
+        }
+
+        const creatorId = creator.id || creator.influencer_id;
+        const appId = process.env.META_APP_ID;
+        if (!appId) {
+            return res.status(400).json({
+                success: false,
+                error: { message: 'Meta App ID is not configured on the server. Please check META_APP_ID.' }
+            });
+        }
+
+        // Build callback redirect_uri
+        const host = req.headers['x-forwarded-host'] || req.headers['host'] || 'localhost:8085';
+        const proto = (req.headers['x-forwarded-proto'] || (host.startsWith('localhost') ? 'http' : 'https'));
+        const defaultCallback = `${proto}://${host}/api/creator/instagram/oauth/callback`;
+        const redirectUri = process.env.META_REDIRECT_URI || defaultCallback;
+
+        const state = createOAuthState(creatorId, redirectUri);
+        const scopes = [
+            'instagram_basic',
+            'pages_show_list',
+            'instagram_manage_insights',
+            'pages_read_engagement'
+        ].join(',');
+
+        const metaAuthUrl = `https://www.facebook.com/${META_GRAPH_API_VERSION}/dialog/oauth?client_id=${encodeURIComponent(appId)}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scopes)}&response_type=code&state=${encodeURIComponent(state)}`;
+
+        // If client requested JSON via query or accept header, return JSON URL
+        if (req.query?.json === 'true' || req.headers?.accept?.includes('application/json')) {
+            return res.json({ success: true, redirect_url: metaAuthUrl });
+        }
+
+        // Standard HTTP 302 redirect to Meta OAuth Dialog
+        return res.redirect(metaAuthUrl);
+    } catch (err) {
+        console.error('[handleInstagramOAuthStart Error]:', err);
+        return res.status(500).json({ success: false, error: { message: err.message } });
+    }
+}
+
+/**
+ * GET /api/creator/instagram/oauth/callback
+ * Handles the redirect from Meta after creator authorization
+ */
+export async function handleInstagramOAuthCallback(req, res) {
+    try {
+        const { code, state, error, error_reason, error_description } = req.query || {};
+
+        if (error) {
+            console.warn('[Meta OAuth Callback] User cancelled or error:', error, error_description);
+            return res.redirect(`/account?tab=creator&instagram=error&msg=${encodeURIComponent(error_description || error)}`);
+        }
+
+        if (!code || !state) {
+            return res.status(400).send('Missing code or state parameter from Meta.');
+        }
+
+        const stateData = verifyOAuthState(state);
+        if (!stateData || !stateData.creatorId) {
+            return res.status(400).send('Invalid or expired OAuth state parameter.');
+        }
+
+        const creatorId = stateData.creatorId;
+        const appId = process.env.META_APP_ID;
+        const appSecret = process.env.META_APP_SECRET;
+
+        if (!appId || !appSecret) {
+            return res.status(500).send('Meta application credentials not configured on server.');
+        }
+
+        const redirectUri = stateData.redirectUri;
+
+        // 1. Exchange authorization code for short-lived access token
+        const tokenUrl = `https://graph.facebook.com/${META_GRAPH_API_VERSION}/oauth/access_token?client_id=${encodeURIComponent(appId)}&redirect_uri=${encodeURIComponent(redirectUri)}&client_secret=${encodeURIComponent(appSecret)}&code=${encodeURIComponent(code)}`;
+        const tokenRes = await fetch(tokenUrl);
+        const tokenData = await tokenRes.json();
+
+        if (tokenData.error || !tokenData.access_token) {
+            console.error('[Meta OAuth Callback] Token exchange failed:', tokenData.error);
+            return res.redirect(`/account?tab=creator&instagram=error&msg=${encodeURIComponent(tokenData.error?.message || 'Token exchange failed')}`);
+        }
+
+        let accessToken = tokenData.access_token;
+
+        // 2. Exchange short-lived token for long-lived access token (60 days)
+        try {
+            const exchangeUrl = `https://graph.facebook.com/${META_GRAPH_API_VERSION}/oauth/access_token?grant_type=fb_exchange_token&client_id=${encodeURIComponent(appId)}&client_secret=${encodeURIComponent(appSecret)}&fb_exchange_token=${encodeURIComponent(accessToken)}`;
+            const exchangeRes = await fetch(exchangeUrl);
+            const exchangeData = await exchangeRes.json();
+            if (exchangeData.access_token) {
+                accessToken = exchangeData.access_token;
+            }
+        } catch (exErr) {
+            console.warn('[Meta OAuth Callback] Long-lived token exchange warning:', exErr.message);
+        }
+
+        // 3. Resolve Connected Instagram Business / Creator Account
+        // Inspect /me/accounts to find Facebook pages connected to Instagram Business Accounts
+        let instagramAccountId = null;
+        let instagramUsername = null;
+        let resolvedPageAccessToken = null;
+
+        try {
+            const pagesUrl = `https://graph.facebook.com/${META_GRAPH_API_VERSION}/me/accounts?fields=id,name,access_token,instagram_business_account{id,username,name}&access_token=${encodeURIComponent(accessToken)}`;
+            const pagesRes = await fetch(pagesUrl);
+            const pagesData = await pagesRes.json();
+
+            if (pagesData.data && Array.isArray(pagesData.data)) {
+                for (const page of pagesData.data) {
+                    if (page.instagram_business_account?.id) {
+                        instagramAccountId = page.instagram_business_account.id;
+                        instagramUsername = page.instagram_business_account.username || null;
+                        if (page.access_token) {
+                            resolvedPageAccessToken = page.access_token;
+                        }
+                        break;
+                    }
+                }
+            }
+        } catch (pageErr) {
+            console.warn('[Meta OAuth Callback] Pages query warning:', pageErr.message);
+        }
+
+        // If not found through pages, inspect /me for Instagram professional / direct ID
+        if (!instagramAccountId) {
+            try {
+                const meRes = await fetch(`https://graph.facebook.com/${META_GRAPH_API_VERSION}/me?fields=id,name,username&access_token=${encodeURIComponent(accessToken)}`);
+                const meData = await meRes.json();
+                if (meData?.id) {
+                    instagramAccountId = meData.id;
+                    if (meData.username) instagramUsername = meData.username;
+                }
+            } catch (meErr) {
+                console.warn('[Meta OAuth Callback] Me query warning:', meErr.message);
+            }
+        }
+
+        const finalToken = resolvedPageAccessToken || accessToken;
+
+        // 4. Resolve current creator profile to preserve handle if username not in token
+        let existingCreator = null;
+        try {
+            const queryOpts = { useAdmin: hasServerAdminCredential() };
+            const dbInfs = await dbQuery('influencers', `influencer_id=eq.${encodeURIComponent(creatorId)}&limit=1`, queryOpts);
+            if (Array.isArray(dbInfs) && dbInfs.length > 0) {
+                existingCreator = dbInfs[0];
+            }
+        } catch (_) {}
+
+        if (!existingCreator) {
+            const local = readLocalStore();
+            existingCreator = (local.influencers || []).find(i => i.id === creatorId);
+        }
+
+        const finalUsername = (instagramUsername || existingCreator?.instagram_connection?.username || existingCreator?.instagram_id || 'creator').replace(/^@/, '');
+
+        const instagramConnPayload = {
+            connected: true,
+            username: finalUsername,
+            account_id: instagramAccountId,
+            account_type: 'professional',
+            access_token: finalToken ? encryptToken(finalToken) : null,
+            last_synced_at: new Date().toISOString(),
+            insights_status: instagramAccountId ? 'connected' : 'api_permission_required',
+            updated_at: new Date().toISOString()
+        };
+
+        // 5. Authoritative update in Supabase
+        try {
+            await dbUpdate('influencers', 'influencer_id', creatorId, {
+                instagram_connection: instagramConnPayload
+            }, { useAdmin: true });
+        } catch (dbErr) {
+            console.warn('[handleInstagramOAuthCallback] Supabase update notice:', dbErr.message);
+        }
+
+        // 6. Update local store
+        try {
+            const local = readLocalStore();
+            let localInf = (local.influencers || []).find(i => i.id === creatorId);
+            if (localInf) {
+                localInf.instagram_connection = instagramConnPayload;
+            }
+            writeLocalStore(local);
+        } catch (_) {}
+
+        // 7. Redirect back to creator dashboard with success parameter
+        return res.redirect('/account?tab=creator&instagram=connected');
+    } catch (err) {
+        console.error('[handleInstagramOAuthCallback Error]:', err);
+        return res.redirect('/account?tab=creator&instagram=error&msg=Authorization+failed');
     }
 }
 
