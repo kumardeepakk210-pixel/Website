@@ -321,6 +321,47 @@ describe('WishRite Creator — Instagram Content List & Official Insights Sync',
         instagram_handle: 'priyastylez'
       });
     });
+
+    test('GET /api/creator/instagram/oauth/start returns unversioned Meta dialog URL', async () => {
+      process.env.META_APP_ID = '439894570032149';
+      const res = await makeRequest({
+        path: '/api/creator/instagram/oauth/start?json=true',
+        method: 'GET',
+        headers: authHeadersA
+      });
+
+      assert.equal(res.statusCode, 200);
+      assert.equal(res.data.success, true);
+      assert.ok(res.data.redirect_url, 'redirect_url must be provided');
+
+      const redirectUrl = res.data.redirect_url;
+      // Assert unversioned Meta OAuth dialog endpoint
+      assert.ok(
+        redirectUrl.startsWith('https://www.facebook.com/dialog/oauth'),
+        'OAuth dialog endpoint must start with https://www.facebook.com/dialog/oauth'
+      );
+      assert.equal(
+        redirectUrl.includes('/v26.0/dialog/oauth'),
+        false,
+        'OAuth dialog endpoint must NOT contain /v26.0/dialog/oauth'
+      );
+      assert.ok(
+        redirectUrl.includes('client_id=439894570032149'),
+        'Must contain configured client_id'
+      );
+      assert.ok(
+        redirectUrl.includes('response_type=code'),
+        'Must contain response_type=code'
+      );
+      assert.ok(
+        redirectUrl.includes('instagram_basic'),
+        'Must contain instagram_basic scope'
+      );
+      assert.ok(
+        redirectUrl.includes('instagram_manage_insights'),
+        'Must contain instagram_manage_insights scope'
+      );
+    });
   });
 
   describe('5. Instagram Metrics & Official API Sync', () => {

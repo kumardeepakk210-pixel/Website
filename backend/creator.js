@@ -3418,7 +3418,7 @@ export async function handleInstagramOAuthStart(req, res) {
             'pages_read_engagement'
         ].join(',');
 
-        const metaAuthUrl = `https://www.facebook.com/${META_GRAPH_API_VERSION}/dialog/oauth?client_id=${encodeURIComponent(appId)}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scopes)}&response_type=code&state=${encodeURIComponent(state)}`;
+        const metaAuthUrl = `https://www.facebook.com/dialog/oauth?client_id=${encodeURIComponent(appId)}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scopes)}&response_type=code&state=${encodeURIComponent(state)}`;
 
         // If client requested JSON via query or accept header, return JSON URL
         if (req.query?.json === 'true' || req.headers?.accept?.includes('application/json')) {
