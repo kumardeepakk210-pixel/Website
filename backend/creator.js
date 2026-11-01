@@ -3392,24 +3392,49 @@ export async function handleSyncCreatorContent(req, res, contentId) {
             return res.status(401).json({ success: false, error: { message: 'Creator authentication required.' } });
         }
 
+        let item = null;
+        let isLocalItem = false;
+
+        // 1. Query canonical Supabase database first
+        if (!CREATOR_USE_LOCAL_STORE && process.env.NODE_ENV !== 'test') {
+            try {
+                const rows = await dbQuery('creator_content', `id=eq.${encodeURIComponent(contentId)}&limit=1`, { useAdmin: hasServerAdminCredential() });
+                if (Array.isArray(rows) && rows.length > 0) {
+                    item = rows[0];
+                }
+            } catch (dbErr) {
+                console.warn('[handleSyncCreatorContent] Supabase lookup error:', dbErr.message);
+            }
+        }
+
+        // 2. Check local store if not found in Supabase or in test mode
         const local = readLocalStore();
         if (!local.creator_content) local.creator_content = [];
 
-        const item = local.creator_content.find(c => c.id === contentId);
+        if (!item) {
+            item = local.creator_content.find(c => c.id === contentId);
+            if (item) isLocalItem = true;
+        }
+
         if (!item) {
             return res.status(404).json({ success: false, error: { message: 'Content item not found.' } });
         }
 
         // Section 32: Creator isolation - verify ownership
-        if (item.influencer_id !== creator.id) {
+        const creatorId = creator.id || creator.influencer_id;
+        if (item.influencer_id !== creatorId) {
             return res.status(403).json({ success: false, error: { message: 'Unauthorized. You do not own this content.' } });
         }
 
         const syncResult = await syncInstagramMediaMetrics(item, creator);
-        writeLocalStore(local);
 
+        if (isLocalItem) {
+            writeLocalStore(local);
+        }
+
+        // Persist update in Supabase
         try {
-            await dbUpdate('creator_content', item.id, item, { useAdmin: true }).catch(() => {});
+            await dbUpdate('creator_content', 'id', item.id, item, { useAdmin: true }).catch(() => {});
         } catch (_) {}
 
         return res.json({
