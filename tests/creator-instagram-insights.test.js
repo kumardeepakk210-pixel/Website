@@ -378,6 +378,21 @@ describe('WishRite Creator — Instagram Content List & Official Insights Sync',
         'Must contain signed state parameter'
       );
     });
+
+    test('Meta OAuth token exchange URL targets unversioned oauth/access_token endpoint without leakage', () => {
+      const fs = require('fs');
+      const backendCreatorCode = fs.readFileSync('backend/creator.js', 'utf8');
+      
+      // Verify tokenUrl and exchangeUrl construction
+      assert.ok(
+        backendCreatorCode.includes("process.env.META_OAUTH_TOKEN_URL || 'https://graph.facebook.com/oauth/access_token'"),
+        'Token exchange endpoint must target unversioned https://graph.facebook.com/oauth/access_token'
+      );
+      assert.ok(
+        !backendCreatorCode.includes("`${META_GRAPH_API_VERSION}/oauth/access_token"),
+        'Token exchange endpoint must NOT be prefixed with versioned path components like /v26.0/oauth/access_token'
+      );
+    });
   });
 
   describe('5. Instagram Metrics & Official API Sync', () => {

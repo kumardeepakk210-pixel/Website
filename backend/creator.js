@@ -3473,7 +3473,8 @@ export async function handleInstagramOAuthCallback(req, res) {
         const redirectUri = stateData.redirectUri;
 
         // 1. Exchange authorization code for short-lived access token
-        const tokenUrl = `https://graph.facebook.com/${META_GRAPH_API_VERSION}/oauth/access_token?client_id=${encodeURIComponent(appId)}&redirect_uri=${encodeURIComponent(redirectUri)}&client_secret=${encodeURIComponent(appSecret)}&code=${encodeURIComponent(code)}`;
+        const tokenBaseUrl = process.env.META_OAUTH_TOKEN_URL || 'https://graph.facebook.com/oauth/access_token';
+        const tokenUrl = `${tokenBaseUrl}?client_id=${encodeURIComponent(appId)}&redirect_uri=${encodeURIComponent(redirectUri)}&client_secret=${encodeURIComponent(appSecret)}&code=${encodeURIComponent(code)}`;
         const tokenRes = await fetch(tokenUrl);
         const tokenData = await tokenRes.json();
 
@@ -3486,7 +3487,8 @@ export async function handleInstagramOAuthCallback(req, res) {
 
         // 2. Exchange short-lived token for long-lived access token (60 days)
         try {
-            const exchangeUrl = `https://graph.facebook.com/${META_GRAPH_API_VERSION}/oauth/access_token?grant_type=fb_exchange_token&client_id=${encodeURIComponent(appId)}&client_secret=${encodeURIComponent(appSecret)}&fb_exchange_token=${encodeURIComponent(accessToken)}`;
+            const exchangeBaseUrl = process.env.META_OAUTH_TOKEN_URL || 'https://graph.facebook.com/oauth/access_token';
+            const exchangeUrl = `${exchangeBaseUrl}?grant_type=fb_exchange_token&client_id=${encodeURIComponent(appId)}&client_secret=${encodeURIComponent(appSecret)}&fb_exchange_token=${encodeURIComponent(accessToken)}`;
             const exchangeRes = await fetch(exchangeUrl);
             const exchangeData = await exchangeRes.json();
             if (exchangeData.access_token) {
