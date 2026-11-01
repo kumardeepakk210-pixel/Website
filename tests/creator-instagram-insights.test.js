@@ -361,6 +361,22 @@ describe('WishRite Creator — Instagram Content List & Official Insights Sync',
         redirectUrl.includes('instagram_manage_insights'),
         'Must contain instagram_manage_insights scope'
       );
+      assert.ok(
+        redirectUrl.includes('pages_show_list'),
+        'Must contain pages_show_list scope'
+      );
+      assert.ok(
+        redirectUrl.includes('pages_read_engagement'),
+        'Must contain pages_read_engagement scope'
+      );
+      assert.ok(
+        redirectUrl.includes('config_id=1112681211580113'),
+        'Must contain config_id=1112681211580113 for Facebook Login for Business'
+      );
+      assert.ok(
+        redirectUrl.includes('state='),
+        'Must contain signed state parameter'
+      );
     });
   });
 

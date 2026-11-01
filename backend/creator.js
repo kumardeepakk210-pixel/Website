@@ -3411,6 +3411,7 @@ export async function handleInstagramOAuthStart(req, res) {
         const redirectUri = process.env.META_REDIRECT_URI || defaultCallback;
 
         const state = createOAuthState(creatorId, redirectUri);
+        const configId = process.env.META_CONFIG_ID || '1112681211580113';
         const scopes = [
             'instagram_basic',
             'pages_show_list',
@@ -3418,7 +3419,13 @@ export async function handleInstagramOAuthStart(req, res) {
             'pages_read_engagement'
         ].join(',');
 
-        const metaAuthUrl = `https://www.facebook.com/dialog/oauth?client_id=${encodeURIComponent(appId)}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scopes)}&response_type=code&state=${encodeURIComponent(state)}`;
+        let metaAuthUrl = `https://www.facebook.com/dialog/oauth?client_id=${encodeURIComponent(appId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&state=${encodeURIComponent(state)}`;
+        if (configId) {
+            metaAuthUrl += `&config_id=${encodeURIComponent(configId)}`;
+        }
+        if (scopes) {
+            metaAuthUrl += `&scope=${encodeURIComponent(scopes)}`;
+        }
 
         // If client requested JSON via query or accept header, return JSON URL
         if (req.query?.json === 'true' || req.headers?.accept?.includes('application/json')) {
