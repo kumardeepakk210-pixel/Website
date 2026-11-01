@@ -1294,6 +1294,14 @@ function filterReelInsights(filter, btn) {
 }
 window.filterReelInsights = filterReelInsights;
 
+function isReelContentItem(item) {
+    if (!item) return false;
+    if ((item.content_type || '').toLowerCase() === 'reel') return true;
+    const u = (item.url || item.instagram_permalink || '').toLowerCase();
+    return u.includes('/reel/') || u.includes('/reels/');
+}
+window.isReelContentItem = isReelContentItem;
+
 function renderReelInsightsGrid() {
     const container = document.getElementById('reel-insights-container');
     if (!container) return;
@@ -1481,33 +1489,64 @@ function renderInstagramConnectionCard(conn) {
 
     if (conn && conn.connected && conn.username) {
         const syncText = conn.last_synced_at ? `Last synced: ${formatSyncTime(conn.last_synced_at)}` : 'Not synced yet';
-        cardEl.innerHTML = `
-            <div class="ig-conn-connected">
-                <div class="ig-conn-header">
-                    <div class="ig-conn-brand">
-                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>
-                        <span>INSTAGRAM CONNECTION</span>
+        const isAuthorized = Boolean(conn.api_authorized || conn.account_id);
+
+        if (isAuthorized) {
+            cardEl.innerHTML = `
+                <div class="ig-conn-connected">
+                    <div class="ig-conn-header">
+                        <div class="ig-conn-brand">
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>
+                            <span>INSTAGRAM CONNECTION</span>
+                        </div>
+                        <span class="ig-conn-badge connected">✓ Connected</span>
                     </div>
-                    <span class="ig-conn-badge connected">✓ Connected</span>
+                    <div class="ig-conn-body">
+                        <div>
+                            <div class="ig-conn-handle">@${conn.username}</div>
+                            <div class="ig-conn-sub">Eligible Professional Account &bull; Official Meta Graph API Connected</div>
+                            <div class="ig-conn-synced">${syncText}</div>
+                        </div>
+                        <div class="ig-conn-actions">
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="syncAllInstagramInsights()" id="btn-sync-all-ig" style="display:inline-flex; align-items:center; gap:6px; padding:6px 14px; font-size:0.75rem;">
+                                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" id="icon-sync-all-ig"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                                <span>SYNC NOW</span>
+                            </button>
+                            <button type="button" class="btn btn-ghost btn-sm" onclick="disconnectInstagramAccount()" style="padding:6px 12px; font-size:0.75rem; color:#dc2626;">
+                                <span>DISCONNECT</span>
+                            </button>
+                        </div>
+                    </div>
                 </div>
-                <div class="ig-conn-body">
-                    <div>
-                        <div class="ig-conn-handle">@${conn.username}</div>
-                        <div class="ig-conn-sub">Eligible Professional Account &bull; Official Meta Graph API Connected</div>
-                        <div class="ig-conn-synced">${syncText}</div>
+            `;
+        } else {
+            cardEl.innerHTML = `
+                <div class="ig-conn-connected" style="border-left: 3px solid #d97706;">
+                    <div class="ig-conn-header">
+                        <div class="ig-conn-brand">
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>
+                            <span>INSTAGRAM CONNECTION</span>
+                        </div>
+                        <span class="ig-conn-badge" style="background:#fef3c7; color:#92400e; border:1px solid #fde68a;">Action Required</span>
                     </div>
-                    <div class="ig-conn-actions">
-                        <button type="button" class="btn btn-secondary btn-sm" onclick="syncAllInstagramInsights()" id="btn-sync-all-ig" style="display:inline-flex; align-items:center; gap:6px; padding:6px 14px; font-size:0.75rem;">
-                            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" id="icon-sync-all-ig"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-                            <span>SYNC NOW</span>
-                        </button>
-                        <button type="button" class="btn btn-ghost btn-sm" onclick="disconnectInstagramAccount()" style="padding:6px 12px; font-size:0.75rem; color:#dc2626;">
-                            <span>DISCONNECT</span>
-                        </button>
+                    <div class="ig-conn-body">
+                        <div>
+                            <div class="ig-conn-handle">@${conn.username}</div>
+                            <div class="ig-conn-sub" style="color:#b45309; font-weight:500;">Connect Meta API Token to enable live Instagram insights</div>
+                            <div class="ig-conn-synced">${syncText}</div>
+                        </div>
+                        <div class="ig-conn-actions">
+                            <button type="button" class="btn btn-primary btn-sm" onclick="openInstagramConnectModal()" style="display:inline-flex; align-items:center; gap:6px; padding:6px 14px; font-size:0.75rem;">
+                                <span>CONNECT TOKEN</span>
+                            </button>
+                            <button type="button" class="btn btn-ghost btn-sm" onclick="disconnectInstagramAccount()" style="padding:6px 12px; font-size:0.75rem; color:#dc2626;">
+                                <span>DISCONNECT</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
-            </div>
-        `;
+            `;
+        }
     } else {
         cardEl.innerHTML = `
             <div class="ig-conn-unconnected">
@@ -1777,7 +1816,7 @@ async function loadCreatorContent(statusFilter = 'all') {
         }
 
         currentCreatorContent = json.data;
-        currentReelsList = json.data.filter(i => (i.content_type || '').toLowerCase() === 'reel');
+        currentReelsList = json.data.filter(i => isReelContentItem(i));
         renderReelInsightsGrid();
 
         if (!container) return;
@@ -1786,9 +1825,9 @@ async function loadCreatorContent(statusFilter = 'all') {
         const normFilter = String(statusFilter || 'all').toLowerCase();
         if (normFilter !== 'all') {
             if (normFilter === 'post' || normFilter === 'posts') {
-                items = items.filter(i => (i.content_type || '').toLowerCase() === 'post');
+                items = items.filter(i => !isReelContentItem(i));
             } else if (normFilter === 'reel' || normFilter === 'reels') {
-                items = items.filter(i => (i.content_type || '').toLowerCase() === 'reel');
+                items = items.filter(i => isReelContentItem(i));
             } else if (normFilter === 'pending') {
                 items = items.filter(i => (i.status || '').toLowerCase() !== 'approved' && (i.status || '').toLowerCase() !== 'rejected');
             } else if (normFilter === 'approved') {
@@ -1857,7 +1896,7 @@ function renderCreatorContentList(items, container) {
     `;
 
     items.forEach(item => {
-        const isReel = (item.content_type || '').toLowerCase() === 'reel';
+        const isReel = isReelContentItem(item);
         const typeLabel = isReel ? 'Reel' : 'Post';
         const statusClass = (item.status || '').toLowerCase() === 'approved' ? 'verified' : ((item.status || '').toLowerCase() === 'rejected' ? 'rejected' : 'pending');
         const statusLabel = (item.status || '').toLowerCase() === 'approved' ? '✓ Approved' : ((item.status || '').toLowerCase() === 'rejected' ? '✕ Rejected' : '⧖ Under Review');
@@ -1920,7 +1959,7 @@ function renderCreatorContentList(items, container) {
     // 2. Mobile Responsive Card List (Under 860px)
     let mobileCardsHtml = `<div class="content-card-mobile-list">`;
     items.forEach(item => {
-        const isReel = (item.content_type || '').toLowerCase() === 'reel';
+        const isReel = isReelContentItem(item);
         const typeLabel = isReel ? 'Reel' : 'Post';
         const statusClass = (item.status || '').toLowerCase() === 'approved' ? 'verified' : ((item.status || '').toLowerCase() === 'rejected' ? 'rejected' : 'pending');
         const statusLabel = (item.status || '').toLowerCase() === 'approved' ? '✓ Approved' : ((item.status || '').toLowerCase() === 'rejected' ? '✕ Rejected' : '⧖ Under Review');

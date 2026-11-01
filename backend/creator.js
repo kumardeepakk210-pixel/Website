@@ -2410,8 +2410,10 @@ export async function handleSubmitCreatorContent(req, res) {
                     error: { code: 'INVALID_PLATFORM_URL', message: 'Please enter a valid Instagram post or reel URL.' }
                 });
             }
-            if (!contentType) {
-                contentType = (contentUrl.includes('/reel/') || contentUrl.includes('/reels/')) ? 'reel' : 'post';
+            if (contentUrl.includes('/reel/') || contentUrl.includes('/reels/')) {
+                contentType = 'reel';
+            } else if (!contentType) {
+                contentType = 'post';
             }
         } else if (platform === 'youtube') {
             if (!contentUrl.includes('youtube.com') && !contentUrl.includes('youtu.be')) {
@@ -2489,7 +2491,14 @@ export async function handleSubmitCreatorContent(req, res) {
         }
 
         try {
-            const insertRes = await dbInsert('creator_content', newContent, { useAdmin: hasServerAdminCredential() });
+            const rawAuthHeader = req.headers?.authorization || req.headers?.Authorization || '';
+            const bearerToken = rawAuthHeader.startsWith('Bearer ') ? rawAuthHeader.slice(7).trim() : null;
+
+            const insertRes = await dbInsert('creator_content', newContent, {
+                useAdmin: hasServerAdminCredential(),
+                userToken: bearerToken,
+                returnMinimal: true
+            });
             return res.json({
                 success: true,
                 message: `${contentType === 'reel' ? 'Reel' : 'Post'} submitted successfully and is now under review.`,
@@ -3017,9 +3026,12 @@ export function sanitizeContentItem(item) {
         status: item.status || 'Submitted',
         rejection_reason: item.rejection_reason || null,
         views_count: item.views_count !== undefined ? item.views_count : (typeof item.views === 'number' && item.views > 0 ? item.views : null),
+        reach_count: item.reach_count !== undefined ? item.reach_count : null,
         likes_count: item.likes_count !== undefined ? item.likes_count : (item.social_likes !== undefined ? item.social_likes : null),
         comments_count: item.comments_count !== undefined ? item.comments_count : (item.social_comments !== undefined ? item.social_comments : null),
+        saves_count: item.saves_count !== undefined ? item.saves_count : null,
         shares_count: item.shares_count !== undefined ? item.shares_count : null,
+        total_interactions_count: item.total_interactions_count !== undefined ? item.total_interactions_count : null,
         last_synced_at: item.last_synced_at || null,
         insights_status: item.insights_status || 'not_connected',
         insights_error: item.insights_error || null,
@@ -3205,9 +3217,11 @@ export async function handleGetInstagramStatus(req, res) {
         }
 
         const isConnected = !!(conn && conn.username);
+        const isApiAuthorized = Boolean(conn && (conn.access_token || conn.account_id));
         return res.json({
             success: true,
             connected: isConnected,
+            api_authorized: isApiAuthorized,
             username: conn?.username || (creator.instagram_id ? creator.instagram_id.replace(/^@/, '') : null),
             account_id: conn?.account_id || null,
             account_type: conn?.account_type || 'professional',
