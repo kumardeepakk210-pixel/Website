@@ -95,6 +95,22 @@
       "updated_at": "2026-10-15T00:00:00.000Z"
     }
   ],
-  "contest_participants": [],
-  "contest_scores": []
+  "contest_participants": [
+    {
+      "id": "e396d9c9-2d3c-4e5a-a36f-89e998083ef9",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "41bb07fa-2a1c-4cc1-ae51-25686ce1ec21",
+      "joined_at": "2026-11-02T07:31:53.665Z",
+      "status": "active"
+    }
+  ],
+  "contest_scores": [
+    {
+      "id": "c4177af8-3528-4f2e-963f-b3fb18b2f352",
+      "contest_id": "contest-festive-2026",
+      "influencer_id": "41bb07fa-2a1c-4cc1-ae51-25686ce1ec21",
+      "points": 0,
+      "updated_at": "2026-11-02T07:31:53.665Z"
+    }
+  ]
 }
