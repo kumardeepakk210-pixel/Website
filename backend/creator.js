@@ -3550,7 +3550,129 @@ export async function handleInstagramOAuthCallback(req, res) {
             console.warn('[Meta OAuth Callback] Assigned accounts query warning:', assignedErr.message);
         }
 
-        // 3b. Fallback: Facebook Pages connected to Instagram Business Accounts (/me/accounts)
+        // 3b. Meta Business Portfolio Asset Discovery (e.g. Business ID 1788557671719960 "Deepak Kumar")
+        if (!instagramAccountId) {
+            try {
+                const busRes = await fetch(`https://graph.facebook.com/${META_GRAPH_API_VERSION}/me/businesses?fields=id,name&access_token=${encodeURIComponent(accessToken)}`);
+                const busData = await busRes.json();
+                console.log('[Meta OAuth Diagnostic] /me/businesses status:', busRes.status, 'returned:', busData.data?.length || 0, 'error:', busData.error?.message || null);
+
+                const businesses = (busData.data && Array.isArray(busData.data)) ? busData.data : [];
+                // Check discovered businesses, or check specific business ID if known
+                const targetBusinessIds = businesses.map(b => b.id);
+                if (!targetBusinessIds.includes('1788557671719960')) {
+                    targetBusinessIds.push('1788557671719960');
+                }
+
+                for (const bId of targetBusinessIds) {
+                    if (instagramAccountId) break;
+
+                    // A) owned_instagram_accounts
+                    try {
+                        const ownedRes = await fetch(`https://graph.facebook.com/${META_GRAPH_API_VERSION}/${bId}/owned_instagram_accounts?fields=id,username,name&access_token=${encodeURIComponent(accessToken)}`);
+                        const ownedData = await ownedRes.json();
+                        console.log(`[Meta OAuth Diagnostic] /${bId}/owned_instagram_accounts status:`, ownedRes.status, 'returned:', ownedData.data?.length || 0, 'error:', ownedData.error?.message || null);
+                        if (ownedData.data && Array.isArray(ownedData.data)) {
+                            const match = ownedData.data.find(a => targetUsername ? (a.username || '').toLowerCase().trim() === targetUsername : true);
+                            if (match && match.id) {
+                                instagramAccountId = match.id;
+                                instagramUsername = match.username || targetUsername;
+                                console.log('[Meta OAuth Diagnostic] Selected from owned_instagram_accounts ID ending in:', String(match.id).slice(-4), 'username:', instagramUsername);
+                                break;
+                            }
+                        }
+                    } catch (e) {
+                        console.warn(`[Meta OAuth Diagnostic] /${bId}/owned_instagram_accounts error:`, e.message);
+                    }
+
+                    // B) client_instagram_accounts
+                    if (!instagramAccountId) {
+                        try {
+                            const clientRes = await fetch(`https://graph.facebook.com/${META_GRAPH_API_VERSION}/${bId}/client_instagram_accounts?fields=id,username,name&access_token=${encodeURIComponent(accessToken)}`);
+                            const clientData = await clientRes.json();
+                            console.log(`[Meta OAuth Diagnostic] /${bId}/client_instagram_accounts status:`, clientRes.status, 'returned:', clientData.data?.length || 0, 'error:', clientData.error?.message || null);
+                            if (clientData.data && Array.isArray(clientData.data)) {
+                                const match = clientData.data.find(a => targetUsername ? (a.username || '').toLowerCase().trim() === targetUsername : true);
+                                if (match && match.id) {
+                                    instagramAccountId = match.id;
+                                    instagramUsername = match.username || targetUsername;
+                                    console.log('[Meta OAuth Diagnostic] Selected from client_instagram_accounts ID ending in:', String(match.id).slice(-4), 'username:', instagramUsername);
+                                    break;
+                                }
+                            }
+                        } catch (e) {
+                            console.warn(`[Meta OAuth Diagnostic] /${bId}/client_instagram_accounts error:`, e.message);
+                        }
+                    }
+
+                    // C) instagram_accounts
+                    if (!instagramAccountId) {
+                        try {
+                            const igRes = await fetch(`https://graph.facebook.com/${META_GRAPH_API_VERSION}/${bId}/instagram_accounts?fields=id,username,name&access_token=${encodeURIComponent(accessToken)}`);
+                            const igData = await igRes.json();
+                            console.log(`[Meta OAuth Diagnostic] /${bId}/instagram_accounts status:`, igRes.status, 'returned:', igData.data?.length || 0, 'error:', igData.error?.message || null);
+                            if (igData.data && Array.isArray(igData.data)) {
+                                const match = igData.data.find(a => targetUsername ? (a.username || '').toLowerCase().trim() === targetUsername : true);
+                                if (match && match.id) {
+                                    instagramAccountId = match.id;
+                                    instagramUsername = match.username || targetUsername;
+                                    console.log('[Meta OAuth Diagnostic] Selected from instagram_accounts ID ending in:', String(match.id).slice(-4), 'username:', instagramUsername);
+                                    break;
+                                }
+                            }
+                        } catch (e) {
+                            console.warn(`[Meta OAuth Diagnostic] /${bId}/instagram_accounts error:`, e.message);
+                        }
+                    }
+
+                    // D) owned_pages -> Page -> instagram_business_account
+                    if (!instagramAccountId) {
+                        try {
+                            const pagesRes = await fetch(`https://graph.facebook.com/${META_GRAPH_API_VERSION}/${bId}/owned_pages?fields=id,name,access_token,instagram_business_account{id,username,name}&access_token=${encodeURIComponent(accessToken)}`);
+                            const pagesData = await pagesRes.json();
+                            console.log(`[Meta OAuth Diagnostic] /${bId}/owned_pages status:`, pagesRes.status, 'returned:', pagesData.data?.length || 0, 'error:', pagesData.error?.message || null);
+                            if (pagesData.data && Array.isArray(pagesData.data)) {
+                                for (const page of pagesData.data) {
+                                    if (page.instagram_business_account?.id) {
+                                        const igAcc = page.instagram_business_account;
+                                        if (!targetUsername || (igAcc.username || '').toLowerCase().trim() === targetUsername) {
+                                            instagramAccountId = igAcc.id;
+                                            instagramUsername = igAcc.username || targetUsername;
+                                            if (page.access_token) resolvedPageAccessToken = page.access_token;
+                                            console.log('[Meta OAuth Diagnostic] Selected from owned_pages ID ending in:', String(igAcc.id).slice(-4), 'username:', instagramUsername);
+                                            break;
+                                        }
+                                    } else if (page.id) {
+                                        // Query Page direct fields
+                                        try {
+                                            const pageDirectRes = await fetch(`https://graph.facebook.com/${META_GRAPH_API_VERSION}/${page.id}?fields=id,name,instagram_business_account{id,username,name}&access_token=${encodeURIComponent(page.access_token || accessToken)}`);
+                                            const pageDirect = await pageDirectRes.json();
+                                            console.log(`[Meta OAuth Diagnostic] Page direct /${page.id} status:`, pageDirectRes.status, 'ig_account:', !!pageDirect.instagram_business_account);
+                                            if (pageDirect.instagram_business_account?.id) {
+                                                const igAcc = pageDirect.instagram_business_account;
+                                                if (!targetUsername || (igAcc.username || '').toLowerCase().trim() === targetUsername) {
+                                                    instagramAccountId = igAcc.id;
+                                                    instagramUsername = igAcc.username || targetUsername;
+                                                    if (page.access_token) resolvedPageAccessToken = page.access_token;
+                                                    console.log('[Meta OAuth Diagnostic] Selected from Page direct query ID ending in:', String(igAcc.id).slice(-4), 'username:', instagramUsername);
+                                                    break;
+                                                }
+                                            }
+                                        } catch (_) {}
+                                    }
+                                }
+                            }
+                        } catch (e) {
+                            console.warn(`[Meta OAuth Diagnostic] /${bId}/owned_pages error:`, e.message);
+                        }
+                    }
+                }
+            } catch (busErr) {
+                console.warn('[Meta OAuth Diagnostic] Business portfolio discovery error:', busErr.message);
+            }
+        }
+
+        // 3c. Fallback: Facebook Pages connected to Instagram Business Accounts (/me/accounts)
         if (!instagramAccountId) {
             try {
                 const pagesUrl = `https://graph.facebook.com/${META_GRAPH_API_VERSION}/me/accounts?fields=id,name,access_token,instagram_business_account{id,username,name}&access_token=${encodeURIComponent(accessToken)}`;
@@ -3574,7 +3696,7 @@ export async function handleInstagramOAuthCallback(req, res) {
             }
         }
 
-        // 3c. Fallback: Inspect /me for Instagram professional / direct ID
+        // 3d. Fallback: Inspect /me for Instagram professional / direct ID
         if (!instagramAccountId) {
             try {
                 const meRes = await fetch(`https://graph.facebook.com/${META_GRAPH_API_VERSION}/me?fields=id,name,username&access_token=${encodeURIComponent(accessToken)}`);
