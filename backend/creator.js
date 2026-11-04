@@ -3678,16 +3678,52 @@ export async function handleInstagramOAuthCallback(req, res) {
                 const pagesUrl = `https://graph.facebook.com/${META_GRAPH_API_VERSION}/me/accounts?fields=id,name,access_token,instagram_business_account{id,username,name}&access_token=${encodeURIComponent(accessToken)}`;
                 const pagesRes = await fetch(pagesUrl);
                 const pagesData = await pagesRes.json();
+                console.log('[Meta OAuth Diagnostic] /me/accounts status:', pagesRes.status, 'returned:', pagesData.data?.length || 0, 'error:', pagesData.error?.message || null);
 
                 if (pagesData.data && Array.isArray(pagesData.data)) {
                     for (const page of pagesData.data) {
-                        if (page.instagram_business_account?.id) {
-                            instagramAccountId = page.instagram_business_account.id;
-                            instagramUsername = page.instagram_business_account.username || null;
-                            if (page.access_token) {
-                                resolvedPageAccessToken = page.access_token;
+                        const pageName = page.name || '';
+                        const pageId = page.id || '';
+                        const hasPageToken = Boolean(page.access_token);
+                        const isExpectedPage = !targetUsername || pageName.toLowerCase().includes('funnwith.ai') || pagesData.data.length === 1;
+
+                        // Check direct instagram_business_account on page object
+                        let igAccount = page.instagram_business_account || null;
+
+                        // If direct object is missing but Page has its own access token, query the Page node directly with the Page access token
+                        if (!igAccount?.id && pageId && hasPageToken) {
+                            try {
+                                const pageDetailUrl = `https://graph.facebook.com/${META_GRAPH_API_VERSION}/${encodeURIComponent(pageId)}?fields=id,name,instagram_business_account{id,username,name}&access_token=${encodeURIComponent(page.access_token)}`;
+                                const pageDetailRes = await fetch(pageDetailUrl);
+                                const pageDetailData = await pageDetailRes.json();
+                                console.log(`[Meta OAuth Diagnostic] Page node /${pageId} (with Page Token) status:`, pageDetailRes.status, 'error:', pageDetailData.error?.message || null, 'code:', pageDetailData.error?.code || null);
+                                if (pageDetailData.instagram_business_account?.id) {
+                                    igAccount = pageDetailData.instagram_business_account;
+                                }
+                            } catch (pageDetailErr) {
+                                console.warn(`[Meta OAuth Diagnostic] Page node /${pageId} query error:`, pageDetailErr.message);
                             }
-                            break;
+                        }
+
+                        if (igAccount?.id) {
+                            const igHandle = (igAccount.username || '').toLowerCase().trim();
+                            // Strict matching: If targetUsername is known, require exact username match
+                            const usernameMatches = targetUsername ? igHandle === targetUsername : isExpectedPage;
+
+                            if (usernameMatches) {
+                                instagramAccountId = igAccount.id;
+                                instagramUsername = igAccount.username || targetUsername;
+                                if (page.access_token) {
+                                    resolvedPageAccessToken = page.access_token;
+                                }
+                                console.log('[Meta OAuth Diagnostic] Successfully resolved Instagram Account from Page:', {
+                                    pageIdEnding: String(pageId).slice(-4),
+                                    pageName,
+                                    instagramAccountIdEnding: String(igAccount.id).slice(-4),
+                                    username: instagramUsername
+                                });
+                                break;
+                            }
                         }
                     }
                 }

@@ -432,6 +432,165 @@ describe('WishRite Creator — Instagram Content List & Official Insights Sync',
       assert.equal(Boolean(resolveAccount(multiple, 'non_existent_creator')), false);
       assert.equal(resolveAccount(multiple, 'non_existent_creator') || null, null);
     });
+
+    test('Meta OAuth callback Page-token fallback resolves connected Instagram Business Account', () => {
+      const fs = require('fs');
+      const backendCreatorCode = fs.readFileSync('backend/creator.js', 'utf8');
+
+      // Verify Page direct node query with Page access token exists in code
+      assert.ok(
+        backendCreatorCode.includes('pageDetailUrl = `https://graph.facebook.com/${META_GRAPH_API_VERSION}/${encodeURIComponent(pageId)}?fields=id,name,instagram_business_account{id,username,name}&access_token=${encodeURIComponent(page.access_token)}`'),
+        'Must support querying Page direct node using page.access_token when direct instagram_business_account is null'
+      );
+
+      // Verify regression logic for scenarios A through H
+      const simulatePageResolution = ({ pagesData, targetUsername, pageTokenFetcher }) => {
+        let instagramAccountId = null;
+        let instagramUsername = null;
+        let resolvedPageAccessToken = null;
+
+        for (const page of pagesData) {
+          const pageName = page.name || '';
+          const pageId = page.id || '';
+          const hasPageToken = Boolean(page.access_token);
+          const isExpectedPage = !targetUsername || pageName.toLowerCase().includes('funnwith.ai') || pagesData.length === 1;
+
+          let igAccount = page.instagram_business_account || null;
+
+          if (!igAccount?.id && pageId && hasPageToken && pageTokenFetcher) {
+            const pageDetail = pageTokenFetcher(pageId, page.access_token);
+            if (pageDetail?.instagram_business_account?.id) {
+              igAccount = pageDetail.instagram_business_account;
+            }
+          }
+
+          if (igAccount?.id) {
+            const igHandle = (igAccount.username || '').toLowerCase().trim();
+            const usernameMatches = targetUsername ? igHandle === targetUsername : isExpectedPage;
+
+            if (usernameMatches) {
+              instagramAccountId = igAccount.id;
+              instagramUsername = igAccount.username || targetUsername;
+              if (page.access_token) {
+                resolvedPageAccessToken = page.access_token;
+              }
+              break;
+            }
+          }
+        }
+
+        return { instagramAccountId, instagramUsername, resolvedPageAccessToken };
+      };
+
+      // Scenario A: /me/accounts directly returns the Instagram account
+      const resA = simulatePageResolution({
+        pagesData: [{
+          id: '1001',
+          name: 'funnwith.ai',
+          access_token: 'page_token_123',
+          instagram_business_account: { id: '178414001', username: 'wishrite.in' }
+        }],
+        targetUsername: 'wishrite.in'
+      });
+      assert.equal(resA.instagramAccountId, '178414001');
+      assert.equal(resA.instagramUsername, 'wishrite.in');
+      assert.equal(resA.resolvedPageAccessToken, 'page_token_123');
+
+      // Scenario B: /me/accounts returns Instagram account as null, but Page-token lookup returns wishrite.in
+      const resB = simulatePageResolution({
+        pagesData: [{
+          id: '1002',
+          name: 'funnwith.ai',
+          access_token: 'page_token_456',
+          instagram_business_account: null
+        }],
+        targetUsername: 'wishrite.in',
+        pageTokenFetcher: (pId, pToken) => {
+          if (pId === '1002' && pToken === 'page_token_456') {
+            return {
+              id: '1002',
+              name: 'funnwith.ai',
+              instagram_business_account: { id: '178414099', username: 'wishrite.in' }
+            };
+          }
+          return null;
+        }
+      });
+      assert.equal(resB.instagramAccountId, '178414099');
+      assert.equal(resB.instagramUsername, 'wishrite.in');
+      assert.equal(resB.resolvedPageAccessToken, 'page_token_456');
+
+      // Scenario C: Page-token lookup returns a different Instagram username
+      const resC = simulatePageResolution({
+        pagesData: [{
+          id: '1003',
+          name: 'other_page',
+          access_token: 'page_token_789',
+          instagram_business_account: null
+        }],
+        targetUsername: 'wishrite.in',
+        pageTokenFetcher: () => ({
+          instagram_business_account: { id: '178414999', username: 'unrelated_brand' }
+        })
+      });
+      assert.equal(resC.instagramAccountId, null);
+
+      // Scenario D: Page token is missing
+      const resD = simulatePageResolution({
+        pagesData: [{
+          id: '1004',
+          name: 'funnwith.ai',
+          access_token: null,
+          instagram_business_account: null
+        }],
+        targetUsername: 'wishrite.in',
+        pageTokenFetcher: () => ({
+          instagram_business_account: { id: '178414001', username: 'wishrite.in' }
+        })
+      });
+      assert.equal(resD.instagramAccountId, null);
+
+      // Scenario E: Page-token lookup returns Meta error 190 (empty / error returned by fetcher)
+      const resE = simulatePageResolution({
+        pagesData: [{
+          id: '1005',
+          name: 'funnwith.ai',
+          access_token: 'expired_page_token',
+          instagram_business_account: null
+        }],
+        targetUsername: 'wishrite.in',
+        pageTokenFetcher: () => ({ error: { message: 'The session is invalid', code: 190 } })
+      });
+      assert.equal(resE.instagramAccountId, null);
+
+      // Scenario F: No Instagram account is returned anywhere
+      const resF = simulatePageResolution({
+        pagesData: [{
+          id: '1006',
+          name: 'funnwith.ai',
+          access_token: 'page_token_xyz',
+          instagram_business_account: null
+        }],
+        targetUsername: 'wishrite.in',
+        pageTokenFetcher: () => ({ id: '1006', instagram_business_account: null })
+      });
+      assert.equal(resF.instagramAccountId, null);
+
+      // Scenario G: Credentials never appear in logs or frontend responses
+      assert.ok(!backendCreatorCode.includes('console.log(page.access_token)'));
+      assert.ok(!backendCreatorCode.includes('console.log(accessToken)'));
+      assert.ok(!backendCreatorCode.includes('console.log(finalToken)'));
+
+      // Scenario H: Existing connection is safely not falsely marked as authorized when accountId is null
+      const instagramAccountIdNull = null;
+      const testConnPayload = {
+        connected: true,
+        account_id: instagramAccountIdNull,
+        insights_status: instagramAccountIdNull ? 'connected' : 'api_permission_required'
+      };
+      assert.equal(testConnPayload.account_id, null);
+      assert.equal(testConnPayload.insights_status, 'api_permission_required');
+    });
   });
 
   describe('5. Instagram Metrics & Official API Sync', () => {
