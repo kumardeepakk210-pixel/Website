@@ -1806,6 +1806,21 @@ async function initAuthSystem() {
                         );
                     }
 
+                    // On INITIAL_SESSION or SIGNED_IN, if the Creator tab is currently active, load creator status
+                    if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') {
+                        try {
+                            const isCreatorTab = (typeof window.location !== 'undefined' && window.location.search.includes('tab=creator')) ||
+                                document.getElementById('tab-pane-creator')?.style.display === 'block';
+                            if (isCreatorTab) {
+                                setTimeout(() => {
+                                    if (typeof window.loadCustomerCreatorStatus === 'function') {
+                                        window.loadCustomerCreatorStatus();
+                                    }
+                                }, 0);
+                            }
+                        } catch (_) {}
+                    }
+
                 } else {
 
                     currentUser = null;

@@ -273,6 +273,7 @@ let _lastAuthUserId = null;
 function resetCreatorAuthReadiness() {
     _authReadinessPromise = null;
     _lastAuthUserId = null;
+    _activeStatusRequestId++;
 }
 window.resetCreatorAuthReadiness = resetCreatorAuthReadiness;
 
@@ -411,21 +412,109 @@ async function getAuthHeaders() {
 }
 
 /**
+ * Helper to ensure mutual exclusivity among all Creator tab state containers
+ */
+function setCreatorUIState(activeStateKey, options = {}) {
+    const states = {
+        loading: document.getElementById('creator-loading-state'),
+        signin: document.getElementById('creator-signin-state'),
+        onboard: document.getElementById('creator-onboard-state'),
+        dashboard: document.getElementById('creator-dashboard-state'),
+        review: document.getElementById('creator-review-state'),
+        error: document.getElementById('creator-error-state')
+    };
+
+    // Lazy create dedicated signin state container if not in DOM
+    if (!states.signin) {
+        const creatorPane = document.getElementById('tab-pane-creator');
+        if (creatorPane) {
+            const signinDiv = document.createElement('div');
+            signinDiv.id = 'creator-signin-state';
+            signinDiv.className = 'account-card';
+            signinDiv.style.cssText = 'display:none; text-align:center; padding:48px 24px; margin:24px auto; max-width:640px;';
+            signinDiv.innerHTML = `
+                <div class="creator-hero-badge" style="background:rgba(220,53,69,0.12); color:#dc3545; border-color:rgba(220,53,69,0.3); display:inline-block; margin-bottom:14px; padding:4px 12px; border-radius:20px; font-size:0.75rem; font-weight:700; letter-spacing:1px;">SIGN IN REQUIRED</div>
+                <h2 style="font-family:var(--wr-font-heading); color:var(--wr-primary); font-size:1.6rem; margin:0 0 10px 0; text-transform:uppercase;">Sign in to access Creator Club</h2>
+                <p style="color:var(--wr-text-muted); font-size:0.95rem; max-width:480px; margin:0 auto 24px auto; line-height:1.5;">Your creator dashboard, content tracking, and commission insights require an active customer sign-in.</p>
+                <div style="display:flex; justify-content:center; gap:12px;">
+                    <button type="button" class="btn btn-primary" onclick="if (typeof navigateTo === 'function') navigateTo('login');" style="padding: 12px 28px; font-weight: 600; letter-spacing:0.5px;">SIGN IN TO MY ACCOUNT</button>
+                </div>
+            `;
+            const onboardEl = document.getElementById('creator-onboard-state');
+            if (onboardEl && onboardEl.parentNode === creatorPane) {
+                creatorPane.insertBefore(signinDiv, onboardEl);
+            } else {
+                creatorPane.appendChild(signinDiv);
+            }
+            states.signin = signinDiv;
+        }
+    }
+
+    // Lazy create dedicated error state container if not in DOM
+    if (!states.error) {
+        const creatorPane = document.getElementById('tab-pane-creator');
+        if (creatorPane) {
+            const errorDiv = document.createElement('div');
+            errorDiv.id = 'creator-error-state';
+            errorDiv.className = 'account-card';
+            errorDiv.style.cssText = 'display:none; text-align:center; padding:48px 24px; margin:24px auto; max-width:640px;';
+            errorDiv.innerHTML = `
+                <div class="creator-hero-badge" style="background:rgba(94,52,53,0.12); color:#5E3435; display:inline-block; margin-bottom:14px; padding:4px 12px; border-radius:20px; font-size:0.75rem; font-weight:700; letter-spacing:1px;">UNABLE TO LOAD</div>
+                <h2 id="creator-error-title" style="font-family:var(--wr-font-heading); color:var(--wr-primary); font-size:1.6rem; margin:0 0 10px 0; text-transform:uppercase;">Unable to verify Creator status</h2>
+                <p id="creator-error-desc" style="color:var(--wr-text-muted); font-size:0.95rem; max-width:480px; margin:0 auto 24px auto; line-height:1.5;">We encountered an issue checking your Creator account. Please refresh or try again.</p>
+                <div style="display:flex; justify-content:center; gap:12px;">
+                    <button type="button" class="btn btn-outline-dark" onclick="window.loadCustomerCreatorStatus()" style="padding: 10px 24px; font-weight: 600;">↻ RETRY</button>
+                </div>
+            `;
+            creatorPane.appendChild(errorDiv);
+            states.error = errorDiv;
+        }
+    }
+
+    // Hide all containers
+    Object.keys(states).forEach((key) => {
+        if (states[key]) states[key].style.display = 'none';
+    });
+
+    // Show the active state
+    if (activeStateKey && states[activeStateKey]) {
+        states[activeStateKey].style.display = 'block';
+    }
+
+    // Specialized sub-state controls
+    if (activeStateKey === 'onboard') {
+        const formCard = document.getElementById('creator-onboard-form-card');
+        const heroCard = document.querySelector('.creator-onboard-hero') || document.getElementById('creator-onboard-hero');
+        if (heroCard) heroCard.style.display = 'block';
+        if (formCard) formCard.style.display = options.showForm ? 'block' : 'none';
+        updateCreatorHeroCTA(false);
+    } else if (activeStateKey === 'signin') {
+        const formCard = document.getElementById('creator-onboard-form-card');
+        if (formCard) formCard.style.display = 'none';
+    } else if (activeStateKey === 'error') {
+        if (options.title) {
+            const titleEl = document.getElementById('creator-error-title');
+            if (titleEl) titleEl.innerText = options.title;
+        }
+        if (options.desc) {
+            const descEl = document.getElementById('creator-error-desc');
+            if (descEl) descEl.innerText = options.desc;
+        }
+    }
+}
+window.setCreatorUIState = setCreatorUIState;
+
+/**
  * Loads authoritatively whether current customer has an active creator profile
  */
 let _authRetryTimeoutId = null;
+let _activeStatusRequestId = 0;
 
 async function loadCustomerCreatorStatus() {
-    const onboardState = document.getElementById('creator-onboard-state');
-    const dashboardState = document.getElementById('creator-dashboard-state');
-    const reviewState = document.getElementById('creator-review-state');
-    const loadingState = document.getElementById('creator-loading-state');
+    const requestId = ++_activeStatusRequestId;
 
-    // Keep loading indicator active during check
-    if (loadingState) loadingState.style.display = 'block';
-    if (onboardState) onboardState.style.display = 'none';
-    if (dashboardState) dashboardState.style.display = 'none';
-    if (reviewState) reviewState.style.display = 'none';
+    // Mutually exclusive: Show Loading, hide all others
+    setCreatorUIState('loading');
 
     // Wait for Supabase auth readiness before making request
     let isAuthReady = false;
@@ -440,20 +529,20 @@ async function loadCustomerCreatorStatus() {
         const headers = await getAuthHeaders();
         const hasAuthHeader = Boolean(headers['Authorization']);
 
-        // FIX 3: If authentication is unresolved / not confirmed, do NOT show onboarding prematurely
-        if (!isAuthReady && !hasAuthHeader) {
-            // Check if a customer session might still be hydrating in the background
-            const client = window.supabaseClient || (typeof supabaseClient !== 'undefined' ? supabaseClient : null);
-            const hasPossibleStoredSession = Boolean(localStorage.getItem('sb-' + (window.SUPABASE_PROJECT_ID || 'ptpuepejciqiktmcpuon') + '-auth-token') || localStorage.getItem('wishrite_auth_token'));
-            
-            if (hasPossibleStoredSession && !_authRetryTimeoutId) {
-                console.log('[WishRite Creator] Session restoration pending after timeout. Holding loading state and scheduling retry.');
-                _authRetryTimeoutId = setTimeout(() => {
-                    _authRetryTimeoutId = null;
-                    loadCustomerCreatorStatus();
-                }, 1500);
-                return;
-            }
+        // Check if a customer session might still be hydrating in the background
+        const hasStoredToken = Boolean(
+            localStorage.getItem('sb-ptpuepejciqiktmcpuon-auth-token') ||
+            localStorage.getItem('wishrite_auth_token') ||
+            localStorage.getItem('wishrite_creator_token')
+        );
+
+        if (!hasAuthHeader && hasStoredToken && !_authRetryTimeoutId) {
+            console.log('[WishRite Creator] Session restoration pending with stored token. Holding loading state and scheduling retry.');
+            _authRetryTimeoutId = setTimeout(() => {
+                _authRetryTimeoutId = null;
+                loadCustomerCreatorStatus();
+            }, 1200);
+            return;
         }
 
         const res = await fetch('/api/creator/status', { 
@@ -461,9 +550,38 @@ async function loadCustomerCreatorStatus() {
             signal: controller?.signal 
         });
         if (timeoutId) clearTimeout(timeoutId);
-        const data = await res.json();
 
-        if (data.success && data.is_creator && data.creator) {
+        // Guard against race conditions and stale out-of-order responses
+        if (requestId !== _activeStatusRequestId) return;
+
+        // Handle HTTP 401 Unauthorized / Session Expired
+        if (res.status === 401) {
+            currentCreatorData = null;
+            setCreatorUIState('signin');
+            return;
+        }
+
+        // Handle HTTP 403 Forbidden / Creator Access Suspended
+        if (res.status === 403) {
+            currentCreatorData = null;
+            setCreatorUIState('review');
+            const reviewState = document.getElementById('creator-review-state');
+            if (reviewState) {
+                reviewState.innerHTML = `
+                    <div style="width:56px; height:56px; background:#fff5f5; border:2px solid #e53e3e; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; color:#e53e3e; font-size:24px; margin-bottom:16px;">✕</div>
+                    <h3 style="color:#9b2c2c; margin-bottom:8px;">Creator Access Unavailable</h3>
+                    <p style="color:var(--wr-text-muted); font-size:0.92rem; max-width:480px; margin:0 auto;">Your Creator Club account is currently inactive or under review. Please contact WishRite support for assistance.</p>
+                `;
+            }
+            return;
+        }
+
+        let data = null;
+        try {
+            data = await res.json();
+        } catch (_) {}
+
+        if (res.ok && data?.success && data?.is_creator && data?.creator) {
             currentCreatorData = data;
             if (data.token) {
                 localStorage.setItem('wishrite_creator_token', data.token);
@@ -473,45 +591,44 @@ async function loadCustomerCreatorStatus() {
 
             const creatorStatus = (data.status || data.creator.status || '').toLowerCase();
             if (creatorStatus === 'under_review' || creatorStatus === 'pending') {
-                if (reviewState) reviewState.style.display = 'block';
+                setCreatorUIState('review');
             } else {
-                if (dashboardState) dashboardState.style.display = 'block';
+                setCreatorUIState('dashboard');
                 renderCreatorDashboard(data);
             }
             updateCreatorHeroCTA(true);
-        } else {
-            // If the server explicitly confirms customer is logged in AND is not a creator, then show onboarding
-            // But if user is completely unauthenticated (401 or is_authenticated === false), keep user in clean prompt
-            if (data?.authenticated === false || !headers['Authorization']) {
-                console.log('[WishRite Creator] Customer is not logged in.');
-            }
-
+        } else if (res.ok && data?.success && data?.is_authenticated === true && data?.is_creator === false) {
+            // ONLY show onboarding when the server explicitly confirms customer is logged in AND is_creator is false
             currentCreatorData = null;
-            if (onboardState) onboardState.style.display = 'block';
-            const heroCard = document.querySelector('.creator-onboard-hero') || document.getElementById('creator-onboard-hero');
-            const formCard = document.getElementById('creator-onboard-form-card');
-            if (heroCard) heroCard.style.display = 'block';
-            if (formCard) formCard.style.display = 'none';
-            updateCreatorHeroCTA(false);
+            setCreatorUIState('onboard');
             prefillOnboardingForm();
+        } else if (data?.is_authenticated === false || !hasAuthHeader) {
+            // Unauthenticated visitor
+            currentCreatorData = null;
+            setCreatorUIState('signin');
+        } else {
+            // Server error / unexpected response (5xx or malformed)
+            currentCreatorData = null;
+            setCreatorUIState('error');
         }
     } catch (err) {
         console.error('Error checking creator status:', err);
-        // On recoverable network or abort error, do not flash onboard state if user might already be logged in
+        if (requestId !== _activeStatusRequestId) return;
         if (currentCreatorData?.is_creator) {
-            if (dashboardState) dashboardState.style.display = 'block';
+            setCreatorUIState('dashboard');
         } else {
-            if (onboardState) onboardState.style.display = 'block';
-            const heroCard = document.querySelector('.creator-onboard-hero') || document.getElementById('creator-onboard-hero');
-            const formCard = document.getElementById('creator-onboard-form-card');
-            if (heroCard) heroCard.style.display = 'block';
-            if (formCard) formCard.style.display = 'none';
-            updateCreatorHeroCTA(false);
-            prefillOnboardingForm();
+            setCreatorUIState('error', {
+                title: 'Unable to connect',
+                desc: 'A network error occurred while checking Creator status. Please verify your connection and try again.'
+            });
         }
     } finally {
         if (timeoutId) clearTimeout(timeoutId);
-        if (loadingState && !_authRetryTimeoutId) loadingState.style.display = 'none';
+        if (_authRetryTimeoutId) {
+            // If retry is scheduled, preserve loading state
+            const loadingState = document.getElementById('creator-loading-state');
+            if (loadingState) loadingState.style.display = 'block';
+        }
     }
 }
 window.loadCustomerCreatorStatus = loadCustomerCreatorStatus;

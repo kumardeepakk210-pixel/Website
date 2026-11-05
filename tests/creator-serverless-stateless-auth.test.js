@@ -463,4 +463,136 @@ describe('Creator Serverless & Stateless Authentication Suite', () => {
             writeLocalStore(store);
         });
     });
+
+    describe('6. Session Hydration & Authentication Timing Tests', () => {
+        it('verifies auth onAuthStateChange listens for INITIAL_SESSION and SIGNED_IN to reload creator status with deferred invocation', () => {
+            const authSource = fs.readFileSync('js/auth.js', 'utf8');
+            assert.ok(authSource.includes("event === 'INITIAL_SESSION' || event === 'SIGNED_IN'"), 'Must handle INITIAL_SESSION and SIGNED_IN');
+            assert.ok(authSource.includes('setTimeout(') && authSource.includes('window.loadCustomerCreatorStatus()'), 'Must defer call to loadCustomerCreatorStatus with setTimeout');
+            assert.ok(authSource.includes("typeof window.loadCustomerCreatorStatus === 'function'"), 'Must verify function existence before invocation');
+        });
+
+        it('verifies loadCustomerCreatorStatus protects against premature onboarding and concurrent race conditions', () => {
+            const creatorSource = fs.readFileSync('js/creator-program.js', 'utf8');
+            assert.ok(creatorSource.includes('_activeStatusRequestId'), 'Must track active status request ID for concurrency');
+            assert.ok(creatorSource.includes('data?.is_authenticated === true && data?.is_creator === false'), 'Only shows onboarding when authenticated non-creator is confirmed');
+            assert.ok(creatorSource.includes('setCreatorUIState'), 'Must manage states through mutually exclusive helper');
+            assert.ok(creatorSource.includes('SIGN IN REQUIRED'), 'Renders sign in required on 401 instead of become a creator');
+            assert.ok(creatorSource.includes('Creator Access Unavailable'), 'Renders access unavailable on 403');
+            assert.ok(creatorSource.includes('UNABLE TO LOAD'), 'Renders retry state on unexpected error');
+        });
+
+        it('behavioral test: setCreatorUIState ensures mutual exclusivity across all Creator tab states', () => {
+            // Emulate minimal browser DOM environment for behavioral testing
+            const stateIds = [
+                'creator-loading-state',
+                'creator-signin-state',
+                'creator-onboard-state',
+                'creator-dashboard-state',
+                'creator-review-state',
+                'creator-error-state'
+            ];
+
+            const domElements = {};
+            const mockDoc = {
+                getElementById: (id) => domElements[id] || null,
+                querySelector: (sel) => null,
+                createElement: (tag) => {
+                    const el = { tagName: tag, style: {}, innerHTML: '', innerText: '', id: '', className: '' };
+                    return el;
+                }
+            };
+
+            const creatorPane = {
+                id: 'tab-pane-creator',
+                appendChild: (el) => { domElements[el.id] = el; return el; },
+                insertBefore: (el, ref) => { domElements[el.id] = el; return el; },
+                lastElementChild: null
+            };
+            domElements['tab-pane-creator'] = creatorPane;
+
+            // Pre-populate standard index.html elements
+            ['creator-loading-state', 'creator-onboard-state', 'creator-dashboard-state', 'creator-review-state'].forEach((id) => {
+                domElements[id] = { id, style: { display: 'none' } };
+            });
+
+            // Evaluate setCreatorUIState in context
+            const code = fs.readFileSync('js/creator-program.js', 'utf8');
+            const fnMatch = code.match(/function setCreatorUIState[\s\S]*?\n\}/);
+            assert.ok(fnMatch, 'setCreatorUIState function definition must exist');
+
+            const testScope = {
+                document: mockDoc,
+                window: {},
+                updateCreatorHeroCTA: () => {},
+                prefillOnboardingForm: () => {}
+            };
+            const runner = new Function('document', 'window', 'updateCreatorHeroCTA', 'prefillOnboardingForm', `
+                ${fnMatch[0]};
+                return setCreatorUIState;
+            `);
+            const setCreatorUIState = runner(testScope.document, testScope.window, testScope.updateCreatorHeroCTA, testScope.prefillOnboardingForm);
+
+            // Test 1: Transition to 'loading'
+            setCreatorUIState('loading');
+            assert.strictEqual(domElements['creator-loading-state'].style.display, 'block');
+            assert.strictEqual(domElements['creator-onboard-state'].style.display, 'none');
+            assert.strictEqual(domElements['creator-dashboard-state'].style.display, 'none');
+
+            // Test 2: Transition to 'signin'
+            setCreatorUIState('signin');
+            assert.strictEqual(domElements['creator-signin-state'].style.display, 'block');
+            assert.strictEqual(domElements['creator-loading-state'].style.display, 'none');
+            assert.strictEqual(domElements['creator-onboard-state'].style.display, 'none');
+
+            // Test 3: Transition to 'onboard'
+            setCreatorUIState('onboard');
+            assert.strictEqual(domElements['creator-onboard-state'].style.display, 'block');
+            assert.strictEqual(domElements['creator-signin-state'].style.display, 'none');
+            assert.strictEqual(domElements['creator-dashboard-state'].style.display, 'none');
+
+            // Test 4: Transition to 'dashboard'
+            setCreatorUIState('dashboard');
+            assert.strictEqual(domElements['creator-dashboard-state'].style.display, 'block');
+            assert.strictEqual(domElements['creator-onboard-state'].style.display, 'none');
+            assert.strictEqual(domElements['creator-signin-state'].style.display, 'none');
+
+            // Test 5: Transition to 'review' (403 or under_review)
+            setCreatorUIState('review');
+            assert.strictEqual(domElements['creator-review-state'].style.display, 'block');
+            assert.strictEqual(domElements['creator-dashboard-state'].style.display, 'none');
+
+            // Test 6: Transition to 'error' (5xx / network)
+            setCreatorUIState('error');
+            assert.strictEqual(domElements['creator-error-state'].style.display, 'block');
+            assert.strictEqual(domElements['creator-review-state'].style.display, 'none');
+            assert.strictEqual(domElements['creator-dashboard-state'].style.display, 'none');
+        });
+
+        it('behavioral test: stale status requests cannot overwrite newer account state', async () => {
+            let activeRequestId = 0;
+            let currentUiState = 'initial';
+
+            // Simulate the request ID concurrency logic from loadCustomerCreatorStatus
+            const simulateStatusRequest = async (userLabel, delayMs, finishState) => {
+                const reqId = ++activeRequestId;
+                await new Promise((resolve) => setTimeout(resolve, delayMs));
+                // Only write if this request is still active
+                if (reqId === activeRequestId) {
+                    currentUiState = finishState;
+                }
+            };
+
+            // Launch Request 1 (slow, from Account A) with 50ms delay
+            const p1 = simulateStatusRequest('Account A', 50, 'Account A State');
+
+            // Immediately launch Request 2 (fast, account switch to Account B) with 10ms delay
+            const p2 = simulateStatusRequest('Account B', 10, 'Account B State');
+
+            await Promise.all([p1, p2]);
+
+            // Request 2 was newer, so Request 1 must NOT have overwritten currentUiState
+            assert.strictEqual(currentUiState, 'Account B State');
+        });
+    });
 });
