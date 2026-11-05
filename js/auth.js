@@ -154,6 +154,26 @@ function maskEmail(email) {
 }
 window.maskEmail = maskEmail;
 
+function maskDestination(identifier, type = 'email') {
+    if (!identifier) return '';
+    if (type === 'email' || identifier.includes('@')) {
+        return maskEmail(identifier);
+    }
+    // Phone masking: e.g. +919876543210 -> +91******3210 or 98******10
+    const str = String(identifier).trim();
+    if (str.startsWith('+91') && str.length >= 12) {
+        return `+91******${str.slice(-4)}`;
+    }
+    if (str.length === 10) {
+        return `+91******${str.slice(-4)}`;
+    }
+    if (str.length > 5) {
+        return `${str.slice(0, 3)}****${str.slice(-2)}`;
+    }
+    return str;
+}
+window.maskDestination = maskDestination;
+
 
 // ─────────────────────────────────────────────
 // Login Method Switch
@@ -263,12 +283,71 @@ function toggleUserDropdown(event) {
 
 
 // ─────────────────────────────────────────────
-// EMAIL OTP AUTHENTICATION SYSTEM
+// UNIFIED PASSWORDLESS OTP AUTHENTICATION SYSTEM (EMAIL & WHATSAPP)
 // ─────────────────────────────────────────────
 
 let otpTimerInterval = null;
 let otpTimerSeconds = 0;
 let pendingOTPEmail = '';
+let pendingOTPPhone = '';
+let pendingOTPChannel = 'email'; // 'email' | 'whatsapp'
+
+/**
+ * Normalizes input and detects whether it is an email address or mobile number
+ */
+function detectAuthIdentifier(input) {
+    if (!input || typeof input !== 'string') return null;
+    const trimmed = input.trim();
+
+    // 1. Check for email
+    if (trimmed.includes('@')) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (emailRegex.test(trimmed)) {
+            return {
+                type: 'email',
+                normalized: trimmed.toLowerCase(),
+                display: trimmed.toLowerCase()
+            };
+        }
+        return { type: 'invalid_email', error: 'Please enter a valid email address.' };
+    }
+
+    // 2. Check for Indian mobile number or E.164
+    const digitsOnly = trimmed.replace(/\D/g, '');
+
+    // Standard 10-digit Indian mobile (starts with 6, 7, 8, or 9)
+    if (digitsOnly.length === 10 && /^[6-9]/.test(digitsOnly)) {
+        return {
+            type: 'mobile',
+            normalized: `+91${digitsOnly}`,
+            display: `+91 ${digitsOnly}`
+        };
+    }
+
+    // 11 digits starting with 0 (e.g. 09876543210)
+    if (digitsOnly.length === 11 && digitsOnly.startsWith('0') && /^[6-9]/.test(digitsOnly.slice(1))) {
+        return {
+            type: 'mobile',
+            normalized: `+91${digitsOnly.slice(1)}`,
+            display: `+91 ${digitsOnly.slice(1)}`
+        };
+    }
+
+    // 12 digits starting with 91 (e.g. 919876543210 or +919876543210)
+    if (digitsOnly.length === 12 && digitsOnly.startsWith('91') && /^[6-9]/.test(digitsOnly.slice(2))) {
+        return {
+            type: 'mobile',
+            normalized: `+${digitsOnly}`,
+            display: `+91 ${digitsOnly.slice(2)}`
+        };
+    }
+
+    return {
+        type: 'invalid',
+        error: 'Please enter a valid 10-digit mobile number or email address.'
+    };
+}
+window.detectAuthIdentifier = detectAuthIdentifier;
 
 function startOTPTimer(duration = 45) {
     if (otpTimerInterval) {
@@ -304,16 +383,20 @@ function startOTPTimer(duration = 45) {
     }, 1000);
 }
 
-function resetEmailOTPFlow() {
+function resetUnifiedOTPFlow() {
     if (otpTimerInterval) {
         clearInterval(otpTimerInterval);
         otpTimerInterval = null;
     }
 
+    pendingOTPEmail = '';
+    pendingOTPPhone = '';
+    pendingOTPChannel = 'email';
+
     const requestForm = document.getElementById('email-otp-request-form');
     const verifyForm = document.getElementById('email-otp-verify-form');
     const onboardingContainer = document.getElementById('email-onboarding-container');
-    const emailInput = document.getElementById('login-email');
+    const unifiedInput = document.getElementById('login-identifier') || document.getElementById('login-email');
 
     if (requestForm) requestForm.style.display = 'block';
     if (verifyForm) verifyForm.style.display = 'none';
@@ -329,10 +412,14 @@ function resetEmailOTPFlow() {
     }
 
     setAuthMessage('login-message', '');
-    if (emailInput) {
-        emailInput.disabled = false;
-        emailInput.focus();
+    if (unifiedInput) {
+        unifiedInput.disabled = false;
+        unifiedInput.focus();
     }
+}
+window.resetUnifiedOTPFlow = resetUnifiedOTPFlow;
+function resetEmailOTPFlow() {
+    resetUnifiedOTPFlow();
 }
 window.resetEmailOTPFlow = resetEmailOTPFlow;
 
@@ -395,28 +482,42 @@ function getEnteredOTP() {
     return otp;
 }
 
-async function sendEmailOTP() {
-    const emailInput = document.getElementById('login-email');
+async function sendUnifiedOTP() {
+    const identifierInput = document.getElementById('login-identifier');
+    const emailFallback = document.getElementById('login-email');
     const sendBtn = document.getElementById('email-send-otp-btn');
-    const email = emailInput?.value?.trim().toLowerCase();
+    const rawVal = identifierInput?.value?.trim() || emailFallback?.value?.trim();
 
     setAuthMessage('login-message', '');
 
-    if (!email || !email.includes('@') || !email.includes('.')) {
-        setAuthMessage('login-message', 'Please enter a valid email address.', 'error');
+    const detected = detectAuthIdentifier(rawVal);
+    if (!detected || detected.error) {
+        setAuthMessage('login-message', detected?.error || 'Please enter a valid 10-digit mobile number or email address.', 'error');
         return false;
+    }
+
+    // Update backwards-compatibility hidden fields
+    const emailField = document.getElementById('login-email');
+    const mobileField = document.getElementById('login-mobile');
+    if (detected.type === 'email') {
+        if (emailField) emailField.value = detected.normalized;
+        if (mobileField) mobileField.value = '';
+    } else if (detected.type === 'mobile') {
+        if (emailField) emailField.value = '';
+        if (mobileField) mobileField.value = detected.normalized.replace(/^\+91/, '');
     }
 
     // --- LOCAL E2E TEST LOGIN INTERCEPTOR ---
     const isLocalHost = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
     const isE2EAuthEnabled = (window.E2E_LOCAL_AUTH === true || window.E2E_LOCAL_AUTH === 'true');
 
-    if (isLocalHost && isE2EAuthEnabled && email === 'e2e.creator.customer@wishrite.local') {
+    if (isLocalHost && isE2EAuthEnabled && (detected.normalized === 'e2e.creator.customer@wishrite.local' || detected.normalized === '+919999999999')) {
         const localE2ESession = {
             auth_mode: 'local_e2e',
             customer_id: 'local-e2e-customer-id',
             customer_name: 'E2E Creator Customer',
-            customer_email: 'e2e.creator.customer@wishrite.local'
+            customer_email: 'e2e.creator.customer@wishrite.local',
+            customer_phone: '+919999999999'
         };
 
         try {
@@ -427,7 +528,7 @@ async function sendEmailOTP() {
         currentUser = {
             id: localE2ESession.customer_id,
             email: localE2ESession.customer_email,
-            phone: '',
+            phone: localE2ESession.customer_phone,
             auth_mode: 'local_e2e',
             user_metadata: {
                 full_name: localE2ESession.customer_name
@@ -439,7 +540,7 @@ async function sendEmailOTP() {
             id: localE2ESession.customer_id,
             customerId: localE2ESession.customer_id,
             name: localE2ESession.customer_name,
-            phone: '',
+            phone: localE2ESession.customer_phone,
             email: localE2ESession.customer_email,
             auth_mode: 'local_e2e'
         };
@@ -452,11 +553,7 @@ async function sendEmailOTP() {
         }
 
         if (typeof navigateTo === 'function') {
-            if (typeof navigateTo === 'function') {
             navigateTo('profile');
-        } else if (typeof window !== 'undefined' && typeof window.navigateTo === 'function') {
-            window.navigateTo('profile');
-        }
         } else if (typeof window !== 'undefined' && typeof window.navigateTo === 'function') {
             window.navigateTo('profile');
         }
@@ -474,28 +571,53 @@ async function sendEmailOTP() {
             sendBtn.innerText = 'Sending Code...';
         }
 
-        const { data, error } = await supabaseClient.auth.signInWithOtp({
-            email,
-            options: {
-                shouldCreateUser: true
-            }
-        });
+        let sendResult = null;
+
+        if (detected.type === 'email') {
+            pendingOTPEmail = detected.normalized;
+            pendingOTPPhone = '';
+            pendingOTPChannel = 'email';
+
+            sendResult = await supabaseClient.auth.signInWithOtp({
+                email: detected.normalized,
+                options: {
+                    shouldCreateUser: true
+                }
+            });
+        } else if (detected.type === 'mobile') {
+            pendingOTPPhone = detected.normalized;
+            pendingOTPEmail = '';
+            pendingOTPChannel = 'whatsapp';
+
+            sendResult = await supabaseClient.auth.signInWithOtp({
+                phone: detected.normalized,
+                options: {
+                    channel: 'sms',
+                    shouldCreateUser: true
+                }
+            });
+        }
+
+        const { data, error } = sendResult || {};
 
         if (error) {
             setAuthMessage('login-message', getFriendlyAuthErrorMessage(error.message), 'error');
             return false;
         }
 
-        pendingOTPEmail = email;
-
         // Transition to OTP verification state
         const requestForm = document.getElementById('email-otp-request-form');
         const verifyForm = document.getElementById('email-otp-verify-form');
-        const maskedEmailSpan = document.getElementById('otp-masked-email');
+        const maskedDestSpan = document.getElementById('otp-masked-destination') || document.getElementById('otp-masked-email');
 
         if (requestForm) requestForm.style.display = 'none';
         if (verifyForm) verifyForm.style.display = 'block';
-        if (maskedEmailSpan) maskedEmailSpan.innerText = maskEmail(email);
+
+        const displayMasked = maskDestination(detected.normalized, detected.type);
+        if (maskedDestSpan) {
+            maskedDestSpan.innerText = displayMasked;
+            maskedDestSpan.style.display = 'inline';
+        }
 
         startOTPTimer(45);
         setupOTPInputListeners();
@@ -504,48 +626,85 @@ async function sendEmailOTP() {
         const firstBox = document.getElementById('otp-digit-1');
         if (firstBox) firstBox.focus();
 
-        setAuthMessage('login-message', `Verification code sent to ${maskEmail(email)}`, 'success');
+        const channelLabel = detected.type === 'mobile' ? 'WhatsApp' : 'email';
+        setAuthMessage('login-message', `Verification code sent to ${channelLabel}: ${displayMasked}`, 'success');
         return true;
 
     } catch (err) {
-        console.error('sendEmailOTP exception:', err);
+        console.error('sendUnifiedOTP exception:', err);
         setAuthMessage('login-message', getFriendlyAuthErrorMessage(err.message), 'error');
         return false;
     } finally {
         if (sendBtn) {
             sendBtn.disabled = false;
-            sendBtn.innerText = 'Send OTP';
+            sendBtn.innerText = 'CONTINUE';
         }
     }
 }
+window.sendUnifiedOTP = sendUnifiedOTP;
+
+// Keep sendEmailOTP as alias
+async function sendEmailOTP() {
+    return await sendUnifiedOTP();
+}
 window.sendEmailOTP = sendEmailOTP;
+
+async function handleSendUnifiedOTP(e) {
+    if (e) e.preventDefault();
+    await sendUnifiedOTP();
+}
+window.handleSendUnifiedOTP = handleSendUnifiedOTP;
 
 async function handleSendEmailOTP(e) {
     if (e) e.preventDefault();
-    await sendEmailOTP();
+    await sendUnifiedOTP();
 }
 window.handleSendEmailOTP = handleSendEmailOTP;
 
-async function resendEmailOTP() {
-    const email = pendingOTPEmail || document.getElementById('login-email')?.value?.trim().toLowerCase();
-    if (!email) {
-        setAuthMessage('login-message', 'Please enter your email address first.', 'error');
-        return;
-    }
-
+async function resendUnifiedOTP() {
     const resendBtn = document.getElementById('email-resend-otp-btn');
     if (resendBtn) resendBtn.disabled = true;
 
     setAuthMessage('login-message', 'Sending new code...');
 
     try {
-        const { error } = await supabaseClient.auth.signInWithOtp({
-            email,
-            options: {
-                shouldCreateUser: true
+        let resendResult = null;
+        if (pendingOTPChannel === 'email' && pendingOTPEmail) {
+            resendResult = await supabaseClient.auth.signInWithOtp({
+                email: pendingOTPEmail,
+                options: { shouldCreateUser: true }
+            });
+        } else if (pendingOTPChannel === 'whatsapp' && pendingOTPPhone) {
+            resendResult = await supabaseClient.auth.signInWithOtp({
+                phone: pendingOTPPhone,
+                options: { channel: 'sms', shouldCreateUser: true }
+            });
+        } else {
+            // Fallback to reading identifier input
+            const inputVal = document.getElementById('login-identifier')?.value?.trim();
+            const detected = detectAuthIdentifier(inputVal);
+            if (detected?.type === 'email') {
+                pendingOTPEmail = detected.normalized;
+                pendingOTPChannel = 'email';
+                resendResult = await supabaseClient.auth.signInWithOtp({
+                    email: pendingOTPEmail,
+                    options: { shouldCreateUser: true }
+                });
+            } else if (detected?.type === 'mobile') {
+                pendingOTPPhone = detected.normalized;
+                pendingOTPChannel = 'whatsapp';
+                resendResult = await supabaseClient.auth.signInWithOtp({
+                    phone: pendingOTPPhone,
+                    options: { channel: 'sms', shouldCreateUser: true }
+                });
+            } else {
+                setAuthMessage('login-message', 'Missing phone or email address. Please start over.', 'error');
+                if (resendBtn) resendBtn.disabled = false;
+                return;
             }
-        });
+        }
 
+        const { error } = resendResult || {};
         if (error) {
             setAuthMessage('login-message', getFriendlyAuthErrorMessage(error.message), 'error');
             if (resendBtn) resendBtn.disabled = false;
@@ -553,7 +712,9 @@ async function resendEmailOTP() {
         }
 
         startOTPTimer(45);
-        setAuthMessage('login-message', `New code sent to ${maskEmail(email)}`, 'success');
+        const destination = pendingOTPChannel === 'email' ? pendingOTPEmail : pendingOTPPhone;
+        const channelLabel = pendingOTPChannel === 'email' ? 'email' : 'WhatsApp';
+        setAuthMessage('login-message', `New code sent to ${channelLabel}: ${maskDestination(destination, pendingOTPChannel)}`, 'success');
 
         // Clear boxes & focus first
         for (let i = 1; i <= 6; i++) {
@@ -571,18 +732,33 @@ async function resendEmailOTP() {
         if (resendBtn) resendBtn.disabled = false;
     }
 }
+window.resendUnifiedOTP = resendUnifiedOTP;
+
+async function resendEmailOTP() {
+    return await resendUnifiedOTP();
+}
 window.resendEmailOTP = resendEmailOTP;
 
-async function verifyEmailOTP() {
-    const email = pendingOTPEmail || document.getElementById('login-email')?.value?.trim().toLowerCase();
+async function verifyUnifiedOTP() {
     const otp = getEnteredOTP();
     const verifyBtn = document.getElementById('email-verify-otp-btn');
 
     setAuthMessage('login-message', '');
 
-    if (!email) {
-        setAuthMessage('login-message', 'Missing email address. Please start over.', 'error');
-        return false;
+    if (!pendingOTPEmail && !pendingOTPPhone) {
+        // Attempt detection from login-identifier if state was refreshed
+        const inputVal = document.getElementById('login-identifier')?.value?.trim();
+        const detected = detectAuthIdentifier(inputVal);
+        if (detected?.type === 'email') {
+            pendingOTPEmail = detected.normalized;
+            pendingOTPChannel = 'email';
+        } else if (detected?.type === 'mobile') {
+            pendingOTPPhone = detected.normalized;
+            pendingOTPChannel = 'whatsapp';
+        } else {
+            setAuthMessage('login-message', 'Missing destination. Please enter your mobile or email again.', 'error');
+            return false;
+        }
     }
 
     if (!otp || otp.length !== 6) {
@@ -603,11 +779,23 @@ async function verifyEmailOTP() {
 
         setAuthMessage('login-message', 'Verifying code...');
 
-        const { data, error } = await supabaseClient.auth.verifyOtp({
-            email,
-            token: otp,
-            type: 'email'
-        });
+        let verifyResult = null;
+
+        if (pendingOTPChannel === 'email' && pendingOTPEmail) {
+            verifyResult = await supabaseClient.auth.verifyOtp({
+                email: pendingOTPEmail,
+                token: otp,
+                type: 'email'
+            });
+        } else if (pendingOTPChannel === 'whatsapp' && pendingOTPPhone) {
+            verifyResult = await supabaseClient.auth.verifyOtp({
+                phone: pendingOTPPhone,
+                token: otp,
+                type: 'sms'
+            });
+        }
+
+        const { data, error } = verifyResult || {};
 
         if (error) {
             setAuthMessage('login-message', getFriendlyAuthErrorMessage(error.message), 'error');
@@ -629,7 +817,7 @@ async function verifyEmailOTP() {
 
         updateAuthDropdown();
 
-        // Check if customer profile exists
+        // Check if customer profile exists by user_id, customer_email or customer_phone
         let customerRecord = null;
         if (currentUser.id) {
             const { data: byUid } = await supabaseClient
@@ -640,13 +828,30 @@ async function verifyEmailOTP() {
             customerRecord = byUid;
         }
 
-        if (!customerRecord && email) {
+        if (!customerRecord && currentUser.email) {
             const { data: byEmail } = await supabaseClient
                 .from('customers')
                 .select('id, user_id, customer_email, customer_phone, customer_name')
-                .ilike('customer_email', email)
+                .ilike('customer_email', currentUser.email.toLowerCase())
                 .maybeSingle();
             customerRecord = byEmail;
+        }
+
+        const phoneToCheck = currentUser.phone || pendingOTPPhone;
+        if (!customerRecord && phoneToCheck) {
+            const cleanDigits = phoneToCheck.replace(/\D/g, '');
+            const phoneVariants = [cleanDigits, '+91' + cleanDigits, '91' + cleanDigits];
+            for (const p of phoneVariants) {
+                const { data: byPhone } = await supabaseClient
+                    .from('customers')
+                    .select('id, user_id, customer_email, customer_phone, customer_name')
+                    .eq('customer_phone', p)
+                    .maybeSingle();
+                if (byPhone) {
+                    customerRecord = byPhone;
+                    break;
+                }
+            }
         }
 
         // If user is brand new and has no customer record or missing name/phone, show onboarding step
@@ -667,7 +872,8 @@ async function verifyEmailOTP() {
                 }
                 const phoneInput = document.getElementById('onboarding-mobile');
                 if (phoneInput) {
-                    phoneInput.value = (currentUser.phone || currentUser.user_metadata?.phone || '').replace(/^\+91/, '');
+                    const existingPhone = currentUser.phone || pendingOTPPhone || '';
+                    phoneInput.value = existingPhone.replace(/^\+91/, '').replace(/^91/, '');
                 }
             }
             setAuthMessage('login-message', '');
@@ -675,7 +881,9 @@ async function verifyEmailOTP() {
         }
 
         // Existing customer: sync customer profile directly without onboarding
-        await syncCustomerProfile(currentUser);
+        await syncCustomerProfile(currentUser, {
+            phone: currentUser.phone || pendingOTPPhone || null
+        });
 
         setAuthMessage('login-message', '');
 
@@ -684,11 +892,7 @@ async function verifyEmailOTP() {
         }
 
         if (typeof navigateTo === 'function') {
-            if (typeof navigateTo === 'function') {
             navigateTo('profile');
-        } else if (typeof window !== 'undefined' && typeof window.navigateTo === 'function') {
-            window.navigateTo('profile');
-        }
         } else if (typeof window !== 'undefined' && typeof window.navigateTo === 'function') {
             window.navigateTo('profile');
         }
@@ -696,7 +900,7 @@ async function verifyEmailOTP() {
         return true;
 
     } catch (err) {
-        console.error('verifyEmailOTP error:', err);
+        console.error('verifyUnifiedOTP error:', err);
         setAuthMessage('login-message', getFriendlyAuthErrorMessage(err.message), 'error');
         return false;
     } finally {
@@ -706,11 +910,22 @@ async function verifyEmailOTP() {
         }
     }
 }
+window.verifyUnifiedOTP = verifyUnifiedOTP;
+
+async function verifyEmailOTP() {
+    return await verifyUnifiedOTP();
+}
 window.verifyEmailOTP = verifyEmailOTP;
+
+async function handleVerifyUnifiedOTP(e) {
+    if (e) e.preventDefault();
+    await verifyUnifiedOTP();
+}
+window.handleVerifyUnifiedOTP = handleVerifyUnifiedOTP;
 
 async function handleVerifyEmailOTP(e) {
     if (e) e.preventDefault();
-    await verifyEmailOTP();
+    await verifyUnifiedOTP();
 }
 window.handleVerifyEmailOTP = handleVerifyEmailOTP;
 
@@ -1331,6 +1546,32 @@ async function syncCustomerProfile(user, extraData = {}) {
 
             if (!errEmail && byEmail) {
                 existingCustomer = byEmail;
+            }
+        }
+
+        // 3. If not found by email, check by customer_phone (with and without +91)
+        if (!existingCustomer && phone) {
+            const cleanDigits = String(phone).replace(/\D/g, '');
+            const phoneVariants = [];
+            if (cleanDigits.length === 10) {
+                phoneVariants.push(cleanDigits, '+91' + cleanDigits, '91' + cleanDigits);
+            } else if (cleanDigits.length === 12 && cleanDigits.startsWith('91')) {
+                phoneVariants.push('+' + cleanDigits, cleanDigits.slice(2), cleanDigits);
+            } else {
+                phoneVariants.push(phone);
+            }
+
+            for (const pVariant of phoneVariants) {
+                const { data: byPhone, error: errPhone } = await supabaseClient
+                    .from('customers')
+                    .select('id, user_id, customer_email, customer_phone, customer_name')
+                    .eq('customer_phone', pVariant)
+                    .maybeSingle();
+
+                if (!errPhone && byPhone) {
+                    existingCustomer = byPhone;
+                    break;
+                }
             }
         }
 

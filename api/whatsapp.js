@@ -61,6 +61,135 @@ module.exports = async function handler(req, res) {
         }
     }
 
+    // 3. POST /api/whatsapp/send-otp — Supabase Auth Custom Send SMS Hook
+    // Invoked by Supabase Auth when a customer triggers phone OTP (signInWithOtp)
+    if ((subPath === '/send-otp' || subPath === '/send-sms') && method === 'POST') {
+        try {
+            const body = req.body || {};
+            // Supabase Send SMS hook sends: { user: { id, phone }, sms: { otp } }
+            // Or direct payload: { phone, otp }
+            const rawPhone = body.user?.phone || body.phone;
+            const otp = body.sms?.otp || body.otp;
+
+            if (!rawPhone || !otp) {
+                return res.status(400).json({
+                    error: { message: 'Missing phone or OTP parameter' }
+                });
+            }
+
+            // Clean & normalize phone number
+            const phoneDigits = String(rawPhone).replace(/\D/g, '');
+            let destinationPhone = phoneDigits;
+            // For Indian numbers without country code (10 digits), prepend 91
+            if (phoneDigits.length === 10) {
+                destinationPhone = '91' + phoneDigits;
+            }
+
+            // Check Hook Shared Secret if configured
+            const hookSecret = process.env.SUPABASE_SMS_HOOK_SECRET;
+            if (hookSecret) {
+                const authHeader = req.headers['authorization'] || '';
+                const incomingSecret = authHeader.replace(/^Bearer\s+/i, '').trim();
+                if (incomingSecret !== hookSecret) {
+                    console.warn('[WhatsApp Auth Hook] Unauthorized hook request: secret mismatch.');
+                    return res.status(401).json({ error: { message: 'Unauthorized' } });
+                }
+            }
+
+            // Check if mock mode is active (for automated tests or explicit local dev without Meta credentials)
+            const isTestEnv = process.env.NODE_ENV === 'test';
+            const isExplicitLocalMock = (process.env.LOCAL_WHATSAPP_MOCK === 'true' || process.env.LOCAL_WHATSAPP_MOCK === true);
+            const whatsappToken = process.env.WHATSAPP_ACCESS_TOKEN || process.env.META_WHATSAPP_TOKEN || process.env.WHATSAPP_TOKEN;
+            const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID || process.env.META_PHONE_NUMBER_ID;
+            const templateName = process.env.WHATSAPP_AUTH_TEMPLATE_NAME || 'wishrite_auth_otp';
+            const templateLang = process.env.WHATSAPP_AUTH_TEMPLATE_LANG || 'en';
+
+            if (isTestEnv || isExplicitLocalMock) {
+                console.log(`[WhatsApp Auth Hook] (MOCK/TEST) Delivered OTP to ${destinationPhone.slice(0, 4)}****${destinationPhone.slice(-2)}`);
+                return res.status(200).json({
+                    success: true,
+                    mock: true,
+                    destination: destinationPhone.slice(0, 4) + '****' + destinationPhone.slice(-2)
+                });
+            }
+
+            // Production delivery requires valid Meta Cloud API credentials
+            if (!whatsappToken || !phoneNumberId) {
+                console.error('[WhatsApp Auth Hook] Meta WhatsApp credentials not configured on server.');
+                return res.status(500).json({
+                    error: { message: 'WhatsApp Cloud API credentials not configured' }
+                });
+            }
+
+            const graphApiVersion = process.env.META_GRAPH_API_VERSION || 'v26.0';
+            const metaEndpoint = `https://graph.facebook.com/${graphApiVersion}/${phoneNumberId}/messages`;
+
+            // Standard Meta WhatsApp Authentication Template Body
+            const metaPayload = {
+                messaging_product: 'whatsapp',
+                recipient_type: 'individual',
+                to: destinationPhone,
+                type: 'template',
+                template: {
+                    name: templateName,
+                    language: {
+                        code: templateLang
+                    },
+                    components: [
+                        {
+                            type: 'body',
+                            parameters: [
+                                {
+                                    type: 'text',
+                                    text: String(otp)
+                                }
+                            ]
+                        },
+                        {
+                            type: 'button',
+                            sub_type: 'url',
+                            index: '0',
+                            parameters: [
+                                {
+                                    type: 'text',
+                                    text: String(otp)
+                                }
+                            ]
+                        }
+                    ]
+                }
+            };
+
+            const metaRes = await fetch(metaEndpoint, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${whatsappToken}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(metaPayload)
+            });
+
+            const metaData = await metaRes.json();
+
+            if (!metaRes.ok) {
+                console.error('[WhatsApp Auth Hook] Meta API Error:', metaData?.error?.message || metaRes.statusText);
+                return res.status(502).json({
+                    error: {
+                        message: 'WhatsApp delivery failed',
+                        details: metaData?.error?.message
+                    }
+                });
+            }
+
+            console.log(`[WhatsApp Auth Hook] Successfully delivered WhatsApp OTP to destination.`);
+            return res.status(200).json({ success: true, messageId: metaData?.messages?.[0]?.id });
+
+        } catch (err) {
+            console.error('[WhatsApp Auth Hook] Internal exception:', err.message);
+            return res.status(500).json({ error: { message: 'Internal server error' } });
+        }
+    }
+
     // 404 for unknown subroutes
     res.status(404).json({ success: false, error: 'Endpoint not found' });
 };

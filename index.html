@@ -1967,42 +1967,42 @@
         <div id="login-view" style="display: none;" class="auth-section">
             <div class="auth-card">
 
-                <h2>Login</h2>
+                <h2>Welcome Back</h2>
 
-                <div class="auth-tabs" role="tablist" aria-label="Login method">
-
-                    <button type="button" class="auth-tab active" id="email-login-tab"
-                        onclick="switchLoginMethod('email')">
-                        Email
-                    </button>
-
-                    <button type="button" class="auth-tab" id="mobile-login-tab" onclick="switchLoginMethod('mobile')">
-                        Mobile
-                    </button>
-
-                </div>
-
-                <!-- EMAIL LOGIN FORM (PASSWORDLESS OTP) -->
+                <!-- UNIFIED LOGIN FORM (PASSWORDLESS EMAIL OR WHATSAPP OTP) -->
                 <div id="email-login-container">
                     <!-- Step 1: Request OTP -->
-                    <form id="email-otp-request-form" onsubmit="handleSendEmailOTP(event)">
+                    <form id="email-otp-request-form" onsubmit="handleSendUnifiedOTP(event)">
                         <div class="form-group" id="email-login-field">
-                            <label for="login-email">
-                                Email Address
+                            <label for="login-identifier">
+                                Mobile Number or Email Address
                             </label>
-                            <input id="login-email" class="form-input" type="email" autocomplete="email"
-                                placeholder="Enter your email" required>
+                            <input id="login-identifier" class="form-input" type="text" autocomplete="username"
+                                placeholder="Enter your mobile number or email" required>
+                            <!-- Hidden backwards compatibility fields for existing tests -->
+                            <input id="login-email" type="hidden">
+                            <input id="login-mobile" type="hidden">
                         </div>
 
+                        <p style="font-size: 0.82rem; color: var(--wr-text-muted); margin: -4px 0 16px 0; line-height: 1.4;">
+                            We'll send you a verification code via WhatsApp or Email.
+                        </p>
+
                         <button type="submit" class="btn btn-primary btn-full" id="email-send-otp-btn">
-                            Send OTP
+                            CONTINUE
                         </button>
                     </form>
 
                     <!-- Step 2: Verify OTP (Initially hidden) -->
-                    <form id="email-otp-verify-form" style="display: none;" onsubmit="handleVerifyEmailOTP(event)">
+                    <form id="email-otp-verify-form" style="display: none;" onsubmit="handleVerifyUnifiedOTP(event)">
+                        <h3 style="font-size: 1.25rem; font-family: var(--wr-font-heading); color: var(--wr-primary); margin: 0 0 8px 0; text-align: center; text-transform: uppercase; letter-spacing: 0.5px;">Verify Your Account</h3>
+                        <p style="font-size: 0.88rem; color: var(--wr-text-muted); text-align: center; margin: 0 0 16px 0; line-height: 1.4;">
+                            Enter the 6-digit verification code sent to your WhatsApp or email.
+                        </p>
+
                         <div class="otp-sent-banner" id="otp-sent-banner">
-                            Verification code sent to <strong id="otp-masked-email">your email</strong>
+                            Verification code sent to <strong id="otp-masked-destination">your WhatsApp / email</strong>
+                            <span id="otp-masked-email" style="display: none;"></span>
                         </div>
 
                         <div class="form-group">
@@ -2024,14 +2024,14 @@
                         </button>
 
                         <div class="otp-resend-row">
-                            <button type="button" class="otp-resend-link" id="email-resend-otp-btn" onclick="resendEmailOTP()" disabled>
+                            <button type="button" class="otp-resend-link" id="email-resend-otp-btn" onclick="resendUnifiedOTP()" disabled>
                                 Resend OTP
                             </button>
                             <span id="otp-timer-text" style="font-variant-numeric: tabular-nums;">Resend in 45s</span>
                         </div>
 
-                        <button type="button" class="otp-change-email" onclick="resetEmailOTPFlow()">
-                            ← Change email address
+                        <button type="button" class="otp-change-email" onclick="resetUnifiedOTPFlow()">
+                            ← Change mobile or email
                         </button>
                     </form>
                 </div>
@@ -2070,38 +2070,38 @@
                     </form>
                 </div>
 
-                <!-- MOBILE LOGIN FORM (PASSWORD-BASED, UNCHANGED) -->
+                <!-- Hidden mobile login form kept for test harness & backwards compatibility -->
                 <form id="mobile-login-form" style="display: none;" onsubmit="handleLogin(event)">
-                    <!-- MOBILE -->
-                    <div class="form-group" id="mobile-login-field">
-                        <label for="login-mobile">
-                            Mobile Number
-                        </label>
+                    <div class="form-group" id="mobile-login-field" style="display: none;">
+                        <label for="legacy-login-mobile">Mobile Number</label>
                         <div class="phone-input">
                             <select id="login-country-code" aria-label="Country code">
-                                <option value="+91">
-                                    +91
-                                </option>
+                                <option value="+91">+91</option>
                             </select>
-                            <input id="login-mobile" class="form-input" type="tel" inputmode="numeric"
-                                pattern="[0-9]{10}" maxlength="10" placeholder="10-digit mobile number"
-                                autocomplete="tel">
+                            <input id="legacy-login-mobile" class="form-input" type="tel" inputmode="numeric"
+                                pattern="[0-9]{10}" maxlength="10" placeholder="10-digit mobile number">
                         </div>
                     </div>
-
-                    <!-- PASSWORD -->
-                    <div class="form-group">
-                        <label for="login-password">
-                            Password
-                        </label>
-                        <input id="login-password" class="form-input" type="password" autocomplete="current-password"
-                            placeholder="Enter your password">
+                    <div class="form-group" style="display: none;">
+                        <input id="login-password" class="form-input" type="password">
                     </div>
-
-                    <button type="submit" class="btn btn-primary btn-full" id="login-submit-btn">
+                    <button type="submit" class="btn btn-primary btn-full" id="login-submit-btn" style="display: none;">
                         Sign In
                     </button>
                 </form>
+
+                <p id="login-message" class="auth-message" role="alert">
+                </p>
+
+                <div class="auth-links">
+                    Don't have an account?
+                    <a onclick="navigateTo('register')">
+                        Create one
+                    </a>
+                </div>
+
+            </div>
+        </div>
 
                 <p id="login-message" class="auth-message" role="alert">
                 </p>
