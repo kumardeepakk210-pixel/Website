@@ -1778,10 +1778,15 @@ async function initAuthSystem() {
                         window.resetCreatorAuthReadiness();
                     } catch (_) {}
                 }
-                if (event === 'SIGNED_OUT' && typeof window.cleanUpCreatorRealtimeSync === 'function') {
+                if (event === 'SIGNED_OUT') {
                     try {
-                        window.cleanUpCreatorRealtimeSync();
+                        localStorage.removeItem('wishrite_creator_token');
                     } catch (_) {}
+                    if (typeof window.cleanUpCreatorRealtimeSync === 'function') {
+                        try {
+                            window.cleanUpCreatorRealtimeSync();
+                        } catch (_) {}
+                    }
                 }
 
                 if (session?.user) {

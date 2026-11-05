@@ -43,11 +43,79 @@ export const CREATOR_USE_LOCAL_STORE = process.env.CREATOR_USE_LOCAL_STORE === '
 // Concurrency lock: Protects against double-click, concurrent requests, or repeated submission
 const onboardingLocks = new Set();
 
-// In-memory active creator sessions (token -> { accountId, influencerId, expiresAt, createdAt })
+// In-memory active creator sessions (fallback / local dev cache)
 const creatorSessions = new Map();
 
-// Session duration: 7 days
-const SESSION_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
+// Session duration: 24 hours for fallback stateless creator tokens (shorter lifetime; Supabase JWT preferred)
+const SESSION_DURATION_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Returns a dedicated secret key for HMAC stateless token signing across serverless instances.
+ * In production (NODE_ENV === 'production'), strictly requires CREATOR_SESSION_SECRET.
+ * In development / test, falls back to a dedicated local-only test secret.
+ */
+export function getCreatorHmacSecret() {
+    const secret = (process.env.CREATOR_SESSION_SECRET || '').trim();
+    if (secret) {
+        return secret;
+    }
+
+    if (process.env.NODE_ENV === 'production') {
+        throw new Error('[CREATOR AUTH CONFIG ERROR] Missing CREATOR_SESSION_SECRET in production environment.');
+    }
+
+    // Explicit local / test only fallback secret
+    return 'wishrite-dev-local-session-secret-key-32b';
+}
+
+/**
+ * Creates an HMAC-SHA256 signature for a string payload using the server secret.
+ */
+function signPayload(payloadStr) {
+    const secret = getCreatorHmacSecret();
+    return crypto.createHmac('sha256', secret).update(payloadStr).digest('base64url');
+}
+
+/**
+ * Verifies a stateless creator session token: crt.<base64urlPayload>.<signature>
+ */
+export function verifyCreatorSessionToken(token) {
+    if (!token || typeof token !== 'string') return null;
+    const parts = token.split('.');
+    if (parts.length !== 3 || parts[0] !== 'crt') return null;
+
+    const [prefix, payloadB64, signature] = parts;
+
+    let expectedSig;
+    try {
+        expectedSig = signPayload(`${prefix}.${payloadB64}`);
+    } catch (err) {
+        console.error('[verifyCreatorSessionToken Secret Error]:', err.message);
+        return null;
+    }
+
+    // Timing-safe comparison to prevent timing attacks
+    const sigBuf = Buffer.from(signature, 'utf8');
+    const expBuf = Buffer.from(expectedSig, 'utf8');
+    if (sigBuf.length !== expBuf.length || !crypto.timingSafeEqual(sigBuf, expBuf)) {
+        return null;
+    }
+
+    try {
+        const payloadStr = Buffer.from(payloadB64, 'base64url').toString('utf8');
+        const payload = JSON.parse(payloadStr);
+
+        if (!payload || typeof payload !== 'object') return null;
+        if (!payload.accountId || !payload.influencerId) return null;
+        if (payload.exp && payload.exp < Date.now()) {
+            return { expired: true, payload };
+        }
+
+        return { expired: false, payload };
+    } catch (_) {
+        return null;
+    }
+}
 
 // Rate limiting: max 5 failed attempts per 15 minutes per IP + identifier
 const loginRateLimits = new Map();
@@ -330,12 +398,24 @@ export async function getOrLinkInfluencerAccount({ email, influencer_id, auth_us
 }
 
 /**
- * Creates an active creator session token
+ * Creates an active creator session token (stateless HMAC-signed token)
  */
 export function issueCreatorSession(account, influencer) {
-    const token = `crt_${randomUUID().replace(/-/g, '')}${crypto.randomBytes(8).toString('hex')}`;
     const expiresAt = Date.now() + SESSION_DURATION_MS;
+    const payload = {
+        accountId: account.id,
+        influencerId: influencer.id,
+        email: account.email || influencer.email || '',
+        iat: Date.now(),
+        exp: expiresAt,
+        nonce: crypto.randomBytes(6).toString('hex')
+    };
+
+    const payloadB64 = Buffer.from(JSON.stringify(payload)).toString('base64url');
+    const signature = signPayload(`crt.${payloadB64}`);
+    const token = `crt.${payloadB64}.${signature}`;
     
+    // Also cache locally in memory for instant lookups in same runtime instance
     creatorSessions.set(token, {
         accountId: account.id,
         influencerId: influencer.id,
@@ -389,8 +469,76 @@ export async function requireCreatorAuth(req, res, next) {
         let matchedAccount = null;
         let matchedCreator = null;
 
-        // 1. Check in-memory creator session
-        if (creatorSessions.has(token)) {
+        // 1. Check stateless HMAC-signed creator session token (crt.<payload>.<sig>)
+        if (token.startsWith('crt.')) {
+            const verified = verifyCreatorSessionToken(token);
+            if (verified) {
+                if (verified.expired) {
+                    return res.status(401).json({
+                        success: false,
+                        error: {
+                            code: 'SESSION_EXPIRED',
+                            message: 'Session expired. Please log in again.'
+                        }
+                    });
+                }
+
+                const { accountId, influencerId, email } = verified.payload;
+
+                // 1a. Authoritatively resolve from Supabase
+                if (influencerId) {
+                    try {
+                        const queryOpts = { useAdmin: hasServerAdminCredential() };
+                        const dbInfs = await dbQuery('influencers', `influencer_id=eq.${encodeURIComponent(influencerId)}&limit=1`, queryOpts);
+                        if (Array.isArray(dbInfs) && dbInfs.length > 0) {
+                            matchedCreator = normalizeInfluencerRecord(dbInfs[0]);
+                        }
+                    } catch (_) {}
+                }
+
+                if (accountId) {
+                    try {
+                        const queryOpts = { useAdmin: hasServerAdminCredential() };
+                        const dbAccts = await dbQuery('influencer_accounts', `id=eq.${encodeURIComponent(accountId)}&limit=1`, queryOpts);
+                        if (Array.isArray(dbAccts) && dbAccts.length > 0) {
+                            matchedAccount = dbAccts[0];
+                        }
+                    } catch (_) {}
+                }
+
+                // 1b. Fallback to local store if Supabase did not return records (local test / offline store)
+                if ((!matchedAccount || !matchedCreator) && (CREATOR_USE_LOCAL_STORE || process.env.NODE_ENV === 'test')) {
+                    const local = readLocalStore();
+                    if (!matchedAccount && accountId) {
+                        matchedAccount = (local.accounts || []).find(a => a.id === accountId);
+                    }
+                    if (!matchedCreator && influencerId) {
+                        matchedCreator = (local.influencers || []).find(i => i.id === influencerId);
+                    }
+                }
+
+                // 1c. If creator record was confirmed in Supabase and matchedAccount wasn't explicitly fetched, reconstruct valid account
+                if (matchedCreator && !matchedAccount) {
+                    matchedAccount = {
+                        id: accountId,
+                        influencer_id: matchedCreator.id,
+                        email: email || matchedCreator.email,
+                        is_active: matchedCreator.status === 'active' || matchedCreator.status === 'pending'
+                    };
+                }
+            } else {
+                return res.status(401).json({
+                    success: false,
+                    error: {
+                        code: 'SESSION_EXPIRED',
+                        message: 'Session invalid or signature verification failed. Please log in again.'
+                    }
+                });
+            }
+        }
+
+        // 1b. Check legacy / in-memory creator session
+        if (!matchedCreator && creatorSessions.has(token)) {
             const session = creatorSessions.get(token);
             if (session.expiresAt < Date.now()) {
                 creatorSessions.delete(token);
@@ -1706,13 +1854,26 @@ export async function resolveCustomerIdentity(req) {
         }
     }
 
+    if (token && token.startsWith('crt.')) {
+        const verified = verifyCreatorSessionToken(token);
+        if (verified && !verified.expired) {
+            return {
+                userId: verified.payload.accountId,
+                email: verified.payload.email ? verified.payload.email.toLowerCase() : null,
+                influencerId: verified.payload.influencerId,
+                token
+            };
+        }
+    }
+
     if (token && creatorSessions.has(token)) {
         const sess = creatorSessions.get(token);
         if (sess.expiresAt > Date.now()) {
             return {
                 userId: sess.accountId,
                 email: sess.email?.toLowerCase(),
-                influencerId: sess.influencerId
+                influencerId: sess.influencerId,
+                token
             };
         }
     }

@@ -138,6 +138,7 @@ window.initCreatorRealtimeSync = initCreatorRealtimeSync;
 
 /**
  * Tears down Supabase Realtime channel on logout or account switch
+ * Cleans up subscriptions and resets cached creator content without deleting stored token during resubscription.
  */
 function cleanUpCreatorRealtimeSync() {
     if (creatorRealtimeChannel) {
@@ -156,6 +157,9 @@ function cleanUpCreatorRealtimeSync() {
     }
     resetCreatorAuthReadiness();
     currentCreatorData = null;
+    currentCreatorContent = [];
+    currentReelsList = [];
+    _activeContentLoadId++;
 }
 window.cleanUpCreatorRealtimeSync = cleanUpCreatorRealtimeSync;
 
@@ -353,14 +357,26 @@ async function getAuthHeaders() {
             const sessionPromise = client.auth.getSession();
             const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Auth getSession timeout')), 2500));
             const { data } = await Promise.race([sessionPromise, timeoutPromise]);
-            if (data?.session?.access_token) {
-                headers['Authorization'] = `Bearer ${data.session.access_token}`;
+            let session = data?.session;
+
+            // If session is expired or close to expiring (within 60s), proactively refresh it
+            if (session?.expires_at && (session.expires_at * 1000) < (Date.now() + 60000)) {
+                try {
+                    const { data: refreshData } = await client.auth.refreshSession();
+                    if (refreshData?.session) {
+                        session = refreshData.session;
+                    }
+                } catch (_) {}
             }
-            if (data?.session?.user?.email) {
-                headers['x-customer-email'] = data.session.user.email;
+
+            if (session?.access_token) {
+                headers['Authorization'] = `Bearer ${session.access_token}`;
             }
-            if (data?.session?.user?.id) {
-                headers['x-customer-id'] = data.session.user.id;
+            if (session?.user?.email) {
+                headers['x-customer-email'] = session.user.email;
+            }
+            if (session?.user?.id) {
+                headers['x-customer-id'] = session.user.id;
             }
         } catch (_) {}
     }
@@ -2048,19 +2064,84 @@ async function syncAllInstagramInsights() {
 }
 window.syncAllInstagramInsights = syncAllInstagramInsights;
 
+let _activeContentLoadId = 0;
+
 /**
  * Fetches and renders creator's submitted content in list/table view
  */
 async function loadCreatorContent(statusFilter = 'all') {
     currentContentFilter = statusFilter;
     const container = document.getElementById('creator-content-list-container') || document.getElementById('creator-content-grid');
+    const loadId = ++_activeContentLoadId;
 
     try {
         const headers = await getAuthHeaders();
         const res = await fetch('/api/creator/content', { headers });
-        const json = await res.json();
 
-        if (!json.success || !Array.isArray(json.data) || json.data.length === 0) {
+        // Concurrency guard: ignore outdated responses
+        if (loadId !== _activeContentLoadId) return;
+
+        let json = null;
+        try {
+            json = await res.json();
+        } catch (_) {}
+
+        // 1. Handle HTTP 401 Unauthorized / Session Expired
+        if (res.status === 401) {
+            currentCreatorContent = [];
+            currentReelsList = [];
+            if (container) {
+                container.innerHTML = `
+                    <div style="text-align:center; padding:36px 20px; background:#fff; border:1px solid rgba(220,53,69,0.25); border-radius:8px; color:var(--wr-text-muted);">
+                        <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="#dc3545" stroke-width="1.5" style="margin-bottom:8px;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                        <h4 style="margin:0 0 6px 0; color:#dc3545; font-size:1rem;">Session Expired</h4>
+                        <p style="margin:0 0 14px 0; font-size:0.85rem;">Your session has expired. Please refresh your session to view your content.</p>
+                        <button type="button" class="btn btn-sm btn-outline-dark" onclick="window.loadCustomerCreatorStatus ? window.loadCustomerCreatorStatus(true) : window.location.reload();" style="font-size:0.82rem; padding:6px 14px; border-radius:4px; cursor:pointer;">↻ Refresh Session</button>
+                    </div>
+                `;
+            }
+            renderReelInsightsGrid();
+            return;
+        }
+
+        // 2. Handle HTTP 403 Forbidden / Access Unavailable
+        if (res.status === 403) {
+            currentCreatorContent = [];
+            currentReelsList = [];
+            if (container) {
+                container.innerHTML = `
+                    <div style="text-align:center; padding:36px 20px; background:#fff; border:1px solid rgba(255,193,7,0.4); border-radius:8px; color:var(--wr-text-muted);">
+                        <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="#ffc107" stroke-width="1.5" style="margin-bottom:8px;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                        <h4 style="margin:0 0 6px 0; color:#856404; font-size:1rem;">Creator Access Unavailable</h4>
+                        <p style="margin:0; font-size:0.85rem;">${(json && json.error && json.error.message) || 'Your Creator Club account is currently inactive or under review.'}</p>
+                    </div>
+                `;
+            }
+            renderReelInsightsGrid();
+            return;
+        }
+
+        // 3. Handle Rate Limiting (429) or Server/API Errors (>= 500 or non-success)
+        if (!res.ok || !json || !json.success) {
+            currentCreatorContent = [];
+            currentReelsList = [];
+            const errMsg = (json && json.error && (json.error.message || json.error.code)) || `Server returned error (${res.status})`;
+            if (container) {
+                container.innerHTML = `
+                    <div style="text-align:center; padding:36px 20px; background:#fff; border:1px solid rgba(94,52,53,0.18); border-radius:8px; color:var(--wr-text-muted);">
+                        <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="#5E3435" stroke-width="1.5" style="margin-bottom:8px;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                        <h4 style="margin:0 0 6px 0; color:#5E3435; font-size:1rem;">Unable to Load Content</h4>
+                        <p style="margin:0 0 14px 0; font-size:0.85rem;">${errMsg}</p>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="window.loadCreatorContent('${statusFilter}')" style="font-size:0.82rem; padding:6px 14px; border-radius:4px; cursor:pointer;">↻ Try Again</button>
+                    </div>
+                `;
+            }
+            renderReelInsightsGrid();
+            return;
+        }
+
+        // 4. Genuine 200 OK with empty content array
+        if (!Array.isArray(json.data) || json.data.length === 0) {
             currentCreatorContent = [];
             currentReelsList = [];
             if (container) {
