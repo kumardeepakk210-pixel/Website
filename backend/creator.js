@@ -192,7 +192,7 @@ export function clearMemoryStoreCache() {
     // No-op for direct filesystem reading
 }
 
-function readLocalStore() {
+export function readLocalStore() {
     try {
         if (fs.existsSync(INFLUENCERS_STORE_PATH)) {
             const raw = fs.readFileSync(INFLUENCERS_STORE_PATH, 'utf-8');
@@ -250,7 +250,7 @@ function readLocalStore() {
 /**
  * Writes to local JSON backup store safely and atomically
  */
-function writeLocalStore(store) {
+export function writeLocalStore(store) {
     try {
         const tempPath = `${INFLUENCERS_STORE_PATH}.tmp.${process.pid}.${Date.now()}`;
         fs.writeFileSync(tempPath, JSON.stringify(store, null, 2), 'utf-8');
@@ -3353,7 +3353,7 @@ export async function handleConnectInstagram(req, res) {
 /**
  * Generates HMAC-signed state parameter for CSRF protection during OAuth
  */
-function createOAuthState(creatorId, redirectUri) {
+export function createOAuthState(creatorId, redirectUri) {
     const timestamp = Date.now();
     const nonce = crypto.randomBytes(16).toString('hex');
     const payload = JSON.stringify({ creatorId, redirectUri, timestamp, nonce });
@@ -3366,7 +3366,7 @@ function createOAuthState(creatorId, redirectUri) {
 /**
  * Validates HMAC-signed state parameter returned by Meta OAuth callback
  */
-function verifyOAuthState(stateStr) {
+export function verifyOAuthState(stateStr) {
     if (!stateStr || typeof stateStr !== 'string' || !stateStr.includes('.')) return null;
     const [payloadB64, sig] = stateStr.split('.');
     const secret = process.env.META_APP_SECRET || process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || 'wishrite-meta-sec-fallback-key-32b';
@@ -3751,6 +3751,16 @@ export async function handleInstagramOAuthCallback(req, res) {
         // 4. Resolve final username
         const finalUsername = (instagramUsername || existingCreator?.instagram_connection?.username || existingCreator?.instagram_id || 'creator').replace(/^@/, '');
 
+        // FIX 2 Guard: Never redirect with instagram=connected or overwrite valid records if account_id is null
+        if (!instagramAccountId) {
+            console.warn('[Meta OAuth Callback] Could not resolve an Instagram Business / Creator Account ID for creator:', creatorId);
+            // If existing connection had an account_id, do NOT overwrite it with nulls
+            if (existingCreator?.instagram_connection?.account_id) {
+                console.warn('[Meta OAuth Callback] Retaining existing valid instagram_connection to prevent data loss.');
+            }
+            return res.redirect('/account?tab=creator&instagram=error&msg=Unable+to+resolve+Instagram+Business+Account+ID.+Please+ensure+your+Instagram+Professional+account+is+linked+to+your+Facebook+Page.');
+        }
+
         const instagramConnPayload = {
             connected: true,
             username: finalUsername,
@@ -3758,28 +3768,38 @@ export async function handleInstagramOAuthCallback(req, res) {
             account_type: 'professional',
             access_token: finalToken ? encryptToken(finalToken) : null,
             last_synced_at: new Date().toISOString(),
-            insights_status: instagramAccountId ? 'connected' : 'api_permission_required',
+            insights_status: 'connected',
             updated_at: new Date().toISOString()
         };
 
         // 5. Authoritative update in Supabase
+        let dbSucceeded = false;
         try {
             await dbUpdate('influencers', 'influencer_id', creatorId, {
                 instagram_connection: instagramConnPayload
             }, { useAdmin: true });
+            dbSucceeded = true;
         } catch (dbErr) {
             console.warn('[handleInstagramOAuthCallback] Supabase update notice:', dbErr.message);
         }
 
         // 6. Update local store
+        let localSucceeded = false;
         try {
             const local = readLocalStore();
             let localInf = (local.influencers || []).find(i => i.id === creatorId);
             if (localInf) {
                 localInf.instagram_connection = instagramConnPayload;
+                localSucceeded = true;
             }
             writeLocalStore(local);
         } catch (_) {}
+
+        // Verify successful database persistence before reporting success
+        if (!dbSucceeded && !localSucceeded && !CREATOR_USE_LOCAL_STORE) {
+            console.error('[handleInstagramOAuthCallback] Failed to persist Instagram connection to database for creator:', creatorId);
+            return res.redirect('/account?tab=creator&instagram=error&msg=Failed+to+save+Instagram+connection+details.+Please+try+again.');
+        }
 
         // 7. Redirect back to creator dashboard with success parameter
         return res.redirect('/account?tab=creator&instagram=connected');

@@ -43,14 +43,26 @@ window.handleProductThumbError = handleProductThumbError;
 /**
  * Initializes Supabase Realtime listener for creator financial & profile updates
  */
+let creatorRealtimeInfluencerId = null;
 function initCreatorRealtimeSync(influencerId) {
     const client = window.supabaseClient || (typeof supabaseClient !== 'undefined' ? supabaseClient : null);
     if (!client || typeof client.channel !== 'function') return null;
-    if (creatorRealtimeChannel) return creatorRealtimeChannel;
+
+    // Prevent duplicate subscriptions for the same creator
+    if (creatorRealtimeChannel && creatorRealtimeInfluencerId === influencerId) {
+        return creatorRealtimeChannel;
+    }
+
+    // Clean up existing subscription if influencerId changed
+    if (creatorRealtimeChannel) {
+        cleanUpCreatorRealtimeSync();
+    }
 
     try {
-        creatorRealtimeChannel = client
-            .channel('wishrite-creator-realtime-sync')
+        creatorRealtimeInfluencerId = influencerId;
+        const channelName = influencerId ? `wishrite-creator-sync-${influencerId}` : 'wishrite-creator-realtime-sync';
+        
+        let chan = client.channel(channelName)
             .on(
                 'postgres_changes',
                 {
@@ -74,18 +86,78 @@ function initCreatorRealtimeSync(influencerId) {
                     console.log('[WishRite Creator] Realtime update on customers:', payload.eventType);
                     loadCustomerCreatorStatus();
                 }
-            )
-            .subscribe((status) => {
-                if (status === 'SUBSCRIBED') {
-                    console.log('[WishRite Creator] Subscribed to creator realtime updates.');
-                }
-            });
+            );
+
+        // Creator-scoped subscriptions if influencerId is provided
+        if (influencerId) {
+            chan = chan
+                .on(
+                    'postgres_changes',
+                    {
+                        event: '*',
+                        schema: 'public',
+                        table: 'creator_content',
+                        filter: `influencer_id=eq.${influencerId}`
+                    },
+                    (payload) => {
+                        console.log('[WishRite Creator] Realtime update on creator_content:', payload.eventType);
+                        if (typeof loadCreatorContent === 'function') {
+                            loadCreatorContent();
+                        }
+                    }
+                )
+                .on(
+                    'postgres_changes',
+                    {
+                        event: '*',
+                        schema: 'public',
+                        table: 'influencers',
+                        filter: `influencer_id=eq.${influencerId}`
+                    },
+                    (payload) => {
+                        console.log('[WishRite Creator] Realtime update on influencers:', payload.eventType);
+                        if (typeof loadInstagramConnection === 'function') {
+                            loadInstagramConnection();
+                        }
+                        loadCustomerCreatorStatus();
+                    }
+                );
+        }
+
+        creatorRealtimeChannel = chan.subscribe((status) => {
+            if (status === 'SUBSCRIBED') {
+                console.log('[WishRite Creator] Subscribed to creator realtime updates.');
+            }
+        });
     } catch (err) {
         console.warn('[WishRite Creator] Realtime subscription notice:', err);
     }
     return creatorRealtimeChannel;
 }
 window.initCreatorRealtimeSync = initCreatorRealtimeSync;
+
+/**
+ * Tears down Supabase Realtime channel on logout or account switch
+ */
+function cleanUpCreatorRealtimeSync() {
+    if (creatorRealtimeChannel) {
+        try {
+            const client = window.supabaseClient || (typeof supabaseClient !== 'undefined' ? supabaseClient : null);
+            if (client && typeof client.removeChannel === 'function') {
+                client.removeChannel(creatorRealtimeChannel);
+            } else if (typeof creatorRealtimeChannel.unsubscribe === 'function') {
+                creatorRealtimeChannel.unsubscribe();
+            }
+        } catch (e) {
+            console.warn('[WishRite Creator] Error cleaning up realtime channel:', e);
+        }
+        creatorRealtimeChannel = null;
+        creatorRealtimeInfluencerId = null;
+    }
+    resetCreatorAuthReadiness();
+    currentCreatorData = null;
+}
+window.cleanUpCreatorRealtimeSync = cleanUpCreatorRealtimeSync;
 
 /**
  * Switches between ACCOUNT and CREATOR tabs in My Account
@@ -188,6 +260,72 @@ if (document.readyState === 'loading') {
 }
 
 /**
+ * Waits for Supabase authentication state to settle before making authenticated creator calls.
+ * Prevents race condition between page load/redirect and Supabase session restoration.
+ */
+let _authReadinessPromise = null;
+let _lastAuthUserId = null;
+
+function resetCreatorAuthReadiness() {
+    _authReadinessPromise = null;
+    _lastAuthUserId = null;
+}
+window.resetCreatorAuthReadiness = resetCreatorAuthReadiness;
+
+function ensureSupabaseAuthReady(timeoutMs = 4000) {
+    // Check if current user ID changed since the readiness promise was created
+    const currentUserId = window.currentUser?.id || window.supabaseClient?.auth?.user?.()?.id || null;
+    if (_lastAuthUserId !== null && currentUserId !== null && _lastAuthUserId !== currentUserId) {
+        resetCreatorAuthReadiness();
+    }
+
+    if (_authReadinessPromise) return _authReadinessPromise;
+
+    _authReadinessPromise = new Promise((resolve) => {
+        // 1. Fast check for local E2E mode
+        const authUser = (typeof window.getWishriteAuthUser === 'function') ? window.getWishriteAuthUser() : (window.currentUser || null);
+        if (authUser?.auth_mode === 'local_e2e') {
+            _lastAuthUserId = authUser.id || 'local-e2e-user';
+            return resolve(true);
+        }
+
+        const client = window.supabaseClient || (typeof supabaseClient !== 'undefined' ? supabaseClient : null);
+        if (!client || !client.auth) {
+            return resolve(true);
+        }
+
+        let settled = false;
+        const timer = setTimeout(() => {
+            if (!settled) {
+                settled = true;
+                // Do not cache a timed-out promise permanently so subsequent calls can retry
+                _authReadinessPromise = null;
+                resolve(false);
+            }
+        }, timeoutMs);
+
+        client.auth.getSession().then(({ data }) => {
+            if (!settled) {
+                settled = true;
+                clearTimeout(timer);
+                _lastAuthUserId = data?.session?.user?.id || null;
+                resolve(Boolean(data?.session));
+            }
+        }).catch(() => {
+            if (!settled) {
+                settled = true;
+                clearTimeout(timer);
+                _authReadinessPromise = null;
+                resolve(false);
+            }
+        });
+    });
+
+    return _authReadinessPromise;
+}
+window.ensureSupabaseAuthReady = ensureSupabaseAuthReady;
+
+/**
  * Returns authorization headers using customer session or creator token
  */
 async function getAuthHeaders() {
@@ -202,6 +340,11 @@ async function getAuthHeaders() {
         headers['Authorization'] = creatorToken ? `Bearer ${creatorToken}` : 'Bearer local-e2e-customer-token';
         return headers;
     }
+
+    // Ensure session has initialized before fetching headers
+    try {
+        await ensureSupabaseAuthReady(3000);
+    } catch (_) {}
 
     // Check Supabase customer session
     const client = window.supabaseClient || (typeof supabaseClient !== 'undefined' ? supabaseClient : null);
@@ -254,22 +397,49 @@ async function getAuthHeaders() {
 /**
  * Loads authoritatively whether current customer has an active creator profile
  */
+let _authRetryTimeoutId = null;
+
 async function loadCustomerCreatorStatus() {
     const onboardState = document.getElementById('creator-onboard-state');
     const dashboardState = document.getElementById('creator-dashboard-state');
     const reviewState = document.getElementById('creator-review-state');
     const loadingState = document.getElementById('creator-loading-state');
 
+    // Keep loading indicator active during check
     if (loadingState) loadingState.style.display = 'block';
     if (onboardState) onboardState.style.display = 'none';
     if (dashboardState) dashboardState.style.display = 'none';
     if (reviewState) reviewState.style.display = 'none';
+
+    // Wait for Supabase auth readiness before making request
+    let isAuthReady = false;
+    try {
+        isAuthReady = await ensureSupabaseAuthReady(4000);
+    } catch (_) {}
 
     const controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
     const timeoutId = controller ? setTimeout(() => controller.abort(), 8000) : null;
 
     try {
         const headers = await getAuthHeaders();
+        const hasAuthHeader = Boolean(headers['Authorization']);
+
+        // FIX 3: If authentication is unresolved / not confirmed, do NOT show onboarding prematurely
+        if (!isAuthReady && !hasAuthHeader) {
+            // Check if a customer session might still be hydrating in the background
+            const client = window.supabaseClient || (typeof supabaseClient !== 'undefined' ? supabaseClient : null);
+            const hasPossibleStoredSession = Boolean(localStorage.getItem('sb-' + (window.SUPABASE_PROJECT_ID || 'ptpuepejciqiktmcpuon') + '-auth-token') || localStorage.getItem('wishrite_auth_token'));
+            
+            if (hasPossibleStoredSession && !_authRetryTimeoutId) {
+                console.log('[WishRite Creator] Session restoration pending after timeout. Holding loading state and scheduling retry.');
+                _authRetryTimeoutId = setTimeout(() => {
+                    _authRetryTimeoutId = null;
+                    loadCustomerCreatorStatus();
+                }, 1500);
+                return;
+            }
+        }
+
         const res = await fetch('/api/creator/status', { 
             headers,
             signal: controller?.signal 
@@ -294,7 +464,12 @@ async function loadCustomerCreatorStatus() {
             }
             updateCreatorHeroCTA(true);
         } else {
-            // Not a creator yet -> show Onboard invite & details form
+            // If the server explicitly confirms customer is logged in AND is not a creator, then show onboarding
+            // But if user is completely unauthenticated (401 or is_authenticated === false), keep user in clean prompt
+            if (data?.authenticated === false || !headers['Authorization']) {
+                console.log('[WishRite Creator] Customer is not logged in.');
+            }
+
             currentCreatorData = null;
             if (onboardState) onboardState.style.display = 'block';
             const heroCard = document.querySelector('.creator-onboard-hero') || document.getElementById('creator-onboard-hero');
@@ -306,16 +481,21 @@ async function loadCustomerCreatorStatus() {
         }
     } catch (err) {
         console.error('Error checking creator status:', err);
-        if (onboardState) onboardState.style.display = 'block';
-        const heroCard = document.querySelector('.creator-onboard-hero') || document.getElementById('creator-onboard-hero');
-        const formCard = document.getElementById('creator-onboard-form-card');
-        if (heroCard) heroCard.style.display = 'block';
-        if (formCard) formCard.style.display = 'none';
-        updateCreatorHeroCTA(false);
-        prefillOnboardingForm();
+        // On recoverable network or abort error, do not flash onboard state if user might already be logged in
+        if (currentCreatorData?.is_creator) {
+            if (dashboardState) dashboardState.style.display = 'block';
+        } else {
+            if (onboardState) onboardState.style.display = 'block';
+            const heroCard = document.querySelector('.creator-onboard-hero') || document.getElementById('creator-onboard-hero');
+            const formCard = document.getElementById('creator-onboard-form-card');
+            if (heroCard) heroCard.style.display = 'block';
+            if (formCard) formCard.style.display = 'none';
+            updateCreatorHeroCTA(false);
+            prefillOnboardingForm();
+        }
     } finally {
         if (timeoutId) clearTimeout(timeoutId);
-        if (loadingState) loadingState.style.display = 'none';
+        if (loadingState && !_authRetryTimeoutId) loadingState.style.display = 'none';
     }
 }
 window.loadCustomerCreatorStatus = loadCustomerCreatorStatus;

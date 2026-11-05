@@ -1657,6 +1657,12 @@ async function handleLogout() {
         WishRiteWalletRewards.resetState();
     }
 
+    if (typeof window.cleanUpCreatorRealtimeSync === 'function') {
+        try {
+            window.cleanUpCreatorRealtimeSync();
+        } catch (_) {}
+    }
+
     isLoggedIn = false;
     currentUser = null;
 
@@ -1764,6 +1770,18 @@ async function initAuthSystem() {
             async (event, session) => {
                 if (currentUser?.auth_mode === 'local_e2e') {
                     return;
+                }
+
+                // If auth user changed or signed out, reset creator readiness & realtime subscriptions
+                if (typeof window.resetCreatorAuthReadiness === 'function') {
+                    try {
+                        window.resetCreatorAuthReadiness();
+                    } catch (_) {}
+                }
+                if (event === 'SIGNED_OUT' && typeof window.cleanUpCreatorRealtimeSync === 'function') {
+                    try {
+                        window.cleanUpCreatorRealtimeSync();
+                    } catch (_) {}
                 }
 
                 if (session?.user) {
