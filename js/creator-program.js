@@ -609,7 +609,11 @@ async function loadCustomerCreatorStatus() {
         } else {
             // Server error / unexpected response (5xx or malformed)
             currentCreatorData = null;
-            setCreatorUIState('error');
+            const errorMsg = data?.error?.message || 'We encountered an issue checking your Creator account. Please refresh or try again.';
+            setCreatorUIState('error', {
+                title: 'Unable to verify Creator status',
+                desc: errorMsg
+            });
         }
     } catch (err) {
         console.error('Error checking creator status:', err);

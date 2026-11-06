@@ -2144,12 +2144,20 @@ export async function handleCustomerCreatorStatus(req, res) {
         }
 
         if (matchedAccount) {
-            const sess = issueCreatorSession(matchedAccount, matchedCreator);
-            sessionToken = sess.token;
+            try {
+                const sess = issueCreatorSession(matchedAccount, matchedCreator);
+                sessionToken = sess.token;
+            } catch (tokenErr) {
+                console.warn('[handleCustomerCreatorStatus] Stateless token generation notice:', tokenErr.message);
+            }
         } else if (ident.isLocalE2E && matchedCreator) {
-            const mockAcct = { id: 'local-e2e-account-id', influencer_id: matchedCreator.id, email: ident.email };
-            const sess = issueCreatorSession(mockAcct, matchedCreator);
-            sessionToken = sess.token;
+            try {
+                const mockAcct = { id: 'local-e2e-account-id', influencer_id: matchedCreator.id, email: ident.email };
+                const sess = issueCreatorSession(mockAcct, matchedCreator);
+                sessionToken = sess.token;
+            } catch (tokenErr) {
+                console.warn('[handleCustomerCreatorStatus] Local E2E token generation notice:', tokenErr.message);
+            }
         }
 
         const baseUrl = isLocalHost ? `http://${req.headers['host']}` : 'https://wishrite.in';
