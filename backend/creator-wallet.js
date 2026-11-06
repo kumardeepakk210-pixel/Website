@@ -63,7 +63,7 @@ export async function atomicDeductWalletBalance(influencerId, amount, local, opt
     } = options;
 
     // Attempt Supabase PostgreSQL atomic stored procedure if available
-    if (adminClient) {
+    if (adminClient && !CREATOR_USE_LOCAL_STORE) {
         try {
             const { data: rpcData, error: rpcError } = await adminClient.rpc('deduct_influencer_wallet_balance', {
                 p_influencer_id: influencerId,

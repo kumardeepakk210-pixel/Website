@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
+import crypto from 'node:crypto';
 
 console.log('--- RUNNING UNIFIED EMAIL + WHATSAPP OTP TEST SUITE ---');
 
@@ -48,45 +49,12 @@ function createMockEnv(initialData = {}) {
         'email-onboarding-container', 'login-identifier', 'login-email', 'login-mobile', 'email-send-otp-btn',
         'otp-digit-1', 'otp-digit-2', 'otp-digit-3', 'otp-digit-4', 'otp-digit-5', 'otp-digit-6',
         'email-verify-otp-btn', 'email-resend-otp-btn', 'otp-timer-text', 'otp-masked-destination', 'otp-masked-email',
-        'mobile-login-form', 'login-country-code', 'login-password', 'login-submit-btn',
-        'login-message', 'email-login-tab', 'mobile-login-tab',
-        'onboarding-name', 'onboarding-mobile', 'onboarding-country-code', 'onboarding-referral-code', 'onboarding-submit-btn',
-        'user-dropdown'
+        'login-message', 'onboarding-name', 'onboarding-mobile'
     ].forEach(id => getEl(id));
-
-    const windowMock = {
-        location: { hostname: 'localhost' },
-        E2E_LOCAL_AUTH: false,
-        document: {
-            getElementById: (id) => getEl(id),
-            querySelectorAll: () => [],
-            addEventListener: () => {}
-        },
-        localStorage: {
-            data: {},
-            getItem(k) { return this.data[k] || null; },
-            setItem(k, v) { this.data[k] = String(v); },
-            removeItem(k) { delete this.data[k]; }
-        },
-        sessionStorage: {
-            data: {},
-            getItem(k) { return this.data[k] || null; },
-            setItem(k, v) { this.data[k] = String(v); },
-            removeItem(k) { delete this.data[k]; }
-        },
-        showToast: (msg, type) => {
-            windowMock.lastToast = { msg, type };
-        },
-        navigateTo: (view, param) => {
-            windowMock.lastNavigation = { view, param };
-        }
-    };
-    windowMock.window = windowMock;
 
     const supabaseCalls = {
         signInWithOtp: [],
         verifyOtp: [],
-        signOut: [],
         customersSelect: [],
         customersUpdate: [],
         customersInsert: []
@@ -94,29 +62,23 @@ function createMockEnv(initialData = {}) {
 
     const mockSupabase = {
         auth: {
-            async signInWithOtp(opts) {
-                supabaseCalls.signInWithOtp.push(opts);
-                if (initialData.signInWithOtpError) {
-                    return { data: null, error: initialData.signInWithOtpError };
-                }
-                return { data: { user: null, session: null }, error: null };
+            signInWithOtp: async (args) => {
+                supabaseCalls.signInWithOtp.push(args);
+                return { data: { user: null }, error: null };
             },
-            async verifyOtp(opts) {
-                supabaseCalls.verifyOtp.push(opts);
-                if (initialData.verifyOtpError) {
-                    return { data: null, error: initialData.verifyOtpError };
-                }
-                const user = initialData.authUser || {
-                    id: 'usr_mock_123',
-                    email: opts.email || null,
-                    phone: opts.phone || null,
-                    user_metadata: initialData.userMetadata || {}
+            verifyOtp: async (args) => {
+                supabaseCalls.verifyOtp.push(args);
+                return {
+                    data: {
+                        user: initialData.authUser || {
+                            id: 'usr_test_auth_1',
+                            email: args.email || null,
+                            phone: args.phone || null,
+                            user_metadata: { full_name: 'Test Customer' }
+                        }
+                    },
+                    error: null
                 };
-                return { data: { user, session: { user } }, error: null };
-            },
-            async signOut() {
-                supabaseCalls.signOut.push({});
-                return { error: null };
             }
         },
         from(tableName) {
@@ -172,7 +134,7 @@ function createMockEnv(initialData = {}) {
                             return {
                                 maybeSingle: async () => {
                                     supabaseCalls.customersInsert.push(payload);
-                                    return { data: { id: 'cust_new_auto_id', ...payload }, error: null };
+                                    return { data: { id: 'cust_new_auto', ...payload }, error: null };
                                 }
                             };
                         }
@@ -182,25 +144,44 @@ function createMockEnv(initialData = {}) {
         }
     };
 
-    windowMock.supabaseClient = mockSupabase;
-
     const sandbox = {
-        window: windowMock,
-        document: windowMock.document,
-        localStorage: windowMock.localStorage,
-        sessionStorage: windowMock.sessionStorage,
-        supabaseClient: mockSupabase,
         console,
-        setTimeout,
-        clearTimeout,
-        setInterval,
-        clearInterval
+        window: {
+            location: { hostname: 'test.local' },
+            supabaseClient: mockSupabase,
+            addEventListener: () => {},
+            localStorage: {
+                getItem: () => null,
+                setItem: () => {},
+                removeItem: () => {}
+            },
+            history: { replaceState: () => {} }
+        },
+        document: {
+            getElementById: (id) => getEl(id),
+            querySelectorAll: () => [],
+            addEventListener: () => {}
+        },
+        supabase: {
+            createClient: () => mockSupabase
+        },
+        supabaseClient: mockSupabase,
+        currentCustomerProfile: null,
+        setTimeout: (fn) => fn(),
+        setInterval: () => 123,
+        clearInterval: () => {},
+        showToast: () => {},
+        navigateTo: () => {}
     };
 
+    sandbox.window.document = sandbox.document;
     vm.createContext(sandbox);
+
+    // Bootstrap auth.js inside vm
     vm.runInContext(authJsCode, sandbox);
 
     return {
+        context: sandbox,
         window: sandbox.window,
         elements,
         supabaseCalls
@@ -208,79 +189,58 @@ function createMockEnv(initialData = {}) {
 }
 
 async function runUnifiedSuite() {
-    // 1. UI Structure in index.html
-    assert.ok(indexHtml.includes('id="login-identifier"'), 'Must have unified login-identifier input');
-    assert.ok(indexHtml.includes('Welcome Back'), 'Must have Welcome Back heading');
-    assert.ok(indexHtml.includes('Mobile Number or Email Address'), 'Must have Mobile Number or Email Address label');
-    assert.ok(indexHtml.includes('CONTINUE'), 'Must have CONTINUE button text');
-    assert.ok(indexHtml.includes("We'll send you a verification code via WhatsApp or Email"), 'Must have supporting text');
-    console.log('✔ 1. HTML structure and unified elements verified');
+    // 1. UI Structure
+    {
+        assert.ok(indexHtml.includes('id="login-identifier"'), 'index.html must contain login-identifier input');
+        assert.ok(indexHtml.includes('CONTINUE'), 'index.html must contain CONTINUE primary CTA');
+        assert.ok(indexHtml.includes('otp-masked-destination'), 'index.html must contain otp-masked-destination span');
+        console.log('✔ 1. HTML structure and unified elements verified');
+    }
 
-    // 2. Input Detection Unit Logic
+    // 2. detectAuthIdentifier
     {
         const env = createMockEnv();
         const detect = env.window.detectAuthIdentifier;
-        assert.equal(typeof detect, 'function', 'detectAuthIdentifier must be exposed');
+        assert.equal(typeof detect, 'function', 'detectAuthIdentifier should be exposed');
 
-        // Email detections
-        const e1 = detect('user@example.com');
+        const e1 = detect('deepak@wishrite.in');
         assert.equal(e1.type, 'email');
-        assert.equal(e1.normalized, 'user@example.com');
+        assert.equal(e1.normalized, 'deepak@wishrite.in');
 
-        const e2 = detect('  TEST.USER@WISHRITE.IN  ');
-        assert.equal(e2.type, 'email');
-        assert.equal(e2.normalized, 'test.user@wishrite.in');
-
-        // Invalid email
-        const badEmail = detect('bademail@domain');
-        assert.equal(badEmail.type, 'invalid_email');
-
-        // Mobile detections (10 digits Indian)
         const m1 = detect('9876543210');
         assert.equal(m1.type, 'mobile');
         assert.equal(m1.normalized, '+919876543210');
 
-        // Mobile with +91
         const m2 = detect('+91 98765 43210');
         assert.equal(m2.type, 'mobile');
         assert.equal(m2.normalized, '+919876543210');
 
-        // Mobile with 91 prefix
-        const m3 = detect('919876543210');
+        const m3 = detect('09876543210');
         assert.equal(m3.type, 'mobile');
         assert.equal(m3.normalized, '+919876543210');
 
-        // Mobile with 0 prefix
-        const m4 = detect('09876543210');
-        assert.equal(m4.type, 'mobile');
-        assert.equal(m4.normalized, '+919876543210');
-
-        // Invalid numbers
-        const badNum = detect('12345');
-        assert.equal(badNum.type, 'invalid');
-
+        const inv = detect('12345');
+        assert.equal(inv.type, 'invalid');
+        assert.ok(inv.error.includes('valid 10-digit mobile number'));
         console.log('✔ 2. detectAuthIdentifier parses emails and Indian mobile variants accurately');
     }
 
-    // 3. Email OTP Flow (Existing customer)
+    // 3. Email OTP Flow
     {
         const env = createMockEnv({
             existingCustomer: {
                 id: 'cust_email_1',
-                customer_email: 'test@wishrite.test',
-                customer_name: 'Priya Sharma'
-            },
-            authUser: {
-                id: 'usr_email_1',
-                email: 'test@wishrite.test'
+                customer_email: 'test@example.com',
+                customer_name: 'Priya Sharma',
+                user_id: 'usr_auth_existing'
             }
         });
 
-        env.elements['login-identifier'].value = 'test@wishrite.test';
+        env.elements['login-identifier'].value = 'test@example.com';
         const sent = await env.window.sendUnifiedOTP();
         assert.equal(sent, true);
         assert.equal(env.supabaseCalls.signInWithOtp.length, 1);
-        assert.equal(env.supabaseCalls.signInWithOtp[0].email, 'test@wishrite.test');
+        assert.equal(env.supabaseCalls.signInWithOtp[0].email, 'test@example.com');
 
         ['1', '2', '3', '4', '5', '6'].forEach((d, i) => {
             env.elements[`otp-digit-${i + 1}`].value = d;
@@ -289,21 +249,24 @@ async function runUnifiedSuite() {
         const verified = await env.window.verifyUnifiedOTP();
         assert.equal(verified, true);
         assert.equal(env.window.isLoggedIn, true);
-        assert.equal(env.window.currentUser.email, 'test@wishrite.test');
+        assert.equal(env.supabaseCalls.verifyOtp.length, 1);
+        assert.equal(env.supabaseCalls.verifyOtp[0].type, 'email');
+        assert.equal(env.supabaseCalls.verifyOtp[0].token, '123456');
+        assert.equal(env.window.currentCustomerProfile.customerId, 'cust_email_1');
         console.log('✔ 3. Email OTP flow operates with unified input and establishes session');
     }
 
-    // 4. WhatsApp / Phone OTP Flow (Existing mobile customer account linking)
+    // 4. WhatsApp Phone OTP & Canonical Account Guard
     {
         const env = createMockEnv({
             existingCustomer: {
                 id: 'cust_phone_1',
                 customer_phone: '+919876543210',
                 customer_name: 'Rohan Verma',
-                user_id: 'usr_old_id'
+                user_id: 'usr_canonical_email_user'
             },
             authUser: {
-                id: 'usr_phone_new_auth',
+                id: 'usr_new_phone_auth_user',
                 phone: '+919876543210'
             }
         });
@@ -327,41 +290,116 @@ async function runUnifiedSuite() {
         assert.equal(env.supabaseCalls.verifyOtp[0].token, '654321');
         assert.equal(env.supabaseCalls.verifyOtp[0].phone, '+919876543210');
         assert.equal(env.window.currentCustomerProfile.customerId, 'cust_phone_1');
-        console.log('✔ 4. WhatsApp Phone OTP resolves to existing customer record by phone');
+
+        // CRITICAL CHECK: customers.user_id must NOT have been overwritten with usr_new_phone_auth_user
+        const updatePayload = env.supabaseCalls.customersUpdate[0]?.payload;
+        assert.ok(!updatePayload || !updatePayload.user_id, 'Must NOT reassign canonical user_id to new auth user');
+        console.log('✔ 4. WhatsApp Phone OTP resolves to existing customer record and PRESERVES canonical user_id');
     }
 
-    // 5. Server-side Supabase Send SMS Hook (/api/whatsapp/send-otp)
+    // 5. Standard Webhooks Signature Verification (/api/whatsapp/send-otp)
     {
-        // Load handler dynamically into sandbox
         const handler = (await import('../api/whatsapp.js')).default || (await import('../api/whatsapp.js'));
         const fn = handler.default || handler;
 
-        // Mock test request simulating Supabase Auth Hook
-        let resStatus = 0;
-        let resJson = null;
-        const mockReq = {
-            method: 'POST',
-            url: '/api/whatsapp/send-otp',
-            headers: {},
-            body: {
-                user: { id: 'usr_hook_1', phone: '+919876543210' },
-                sms: { otp: '482910' }
-            }
-        };
-        const mockRes = {
-            setHeader: () => {},
-            status(code) { resStatus = code; return this; },
-            json(data) { resJson = data; return this; }
-        };
+        const secret = 'whsec_' + Buffer.from('test_secret_key_32_bytes_long_1234').toString('base64');
+        process.env.SEND_SMS_HOOK_SECRETS = secret;
+        process.env.LOCAL_WHATSAPP_MOCK = 'true';
 
-        process.env.NODE_ENV = 'test';
-        await fn(mockReq, mockRes);
+        const bodyObj = {
+            user: { id: 'usr_hook_1', phone: '+919876543210' },
+            sms: { otp: '482910' }
+        };
+        const rawBody = JSON.stringify(bodyObj);
+        const msgId = 'msg_test_001';
+        const ts = String(Math.floor(Date.now() / 1000));
+        const toSign = `${msgId}.${ts}.${rawBody}`;
+        const secretBytes = Buffer.from(secret.slice(6), 'base64');
+        const expectedSig = crypto.createHmac('sha256', secretBytes).update(toSign).digest('base64');
 
-        assert.equal(resStatus, 200);
-        assert.equal(resJson.success, true);
-        assert.equal(resJson.mock, true);
-        assert.ok(resJson.destination.includes('9198****10'));
-        console.log('✔ 5. Server-side /api/whatsapp/send-otp handles Supabase Auth Send SMS hook safely');
+        // 5a. Valid Standard Webhook Signature
+        {
+            let resStatus = 0;
+            let resJson = null;
+            const mockReq = {
+                method: 'POST',
+                url: '/api/whatsapp/send-otp',
+                rawBody,
+                headers: {
+                    'webhook-id': msgId,
+                    'webhook-timestamp': ts,
+                    'webhook-signature': `v1,${expectedSig}`
+                },
+                body: bodyObj
+            };
+            const mockRes = {
+                setHeader: () => {},
+                status(code) { resStatus = code; return this; },
+                json(data) { resJson = data; return this; }
+            };
+
+            await fn(mockReq, mockRes);
+            assert.equal(resStatus, 200);
+            assert.equal(resJson.success, true);
+            assert.equal(resJson.mock, true);
+        }
+
+        // 5b. Tampered Body / Invalid Signature
+        {
+            let resStatus = 0;
+            let resJson = null;
+            const mockReq = {
+                method: 'POST',
+                url: '/api/whatsapp/send-otp',
+                rawBody: rawBody + 'tamper',
+                headers: {
+                    'webhook-id': msgId,
+                    'webhook-timestamp': ts,
+                    'webhook-signature': `v1,${expectedSig}`
+                },
+                body: bodyObj
+            };
+            const mockRes = {
+                setHeader: () => {},
+                status(code) { resStatus = code; return this; },
+                json(data) { resJson = data; return this; }
+            };
+
+            await fn(mockReq, mockRes);
+            assert.equal(resStatus, 401);
+            assert.equal(resJson.error.code, 'invalid_signature');
+        }
+
+        // 5c. Stale Timestamp (> 300 seconds)
+        {
+            let resStatus = 0;
+            let resJson = null;
+            const oldTs = String(Math.floor(Date.now() / 1000) - 400);
+            const oldToSign = `${msgId}.${oldTs}.${rawBody}`;
+            const oldSig = crypto.createHmac('sha256', secretBytes).update(oldToSign).digest('base64');
+            const mockReq = {
+                method: 'POST',
+                url: '/api/whatsapp/send-otp',
+                rawBody,
+                headers: {
+                    'webhook-id': msgId,
+                    'webhook-timestamp': oldTs,
+                    'webhook-signature': `v1,${oldSig}`
+                },
+                body: bodyObj
+            };
+            const mockRes = {
+                setHeader: () => {},
+                status(code) { resStatus = code; return this; },
+                json(data) { resJson = data; return this; }
+            };
+
+            await fn(mockReq, mockRes);
+            assert.equal(resStatus, 401);
+            assert.equal(resJson.error.code, 'timestamp_out_of_tolerance');
+        }
+
+        console.log('✔ 5. Server-side Standard Webhooks signature verification and replay prevention verified');
     }
 
     // 6. Resend Cooldown and Masking

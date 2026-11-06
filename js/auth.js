@@ -1578,15 +1578,33 @@ async function syncCustomerProfile(user, extraData = {}) {
         let savedCustomer = null;
 
         if (existingCustomer?.id) {
-            // Update existing customer record
+            // Guard canonical customer identity:
+            // If existing customer already has a canonical user_id that differs from current user,
+            // DO NOT blindly overwrite user_id or reassign account ownership!
+            const isConflictingAuthUser = existingCustomer.user_id && existingCustomer.user_id !== user.id;
+
+            if (isConflictingAuthUser) {
+                console.warn(
+                    `[Customer Identity Guard] Preserved canonical account: customer ${existingCustomer.id} belongs to canonical Auth user ${existingCustomer.user_id}. Refusing to overwrite user_id with ${user.id}.`
+                );
+            }
+
+            // Update existing customer record safely
             const updatePayload = {
-                user_id: user.id,
                 last_login_at: now,
                 updated_at: now
             };
 
+            // Only attach user_id if it is currently unset on the customer record
+            if (!existingCustomer.user_id) {
+                updatePayload.user_id = user.id;
+            }
+
             if (email && (!existingCustomer.customer_email || existingCustomer.customer_email.toLowerCase() !== email)) {
-                updatePayload.customer_email = email;
+                // Only associate email if user actually owns this email in auth
+                if (user.email && user.email.toLowerCase() === email) {
+                    updatePayload.customer_email = email;
+                }
             }
 
             if (fullName && (!existingCustomer.customer_name || existingCustomer.customer_name === 'Valued Customer')) {

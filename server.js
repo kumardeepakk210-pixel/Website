@@ -37,6 +37,7 @@ async function parseBody(req) {
             body += chunk.toString();
         });
         req.on('end', () => {
+            req.rawBody = body;
             if (!body) return resolve({});
             try {
                 resolve(JSON.parse(body));
