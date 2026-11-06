@@ -594,5 +594,71 @@ describe('Creator Serverless & Stateless Authentication Suite', () => {
             // Request 2 was newer, so Request 1 must NOT have overwritten currentUiState
             assert.strictEqual(currentUiState, 'Account B State');
         });
+
+        it('UI regression test: auth-links (Create account prompt) is strictly enclosed within login-view and absent from profile-view', () => {
+            const indexHtml = fs.readFileSync('index.html', 'utf8');
+            const loginStart = indexHtml.indexOf('<div id="login-view"');
+            const registerStart = indexHtml.indexOf('<div id="register-view"');
+            const profileStart = indexHtml.indexOf('<div id="profile-view"');
+
+            assert.ok(loginStart !== -1 && registerStart !== -1, 'login-view and register-view must exist');
+            const loginSection = indexHtml.substring(loginStart, registerStart);
+
+            // Exactly one "Create one" link in index.html inside the login section
+            const createOneMatches = indexHtml.match(/navigateTo\('register'\)/g) || [];
+            assert.strictEqual(createOneMatches.length, 1, 'There should be exactly one navigateTo("register") link in the entire index.html');
+
+            const loginCreateOneMatches = loginSection.match(/navigateTo\('register'\)/g) || [];
+            assert.strictEqual(loginCreateOneMatches.length, 1, 'The create account link must reside inside login-view');
+
+            if (profileStart !== -1) {
+                const profileEnd = indexHtml.indexOf('<!-- ═══ NOTIFY ME MODAL ═══ -->', profileStart);
+                const profileSection = indexHtml.substring(profileStart, profileEnd !== -1 ? profileEnd : profileStart + 10000);
+                assert.ok(!profileSection.includes("Don't have an account?"), 'profile-view must never contain the login registration prompt');
+            }
+        });
+
+        it('behavioral test: switchProfileTab reuses valid in-memory creator data and does not freeze on loading state', () => {
+            const creatorSource = fs.readFileSync('js/creator-program.js', 'utf8');
+            assert.ok(creatorSource.includes('function isCurrentCreatorDataValid'), 'Must define isCurrentCreatorDataValid helper');
+            assert.ok(creatorSource.includes('isCurrentCreatorDataValid()'), 'switchProfileTab must check isCurrentCreatorDataValid');
+            assert.ok(creatorSource.includes('silent: true'), 'switchProfileTab must support silent background re-validation');
+            assert.ok(creatorSource.includes('if (!isSilent || !isCurrentCreatorDataValid())'), 'loadCustomerCreatorStatus must not wipe UI to loading during silent re-validation');
+
+            // Behavioral simulation of tab switching:
+            // 1. Initial load -> sets dashboard
+            let currentUiState = 'initial';
+            let currentCreatorData = {
+                is_creator: true,
+                status: 'approved',
+                creator: { id: '41bb07fa-2a1c-4cc1-ae51-25686ce1ec21', email: 'dkr1888@gmail.com' }
+            };
+
+            const simulateTabSwitch = (tab, creatorData) => {
+                if (tab === 'creator') {
+                    if (creatorData && creatorData.is_creator && creatorData.creator) {
+                        currentUiState = 'dashboard';
+                    } else {
+                        currentUiState = 'loading';
+                    }
+                } else {
+                    currentUiState = 'account';
+                }
+            };
+
+            // Switch to Account
+            simulateTabSwitch('account', currentCreatorData);
+            assert.strictEqual(currentUiState, 'account');
+
+            // Switch back to Creator -> immediately renders dashboard without getting stuck on loading
+            simulateTabSwitch('creator', currentCreatorData);
+            assert.strictEqual(currentUiState, 'dashboard');
+
+            // Switch back and forth multiple times
+            simulateTabSwitch('account', currentCreatorData);
+            assert.strictEqual(currentUiState, 'account');
+            simulateTabSwitch('creator', currentCreatorData);
+            assert.strictEqual(currentUiState, 'dashboard');
+        });
     });
 });

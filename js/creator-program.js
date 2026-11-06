@@ -164,6 +164,36 @@ function cleanUpCreatorRealtimeSync() {
 window.cleanUpCreatorRealtimeSync = cleanUpCreatorRealtimeSync;
 
 /**
+ * Checks if in-memory creator data matches the currently authenticated customer
+ */
+function isCurrentCreatorDataValid() {
+    if (!currentCreatorData || !currentCreatorData.is_creator || !currentCreatorData.creator) {
+        return false;
+    }
+    const authUser = (typeof getWishriteAuthUser === 'function') ? getWishriteAuthUser() : (window.currentUser || null);
+    const custProfile = (typeof getWishriteCustomerProfile === 'function') ? getWishriteCustomerProfile() : null;
+    const currentUserId = authUser?.id || custProfile?.id;
+    const currentUserEmail = authUser?.email || custProfile?.email;
+
+    const creator = currentCreatorData.creator;
+    const creatorUserId = creator.auth_user_id || creator.customer_id || creator.id;
+    const creatorEmail = creator.email;
+
+    if (currentUserId && creatorUserId && currentUserId === creatorUserId) {
+        return true;
+    }
+    if (currentUserEmail && creatorEmail && currentUserEmail.toLowerCase() === creatorEmail.toLowerCase()) {
+        return true;
+    }
+    // If authUser is available but doesn't match, data is stale
+    if (currentUserId || currentUserEmail) {
+        return false;
+    }
+    return true;
+}
+window.isCurrentCreatorDataValid = isCurrentCreatorDataValid;
+
+/**
  * Switches between ACCOUNT and CREATOR tabs in My Account
  */
 function switchProfileTab(tabId) {
@@ -189,10 +219,24 @@ function switchProfileTab(tabId) {
             }
         } catch (_) {}
 
-        try {
-            loadCustomerCreatorStatus();
-        } catch (e) {
-            console.error('Error starting creator status load:', e);
+        // If creator data is already loaded and valid for the current user, render immediately
+        if (isCurrentCreatorDataValid()) {
+            const creatorStatus = (currentCreatorData.status || currentCreatorData.creator.status || '').toLowerCase();
+            if (creatorStatus === 'under_review' || creatorStatus === 'pending') {
+                setCreatorUIState('review');
+            } else {
+                setCreatorUIState('dashboard');
+                renderCreatorDashboard(currentCreatorData);
+            }
+            updateCreatorHeroCTA(true);
+            // Refresh in background without wiping UI back to loading spinner
+            loadCustomerCreatorStatus({ silent: true }).catch(() => {});
+        } else {
+            try {
+                loadCustomerCreatorStatus();
+            } catch (e) {
+                console.error('Error starting creator status load:', e);
+            }
         }
 
         try {
@@ -510,11 +554,14 @@ window.setCreatorUIState = setCreatorUIState;
 let _authRetryTimeoutId = null;
 let _activeStatusRequestId = 0;
 
-async function loadCustomerCreatorStatus() {
+async function loadCustomerCreatorStatus(options = {}) {
     const requestId = ++_activeStatusRequestId;
+    const isSilent = Boolean(options && options.silent);
 
-    // Mutually exclusive: Show Loading, hide all others
-    setCreatorUIState('loading');
+    // Only switch to 'loading' state if not in silent background mode or if no valid creator data is rendered
+    if (!isSilent || !isCurrentCreatorDataValid()) {
+        setCreatorUIState('loading');
+    }
 
     // Wait for Supabase auth readiness before making request
     let isAuthReady = false;
