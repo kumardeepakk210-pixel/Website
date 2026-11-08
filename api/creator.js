@@ -241,6 +241,12 @@ module.exports = async function handler(req, res) {
         if (subPath === '/instagram/sync' && method === 'POST') {
             return await withAuth(creator.handleSyncAllInstagramContent);
         }
+        if (subPath === '/instagram/profile/refresh' && method === 'POST') {
+            return await withAuth(creator.handleRefreshInstagramProfile);
+        }
+        if (subPath === '/instagram/profile/niche' && method === 'POST') {
+            return await withAuth(creator.handleUpdateCreatorNiche);
+        }
 
         const syncMatch = subPath.match(/^\/content\/([^\/]+)\/sync$/);
         if (syncMatch && method === 'POST') {

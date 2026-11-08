@@ -1887,39 +1887,118 @@ async function loadInstagramConnection() {
 }
 window.loadInstagramConnection = loadInstagramConnection;
 
+function formatMetricCount(num) {
+    if (num === null || num === undefined) return '0';
+    const n = Number(num);
+    if (isNaN(n)) return '0';
+    if (n >= 1000000) return (n / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+    if (n >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
+    return n.toLocaleString();
+}
+
+const CREATOR_NICHE_LIST = [
+    'Fashion & Lifestyle',
+    'Beauty & Skincare',
+    'Jewellery & Accessories',
+    'Parenting & Kids',
+    'Travel',
+    'Food',
+    'Fitness & Health',
+    'Technology',
+    'Home & Decor',
+    'Entertainment',
+    'Other'
+];
+
 /**
- * Renders the Instagram Connection Card above the content list
+ * Renders the Instagram Influencer Profile & Connection Card above the content list
  */
 function renderInstagramConnectionCard(conn) {
     const cardEl = document.getElementById('creator-instagram-conn-card');
     if (!cardEl) return;
 
     if (conn && conn.connected && conn.username) {
-        const syncText = conn.last_synced_at ? `Last synced: ${formatSyncTime(conn.last_synced_at)}` : 'Not synced yet';
+        const syncText = conn.last_synced_at ? `Insights synced: ${formatSyncTime(conn.last_synced_at)}` : 'Insights not synced yet';
+        const profileSyncText = conn.profile_synced_at ? `Profile updated: ${formatSyncTime(conn.profile_synced_at)}` : '';
         const isAuthorized = Boolean(conn.api_authorized || conn.account_id);
+        const selectedNiche = conn.creator_niche || (currentCreatorData?.creator?.creator_niche) || 'Jewellery & Accessories';
+
+        let nicheOptionsHtml = CREATOR_NICHE_LIST.map(n => 
+            `<option value="${n}" ${n === selectedNiche ? 'selected' : ''}>${n}</option>`
+        ).join('');
 
         if (isAuthorized) {
+            const avatarHtml = conn.profile_picture_url
+                ? `<img src="${conn.profile_picture_url}" class="ig-profile-avatar" alt="@${conn.username}" onerror="this.style.display='none';if(this.nextElementSibling)this.nextElementSibling.style.display='flex';" /><div class="ig-profile-avatar-fallback" style="display:none;">${(conn.username || 'C').charAt(0).toUpperCase()}</div>`
+                : `<div class="ig-profile-avatar-fallback">${(conn.username || 'C').charAt(0).toUpperCase()}</div>`;
+
             cardEl.innerHTML = `
                 <div class="ig-conn-connected">
                     <div class="ig-conn-header">
                         <div class="ig-conn-brand">
                             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>
-                            <span>INSTAGRAM CONNECTION</span>
+                            <span>INSTAGRAM INFLUENCER PROFILE</span>
                         </div>
-                        <span class="ig-conn-badge connected">✓ Connected</span>
+                        <span class="ig-profile-verified-badge">
+                            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                            <span>WishRite Verified</span>
+                        </span>
                     </div>
-                    <div class="ig-conn-body">
-                        <div>
-                            <div class="ig-conn-handle">@${conn.username}</div>
-                            <div class="ig-conn-sub">Eligible Professional Account &bull; Official Meta Graph API Connected</div>
-                            <div class="ig-conn-synced">${syncText}</div>
+
+                    <div class="ig-profile-top">
+                        <div class="ig-profile-avatar-wrap">
+                            ${avatarHtml}
+                        </div>
+                        <div class="ig-profile-info">
+                            <div class="ig-profile-title-row">
+                                <div class="ig-profile-username">@${conn.username}</div>
+                                <span class="ig-pill ig-pill-category" style="font-size:0.68rem; padding:1px 6px;">Professional</span>
+                            </div>
+                            <div class="ig-conn-sub">Official Meta Graph API Connected &bull; Real-time Insights Enabled</div>
+                            <div class="ig-profile-pills">
+                                ${conn.instagram_category ? `<span class="ig-pill ig-pill-category">🏷️ ${conn.instagram_category}</span>` : ''}
+                                <div style="display:inline-flex; align-items:center; gap:5px;">
+                                    <span style="font-size:0.72rem; color:#71717A;">Niche:</span>
+                                    <select class="ig-niche-select" onchange="updateCreatorNiche(this)" title="Select your creator niche">
+                                        ${nicheOptionsHtml}
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="ig-conn-synced" style="margin-top:6px;">
+                                ${profileSyncText ? `${profileSyncText} &bull; ` : ''}${syncText}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="ig-profile-stats-grid">
+                        <div class="ig-profile-stat-item">
+                            <div class="ig-profile-stat-val">${formatMetricCount(conn.followers_count)}</div>
+                            <div class="ig-profile-stat-lbl">Followers</div>
+                        </div>
+                        <div class="ig-profile-stat-item">
+                            <div class="ig-profile-stat-val">${formatMetricCount(conn.following_count)}</div>
+                            <div class="ig-profile-stat-lbl">Following</div>
+                        </div>
+                        <div class="ig-profile-stat-item">
+                            <div class="ig-profile-stat-val">${formatMetricCount(conn.media_count)}</div>
+                            <div class="ig-profile-stat-lbl">Posts</div>
+                        </div>
+                    </div>
+
+                    <div class="ig-conn-body" style="padding-top:4px; border-top:1px solid rgba(94, 52, 53, 0.08);">
+                        <div style="font-size:0.75rem; color:#71717A;">
+                            Reels & metrics automatically discovered from official Meta connection.
                         </div>
                         <div class="ig-conn-actions">
-                            <button type="button" class="btn btn-secondary btn-sm" onclick="syncAllInstagramInsights()" id="btn-sync-all-ig" style="display:inline-flex; align-items:center; gap:6px; padding:6px 14px; font-size:0.75rem;">
-                                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" id="icon-sync-all-ig"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-                                <span>SYNC NOW</span>
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="refreshInstagramProfile(this)" id="btn-refresh-ig-profile" style="display:inline-flex; align-items:center; gap:6px; padding:6px 12px; font-size:0.75rem;">
+                                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                                <span>REFRESH PROFILE</span>
                             </button>
-                            <button type="button" class="btn btn-ghost btn-sm" onclick="disconnectInstagramAccount()" style="padding:6px 12px; font-size:0.75rem; color:#dc2626;">
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="syncAllInstagramInsights()" id="btn-sync-all-ig" style="display:inline-flex; align-items:center; gap:6px; padding:6px 12px; font-size:0.75rem;">
+                                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" id="icon-sync-all-ig"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                                <span>SYNC INSIGHTS</span>
+                            </button>
+                            <button type="button" class="btn btn-ghost btn-sm" onclick="disconnectInstagramAccount()" style="padding:6px 10px; font-size:0.75rem; color:#dc2626;">
                                 <span>DISCONNECT</span>
                             </button>
                         </div>
@@ -1939,7 +2018,7 @@ function renderInstagramConnectionCard(conn) {
                     <div class="ig-conn-body">
                         <div>
                             <div class="ig-conn-handle">@${conn.username}</div>
-                            <div class="ig-conn-sub" style="color:#b45309; font-weight:500;">Instagram authorization needs to be renewed to sync Reel insights</div>
+                            <div class="ig-conn-sub" style="color:#b45309; font-weight:500;">Instagram authorization needs to be renewed to sync Reel insights.</div>
                             <div class="ig-conn-synced">${syncText}</div>
                         </div>
                         <div class="ig-conn-actions">
@@ -2153,6 +2232,93 @@ async function disconnectInstagramAccount() {
     }
 }
 window.disconnectInstagramAccount = disconnectInstagramAccount;
+
+/**
+ * Manually refreshes influencer profile information (followers, following, posts, picture, category)
+ */
+async function refreshInstagramProfile(btnEl) {
+    if (btnEl) {
+        btnEl.disabled = true;
+        btnEl.innerHTML = `<span class="spinner-border spinner-border-sm" style="display:inline-block; width:12px; height:12px; border:2px solid currentColor; border-right-color:transparent; border-radius:50%; animation:spin 0.75s linear infinite; vertical-align:middle; margin-right:4px;"></span> <span>REFRESHING...</span>`;
+    }
+
+    try {
+        const headers = await getAuthHeaders();
+        const res = await fetch('/api/creator/instagram/profile/refresh', {
+            method: 'POST',
+            headers
+        });
+        const json = await res.json();
+
+        if (json.success) {
+            if (typeof showToast === 'function') {
+                showToast('Instagram profile refreshed successfully.', 'success');
+            }
+            await loadInstagramConnection();
+        } else {
+            const errMsg = json.error?.message || 'Failed to refresh Instagram profile.';
+            if (typeof showToast === 'function') {
+                showToast(errMsg, 'error');
+            } else {
+                alert(errMsg);
+            }
+            if (json.error?.is_auth_expired) {
+                await loadInstagramConnection();
+            }
+        }
+    } catch (e) {
+        if (typeof showToast === 'function') {
+            showToast('Network error refreshing profile: ' + e.message, 'error');
+        } else {
+            alert('Network error refreshing profile: ' + e.message);
+        }
+    } finally {
+        if (btnEl) {
+            btnEl.disabled = false;
+            btnEl.innerHTML = `
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                <span>REFRESH PROFILE</span>
+            `;
+        }
+    }
+}
+window.refreshInstagramProfile = refreshInstagramProfile;
+
+/**
+ * Updates the creator's selected niche
+ */
+async function updateCreatorNiche(selectEl) {
+    const niche = selectEl ? selectEl.value : null;
+    if (!niche) return;
+
+    try {
+        const headers = await getAuthHeaders();
+        headers['Content-Type'] = 'application/json';
+        const res = await fetch('/api/creator/instagram/profile/niche', {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ creator_niche: niche })
+        });
+        const json = await res.json();
+
+        if (json.success) {
+            if (typeof showToast === 'function') {
+                showToast(`Niche updated to ${niche}`, 'success');
+            }
+            if (currentInstagramConnection) {
+                currentInstagramConnection.creator_niche = niche;
+            }
+            if (currentCreatorData && currentCreatorData.creator) {
+                currentCreatorData.creator.creator_niche = niche;
+            }
+        } else {
+            alert(json.error?.message || 'Failed to update niche.');
+        }
+    } catch (e) {
+        alert('Network error updating niche: ' + e.message);
+    }
+}
+window.updateCreatorNiche = updateCreatorNiche;
 
 /**
  * Synchronizes metrics for a single content item via official Meta Graph API

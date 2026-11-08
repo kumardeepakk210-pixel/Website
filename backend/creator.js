@@ -32,7 +32,11 @@ import {
     validateSystemUserToken,
     WISHRITE_OFFICIAL_IG_HANDLE,
     WISHRITE_OFFICIAL_IG_ACCOUNT_ID,
-    fetchInstagramAccountMedia
+    fetchInstagramAccountMedia,
+    fetchInstagramProfileDetails,
+    verifyMetaTokenPermissions,
+    ALLOWED_CREATOR_NICHES,
+    getCreatorInstagramConnection
 } from './services/instagram-sync.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -3471,6 +3475,15 @@ export async function handleGetInstagramStatus(req, res) {
             username: rawHandle,
             account_id: resolvedAccountId,
             account_type: conn?.account_type || 'professional',
+            followers_count: conn?.followers_count ?? (creator.instagram_followers_count ?? (creator.followers ? Number(creator.followers) : 0)),
+            following_count: conn?.following_count ?? (creator.instagram_following_count ?? 0),
+            media_count: conn?.media_count ?? (creator.instagram_media_count ?? (creator.no_of_posts ? Number(creator.no_of_posts) : 0)),
+            profile_picture_url: conn?.profile_picture_url || creator.instagram_profile_picture || creator.profile_image || null,
+            instagram_category: conn?.instagram_category || creator.instagram_category || null,
+            creator_niche: creator.creator_niche || conn?.creator_niche || null,
+            allowed_niches: ALLOWED_CREATOR_NICHES,
+            validation_status: conn?.validation_status || (isConnected && isApiAuthorized ? 'verified' : 'pending'),
+            profile_synced_at: conn?.profile_synced_at || conn?.last_synced_at || null,
             last_synced_at: conn?.last_synced_at || null,
             insights_status: insightsStatus,
             meta_configured: !!(process.env.META_APP_ID && process.env.META_APP_SECRET),
@@ -3735,6 +3748,7 @@ export async function handleInstagramOAuthCallback(req, res) {
         let instagramAccountId = null;
         let instagramUsername = null;
         let resolvedPageAccessToken = null;
+        let resolvedPageId = null;
 
         // Resolve existing creator profile upfront to aid username matching
         let existingCreator = null;
@@ -3871,6 +3885,7 @@ export async function handleInstagramOAuthCallback(req, res) {
                                         if (!targetUsername || (igAcc.username || '').toLowerCase().trim() === targetUsername) {
                                             instagramAccountId = igAcc.id;
                                             instagramUsername = igAcc.username || targetUsername;
+                                            resolvedPageId = page.id || null;
                                             if (page.access_token) resolvedPageAccessToken = page.access_token;
                                             console.log('[Meta OAuth Diagnostic] Selected from owned_pages ID ending in:', String(igAcc.id).slice(-4), 'username:', instagramUsername);
                                             break;
@@ -3886,6 +3901,7 @@ export async function handleInstagramOAuthCallback(req, res) {
                                                 if (!targetUsername || (igAcc.username || '').toLowerCase().trim() === targetUsername) {
                                                     instagramAccountId = igAcc.id;
                                                     instagramUsername = igAcc.username || targetUsername;
+                                                    resolvedPageId = page.id || null;
                                                     if (page.access_token) resolvedPageAccessToken = page.access_token;
                                                     console.log('[Meta OAuth Diagnostic] Selected from Page direct query ID ending in:', String(igAcc.id).slice(-4), 'username:', instagramUsername);
                                                     break;
@@ -3979,6 +3995,7 @@ export async function handleInstagramOAuthCallback(req, res) {
                             if (usernameMatches) {
                                 instagramAccountId = igAccount.id;
                                 instagramUsername = igAccount.username || targetUsername;
+                                resolvedPageId = page.id || null;
                                 if (page.access_token) {
                                     resolvedPageAccessToken = page.access_token;
                                 }
@@ -4014,18 +4031,71 @@ export async function handleInstagramOAuthCallback(req, res) {
 
         const finalToken = resolvedPageAccessToken || accessToken;
 
-        // 4. Resolve final username
-        const finalUsername = (instagramUsername || existingCreator?.instagram_connection?.username || existingCreator?.instagram_id || 'creator').replace(/^@/, '');
+        // 4. Verify granted Meta permissions
+        try {
+            const permCheck = await verifyMetaTokenPermissions(accessToken);
+            if (!permCheck.valid && permCheck.missing && permCheck.missing.length > 0) {
+                console.warn('[Meta OAuth Callback] Missing required permissions:', permCheck.missing);
+                const missingList = permCheck.missing.join(', ');
+                return res.redirect(`/account?tab=creator&instagram=error&msg=${encodeURIComponent(`Instagram Insights permissions were not granted (${missingList}). Please reconnect and grant all requested permissions.`)}`);
+            }
+        } catch (permErr) {
+            console.warn('[Meta OAuth Callback] Permissions check notice:', permErr.message);
+        }
 
-        // FIX 2 Guard: Never redirect with instagram=connected or overwrite valid records if account_id is null
+        // 5. Guard: Reject if no eligible Instagram Professional Account was resolved
         if (!instagramAccountId) {
             console.warn('[Meta OAuth Callback] Could not resolve an Instagram Business / Creator Account ID for creator:', creatorId);
-            // If existing connection had an account_id, do NOT overwrite it with nulls
             if (existingCreator?.instagram_connection?.account_id) {
                 console.warn('[Meta OAuth Callback] Retaining existing valid instagram_connection to prevent data loss.');
             }
             return res.redirect('/account?tab=creator&instagram=error&msg=Unable+to+resolve+Instagram+Business+Account+ID.+Please+ensure+your+Instagram+Professional+account+is+linked+to+your+Facebook+Page.');
         }
+
+        // 6. Cross-creator hijacking prevention: Verify account is not already connected to another creator
+        let conflictCreatorId = null;
+        try {
+            const queryOpts = { useAdmin: hasServerAdminCredential() };
+            const existingWithAccount = await dbQuery(
+                'influencers',
+                `instagram_connection->>account_id=eq.${encodeURIComponent(instagramAccountId)}&influencer_id=neq.${encodeURIComponent(creatorId)}&limit=1`,
+                queryOpts
+            );
+            if (Array.isArray(existingWithAccount) && existingWithAccount.length > 0) {
+                conflictCreatorId = existingWithAccount[0].id || existingWithAccount[0].influencer_id;
+            }
+        } catch (_) {}
+
+        if (!conflictCreatorId) {
+            const local = readLocalStore();
+            const conflictLocal = (local.influencers || []).find(i => 
+                i.id !== creatorId && 
+                i.instagram_connection && 
+                i.instagram_connection.account_id === instagramAccountId
+            );
+            if (conflictLocal) conflictCreatorId = conflictLocal.id;
+        }
+
+        if (conflictCreatorId) {
+            console.warn(`[Meta OAuth Callback] Account ID ${instagramAccountId} is already connected to another creator: ${conflictCreatorId}`);
+            return res.redirect(`/account?tab=creator&instagram=error&msg=${encodeURIComponent('This Instagram account is already connected to another WishRite creator account.')}`);
+        }
+
+        // 7. Automatically fetch and validate influencer profile information
+        let profileDetails = null;
+        try {
+            profileDetails = await fetchInstagramProfileDetails(instagramAccountId, finalToken, resolvedPageId);
+        } catch (pfErr) {
+            console.warn('[Meta OAuth Callback] Profile fetch warning:', pfErr.message);
+        }
+
+        if (profileDetails?.error) {
+            console.warn('[Meta OAuth Callback] Profile validation failed:', profileDetails.error);
+            return res.redirect(`/account?tab=creator&instagram=error&msg=${encodeURIComponent(profileDetails.error.message || 'Instagram account validation failed. Please try again.')}`);
+        }
+
+        const finalUsername = (profileDetails?.username || instagramUsername || existingCreator?.instagram_connection?.username || existingCreator?.instagram_id || 'creator').replace(/^@/, '');
+        const now = new Date().toISOString();
 
         const instagramConnPayload = {
             connected: true,
@@ -4033,29 +4103,64 @@ export async function handleInstagramOAuthCallback(req, res) {
             account_id: instagramAccountId,
             account_type: 'professional',
             access_token: finalToken ? encryptToken(finalToken) : null,
-            last_synced_at: new Date().toISOString(),
+            facebook_page_id: resolvedPageId || null,
+            followers_count: profileDetails ? profileDetails.followers_count : (existingCreator?.instagram_connection?.followers_count || 0),
+            following_count: profileDetails ? profileDetails.following_count : (existingCreator?.instagram_connection?.following_count || 0),
+            media_count: profileDetails ? profileDetails.media_count : (existingCreator?.instagram_connection?.media_count || 0),
+            profile_picture_url: profileDetails?.profile_picture_url || existingCreator?.instagram_connection?.profile_picture_url || null,
+            instagram_category: profileDetails?.instagram_category || existingCreator?.instagram_connection?.instagram_category || null,
+            creator_niche: existingCreator?.creator_niche || existingCreator?.instagram_connection?.creator_niche || null,
+            validation_status: 'verified',
+            profile_synced_at: now,
+            last_synced_at: now,
             insights_status: 'connected',
-            updated_at: new Date().toISOString()
+            updated_at: now
         };
 
-        // 5. Authoritative update in Supabase
+        // 8. Authoritative update in Supabase with backward-compatible column fallback
+        const fullUpdate = {
+            instagram_connection: instagramConnPayload,
+            instagram_followers_count: instagramConnPayload.followers_count ?? null,
+            instagram_following_count: instagramConnPayload.following_count ?? null,
+            instagram_media_count: instagramConnPayload.media_count ?? null,
+            instagram_profile_picture: instagramConnPayload.profile_picture_url ?? null,
+            instagram_category: instagramConnPayload.instagram_category ?? null,
+            instagram_profile_synced_at: instagramConnPayload.profile_synced_at ?? null,
+            instagram_validation_status: 'verified',
+            followers: instagramConnPayload.followers_count ?? undefined,
+            no_of_posts: instagramConnPayload.media_count ?? undefined,
+            profile_image: (!existingCreator?.profile_image && instagramConnPayload.profile_picture_url) ? instagramConnPayload.profile_picture_url : undefined
+        };
+        Object.keys(fullUpdate).forEach(k => fullUpdate[k] === undefined && delete fullUpdate[k]);
+
         let dbSucceeded = false;
         try {
-            await dbUpdate('influencers', 'influencer_id', creatorId, {
-                instagram_connection: instagramConnPayload
-            }, { useAdmin: true });
+            await dbUpdate('influencers', 'influencer_id', creatorId, fullUpdate, { useAdmin: true });
             dbSucceeded = true;
         } catch (dbErr) {
-            console.warn('[handleInstagramOAuthCallback] Supabase update notice:', dbErr.message);
+            console.warn('[handleInstagramOAuthCallback] Supabase full column update notice:', dbErr.message);
+            try {
+                await dbUpdate('influencers', 'influencer_id', creatorId, {
+                    instagram_connection: instagramConnPayload
+                }, { useAdmin: true });
+                dbSucceeded = true;
+            } catch (_) {}
         }
 
-        // 6. Update local store
+        // 9. Update local store
         let localSucceeded = false;
         try {
             const local = readLocalStore();
             let localInf = (local.influencers || []).find(i => i.id === creatorId);
             if (localInf) {
                 localInf.instagram_connection = instagramConnPayload;
+                localInf.instagram_followers_count = instagramConnPayload.followers_count;
+                localInf.instagram_following_count = instagramConnPayload.following_count;
+                localInf.instagram_media_count = instagramConnPayload.media_count;
+                localInf.instagram_profile_picture = instagramConnPayload.profile_picture_url;
+                localInf.instagram_category = instagramConnPayload.instagram_category;
+                localInf.instagram_validation_status = 'verified';
+                localInf.instagram_profile_synced_at = now;
                 localSucceeded = true;
             }
             writeLocalStore(local);
@@ -4218,7 +4323,202 @@ export async function handleSyncAllInstagramContent(req, res) {
             synced_count: syncResult.synced_count || 0,
             discovered_count: syncResult.discovered_count || 0,
             last_synced_at: syncResult.last_synced_at || new Date().toISOString(),
+            profile: syncResult.profile || null,
             items: contentList.map(sanitizeContentItem)
+        });
+    } catch (err) {
+        return res.status(500).json({ success: false, error: { message: err.message } });
+    }
+}
+
+/**
+ * POST /api/creator/instagram/profile/refresh
+ * Manually or automatically refreshes influencer profile information from Meta Graph API
+ */
+export async function handleRefreshInstagramProfile(req, res) {
+    try {
+        const creator = req.creator;
+        if (!creator) {
+            return res.status(401).json({ success: false, error: { message: 'Creator authentication required.' } });
+        }
+
+        const creatorId = creator.id || creator.influencer_id;
+        const conn = await getCreatorInstagramConnection(creator);
+
+        if (!conn || !conn.connected || (!conn.decrypted_token && !conn.is_system_user)) {
+            return res.status(400).json({
+                success: false,
+                error: { message: 'No connected Instagram account found to refresh.' }
+            });
+        }
+
+        const accessToken = conn.decrypted_token;
+        const accountId = conn.account_id;
+
+        if (!accountId || !accessToken) {
+            return res.status(400).json({
+                success: false,
+                error: { message: 'Instagram account ID or token not found. Please reconnect Instagram.' }
+            });
+        }
+
+        const profileDetails = await fetchInstagramProfileDetails(accountId, accessToken, conn.facebook_page_id || null);
+
+        if (!profileDetails || profileDetails.error) {
+            const errMsg = profileDetails?.error?.message || 'Failed to retrieve Instagram profile from Meta API.';
+            const isAuthExpired = profileDetails?.error?.code === 190;
+
+            if (isAuthExpired) {
+                // Update status to auth_expired while preserving all existing profile stats
+                const expiredConn = {
+                    ...conn,
+                    insights_status: 'auth_expired',
+                    updated_at: new Date().toISOString()
+                };
+                delete expiredConn.decrypted_token;
+                if (conn.is_system_user) expiredConn.access_token = null;
+                await dbUpdate('influencers', 'influencer_id', creatorId, {
+                    instagram_connection: expiredConn
+                }, { useAdmin: true }).catch(() => {});
+            }
+
+            return res.status(400).json({
+                success: false,
+                error: { message: errMsg, is_auth_expired: isAuthExpired }
+            });
+        }
+
+        const now = new Date().toISOString();
+        const updatedConn = {
+            ...conn,
+            username: profileDetails.username || conn.username,
+            followers_count: profileDetails.followers_count,
+            following_count: profileDetails.following_count,
+            media_count: profileDetails.media_count,
+            profile_picture_url: profileDetails.profile_picture_url || conn.profile_picture_url || null,
+            instagram_category: profileDetails.instagram_category || conn.instagram_category || null,
+            creator_niche: creator.creator_niche || conn.creator_niche || null,
+            validation_status: 'verified',
+            profile_synced_at: now,
+            updated_at: now
+        };
+        delete updatedConn.decrypted_token;
+        if (conn.is_system_user) updatedConn.access_token = null;
+
+        const fullUpdate = {
+            instagram_connection: updatedConn,
+            instagram_followers_count: updatedConn.followers_count,
+            instagram_following_count: updatedConn.following_count,
+            instagram_media_count: updatedConn.media_count,
+            instagram_profile_picture: updatedConn.profile_picture_url,
+            instagram_category: updatedConn.instagram_category,
+            instagram_profile_synced_at: now,
+            instagram_validation_status: 'verified',
+            followers: updatedConn.followers_count,
+            no_of_posts: updatedConn.media_count
+        };
+
+        try {
+            await dbUpdate('influencers', 'influencer_id', creatorId, fullUpdate, { useAdmin: true });
+        } catch (_) {
+            await dbUpdate('influencers', 'influencer_id', creatorId, {
+                instagram_connection: updatedConn
+            }, { useAdmin: true }).catch(() => {});
+        }
+
+        // Update local store
+        try {
+            const local = readLocalStore();
+            const localInf = (local.influencers || []).find(i => i.id === creatorId);
+            if (localInf) {
+                localInf.instagram_connection = updatedConn;
+                localInf.instagram_followers_count = updatedConn.followers_count;
+                localInf.instagram_following_count = updatedConn.following_count;
+                localInf.instagram_media_count = updatedConn.media_count;
+                localInf.instagram_profile_picture = updatedConn.profile_picture_url;
+                localInf.instagram_category = updatedConn.instagram_category;
+                localInf.instagram_validation_status = 'verified';
+                localInf.instagram_profile_synced_at = now;
+                writeLocalStore(local);
+            }
+        } catch (_) {}
+
+        return res.json({
+            success: true,
+            message: 'Instagram profile refreshed successfully.',
+            profile: {
+                username: updatedConn.username,
+                account_id: updatedConn.account_id,
+                followers_count: updatedConn.followers_count,
+                following_count: updatedConn.following_count,
+                media_count: updatedConn.media_count,
+                profile_picture_url: updatedConn.profile_picture_url,
+                instagram_category: updatedConn.instagram_category,
+                creator_niche: updatedConn.creator_niche,
+                validation_status: 'verified',
+                profile_synced_at: now
+            }
+        });
+    } catch (err) {
+        return res.status(500).json({ success: false, error: { message: err.message } });
+    }
+}
+
+/**
+ * POST /api/creator/instagram/profile/niche
+ * Updates the creator's chosen niche from the 11 supported options
+ */
+export async function handleUpdateCreatorNiche(req, res) {
+    try {
+        const creator = req.creator;
+        if (!creator) {
+            return res.status(401).json({ success: false, error: { message: 'Creator authentication required.' } });
+        }
+
+        const creatorId = creator.id || creator.influencer_id;
+        const niche = String(req.body?.creator_niche || req.body?.niche || '').trim();
+
+        if (!ALLOWED_CREATOR_NICHES.includes(niche)) {
+            return res.status(400).json({
+                success: false,
+                error: { message: `Invalid niche. Must be one of: ${ALLOWED_CREATOR_NICHES.join(', ')}` }
+            });
+        }
+
+        creator.creator_niche = niche;
+        let conn = creator.instagram_connection || null;
+        if (conn) {
+            conn.creator_niche = niche;
+        }
+
+        try {
+            await dbUpdate('influencers', 'influencer_id', creatorId, {
+                creator_niche: niche,
+                ...(conn ? { instagram_connection: conn } : {})
+            }, { useAdmin: true });
+        } catch (_) {
+            if (conn) {
+                await dbUpdate('influencers', 'influencer_id', creatorId, {
+                    instagram_connection: conn
+                }, { useAdmin: true }).catch(() => {});
+            }
+        }
+
+        // Local store
+        try {
+            const local = readLocalStore();
+            const localInf = (local.influencers || []).find(i => i.id === creatorId);
+            if (localInf) {
+                localInf.creator_niche = niche;
+                if (localInf.instagram_connection) localInf.instagram_connection.creator_niche = niche;
+                writeLocalStore(local);
+            }
+        } catch (_) {}
+
+        return res.json({
+            success: true,
+            message: 'Creator niche updated successfully.',
+            creator_niche: niche
         });
     } catch (err) {
         return res.status(500).json({ success: false, error: { message: err.message } });

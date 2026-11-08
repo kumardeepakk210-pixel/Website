@@ -1901,6 +1901,146 @@
     gap: 8px;
 }
 
+/* ── Influencer Profile Card Enhancements ── */
+.ig-profile-top {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+}
+
+.ig-profile-avatar-wrap {
+    position: relative;
+    width: 64px;
+    height: 64px;
+    flex-shrink: 0;
+}
+
+.ig-profile-avatar {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid #5E3435;
+    background: #FAF8F5;
+}
+
+.ig-profile-avatar-fallback {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #5E3435 0%, #8C4D4E 100%);
+    color: #FAF8F5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 1.25rem;
+    border: 2px solid #5E3435;
+}
+
+.ig-profile-info {
+    flex: 1;
+    min-width: 220px;
+}
+
+.ig-profile-title-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.ig-profile-username {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #5E3435;
+}
+
+.ig-profile-verified-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: #E8F5E9;
+    color: #2E7D32;
+    border: 1px solid #A5D6A7;
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 12px;
+}
+
+.ig-profile-pills {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 6px;
+}
+
+.ig-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-size: 0.72rem;
+    font-weight: 500;
+}
+
+.ig-pill-category {
+    background: #F4ECE1;
+    color: #5E3435;
+    border: 1px solid rgba(94, 52, 53, 0.2);
+}
+
+.ig-pill-niche {
+    background: #EFF6FF;
+    color: #1D4ED8;
+    border: 1px solid #BFDBFE;
+}
+
+.ig-profile-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+    gap: 12px;
+    background: #FAF8F5;
+    border: 1px solid rgba(94, 52, 53, 0.1);
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 14px;
+}
+
+.ig-profile-stat-item {
+    text-align: center;
+}
+
+.ig-profile-stat-val {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #5E3435;
+    line-height: 1.2;
+}
+
+.ig-profile-stat-lbl {
+    font-size: 0.7rem;
+    color: #71717A;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-top: 2px;
+}
+
+.ig-niche-select {
+    padding: 3px 8px;
+    border-radius: 6px;
+    border: 1px solid rgba(94, 52, 53, 0.25);
+    background: #FFFFFF;
+    color: #5E3435;
+    font-size: 0.75rem;
+    font-weight: 500;
+    cursor: pointer;
+}
+
 /* ── Content List Table (Desktop) ── */
 .content-table-wrapper {
     width: 100%;

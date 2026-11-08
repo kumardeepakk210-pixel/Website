@@ -9,6 +9,20 @@ export const META_API_VERSION = process.env.META_GRAPH_API_VERSION || 'v26.0';
 export const WISHRITE_OFFICIAL_IG_HANDLE = 'wishrite.in';
 export const WISHRITE_OFFICIAL_IG_ACCOUNT_ID = '17841445671263800';
 
+export const ALLOWED_CREATOR_NICHES = [
+    'Fashion & Lifestyle',
+    'Beauty & Skincare',
+    'Jewellery & Accessories',
+    'Parenting & Kids',
+    'Travel',
+    'Food',
+    'Fitness & Health',
+    'Technology',
+    'Home & Decor',
+    'Entertainment',
+    'Other'
+];
+
 const ENCRYPTION_ALGO = 'aes-256-gcm';
 
 // In-memory cache for validated Meta System User Token status (5-minute TTL)
@@ -144,6 +158,98 @@ export async function getCreatorInstagramConnection(creator) {
     return {
         ...conn,
         decrypted_token: rawToken
+    };
+}
+
+/**
+ * Validates granted permissions on the Meta access token.
+ * Ensures instagram_basic and instagram_manage_insights are active.
+ */
+export async function verifyMetaTokenPermissions(accessToken) {
+    if (!accessToken) return { valid: false, missing: ['access_token'], granted: [] };
+    try {
+        const url = `https://graph.facebook.com/${META_API_VERSION}/me/permissions?access_token=${encodeURIComponent(accessToken)}`;
+        const res = await fetch(url);
+        const data = await res.json();
+        if (data.error) {
+            return { valid: false, error: data.error.message, missing: [], granted: [] };
+        }
+        const granted = new Set(
+            (data.data || [])
+                .filter(p => p.status === 'granted')
+                .map(p => p.permission)
+        );
+        const required = ['instagram_basic', 'instagram_manage_insights'];
+        const missing = required.filter(r => !granted.has(r));
+        return {
+            valid: missing.length === 0,
+            granted: Array.from(granted),
+            missing
+        };
+    } catch (err) {
+        return { valid: false, error: err.message, missing: [], granted: [] };
+    }
+}
+
+/**
+ * Fetches Instagram influencer profile information from official Meta Graph API v26.0.
+ * Retrieves account ID, username, name, biography, website, profile picture,
+ * followers count, following count (follows_count), media count, and page category.
+ * Never requests unsupported fields (e.g. account_type or category on the IG node).
+ */
+export async function fetchInstagramProfileDetails(accountId, accessToken, pageId = null) {
+    if (!accountId || !accessToken) return null;
+
+    // 1. Fetch IG User node fields
+    const igFields = 'id,username,name,biography,website,profile_picture_url,followers_count,follows_count,media_count';
+    const igUrl = `https://graph.facebook.com/${META_API_VERSION}/${accountId}?fields=${igFields}&access_token=${encodeURIComponent(accessToken)}`;
+
+    let igData = null;
+    try {
+        const res = await fetch(igUrl);
+        const json = await res.json();
+        if (json && json.id) {
+            igData = json;
+        } else if (json.error) {
+            console.warn('[Instagram Profile Fetch] IG Node error:', json.error.message);
+            return { error: json.error };
+        }
+    } catch (err) {
+        console.warn('[Instagram Profile Fetch] Network error:', err.message);
+        return { error: { message: err.message } };
+    }
+
+    if (!igData) return null;
+
+    // 2. Fetch Facebook Page category if pageId is available
+    let instagramCategory = null;
+    if (pageId) {
+        try {
+            const pageUrl = `https://graph.facebook.com/${META_API_VERSION}/${pageId}?fields=id,name,category,category_list&access_token=${encodeURIComponent(accessToken)}`;
+            const pageRes = await fetch(pageUrl);
+            const pageData = await pageRes.json();
+            if (pageData && (pageData.category || (pageData.category_list && pageData.category_list[0]?.name))) {
+                instagramCategory = pageData.category || pageData.category_list[0]?.name || null;
+            }
+        } catch (pageErr) {
+            console.warn('[Instagram Profile Fetch] Page category query error (ignored):', pageErr.message);
+        }
+    }
+
+    return {
+        account_id: igData.id,
+        username: igData.username,
+        name: igData.name || null,
+        biography: igData.biography || null,
+        website: igData.website || null,
+        profile_picture_url: igData.profile_picture_url || null,
+        followers_count: typeof igData.followers_count === 'number' ? igData.followers_count : 0,
+        following_count: typeof igData.follows_count === 'number' ? igData.follows_count : 0,
+        media_count: typeof igData.media_count === 'number' ? igData.media_count : 0,
+        instagram_category: instagramCategory,
+        account_type: 'professional',
+        validation_status: 'verified',
+        profile_synced_at: new Date().toISOString()
     };
 }
 
@@ -465,6 +571,12 @@ export async function syncCreatorInstagram(creator) {
             conn.account_id = accountId;
         }
 
+        // Fetch refreshed influencer profile information
+        let profileDetails = null;
+        try {
+            profileDetails = await fetchInstagramProfileDetails(accountId, accessToken, conn.facebook_page_id || null);
+        } catch (_) {}
+
         // Security: NEVER persist decrypted_token or system user tokens into database records
         const safeConnToPersist = {
             username: conn.username,
@@ -472,14 +584,53 @@ export async function syncCreatorInstagram(creator) {
             account_id: accountId || conn.account_id || null,
             account_type: conn.account_type || 'professional',
             access_token: conn.is_system_user ? null : (conn.access_token || null),
+            facebook_page_id: conn.facebook_page_id || null,
             insights_status: 'connected',
             last_synced_at: now,
             updated_at: now
         };
 
-        await dbUpdate('influencers', 'influencer_id', creatorId, {
-            instagram_connection: safeConnToPersist
-        }, { useAdmin: true }).catch(() => {});
+        if (profileDetails && !profileDetails.error) {
+            safeConnToPersist.followers_count = profileDetails.followers_count;
+            safeConnToPersist.following_count = profileDetails.following_count;
+            safeConnToPersist.media_count = profileDetails.media_count;
+            safeConnToPersist.profile_picture_url = profileDetails.profile_picture_url;
+            if (profileDetails.instagram_category) safeConnToPersist.instagram_category = profileDetails.instagram_category;
+            safeConnToPersist.validation_status = 'verified';
+            safeConnToPersist.profile_synced_at = now;
+        } else {
+            // Retain valid previous data upon transient failure
+            if (conn.followers_count !== undefined) safeConnToPersist.followers_count = conn.followers_count;
+            if (conn.following_count !== undefined) safeConnToPersist.following_count = conn.following_count;
+            if (conn.media_count !== undefined) safeConnToPersist.media_count = conn.media_count;
+            if (conn.profile_picture_url !== undefined) safeConnToPersist.profile_picture_url = conn.profile_picture_url;
+            if (conn.instagram_category !== undefined) safeConnToPersist.instagram_category = conn.instagram_category;
+            safeConnToPersist.validation_status = conn.validation_status || 'verified';
+            safeConnToPersist.profile_synced_at = conn.profile_synced_at || now;
+        }
+
+        // Persist to Supabase influencers table with backwards-compatible column fallback
+        const fullUpdate = {
+            instagram_connection: safeConnToPersist,
+            instagram_followers_count: safeConnToPersist.followers_count ?? null,
+            instagram_following_count: safeConnToPersist.following_count ?? null,
+            instagram_media_count: safeConnToPersist.media_count ?? null,
+            instagram_profile_picture: safeConnToPersist.profile_picture_url ?? null,
+            instagram_category: safeConnToPersist.instagram_category ?? null,
+            instagram_profile_synced_at: safeConnToPersist.profile_synced_at ?? null,
+            instagram_validation_status: safeConnToPersist.validation_status ?? 'verified',
+            followers: safeConnToPersist.followers_count ?? undefined,
+            no_of_posts: safeConnToPersist.media_count ?? undefined
+        };
+        Object.keys(fullUpdate).forEach(k => fullUpdate[k] === undefined && delete fullUpdate[k]);
+
+        try {
+            await dbUpdate('influencers', 'influencer_id', creatorId, fullUpdate, { useAdmin: true });
+        } catch (_) {
+            await dbUpdate('influencers', 'influencer_id', creatorId, {
+                instagram_connection: safeConnToPersist
+            }, { useAdmin: true }).catch(() => {});
+        }
 
         console.log(`[Instagram Sync] Creator: ${creatorId.slice(0, 8)}... | Discovered: ${mediaList.length} | Synced: ${syncedCount} | Failed: ${failedCount}`);
 
@@ -490,6 +641,17 @@ export async function syncCreatorInstagram(creator) {
             synced_count: syncedCount,
             failed_count: failedCount,
             last_synced_at: now,
+            profile: {
+                username: safeConnToPersist.username,
+                account_id: safeConnToPersist.account_id,
+                followers_count: safeConnToPersist.followers_count || 0,
+                following_count: safeConnToPersist.following_count || 0,
+                media_count: safeConnToPersist.media_count || 0,
+                profile_picture_url: safeConnToPersist.profile_picture_url || null,
+                instagram_category: safeConnToPersist.instagram_category || null,
+                validation_status: safeConnToPersist.validation_status || 'verified',
+                profile_synced_at: safeConnToPersist.profile_synced_at || now
+            },
             items: syncedItems
         };
     } catch (err) {
