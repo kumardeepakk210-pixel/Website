@@ -3210,6 +3210,44 @@ export function sanitizeContentItem(item) {
 }
 
 const META_GRAPH_API_VERSION = process.env.META_GRAPH_API_VERSION || 'v26.0';
+const WISHRITE_OFFICIAL_IG_HANDLE = 'wishrite.in';
+const WISHRITE_OFFICIAL_IG_ACCOUNT_ID = '17841445671263800';
+
+// In-memory cache for validated Meta System User Token status (5-minute TTL)
+let systemUserValidationCache = null;
+
+/**
+ * Validates the configured server-side Meta System User Token against Meta Graph API.
+ * Ensures the token is active, unrevoked, and has access to the official WishRite Instagram account.
+ * Caches positive/negative validation results for 5 minutes to avoid redundant outbound requests.
+ */
+async function validateSystemUserToken() {
+    const sysToken = (process.env.INSTAGRAM_SYSTEM_USER_TOKEN || '').trim();
+    if (!sysToken) return { valid: false, error: 'Token not configured' };
+
+    const now = Date.now();
+    if (systemUserValidationCache && systemUserValidationCache.token === sysToken && (now - systemUserValidationCache.timestamp < 300000)) {
+        return { valid: systemUserValidationCache.valid, error: systemUserValidationCache.error };
+    }
+
+    try {
+        const verifyRes = await fetch(
+            `https://graph.facebook.com/${META_GRAPH_API_VERSION}/${WISHRITE_OFFICIAL_IG_ACCOUNT_ID}?fields=id,username&access_token=${encodeURIComponent(sysToken)}`
+        );
+        const verifyData = await verifyRes.json();
+
+        if (verifyData && verifyData.id === WISHRITE_OFFICIAL_IG_ACCOUNT_ID) {
+            systemUserValidationCache = { token: sysToken, valid: true, error: null, timestamp: now };
+            return { valid: true, error: null };
+        }
+
+        const errMsg = verifyData?.error?.message || 'Meta System User token validation failed';
+        systemUserValidationCache = { token: sysToken, valid: false, error: errMsg, timestamp: now };
+        return { valid: false, error: errMsg };
+    } catch (err) {
+        return { valid: false, error: err.message };
+    }
+}
 
 /**
  * Queries official Meta Graph API to sync metrics for an Instagram media item
@@ -3219,7 +3257,26 @@ export async function syncInstagramMediaMetrics(contentItem, creator) {
     const influencer = (local.influencers || []).find(i => i.id === creator.id) || creator;
     const igConn = influencer.instagram_connection || null;
 
-    if (!igConn || !igConn.access_token) {
+    const creatorHandle = (igConn?.username || influencer?.instagram_id || '').toLowerCase().trim().replace(/^@/, '');
+    const isWishriteBrandAccount = (creatorHandle === WISHRITE_OFFICIAL_IG_HANDLE);
+    const systemUserToken = (process.env.INSTAGRAM_SYSTEM_USER_TOKEN || '').trim();
+
+    let accessToken = null;
+    let accountId = igConn?.account_id || null;
+
+    if (isWishriteBrandAccount && systemUserToken) {
+        const validation = await validateSystemUserToken();
+        if (validation.valid) {
+            accessToken = systemUserToken;
+            accountId = WISHRITE_OFFICIAL_IG_ACCOUNT_ID;
+        }
+    }
+
+    if (!accessToken && igConn && igConn.access_token) {
+        accessToken = decryptToken(igConn.access_token) || igConn.access_token;
+    }
+
+    if (!accessToken) {
         contentItem.last_synced_at = new Date().toISOString();
         contentItem.insights_status = 'not_connected';
         contentItem.insights_error = 'Instagram insights require an eligible Instagram professional account connected to WishRite.';
@@ -3230,14 +3287,13 @@ export async function syncInstagramMediaMetrics(contentItem, creator) {
         };
     }
 
-    const accessToken = igConn.access_token;
     let targetMediaId = contentItem.instagram_media_id;
 
     // Resolve media ID via official Graph API if not yet resolved
-    if (!targetMediaId && igConn.account_id) {
+    if (!targetMediaId && accountId) {
         try {
             const mediaListRes = await fetch(
-                `https://graph.facebook.com/${META_GRAPH_API_VERSION}/${igConn.account_id}/media?fields=id,caption,media_type,media_product_type,permalink,thumbnail_url,like_count,comments_count&access_token=${encodeURIComponent(accessToken)}`
+                `https://graph.facebook.com/${META_GRAPH_API_VERSION}/${accountId}/media?fields=id,caption,media_type,media_product_type,permalink,thumbnail_url,like_count,comments_count&access_token=${encodeURIComponent(accessToken)}`
             );
             const mediaListData = await mediaListRes.json();
             if (mediaListData.data && Array.isArray(mediaListData.data)) {
@@ -3260,7 +3316,7 @@ export async function syncInstagramMediaMetrics(contentItem, creator) {
 
     if (!targetMediaId) {
         contentItem.last_synced_at = new Date().toISOString();
-        if (!igConn.account_id) {
+        if (!accountId) {
             contentItem.insights_status = 'auth_expired';
             contentItem.insights_error = 'Instagram account connection requires reauthorization. Please reconnect your Instagram token.';
             return {
@@ -3394,24 +3450,46 @@ export async function handleGetInstagramStatus(req, res) {
             }
         }
 
-        const isConnected = !!(conn && conn.username);
-        const isApiAuthorized = Boolean(conn && conn.account_id);
-        const insightsStatus = isConnected
+        const rawHandle = conn?.username || (creator.instagram_id ? creator.instagram_id.replace(/^@/, '') : null);
+        const normalizedHandle = (rawHandle || '').toLowerCase().trim();
+        const isWishriteBrandAccount = (normalizedHandle === WISHRITE_OFFICIAL_IG_HANDLE);
+        const systemUserToken = (process.env.INSTAGRAM_SYSTEM_USER_TOKEN || '').trim();
+
+        let isConnected = !!(conn && conn.username);
+        let isApiAuthorized = Boolean(conn && conn.account_id);
+        let resolvedAccountId = conn?.account_id || null;
+        let insightsStatus = isConnected
             ? (conn?.insights_status || (isApiAuthorized ? 'connected' : 'auth_expired'))
             : 'not_connected';
+
+        // For WishRite's official brand account (@wishrite.in), validate server-side System User token
+        if (isWishriteBrandAccount && systemUserToken) {
+            const validation = await validateSystemUserToken();
+            if (validation.valid) {
+                isConnected = true;
+                isApiAuthorized = true;
+                resolvedAccountId = WISHRITE_OFFICIAL_IG_ACCOUNT_ID;
+                insightsStatus = 'connected';
+            } else {
+                console.warn('[WishRite Brand Instagram] System user token configured but validation failed:', validation.error);
+                // If invalid or revoked, do NOT mark connected
+                isApiAuthorized = false;
+                insightsStatus = 'auth_expired';
+            }
+        }
 
         return res.json({
             success: true,
             connected: isConnected,
             api_authorized: isApiAuthorized,
-            username: conn?.username || (creator.instagram_id ? creator.instagram_id.replace(/^@/, '') : null),
-            account_id: conn?.account_id || null,
+            username: rawHandle,
+            account_id: resolvedAccountId,
             account_type: conn?.account_type || 'professional',
             last_synced_at: conn?.last_synced_at || null,
             insights_status: insightsStatus,
             meta_configured: !!(process.env.META_APP_ID && process.env.META_APP_SECRET),
             message: isConnected
-                ? `Connected as @${conn.username}`
+                ? `Connected as @${rawHandle || conn.username}`
                 : 'Connect your Instagram account to automatically receive Reel and Post performance insights. Instagram insights require an eligible Instagram professional account connected to WishRite.'
         });
     } catch (err) {

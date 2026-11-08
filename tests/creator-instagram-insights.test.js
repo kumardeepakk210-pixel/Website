@@ -719,4 +719,195 @@ describe('WishRite Creator — Instagram Content List & Official Insights Sync',
       assert.ok(js.includes('window.disconnectInstagramAccount = disconnectInstagramAccount;'));
     });
   });
+
+  describe('8. Meta System User Token & Token Decryption Tests', () => {
+    test('backend/creator.js validates INSTAGRAM_SYSTEM_USER_TOKEN for official brand account @wishrite.in', async () => {
+      const creatorModule = await import('../backend/creator.js');
+      const origEnv = process.env.INSTAGRAM_SYSTEM_USER_TOKEN;
+      const origFetch = global.fetch;
+
+      try {
+        process.env.INSTAGRAM_SYSTEM_USER_TOKEN = 'mock-meta-sys-token-valid-123';
+        global.fetch = async (url) => {
+          if (url.includes('17841445671263800')) {
+            return {
+              json: async () => ({ id: '17841445671263800', username: 'wishrite.in' })
+            };
+          }
+          return origFetch(url);
+        };
+
+        const brandReq = {
+          creator: {
+            id: 'brand-creator-id',
+            instagram_id: 'wishrite.in',
+            instagram_connection: {
+              connected: true,
+              username: 'wishrite.in',
+              account_id: null
+            }
+          }
+        };
+
+        let result = null;
+        const brandRes = {
+          status() { return this; },
+          json(data) { result = data; }
+        };
+
+        await creatorModule.handleGetInstagramStatus(brandReq, brandRes);
+        assert.ok(result, 'Must return status response');
+        assert.equal(result.connected, true);
+        assert.equal(result.api_authorized, true);
+        assert.equal(result.account_id, '17841445671263800');
+        assert.equal(result.insights_status, 'connected');
+      } finally {
+        global.fetch = origFetch;
+        if (origEnv !== undefined) {
+          process.env.INSTAGRAM_SYSTEM_USER_TOKEN = origEnv;
+        } else {
+          delete process.env.INSTAGRAM_SYSTEM_USER_TOKEN;
+        }
+      }
+    });
+
+    test('invalid or revoked System User token does NOT mark account authorized', async () => {
+      const creatorModule = await import('../backend/creator.js');
+      const origEnv = process.env.INSTAGRAM_SYSTEM_USER_TOKEN;
+      const origFetch = global.fetch;
+
+      try {
+        process.env.INSTAGRAM_SYSTEM_USER_TOKEN = 'mock-invalid-revoked-token';
+        global.fetch = async (url) => {
+          if (url.includes('17841445671263800')) {
+            return {
+              json: async () => ({ error: { message: 'Invalid OAuth access token', code: 190 } })
+            };
+          }
+          return origFetch(url);
+        };
+
+        const brandReq = {
+          creator: {
+            id: 'brand-creator-id-revoked',
+            instagram_id: 'wishrite.in',
+            instagram_connection: {
+              connected: true,
+              username: 'wishrite.in',
+              account_id: null
+            }
+          }
+        };
+
+        let result = null;
+        const brandRes = {
+          status() { return this; },
+          json(data) { result = data; }
+        };
+
+        await creatorModule.handleGetInstagramStatus(brandReq, brandRes);
+        assert.ok(result);
+        assert.equal(result.api_authorized, false, 'Invalid token must NOT mark account authorized');
+        assert.equal(result.insights_status, 'auth_expired');
+      } finally {
+        global.fetch = origFetch;
+        if (origEnv !== undefined) {
+          process.env.INSTAGRAM_SYSTEM_USER_TOKEN = origEnv;
+        } else {
+          delete process.env.INSTAGRAM_SYSTEM_USER_TOKEN;
+        }
+      }
+    });
+
+    test('System User token is isolated to brand account and never used for 3rd-party creators', async () => {
+      const creatorModule = await import('../backend/creator.js');
+      const origEnv = process.env.INSTAGRAM_SYSTEM_USER_TOKEN;
+      const origFetch = global.fetch;
+
+      try {
+        process.env.INSTAGRAM_SYSTEM_USER_TOKEN = 'mock-meta-sys-token-valid-123';
+        global.fetch = async (url) => {
+          if (url.includes('17841445671263800')) {
+            return {
+              json: async () => ({ id: '17841445671263800', username: 'wishrite.in' })
+            };
+          }
+          return origFetch(url);
+        };
+
+        const thirdPartyReq = {
+          creator: {
+            id: 'third-party-influencer-uuid',
+            instagram_id: 'influencer_lifestyle',
+            instagram_connection: {
+              connected: true,
+              username: 'influencer_lifestyle',
+              account_id: null
+            }
+          }
+        };
+
+        let result = null;
+        const res = {
+          status() { return this; },
+          json(data) { result = data; }
+        };
+
+        await creatorModule.handleGetInstagramStatus(thirdPartyReq, res);
+        assert.ok(result);
+        assert.equal(result.username, 'influencer_lifestyle');
+        assert.equal(result.api_authorized, false, '3rd-party influencer must NOT inherit system user token');
+        assert.notEqual(result.account_id, '17841445671263800');
+      } finally {
+        global.fetch = origFetch;
+        if (origEnv !== undefined) {
+          process.env.INSTAGRAM_SYSTEM_USER_TOKEN = origEnv;
+        } else {
+          delete process.env.INSTAGRAM_SYSTEM_USER_TOKEN;
+        }
+      }
+    });
+
+    test('syncInstagramMediaMetrics decrypts encrypted OAuth tokens and never sends enc: ciphertext to Meta', async () => {
+      const creatorModule = await import('../backend/creator.js');
+      const syncService = await import('../backend/services/instagram-sync.js');
+      const origFetch = global.fetch;
+
+      try {
+        const rawSecretToken = 'raw-verified-oauth-access-token-999';
+        const encryptedToken = syncService.encryptToken(rawSecretToken);
+        assert.ok(encryptedToken.startsWith('enc:'), 'Encrypted token must have enc: prefix');
+
+        let tokenSentToMeta = null;
+        global.fetch = async (url) => {
+          const parsed = new URL(url);
+          tokenSentToMeta = parsed.searchParams.get('access_token');
+          return {
+            json: async () => ({ data: [] })
+          };
+        };
+
+        const testContent = {
+          url: 'https://www.instagram.com/reel/C8xyz123abc/',
+          instagram_media_id: null
+        };
+        const testCreator = {
+          id: 'test-third-party-uuid',
+          instagram_id: 'external_creator',
+          instagram_connection: {
+            access_token: encryptedToken,
+            account_id: 'external-account-1234'
+          }
+        };
+
+        await creatorModule.syncInstagramMediaMetrics(testContent, testCreator);
+
+        assert.ok(tokenSentToMeta, 'A token must be sent to Meta Graph API');
+        assert.equal(tokenSentToMeta.startsWith('enc:'), false, 'Ciphertext starting with enc: must NEVER be sent to Meta!');
+        assert.equal(tokenSentToMeta, rawSecretToken, 'Decrypted token sent to Meta must match original plain token');
+      } finally {
+        global.fetch = origFetch;
+      }
+    });
+  });
 });
