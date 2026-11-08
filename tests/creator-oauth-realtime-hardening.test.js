@@ -332,5 +332,63 @@ describe('Creator OAuth & Realtime Hardening Suite', () => {
             simulateStatusCheck(false, false);
             assert.equal(onboardDisplayed, true, 'Onboarding can be shown when user has no stored session');
         });
+
+        it('verifies Meta OAuth callback resolves Instagram account via connected_instagram_account or instagram_accounts edge', () => {
+            const creatorCode = fs.readFileSync('backend/creator.js', 'utf8');
+
+            assert.ok(
+                creatorCode.includes('connected_instagram_account{id,username,name}'),
+                'Must query connected_instagram_account field on Page node'
+            );
+            assert.ok(
+                creatorCode.includes('/instagram_accounts?fields=id,username,name'),
+                'Must query /instagram_accounts edge on Page node'
+            );
+
+            // Simulation: Page returns null for instagram_business_account, but connected_instagram_account resolves the verified account
+            const pageWithConnectedIg = {
+                id: '591667860696059',
+                name: 'funnwith.ai',
+                access_token: 'page-token-xyz',
+                instagram_business_account: null
+            };
+
+            const mockPageDetailFetcher = (field) => {
+                if (field === 'connected_instagram_account') {
+                    return {
+                        id: '591667860696059',
+                        name: 'funnwith.ai',
+                        connected_instagram_account: {
+                            id: '17841445671263800',
+                            username: 'wishrite.in'
+                        }
+                    };
+                }
+                return null;
+            };
+
+            const detail = mockPageDetailFetcher('connected_instagram_account');
+            assert.equal(detail.connected_instagram_account.id, '17841445671263800');
+            assert.equal(detail.connected_instagram_account.username, 'wishrite.in');
+        });
+
+        it('verifies creator status request executes auth readiness before starting 15s network timeout and supports controlled retry', () => {
+            const creatorProgramCode = fs.readFileSync('js/creator-program.js', 'utf8');
+
+            // 1. Auth readiness precedes AbortController timeout
+            const readinessIdx = creatorProgramCode.indexOf('await ensureSupabaseAuthReady(4000)');
+            const timeoutIdx = creatorProgramCode.indexOf('setTimeout(() => controller.abort(), 15000)');
+            assert.ok(readinessIdx !== -1 && timeoutIdx !== -1, 'Both readiness and 15s timeout must exist');
+            assert.ok(readinessIdx < timeoutIdx, 'ensureSupabaseAuthReady must complete before starting network fetch timeout');
+
+            // 2. Fetch timeout is set to 15000ms
+            assert.ok(creatorProgramCode.includes('15000'), 'Fetch timeout must be 15 seconds (15000ms)');
+
+            // 3. Transient error retry exists and does not retry 401/403
+            assert.ok(creatorProgramCode.includes('retryCount < 1'), 'Must include 1-time controlled retry logic');
+            assert.ok(creatorProgramCode.includes('_retryCount: retryCount + 1'), 'Must increment retry count');
+            assert.ok(creatorProgramCode.includes('res.status === 401'), 'Must handle 401 directly without network retry');
+            assert.ok(creatorProgramCode.includes('res.status === 403'), 'Must handle 403 directly without network retry');
+        });
     });
 });

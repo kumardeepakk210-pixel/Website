@@ -557,41 +557,49 @@ let _activeStatusRequestId = 0;
 async function loadCustomerCreatorStatus(options = {}) {
     const requestId = ++_activeStatusRequestId;
     const isSilent = Boolean(options && options.silent);
+    const retryCount = Number(options && options._retryCount) || 0;
 
     // Only switch to 'loading' state if not in silent background mode or if no valid creator data is rendered
     if (!isSilent || !isCurrentCreatorDataValid()) {
         setCreatorUIState('loading');
     }
 
-    // Wait for Supabase auth readiness before making request
+    // 1. Wait for Supabase auth readiness before making request
     let isAuthReady = false;
     try {
         isAuthReady = await ensureSupabaseAuthReady(4000);
     } catch (_) {}
 
+    // 2. Retrieve the current authenticated session and Authorization headers
+    let headers = { 'Content-Type': 'application/json' };
+    try {
+        headers = await getAuthHeaders();
+    } catch (authErr) {
+        console.warn('[WishRite Creator] getAuthHeaders warning:', authErr);
+    }
+    const hasAuthHeader = Boolean(headers['Authorization']);
+
+    // Check if a customer session might still be hydrating in the background
+    const hasStoredToken = Boolean(
+        localStorage.getItem('sb-ptpuepejciqiktmcpuon-auth-token') ||
+        localStorage.getItem('wishrite_auth_token') ||
+        localStorage.getItem('wishrite_creator_token')
+    );
+
+    if (!hasAuthHeader && hasStoredToken && !_authRetryTimeoutId) {
+        console.log('[WishRite Creator] Session restoration pending with stored token. Holding loading state and scheduling retry.');
+        _authRetryTimeoutId = setTimeout(() => {
+            _authRetryTimeoutId = null;
+            loadCustomerCreatorStatus();
+        }, 1200);
+        return;
+    }
+
+    // 3. Create the AbortController and start network timeout only when actually fetching (15s timeout)
     const controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
-    const timeoutId = controller ? setTimeout(() => controller.abort(), 8000) : null;
+    const timeoutId = controller ? setTimeout(() => controller.abort(), 15000) : null;
 
     try {
-        const headers = await getAuthHeaders();
-        const hasAuthHeader = Boolean(headers['Authorization']);
-
-        // Check if a customer session might still be hydrating in the background
-        const hasStoredToken = Boolean(
-            localStorage.getItem('sb-ptpuepejciqiktmcpuon-auth-token') ||
-            localStorage.getItem('wishrite_auth_token') ||
-            localStorage.getItem('wishrite_creator_token')
-        );
-
-        if (!hasAuthHeader && hasStoredToken && !_authRetryTimeoutId) {
-            console.log('[WishRite Creator] Session restoration pending with stored token. Holding loading state and scheduling retry.');
-            _authRetryTimeoutId = setTimeout(() => {
-                _authRetryTimeoutId = null;
-                loadCustomerCreatorStatus();
-            }, 1200);
-            return;
-        }
-
         const res = await fetch('/api/creator/status', { 
             headers,
             signal: controller?.signal 
@@ -664,7 +672,20 @@ async function loadCustomerCreatorStatus(options = {}) {
         }
     } catch (err) {
         console.error('Error checking creator status:', err);
+        if (timeoutId) clearTimeout(timeoutId);
         if (requestId !== _activeStatusRequestId) return;
+
+        // Controlled 1-time retry for transient network errors / timeouts
+        if (retryCount < 1) {
+            console.log('[WishRite Creator] Transient network error or timeout. Attempting 1 automatic retry in 1000ms...');
+            setTimeout(() => {
+                if (requestId === _activeStatusRequestId) {
+                    loadCustomerCreatorStatus({ silent: isSilent, _retryCount: retryCount + 1 });
+                }
+            }, 1000);
+            return;
+        }
+
         if (currentCreatorData?.is_creator) {
             setCreatorUIState('dashboard');
         } else {

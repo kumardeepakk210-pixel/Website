@@ -3874,6 +3874,39 @@ export async function handleInstagramOAuthCallback(req, res) {
                             }
                         }
 
+                        // Also query connected_instagram_account on Page node (supported when asset is linked via Meta Business Suite)
+                        if (!igAccount?.id && pageId && hasPageToken) {
+                            try {
+                                const connDetailUrl = `https://graph.facebook.com/${META_GRAPH_API_VERSION}/${encodeURIComponent(pageId)}?fields=id,name,connected_instagram_account{id,username,name}&access_token=${encodeURIComponent(page.access_token)}`;
+                                const connDetailRes = await fetch(connDetailUrl);
+                                const connDetailData = await connDetailRes.json();
+                                console.log(`[Meta OAuth Diagnostic] Page node /${pageId} connected_instagram_account status:`, connDetailRes.status, 'error:', connDetailData.error?.message || null);
+                                if (connDetailData.connected_instagram_account?.id) {
+                                    igAccount = connDetailData.connected_instagram_account;
+                                }
+                            } catch (connErr) {
+                                console.warn(`[Meta OAuth Diagnostic] Page node /${pageId} connected_instagram_account query error:`, connErr.message);
+                            }
+                        }
+
+                        // Also query /{page-id}/instagram_accounts edge using Page access token
+                        if (!igAccount?.id && pageId && hasPageToken) {
+                            try {
+                                const edgeUrl = `https://graph.facebook.com/${META_GRAPH_API_VERSION}/${encodeURIComponent(pageId)}/instagram_accounts?fields=id,username,name&access_token=${encodeURIComponent(page.access_token)}`;
+                                const edgeRes = await fetch(edgeUrl);
+                                const edgeData = await edgeRes.json();
+                                console.log(`[Meta OAuth Diagnostic] Page edge /${pageId}/instagram_accounts status:`, edgeRes.status, 'returned:', edgeData.data?.length || 0, 'error:', edgeData.error?.message || null);
+                                if (edgeData.data && Array.isArray(edgeData.data) && edgeData.data.length > 0) {
+                                    const edgeMatch = targetUsername ? edgeData.data.find(a => (a.username || '').toLowerCase().trim() === targetUsername) : edgeData.data[0];
+                                    if (edgeMatch?.id) {
+                                        igAccount = edgeMatch;
+                                    }
+                                }
+                            } catch (edgeErr) {
+                                console.warn(`[Meta OAuth Diagnostic] Page edge /${pageId}/instagram_accounts query error:`, edgeErr.message);
+                            }
+                        }
+
                         if (igAccount?.id) {
                             const igHandle = (igAccount.username || '').toLowerCase().trim();
                             // Strict matching: If targetUsername is known, require exact username match
