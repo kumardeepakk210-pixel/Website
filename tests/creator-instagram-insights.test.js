@@ -909,5 +909,123 @@ describe('WishRite Creator — Instagram Content List & Official Insights Sync',
         global.fetch = origFetch;
       }
     });
+
+    test('syncCreatorInstagram uses INSTAGRAM_SYSTEM_USER_TOKEN for @wishrite.in and retrieves 7 metrics', async () => {
+      const syncService = await import('../backend/services/instagram-sync.js');
+      const origEnv = process.env.INSTAGRAM_SYSTEM_USER_TOKEN;
+      const origFetch = global.fetch;
+
+      try {
+        process.env.INSTAGRAM_SYSTEM_USER_TOKEN = 'mock-meta-sys-token-valid-777';
+
+        global.fetch = async (url) => {
+          const urlStr = String(url);
+          // Account validation
+          if (urlStr.includes('fields=id,username')) {
+            return {
+              json: async () => ({ id: '17841445671263800', username: 'wishrite.in' })
+            };
+          }
+          // Media list
+          if (urlStr.includes('/17841445671263800/media')) {
+            return {
+              json: async () => ({
+                data: [
+                  {
+                    id: '18136926376563626',
+                    caption: 'Festive silver bracelet reel',
+                    media_type: 'VIDEO',
+                    media_product_type: 'REELS',
+                    permalink: 'https://www.instagram.com/reel/DfBxwGwz80S/',
+                    timestamp: '2026-11-01T12:00:00+0000'
+                  }
+                ]
+              })
+            };
+          }
+          // Insights
+          if (urlStr.includes('/insights')) {
+            return {
+              json: async () => ({
+                data: [
+                  { name: 'views', values: [{ value: 30 }] },
+                  { name: 'reach', values: [{ value: 28 }] },
+                  { name: 'likes', values: [{ value: 0 }] },
+                  { name: 'comments', values: [{ value: 0 }] },
+                  { name: 'shares', values: [{ value: 0 }] },
+                  { name: 'saved', values: [{ value: 0 }] },
+                  { name: 'total_interactions', values: [{ value: 0 }] }
+                ]
+              })
+            };
+          }
+          return origFetch(url);
+        };
+
+        const brandCreator = {
+          id: '00000000-0000-0000-0000-0000000000c1',
+          influencer_id: '00000000-0000-0000-0000-0000000000c1',
+          instagram_id: 'wishrite.in',
+          instagram_connection: {
+            connected: true,
+            username: 'wishrite.in',
+            account_id: null,
+            access_token: null
+          }
+        };
+
+        const syncResult = await syncService.syncCreatorInstagram(brandCreator);
+        assert.ok(syncResult, 'Must return sync result');
+        assert.equal(syncResult.success, true, 'Brand account sync must succeed with System User token');
+        assert.equal(syncResult.synced_count, 1);
+        assert.equal(syncResult.items[0].views_count, 30);
+        assert.equal(syncResult.items[0].reach_count, 28);
+        assert.equal(syncResult.items[0].likes_count, 0, 'Zero likes must be preserved as 0, not null');
+        assert.equal(syncResult.items[0].total_interactions_count, 0, 'Zero interactions must be preserved as 0');
+      } finally {
+        global.fetch = origFetch;
+        if (origEnv !== undefined) {
+          process.env.INSTAGRAM_SYSTEM_USER_TOKEN = origEnv;
+        } else {
+          delete process.env.INSTAGRAM_SYSTEM_USER_TOKEN;
+        }
+      }
+    });
+
+    test('upsertCreatorContentItem preserves existing submission status and does not duplicate records', async () => {
+      const syncService = await import('../backend/services/instagram-sync.js');
+      const testCreator = {
+        id: 'creator-preservation-uuid',
+        name: 'Deepak Kumar',
+        email: 'dkr1888@gmail.com'
+      };
+
+      const media = {
+        id: '18012472019968870',
+        permalink: 'https://www.instagram.com/reel/DeGIKrkTf7J/',
+        media_type: 'VIDEO',
+        media_product_type: 'REELS',
+        caption: 'Ear Climbers'
+      };
+
+      const insights = {
+        metrics: {
+          views: 19,
+          reach: 13,
+          likes: 1,
+          comments: 0,
+          shares: 0,
+          saved: 0,
+          total_interactions: 1
+        }
+      };
+
+      const result = await syncService.upsertCreatorContentItem(testCreator, media, insights);
+      assert.ok(result, 'Must upsert content item');
+      assert.equal(result.views_count, 19);
+      assert.equal(result.reach_count, 13);
+      assert.equal(result.saves_count, 0);
+      assert.equal(result.total_interactions_count, 1);
+    });
   });
 });

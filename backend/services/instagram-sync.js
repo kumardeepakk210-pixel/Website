@@ -5,8 +5,47 @@ import crypto from 'crypto';
 import { dbQuery, dbInsert, dbUpdate, hasServerAdminCredential } from '../supabase-client.js';
 
 // Server-side configurable Meta Graph API Version (defaults to v26.0)
-const META_API_VERSION = process.env.META_GRAPH_API_VERSION || 'v26.0';
+export const META_API_VERSION = process.env.META_GRAPH_API_VERSION || 'v26.0';
+export const WISHRITE_OFFICIAL_IG_HANDLE = 'wishrite.in';
+export const WISHRITE_OFFICIAL_IG_ACCOUNT_ID = '17841445671263800';
+
 const ENCRYPTION_ALGO = 'aes-256-gcm';
+
+// In-memory cache for validated Meta System User Token status (5-minute TTL)
+let systemUserValidationCache = null;
+
+/**
+ * Validates the configured server-side Meta System User Token against Meta Graph API.
+ * Ensures the token is active, unrevoked, and has access to the official WishRite Instagram account.
+ * Caches positive/negative validation results for 5 minutes to avoid redundant outbound requests.
+ */
+export async function validateSystemUserToken() {
+    const sysToken = (process.env.INSTAGRAM_SYSTEM_USER_TOKEN || '').trim();
+    if (!sysToken) return { valid: false, error: 'Token not configured' };
+
+    const now = Date.now();
+    if (systemUserValidationCache && systemUserValidationCache.token === sysToken && (now - systemUserValidationCache.timestamp < 300000)) {
+        return { valid: systemUserValidationCache.valid, error: systemUserValidationCache.error };
+    }
+
+    try {
+        const verifyRes = await fetch(
+            `https://graph.facebook.com/${META_API_VERSION}/${WISHRITE_OFFICIAL_IG_ACCOUNT_ID}?fields=id,username&access_token=${encodeURIComponent(sysToken)}`
+        );
+        const verifyData = await verifyRes.json();
+
+        if (verifyData && verifyData.id === WISHRITE_OFFICIAL_IG_ACCOUNT_ID) {
+            systemUserValidationCache = { token: sysToken, valid: true, error: null, timestamp: now };
+            return { valid: true, error: null };
+        }
+
+        const errMsg = verifyData?.error?.message || 'Meta System User token validation failed';
+        systemUserValidationCache = { token: sysToken, valid: false, error: errMsg, timestamp: now };
+        return { valid: false, error: errMsg };
+    } catch (err) {
+        return { valid: false, error: err.message };
+    }
+}
 
 // In-memory mutex to prevent double-syncing for the same creator
 const activeSyncJobs = new Set();
@@ -78,6 +117,27 @@ export async function getCreatorInstagramConnection(creator) {
         } catch (_) {}
     }
 
+    const rawHandle = (conn?.username || creator.instagram_id || '').toLowerCase().trim().replace(/^@/, '');
+    const isWishriteBrandAccount = (rawHandle === WISHRITE_OFFICIAL_IG_HANDLE);
+    const systemUserToken = (process.env.INSTAGRAM_SYSTEM_USER_TOKEN || '').trim();
+
+    // Official brand account (@wishrite.in) uses server-side System User Token exclusively
+    if (isWishriteBrandAccount && systemUserToken) {
+        const validation = await validateSystemUserToken();
+        if (validation.valid) {
+            return {
+                ...(conn || {}),
+                username: conn?.username || WISHRITE_OFFICIAL_IG_HANDLE,
+                connected: true,
+                account_id: WISHRITE_OFFICIAL_IG_ACCOUNT_ID,
+                account_type: conn?.account_type || 'professional',
+                insights_status: 'connected',
+                decrypted_token: systemUserToken,
+                is_system_user: true
+            };
+        }
+    }
+
     if (!conn) return null;
 
     const rawToken = conn.access_token ? decryptToken(conn.access_token) : null;
@@ -90,11 +150,11 @@ export async function getCreatorInstagramConnection(creator) {
 /**
  * Fetches media from Instagram Account with cursor-based pagination
  */
-export async function fetchInstagramAccountMedia(accountId, accessToken, maxMedia = 25) {
+export async function fetchInstagramAccountMedia(accountId, accessToken, maxMedia = 150) {
     if (!accountId || !accessToken) return [];
 
     const mediaItems = [];
-    let nextUrl = `https://graph.facebook.com/${META_API_VERSION}/${accountId}/media?fields=id,caption,media_type,media_product_type,permalink,thumbnail_url,media_url,timestamp,like_count,comments_count&limit=15&access_token=${encodeURIComponent(accessToken)}`;
+    let nextUrl = `https://graph.facebook.com/${META_API_VERSION}/${accountId}/media?fields=id,caption,media_type,media_product_type,permalink,thumbnail_url,media_url,timestamp,like_count,comments_count&limit=25&access_token=${encodeURIComponent(accessToken)}`;
 
     try {
         while (nextUrl && mediaItems.length < maxMedia) {
@@ -188,6 +248,12 @@ export async function fetchMediaInsights(mediaId, mediaType, mediaProductType, a
     }
 }
 
+function extractShortcode(url) {
+    if (!url) return null;
+    const match = String(url).match(/\/(?:p|reel|tv)\/([A-Za-z0-9_-]+)/);
+    return match ? match[1] : null;
+}
+
 /**
  * Upserts an Instagram media item and its insights into creator_content
  */
@@ -249,21 +315,60 @@ export async function upsertCreatorContentItem(creator, media, insightsResult) {
     // Check if record exists in Supabase
     try {
         const queryOpts = { useAdmin: hasServerAdminCredential() };
-        const existing = await dbQuery('creator_content', `instagram_media_id=eq.${encodeURIComponent(mediaId)}&limit=1`, queryOpts);
+        let existing = await dbQuery('creator_content', `influencer_id=eq.${encodeURIComponent(creatorId)}&instagram_media_id=eq.${encodeURIComponent(mediaId)}`, queryOpts);
+
+        // Match by permalink or shortcode if not matched by media ID
+        const mediaShortcode = extractShortcode(permalink);
+        if (!Array.isArray(existing) || existing.length === 0) {
+            const creatorItems = await dbQuery('creator_content', `influencer_id=eq.${encodeURIComponent(creatorId)}`, queryOpts);
+            if (Array.isArray(creatorItems) && creatorItems.length > 0) {
+                const matches = creatorItems.filter(item => {
+                    if (item.instagram_media_id && item.instagram_media_id === mediaId) return true;
+                    if (item.url && permalink && item.url.toLowerCase().replace(/\/$/, '') === permalink.toLowerCase().replace(/\/$/, '')) return true;
+                    if (item.instagram_permalink && permalink && item.instagram_permalink.toLowerCase().replace(/\/$/, '') === permalink.toLowerCase().replace(/\/$/, '')) return true;
+                    if (mediaShortcode && (item.url?.includes(mediaShortcode) || item.instagram_permalink?.includes(mediaShortcode))) return true;
+                    return false;
+                });
+                if (matches.length > 0) {
+                    existing = matches;
+                }
+            }
+        }
 
         if (Array.isArray(existing) && existing.length > 0) {
-            const existingId = existing[0].id;
-            // Preserve existing metrics if new insights failed
-            if (error) {
-                if (payload.views_count === null && existing[0].views_count !== null) payload.views_count = existing[0].views_count;
-                if (payload.reach_count === null && existing[0].reach_count !== null) payload.reach_count = existing[0].reach_count;
-                if (payload.likes_count === null && existing[0].likes_count !== null) payload.likes_count = existing[0].likes_count;
-                if (payload.comments_count === null && existing[0].comments_count !== null) payload.comments_count = existing[0].comments_count;
-                if (payload.shares_count === null && existing[0].shares_count !== null) payload.shares_count = existing[0].shares_count;
-                if (payload.saves_count === null && existing[0].saves_count !== null) payload.saves_count = existing[0].saves_count;
+            const results = [];
+            for (const rec of existing) {
+                const updatePayload = {
+                    ...payload,
+                    status: rec.status, // PRESERVE existing submission status ('Approved', 'Submitted', etc.)
+                    product_code: rec.product_code || null,
+                    product_name: rec.product_name || null,
+                    product_image: rec.product_image || payload.thumbnail_url,
+                    thumbnail_url: rec.thumbnail_url || payload.thumbnail_url,
+                    rejection_reason: rec.rejection_reason || null,
+                    clicks: rec.clicks || 0,
+                    orders: rec.orders || 0,
+                    commission_amount: rec.commission_amount || 0,
+                    created_at: rec.created_at,
+                    updated_at: new Date().toISOString()
+                };
+
+                // Preserve existing metrics if new insights failed
+                if (error) {
+                    if (updatePayload.views_count === null && rec.views_count !== null) updatePayload.views_count = rec.views_count;
+                    if (updatePayload.reach_count === null && rec.reach_count !== null) updatePayload.reach_count = rec.reach_count;
+                    if (updatePayload.likes_count === null && rec.likes_count !== null) updatePayload.likes_count = rec.likes_count;
+                    if (updatePayload.comments_count === null && rec.comments_count !== null) updatePayload.comments_count = rec.comments_count;
+                    if (updatePayload.shares_count === null && rec.shares_count !== null) updatePayload.shares_count = rec.shares_count;
+                    if (updatePayload.saves_count === null && rec.saves_count !== null) updatePayload.saves_count = rec.saves_count;
+                    if (updatePayload.total_interactions_count === null && rec.total_interactions_count !== null) updatePayload.total_interactions_count = rec.total_interactions_count;
+                    updatePayload.views = updatePayload.views_count || rec.views || 0;
+                }
+
+                await dbUpdate('creator_content', 'id', rec.id, updatePayload, queryOpts);
+                results.push({ action: 'updated', id: rec.id, ...updatePayload });
             }
-            await dbUpdate('creator_content', 'id', existingId, payload, queryOpts);
-            return { action: 'updated', id: existingId, ...payload };
+            return results[0];
         } else {
             payload.status = 'Approved'; // Directly discovered from connected account
             payload.clicks = 0;
@@ -315,11 +420,11 @@ export async function syncCreatorInstagram(creator) {
                 if (meData?.id) {
                     accountId = meData.id;
                     conn.account_id = accountId;
+                    const safeConn = { ...conn, account_id: accountId };
+                    delete safeConn.decrypted_token;
+                    if (conn.is_system_user) safeConn.access_token = null;
                     await dbUpdate('influencers', 'influencer_id', creatorId, {
-                        instagram_connection: {
-                            ...conn,
-                            account_id: accountId
-                        }
+                        instagram_connection: safeConn
                     }, { useAdmin: true }).catch(() => {});
                 }
             } catch (_) {}
@@ -353,14 +458,27 @@ export async function syncCreatorInstagram(creator) {
         }
 
         const now = new Date().toISOString();
-        // Update connection last_synced_at
+        // Update connection last_synced_at and ensure account_id is populated
         conn.last_synced_at = now;
         conn.insights_status = 'connected';
+        if (!conn.account_id && accountId) {
+            conn.account_id = accountId;
+        }
+
+        // Security: NEVER persist decrypted_token or system user tokens into database records
+        const safeConnToPersist = {
+            username: conn.username,
+            connected: true,
+            account_id: accountId || conn.account_id || null,
+            account_type: conn.account_type || 'professional',
+            access_token: conn.is_system_user ? null : (conn.access_token || null),
+            insights_status: 'connected',
+            last_synced_at: now,
+            updated_at: now
+        };
+
         await dbUpdate('influencers', 'influencer_id', creatorId, {
-            instagram_connection: {
-                ...conn,
-                last_synced_at: now
-            }
+            instagram_connection: safeConnToPersist
         }, { useAdmin: true }).catch(() => {});
 
         console.log(`[Instagram Sync] Creator: ${creatorId.slice(0, 8)}... | Discovered: ${mediaList.length} | Synced: ${syncedCount} | Failed: ${failedCount}`);

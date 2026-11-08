@@ -28,7 +28,11 @@ import {
 import {
     encryptToken,
     decryptToken,
-    syncCreatorInstagram
+    syncCreatorInstagram,
+    validateSystemUserToken,
+    WISHRITE_OFFICIAL_IG_HANDLE,
+    WISHRITE_OFFICIAL_IG_ACCOUNT_ID,
+    fetchInstagramAccountMedia
 } from './services/instagram-sync.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -3210,44 +3214,6 @@ export function sanitizeContentItem(item) {
 }
 
 const META_GRAPH_API_VERSION = process.env.META_GRAPH_API_VERSION || 'v26.0';
-const WISHRITE_OFFICIAL_IG_HANDLE = 'wishrite.in';
-const WISHRITE_OFFICIAL_IG_ACCOUNT_ID = '17841445671263800';
-
-// In-memory cache for validated Meta System User Token status (5-minute TTL)
-let systemUserValidationCache = null;
-
-/**
- * Validates the configured server-side Meta System User Token against Meta Graph API.
- * Ensures the token is active, unrevoked, and has access to the official WishRite Instagram account.
- * Caches positive/negative validation results for 5 minutes to avoid redundant outbound requests.
- */
-async function validateSystemUserToken() {
-    const sysToken = (process.env.INSTAGRAM_SYSTEM_USER_TOKEN || '').trim();
-    if (!sysToken) return { valid: false, error: 'Token not configured' };
-
-    const now = Date.now();
-    if (systemUserValidationCache && systemUserValidationCache.token === sysToken && (now - systemUserValidationCache.timestamp < 300000)) {
-        return { valid: systemUserValidationCache.valid, error: systemUserValidationCache.error };
-    }
-
-    try {
-        const verifyRes = await fetch(
-            `https://graph.facebook.com/${META_GRAPH_API_VERSION}/${WISHRITE_OFFICIAL_IG_ACCOUNT_ID}?fields=id,username&access_token=${encodeURIComponent(sysToken)}`
-        );
-        const verifyData = await verifyRes.json();
-
-        if (verifyData && verifyData.id === WISHRITE_OFFICIAL_IG_ACCOUNT_ID) {
-            systemUserValidationCache = { token: sysToken, valid: true, error: null, timestamp: now };
-            return { valid: true, error: null };
-        }
-
-        const errMsg = verifyData?.error?.message || 'Meta System User token validation failed';
-        systemUserValidationCache = { token: sysToken, valid: false, error: errMsg, timestamp: now };
-        return { valid: false, error: errMsg };
-    } catch (err) {
-        return { valid: false, error: err.message };
-    }
-}
 
 /**
  * Queries official Meta Graph API to sync metrics for an Instagram media item
@@ -3289,16 +3255,13 @@ export async function syncInstagramMediaMetrics(contentItem, creator) {
 
     let targetMediaId = contentItem.instagram_media_id;
 
-    // Resolve media ID via official Graph API if not yet resolved
+    // Resolve media ID via official Graph API with pagination support if not yet resolved
     if (!targetMediaId && accountId) {
         try {
-            const mediaListRes = await fetch(
-                `https://graph.facebook.com/${META_GRAPH_API_VERSION}/${accountId}/media?fields=id,caption,media_type,media_product_type,permalink,thumbnail_url,like_count,comments_count&access_token=${encodeURIComponent(accessToken)}`
-            );
-            const mediaListData = await mediaListRes.json();
-            if (mediaListData.data && Array.isArray(mediaListData.data)) {
+            const mediaList = await fetchInstagramAccountMedia(accountId, accessToken, 150);
+            if (Array.isArray(mediaList) && mediaList.length > 0) {
                 const shortcode = extractInstagramShortcode(contentItem.url);
-                const matched = mediaListData.data.find(m => {
+                const matched = mediaList.find(m => {
                     if (m.permalink && shortcode && m.permalink.includes(shortcode)) return true;
                     if (contentItem.url && m.permalink && m.permalink.toLowerCase().replace(/\/$/, '') === contentItem.url.toLowerCase().replace(/\/$/, '')) return true;
                     return false;
@@ -3336,12 +3299,10 @@ export async function syncInstagramMediaMetrics(contentItem, creator) {
 
     // Call official Meta Graph API endpoints
     try {
-        const metricsToQuery = contentItem.content_type === 'reel'
-            ? 'views,reach,likes,comments,shares,total_interactions'
-            : 'reach,likes,comments,shares,saved,total_interactions';
+        const metricsToQuery = 'views,reach,likes,comments,shares,saved,total_interactions';
 
         const [insightsRes, mediaObjRes] = await Promise.all([
-            fetch(`https://graph.facebook.com/${META_GRAPH_API_VERSION}/${targetMediaId}/insights?metric=${metricsToQuery}&access_token=${encodeURIComponent(accessToken)}`),
+            fetch(`https://graph.facebook.com/${META_GRAPH_API_VERSION}/${targetMediaId}/insights?metric=${encodeURIComponent(metricsToQuery)}&access_token=${encodeURIComponent(accessToken)}`),
             fetch(`https://graph.facebook.com/${META_GRAPH_API_VERSION}/${targetMediaId}?fields=id,media_type,media_product_type,like_count,comments_count,permalink,thumbnail_url&access_token=${encodeURIComponent(accessToken)}`)
         ]);
 
@@ -3362,19 +3323,26 @@ export async function syncInstagramMediaMetrics(contentItem, creator) {
         }
 
         let views = null;
+        let reach = null;
         let likes = null;
         let comments = null;
         let shares = null;
+        let saved = null;
+        let totalInteractions = null;
 
         if (insightsData.data && Array.isArray(insightsData.data)) {
             for (const m of insightsData.data) {
-                const val = (m.values && m.values[0]) ? m.values[0].value : (m.value !== undefined ? m.value : null);
+                const val = (m.values && m.values[0] && m.values[0].value !== undefined)
+                    ? m.values[0].value
+                    : (m.value !== undefined ? m.value : null);
                 if (val !== null && typeof val === 'number') {
                     if (m.name === 'views' || m.name === 'plays') views = val;
-                    else if (m.name === 'reach' && views === null) views = val;
+                    else if (m.name === 'reach') reach = val;
                     else if (m.name === 'likes') likes = val;
                     else if (m.name === 'comments') comments = val;
                     else if (m.name === 'shares') shares = val;
+                    else if (m.name === 'saved') saved = val;
+                    else if (m.name === 'total_interactions') totalInteractions = val;
                 }
             }
         }
@@ -3387,9 +3355,12 @@ export async function syncInstagramMediaMetrics(contentItem, creator) {
 
         contentItem.views_count = views;
         if (views !== null) contentItem.views = views;
+        contentItem.reach_count = reach;
         contentItem.likes_count = likes;
         contentItem.comments_count = comments;
         contentItem.shares_count = shares;
+        contentItem.saves_count = saved;
+        contentItem.total_interactions_count = totalInteractions;
         contentItem.last_synced_at = new Date().toISOString();
         contentItem.insights_status = 'updated';
         contentItem.insights_error = null;
@@ -3398,9 +3369,12 @@ export async function syncInstagramMediaMetrics(contentItem, creator) {
             synced: true,
             insights_status: 'updated',
             views,
+            reach,
             likes,
             comments,
             shares,
+            saved,
+            total_interactions: totalInteractions,
             last_synced_at: contentItem.last_synced_at
         };
     } catch (err) {
@@ -3470,6 +3444,18 @@ export async function handleGetInstagramStatus(req, res) {
                 isApiAuthorized = true;
                 resolvedAccountId = WISHRITE_OFFICIAL_IG_ACCOUNT_ID;
                 insightsStatus = 'connected';
+                // Asynchronously ensure Supabase record has resolved account_id and connected status
+                if (conn && (!conn.account_id || conn.insights_status !== 'connected')) {
+                    conn.account_id = WISHRITE_OFFICIAL_IG_ACCOUNT_ID;
+                    conn.insights_status = 'connected';
+                    dbUpdate('influencers', 'influencer_id', creatorId, {
+                        instagram_connection: {
+                            ...conn,
+                            account_id: WISHRITE_OFFICIAL_IG_ACCOUNT_ID,
+                            insights_status: 'connected'
+                        }
+                    }, { useAdmin: true }).catch(() => {});
+                }
             } else {
                 console.warn('[WishRite Brand Instagram] System user token configured but validation failed:', validation.error);
                 // If invalid or revoked, do NOT mark connected
