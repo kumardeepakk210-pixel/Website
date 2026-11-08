@@ -258,6 +258,10 @@ export const tableColumnsCache = {
         'bio', 'profile_image', 'category', 'commission_rate', 'tier', 'status',
         'public_slug', 'public_profile_url', 'instagram_url', 'youtube_url',
         'facebook_url', 'other_url', 'content_preferences', 'instagram_connection',
+        'followers', 'no_of_posts',
+        'instagram_followers_count', 'instagram_following_count', 'instagram_media_count',
+        'instagram_profile_picture', 'instagram_category', 'creator_niche',
+        'instagram_profile_synced_at', 'instagram_validation_status',
         'created_at', 'updated_at'
     ]),
     influencer_accounts: new Set([
