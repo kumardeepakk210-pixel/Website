@@ -226,6 +226,9 @@ module.exports = async function handler(req, res) {
         if (subPath === '/instagram/status' && method === 'GET') {
             return await withAuth(creator.handleGetInstagramStatus);
         }
+        if (subPath === '/instagram/config' && method === 'GET') {
+            return res.json({ success: true, ...creator.getPublicMetaConfig() });
+        }
         if (subPath === '/instagram/oauth/start' && method === 'GET') {
             return await withAuth(creator.handleInstagramOAuthStart);
         }

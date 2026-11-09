@@ -4,10 +4,17 @@
 import crypto from 'crypto';
 import { dbQuery, dbInsert, dbUpdate, hasServerAdminCredential } from '../supabase-client.js';
 
-// Server-side configurable Meta Graph API Version (defaults to v26.0)
-export const META_API_VERSION = process.env.META_GRAPH_API_VERSION || 'v26.0';
-export const WISHRITE_OFFICIAL_IG_HANDLE = 'wishrite.in';
-export const WISHRITE_OFFICIAL_IG_ACCOUNT_ID = '17841445671263800';
+import {
+    META_GRAPH_API_VERSION as META_API_VERSION,
+    WISHRITE_OFFICIAL_IG_HANDLE,
+    WISHRITE_OFFICIAL_IG_ACCOUNT_ID
+} from '../meta-config.js';
+
+export {
+    META_API_VERSION,
+    WISHRITE_OFFICIAL_IG_HANDLE,
+    WISHRITE_OFFICIAL_IG_ACCOUNT_ID
+};
 
 export const ALLOWED_CREATOR_NICHES = [
     'Fashion & Lifestyle',

@@ -206,7 +206,7 @@ export async function handleWalletCreateOrder(req, res) {
             success: true,
             purpose: 'wallet_topup',
             topup_id: topupId,
-            key_id: keyId || 'rzp_test_mock_id',
+            key_id: keyId || (process.env.NODE_ENV === 'test' ? 'rzp_test_mock_id' : ''),
             order_id: rzpOrderId,
             amount: amountInPaise,
             currency: 'INR'

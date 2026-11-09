@@ -622,7 +622,7 @@ export async function handleCheckoutCreateOrder(req, res) {
             order_id: internalOrderId,
             order_number: orderNumber,
             razorpay_order_id: rzpOrder.id,
-            key_id: getRazorpayCredentials().keyId || 'rzp_test_mock_id',
+            key_id: getRazorpayCredentials().keyId || (process.env.NODE_ENV === 'test' ? 'rzp_test_mock_id' : ''),
             amount: amountInPaise,
             currency: 'INR',
             customer: {

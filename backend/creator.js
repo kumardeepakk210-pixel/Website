@@ -38,6 +38,17 @@ import {
     ALLOWED_CREATOR_NICHES,
     getCreatorInstagramConnection
 } from './services/instagram-sync.js';
+import {
+    META_APP_ID,
+    META_GRAPH_API_VERSION,
+    META_CONFIG_ID,
+    WISHRITE_OFFICIAL_PAGE_NAME,
+    getOAuthRedirectUri,
+    getOAuthSigningSecret,
+    getMetaConfig,
+    validateMetaConfig,
+    getPublicMetaConfig
+} from './meta-config.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -3270,7 +3281,7 @@ export function sanitizeContentItem(item) {
     };
 }
 
-const META_GRAPH_API_VERSION = process.env.META_GRAPH_API_VERSION || 'v26.0';
+// Global Meta Graph API Version is imported from centralized meta-config.js
 
 /**
  * Queries official Meta Graph API to sync metrics for an Instagram media item
@@ -3690,7 +3701,7 @@ export function createOAuthState(creatorId, redirectUri) {
     const nonce = crypto.randomBytes(16).toString('hex');
     const payload = JSON.stringify({ creatorId, redirectUri, timestamp, nonce });
     const payloadB64 = Buffer.from(payload).toString('base64url');
-    const secret = process.env.META_APP_SECRET || process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || 'wishrite-meta-sec-fallback-key-32b';
+    const secret = getOAuthSigningSecret();
     const sig = crypto.createHmac('sha256', secret).update(payloadB64).digest('hex');
     return `${payloadB64}.${sig}`;
 }
@@ -3701,7 +3712,7 @@ export function createOAuthState(creatorId, redirectUri) {
 export function verifyOAuthState(stateStr) {
     if (!stateStr || typeof stateStr !== 'string' || !stateStr.includes('.')) return null;
     const [payloadB64, sig] = stateStr.split('.');
-    const secret = process.env.META_APP_SECRET || process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || 'wishrite-meta-sec-fallback-key-32b';
+    const secret = getOAuthSigningSecret();
     const expectedSig = crypto.createHmac('sha256', secret).update(payloadB64).digest('hex');
     if (sig !== expectedSig) return null;
 
@@ -3728,7 +3739,7 @@ export async function handleInstagramOAuthStart(req, res) {
         }
 
         const creatorId = creator.id || creator.influencer_id;
-        const appId = process.env.META_APP_ID;
+        const appId = META_APP_ID || process.env.META_APP_ID;
         if (!appId) {
             return res.status(400).json({
                 success: false,
@@ -3736,14 +3747,11 @@ export async function handleInstagramOAuthStart(req, res) {
             });
         }
 
-        // Build callback redirect_uri
-        const host = req.headers['x-forwarded-host'] || req.headers['host'] || 'localhost:8085';
-        const proto = (req.headers['x-forwarded-proto'] || (host.startsWith('localhost') ? 'http' : 'https'));
-        const defaultCallback = `${proto}://${host}/api/creator/instagram/oauth/callback`;
-        const redirectUri = process.env.META_REDIRECT_URI || defaultCallback;
+        // Authoritatively resolve callback redirect_uri via centralized meta-config
+        const redirectUri = getOAuthRedirectUri(req);
 
         const state = createOAuthState(creatorId, redirectUri);
-        const configId = process.env.META_CONFIG_ID || '1112681211580113';
+        const configId = META_CONFIG_ID || process.env.META_CONFIG_ID || '1112681211580113';
         const scopes = [
             'instagram_basic',
             'pages_show_list',
@@ -4020,7 +4028,7 @@ export async function handleInstagramOAuthCallback(req, res) {
                         const pageName = page.name || '';
                         const pageId = page.id || '';
                         const hasPageToken = Boolean(page.access_token);
-                        const isExpectedPage = !targetUsername || pageName.toLowerCase().includes('funnwith.ai') || pagesData.data.length === 1;
+                        const isExpectedPage = !targetUsername || (WISHRITE_OFFICIAL_PAGE_NAME && pageName.toLowerCase().includes(WISHRITE_OFFICIAL_PAGE_NAME.toLowerCase())) || pagesData.data.length === 1;
 
                         // Check direct instagram_business_account on page object
                         let igAccount = page.instagram_business_account || null;
@@ -4610,4 +4618,10 @@ export async function handleUpdateCreatorNiche(req, res) {
         return res.status(500).json({ success: false, error: { message: err.message } });
     }
 }
+
+export {
+    getPublicMetaConfig,
+    validateMetaConfig,
+    getMetaConfig
+};
 
