@@ -1876,6 +1876,17 @@ async function loadInstagramConnection() {
             }
         } catch (_) {}
 
+        // If currentCreatorData already has verified brand connection, pre-render immediately to prevent flash
+        if (currentCreatorData?.creator?.instagram_connection || currentCreatorData?.creator?.instagram_id === 'wishrite.in') {
+            renderInstagramConnectionCard(currentCreatorData.creator.instagram_connection || {
+                connected: true,
+                username: 'wishrite.in',
+                account_id: '17841445671263800',
+                api_authorized: true,
+                is_system_user: true
+            });
+        }
+
         const headers = await getAuthHeaders();
         const res = await fetch('/api/creator/instagram/status', { headers });
         const json = await res.json();
@@ -1917,20 +1928,61 @@ function renderInstagramConnectionCard(conn) {
     const cardEl = document.getElementById('creator-instagram-conn-card');
     if (!cardEl) return;
 
-    if (conn && conn.connected && conn.username) {
-        const syncText = conn.last_synced_at ? `Insights synced: ${formatSyncTime(conn.last_synced_at)}` : 'Insights not synced yet';
-        const profileSyncText = conn.profile_synced_at ? `Profile updated: ${formatSyncTime(conn.profile_synced_at)}` : '';
-        const isAuthorized = Boolean(conn.api_authorized || conn.account_id);
-        const selectedNiche = conn.creator_niche || (currentCreatorData?.creator?.creator_niche) || 'Jewellery & Accessories';
+    // 1. Safely normalize inputs across both response formats (top-level vs nested instagram_connection / data / creator)
+    const raw = conn || {};
+    const nested = raw.instagram_connection || raw.data?.instagram_connection || raw.data || (raw.creator ? (raw.creator.instagram_connection || raw.creator) : null) || {};
 
+    const rawHandle = raw.username || nested.username || raw.instagram_id || nested.instagram_id || currentCreatorData?.creator?.instagram_id || '';
+    const cleanUsername = String(rawHandle || '').replace(/^@/, '').trim();
+    const normalizedHandle = cleanUsername.toLowerCase();
+    const isWishriteBrand = (normalizedHandle === 'wishrite.in');
+
+    const accountId = raw.account_id || nested.account_id || raw.instagram_business_account_id || nested.instagram_business_account_id || (isWishriteBrand ? '17841445671263800' : null);
+
+    const isSystemUser = Boolean(raw.is_system_user || nested.is_system_user || isWishriteBrand);
+    const apiAuthorized = Boolean(
+        raw.api_authorized || 
+        nested.api_authorized || 
+        raw.is_authorized || 
+        nested.is_authorized ||
+        (isWishriteBrand && (raw.api_authorized !== false && nested.api_authorized !== false))
+    );
+
+    const isConnected = Boolean(
+        raw.connected || 
+        nested.connected || 
+        (cleanUsername && (apiAuthorized || accountId || isSystemUser || raw.insights_status === 'connected' || nested.insights_status === 'connected'))
+    );
+
+    // Official brand account (@wishrite.in) with valid System User Token or account_id 17841445671263800 is always authorized
+    const isAuthorized = Boolean(
+        (isWishriteBrand && (accountId === '17841445671263800' || isSystemUser) && (raw.api_authorized !== false && nested.api_authorized !== false)) ||
+        apiAuthorized ||
+        (accountId && (raw.insights_status === 'connected' || nested.insights_status === 'connected')) ||
+        (isSystemUser && raw.api_authorized !== false)
+    );
+
+    const followersCount = raw.followers_count ?? nested.followers_count ?? currentCreatorData?.creator?.instagram_followers_count ?? (currentCreatorData?.creator?.followers ? Number(currentCreatorData.creator.followers) : 0);
+    const followingCount = raw.following_count ?? nested.following_count ?? currentCreatorData?.creator?.instagram_following_count ?? 0;
+    const mediaCount = raw.media_count ?? nested.media_count ?? currentCreatorData?.creator?.instagram_media_count ?? (currentCreatorData?.creator?.no_of_posts ? Number(currentCreatorData.creator.no_of_posts) : 0);
+    const profilePicUrl = raw.profile_picture_url || nested.profile_picture_url || currentCreatorData?.creator?.instagram_profile_picture || currentCreatorData?.creator?.profile_image || null;
+    const igCategory = raw.instagram_category || nested.instagram_category || currentCreatorData?.creator?.instagram_category || null;
+    const selectedNiche = raw.creator_niche || nested.creator_niche || currentCreatorData?.creator?.creator_niche || 'Jewellery & Accessories';
+
+    const lastSyncedAt = raw.last_synced_at || nested.last_synced_at || null;
+    const profileSyncedAt = raw.profile_synced_at || nested.profile_synced_at || lastSyncedAt;
+    const syncText = lastSyncedAt ? `Insights synced: ${formatSyncTime(lastSyncedAt)}` : 'Insights not synced yet';
+    const profileSyncText = profileSyncedAt ? `Profile updated: ${formatSyncTime(profileSyncedAt)}` : '';
+
+    if (isConnected && cleanUsername) {
         let nicheOptionsHtml = CREATOR_NICHE_LIST.map(n => 
             `<option value="${n}" ${n === selectedNiche ? 'selected' : ''}>${n}</option>`
         ).join('');
 
         if (isAuthorized) {
-            const avatarHtml = conn.profile_picture_url
-                ? `<img src="${conn.profile_picture_url}" class="ig-profile-avatar" alt="@${conn.username}" onerror="this.style.display='none';if(this.nextElementSibling)this.nextElementSibling.style.display='flex';" /><div class="ig-profile-avatar-fallback" style="display:none;">${(conn.username || 'C').charAt(0).toUpperCase()}</div>`
-                : `<div class="ig-profile-avatar-fallback">${(conn.username || 'C').charAt(0).toUpperCase()}</div>`;
+            const avatarHtml = profilePicUrl
+                ? `<img src="${profilePicUrl}" class="ig-profile-avatar" alt="@${cleanUsername}" onerror="this.style.display='none';if(this.nextElementSibling)this.nextElementSibling.style.display='flex';" /><div class="ig-profile-avatar-fallback" style="display:none;">${(cleanUsername || 'C').charAt(0).toUpperCase()}</div>`
+                : `<div class="ig-profile-avatar-fallback">${(cleanUsername || 'C').charAt(0).toUpperCase()}</div>`;
 
             cardEl.innerHTML = `
                 <div class="ig-conn-connected">
@@ -1939,9 +1991,9 @@ function renderInstagramConnectionCard(conn) {
                             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>
                             <span>INSTAGRAM INFLUENCER PROFILE</span>
                         </div>
-                        <span class="ig-profile-verified-badge">
+                        <span class="ig-profile-verified-badge" style="background:#ecfdf5; color:#065f46; border:1px solid #a7f3d0; display:inline-flex; align-items:center; gap:5px; padding:3px 10px; border-radius:12px; font-size:0.72rem; font-weight:600; text-transform:uppercase; letter-spacing:0.5px;">
                             <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
-                            <span>WishRite Verified</span>
+                            <span>CONNECTED</span>
                         </span>
                     </div>
 
@@ -1950,13 +2002,14 @@ function renderInstagramConnectionCard(conn) {
                             ${avatarHtml}
                         </div>
                         <div class="ig-profile-info">
-                            <div class="ig-profile-title-row">
-                                <div class="ig-profile-username">@${conn.username}</div>
+                            <div class="ig-profile-title-row" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                                <div class="ig-profile-username">@${cleanUsername}</div>
                                 <span class="ig-pill ig-pill-category" style="font-size:0.68rem; padding:1px 6px;">Professional</span>
+                                ${accountId ? `<span class="ig-pill" style="font-size:0.68rem; padding:1px 6px; background:#f4f4f5; color:#52525b; font-family:monospace;">ID: ${accountId}</span>` : ''}
                             </div>
-                            <div class="ig-conn-sub">Official Meta Graph API Connected &bull; Real-time Insights Enabled</div>
+                            <div class="ig-conn-sub">Official Meta Graph API Connected &bull; Real-time Reel Insights Enabled</div>
                             <div class="ig-profile-pills">
-                                ${conn.instagram_category ? `<span class="ig-pill ig-pill-category">🏷️ ${conn.instagram_category}</span>` : ''}
+                                ${igCategory ? `<span class="ig-pill ig-pill-category">🏷️ ${igCategory}</span>` : ''}
                                 <div style="display:inline-flex; align-items:center; gap:5px;">
                                     <span style="font-size:0.72rem; color:#71717A;">Niche:</span>
                                     <select class="ig-niche-select" onchange="updateCreatorNiche(this)" title="Select your creator niche">
@@ -1972,15 +2025,15 @@ function renderInstagramConnectionCard(conn) {
 
                     <div class="ig-profile-stats-grid">
                         <div class="ig-profile-stat-item">
-                            <div class="ig-profile-stat-val">${formatMetricCount(conn.followers_count)}</div>
+                            <div class="ig-profile-stat-val">${formatMetricCount(followersCount)}</div>
                             <div class="ig-profile-stat-lbl">Followers</div>
                         </div>
                         <div class="ig-profile-stat-item">
-                            <div class="ig-profile-stat-val">${formatMetricCount(conn.following_count)}</div>
+                            <div class="ig-profile-stat-val">${formatMetricCount(followingCount)}</div>
                             <div class="ig-profile-stat-lbl">Following</div>
                         </div>
                         <div class="ig-profile-stat-item">
-                            <div class="ig-profile-stat-val">${formatMetricCount(conn.media_count)}</div>
+                            <div class="ig-profile-stat-val">${formatMetricCount(mediaCount)}</div>
                             <div class="ig-profile-stat-lbl">Posts</div>
                         </div>
                     </div>
@@ -2017,7 +2070,7 @@ function renderInstagramConnectionCard(conn) {
                     </div>
                     <div class="ig-conn-body">
                         <div>
-                            <div class="ig-conn-handle">@${conn.username}</div>
+                            <div class="ig-conn-handle">@${cleanUsername}</div>
                             <div class="ig-conn-sub" style="color:#b45309; font-weight:500;">Instagram authorization needs to be renewed to sync Reel insights.</div>
                             <div class="ig-conn-synced">${syncText}</div>
                         </div>

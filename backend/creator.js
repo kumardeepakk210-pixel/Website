@@ -660,6 +660,27 @@ export async function requireCreatorAuth(req, res, next) {
                     }
                 }
 
+                if (!matchedCreator && authEmail) {
+                    try {
+                        const queryOpts = {
+                            useAdmin: hasServerAdminCredential(),
+                            userToken: token
+                        };
+                        const dbInfs = await dbQuery('influencers', `email_id=eq.${encodeURIComponent(authEmail)}&limit=1`, queryOpts);
+                        if (Array.isArray(dbInfs) && dbInfs.length > 0) {
+                            matchedCreator = normalizeInfluencerRecord(dbInfs[0]);
+                            matchedAccount = {
+                                id: matchedCreator.id,
+                                influencer_id: matchedCreator.id,
+                                email: authEmail,
+                                is_active: matchedCreator.status === 'active' || matchedCreator.status === 'pending'
+                            };
+                        }
+                    } catch (emailErr) {
+                        console.warn('[CREATOR AUTH] Supabase email query notice:', emailErr.message);
+                    }
+                }
+
                 // 2. Fallback to local store ONLY if CREATOR_USE_LOCAL_STORE is enabled or in test environment
                 if ((!matchedAccount || !matchedCreator) && (CREATOR_USE_LOCAL_STORE || process.env.NODE_ENV === 'test')) {
                     const local = readLocalStore();
@@ -1374,7 +1395,20 @@ export async function handleGetCreatorProfile(req, res) {
             public_profile_url: creator.public_profile_url || buildInfluencerPublicUrl(creator.public_slug),
             category: creator.category || 'Jewelry & Lifestyle',
             tier: creator.tier || 'starter',
-            created_at: creator.created_at
+            created_at: creator.created_at,
+            instagram_connection: creator.instagram_connection || (
+                (creator.instagram_id && creator.instagram_id.replace(/^@/, '').toLowerCase() === WISHRITE_OFFICIAL_IG_HANDLE)
+                ? {
+                    connected: true,
+                    api_authorized: true,
+                    username: WISHRITE_OFFICIAL_IG_HANDLE,
+                    account_id: WISHRITE_OFFICIAL_IG_ACCOUNT_ID,
+                    insights_status: 'connected',
+                    is_system_user: true,
+                    validation_status: 'verified'
+                }
+                : null
+            )
         }
     });
 }
@@ -2198,7 +2232,26 @@ export async function handleCustomerCreatorStatus(req, res) {
                 public_slug: publicSlug,
                 referral_url: referralUrl,
                 tier: matchedCreator.tier || 'starter',
-                commission_rate: matchedCreator.commission_rate || 10
+                commission_rate: matchedCreator.commission_rate || 10,
+                instagram_followers_count: matchedCreator.instagram_followers_count || 0,
+                instagram_following_count: matchedCreator.instagram_following_count || 0,
+                instagram_media_count: matchedCreator.instagram_media_count || 0,
+                instagram_profile_picture: matchedCreator.instagram_profile_picture || null,
+                instagram_category: matchedCreator.instagram_category || null,
+                creator_niche: matchedCreator.creator_niche || null,
+                instagram_connection: matchedCreator.instagram_connection || (
+                    (matchedCreator.instagram_id && matchedCreator.instagram_id.replace(/^@/, '').toLowerCase() === WISHRITE_OFFICIAL_IG_HANDLE)
+                    ? {
+                        connected: true,
+                        api_authorized: true,
+                        username: WISHRITE_OFFICIAL_IG_HANDLE,
+                        account_id: WISHRITE_OFFICIAL_IG_ACCOUNT_ID,
+                        insights_status: 'connected',
+                        is_system_user: true,
+                        validation_status: 'verified'
+                    }
+                    : null
+                )
             },
             stats,
             wallet: walletData,
@@ -3449,15 +3502,19 @@ export async function handleGetInstagramStatus(req, res) {
                 resolvedAccountId = WISHRITE_OFFICIAL_IG_ACCOUNT_ID;
                 insightsStatus = 'connected';
                 // Asynchronously ensure Supabase record has resolved account_id and connected status
-                if (conn && (!conn.account_id || conn.insights_status !== 'connected')) {
-                    conn.account_id = WISHRITE_OFFICIAL_IG_ACCOUNT_ID;
-                    conn.insights_status = 'connected';
+                if (!conn || !conn.account_id || conn.insights_status !== 'connected') {
+                    const updatedConn = {
+                        ...(conn || {}),
+                        connected: true,
+                        username: WISHRITE_OFFICIAL_IG_HANDLE,
+                        account_id: WISHRITE_OFFICIAL_IG_ACCOUNT_ID,
+                        insights_status: 'connected',
+                        validation_status: 'verified',
+                        is_system_user: true
+                    };
+                    conn = updatedConn;
                     dbUpdate('influencers', 'influencer_id', creatorId, {
-                        instagram_connection: {
-                            ...conn,
-                            account_id: WISHRITE_OFFICIAL_IG_ACCOUNT_ID,
-                            insights_status: 'connected'
-                        }
+                        instagram_connection: updatedConn
                     }, { useAdmin: true }).catch(() => {});
                 }
             } else {
@@ -3468,6 +3525,16 @@ export async function handleGetInstagramStatus(req, res) {
             }
         }
 
+        const followersCount = conn?.followers_count ?? (creator.instagram_followers_count ?? (creator.followers ? Number(creator.followers) : 0));
+        const followingCount = conn?.following_count ?? (creator.instagram_following_count ?? 0);
+        const mediaCount = conn?.media_count ?? (creator.instagram_media_count ?? (creator.no_of_posts ? Number(creator.no_of_posts) : 0));
+        const profilePicUrl = conn?.profile_picture_url || creator.instagram_profile_picture || creator.profile_image || null;
+        const igCategory = conn?.instagram_category || creator.instagram_category || null;
+        const creatorNiche = creator.creator_niche || conn?.creator_niche || null;
+        const validationStatus = conn?.validation_status || (isConnected && isApiAuthorized ? 'verified' : 'pending');
+        const profileSyncedAt = conn?.profile_synced_at || conn?.last_synced_at || null;
+        const lastSyncedAt = conn?.last_synced_at || null;
+
         return res.json({
             success: true,
             connected: isConnected,
@@ -3475,18 +3542,37 @@ export async function handleGetInstagramStatus(req, res) {
             username: rawHandle,
             account_id: resolvedAccountId,
             account_type: conn?.account_type || 'professional',
-            followers_count: conn?.followers_count ?? (creator.instagram_followers_count ?? (creator.followers ? Number(creator.followers) : 0)),
-            following_count: conn?.following_count ?? (creator.instagram_following_count ?? 0),
-            media_count: conn?.media_count ?? (creator.instagram_media_count ?? (creator.no_of_posts ? Number(creator.no_of_posts) : 0)),
-            profile_picture_url: conn?.profile_picture_url || creator.instagram_profile_picture || creator.profile_image || null,
-            instagram_category: conn?.instagram_category || creator.instagram_category || null,
-            creator_niche: creator.creator_niche || conn?.creator_niche || null,
+            is_system_user: isWishriteBrandAccount,
+            followers_count: followersCount,
+            following_count: followingCount,
+            media_count: mediaCount,
+            profile_picture_url: profilePicUrl,
+            instagram_category: igCategory,
+            creator_niche: creatorNiche,
             allowed_niches: ALLOWED_CREATOR_NICHES,
-            validation_status: conn?.validation_status || (isConnected && isApiAuthorized ? 'verified' : 'pending'),
-            profile_synced_at: conn?.profile_synced_at || conn?.last_synced_at || null,
-            last_synced_at: conn?.last_synced_at || null,
+            validation_status: validationStatus,
+            profile_synced_at: profileSyncedAt,
+            last_synced_at: lastSyncedAt,
             insights_status: insightsStatus,
             meta_configured: !!(process.env.META_APP_ID && process.env.META_APP_SECRET),
+            instagram_connection: {
+                connected: isConnected,
+                api_authorized: isApiAuthorized,
+                username: rawHandle,
+                account_id: resolvedAccountId,
+                account_type: conn?.account_type || 'professional',
+                is_system_user: isWishriteBrandAccount,
+                insights_status: insightsStatus,
+                validation_status: validationStatus,
+                followers_count: followersCount,
+                following_count: followingCount,
+                media_count: mediaCount,
+                profile_picture_url: profilePicUrl,
+                instagram_category: igCategory,
+                creator_niche: creatorNiche,
+                profile_synced_at: profileSyncedAt,
+                last_synced_at: lastSyncedAt
+            },
             message: isConnected
                 ? `Connected as @${rawHandle || conn.username}`
                 : 'Connect your Instagram account to automatically receive Reel and Post performance insights. Instagram insights require an eligible Instagram professional account connected to WishRite.'
