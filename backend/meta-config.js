@@ -64,7 +64,7 @@ export function getOAuthRedirectUri(req) {
  * Strictly uses server-side secrets without exposing them.
  */
 export function getOAuthSigningSecret() {
-    const secret = (process.env.META_APP_SECRET || process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.CREATOR_SESSION_SECRET || '').trim();
+    const secret = (process.env.META_OAUTH_SIGNING_SECRET || process.env.META_APP_SECRET || process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.CREATOR_SESSION_SECRET || '').trim();
     if (secret) return secret;
     const isTest = process.env.NODE_ENV === 'test' || Boolean(process.env.NODE_TEST_CONTEXT) || process.argv.some(a => a.includes('test'));
     if (isTest) return 'test-mock-meta-secret-32b';
@@ -103,6 +103,8 @@ export function getPublicMetaConfig() {
     return {
         meta_configured: Boolean(cfg.appId && cfg.appSecret),
         meta_app_id_configured: Boolean(cfg.appId),
+        system_user_token_configured: Boolean(cfg.systemUserToken),
+        oauth_signing_secret_configured: Boolean(process.env.META_OAUTH_SIGNING_SECRET || process.env.META_APP_SECRET || process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.CREATOR_SESSION_SECRET),
         graph_api_version: cfg.graphApiVersion,
         official_handle: WISHRITE_OFFICIAL_IG_HANDLE
     };
