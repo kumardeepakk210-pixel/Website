@@ -15,6 +15,7 @@ import {
     dbQuery,
     dbUpdate
 } from './supabase-client.js';
+import { isStagingMode } from './meta-config.js';
 
 // Server-side Razorpay configuration (NEVER expose to frontend)
 export function getRazorpayCredentials() {
@@ -61,6 +62,13 @@ const processedPayments = new Set();
  * Creates a Razorpay order for wallet top-up
  */
 export async function handleWalletCreateOrder(req, res) {
+    if (isStagingMode()) {
+        return res.status(403).json({
+            success: false,
+            error: 'Wallet top-ups and financial payments are disabled in the staging review environment.'
+        });
+    }
+
     try {
         const body = req.body || {};
         const amount = Number(body.amount);

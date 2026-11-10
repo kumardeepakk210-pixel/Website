@@ -16,6 +16,7 @@ import {
     dbUpdate
 } from './supabase-client.js';
 import { attributeOrderToInfluencer } from './influencers.js';
+import { isStagingMode } from './meta-config.js';
 
 // Server-side Razorpay configuration (NEVER expose to frontend)
 export function getRazorpayCredentials() {
@@ -355,6 +356,13 @@ async function validateServerCoupon(code, subtotal) {
  * Main secure server-authoritative order creation endpoint
  */
 export async function handleCheckoutCreateOrder(req, res) {
+    if (isStagingMode()) {
+        return res.status(403).json({
+            success: false,
+            error: 'Checkout and financial payments are disabled in the staging review environment.'
+        });
+    }
+
     try {
         const body = req.body || {};
         const customer = body.customer || {};

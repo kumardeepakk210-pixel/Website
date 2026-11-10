@@ -16,6 +16,7 @@ import {
     SUPABASE_URL,
     hasServerAdminCredential
 } from './supabase-client.js';
+import { isStagingMode } from './meta-config.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -1096,6 +1097,16 @@ export async function handleSetDefaultPayoutMethod(req, res) {
  * Requests withdrawal with atomic balance deduction and concurrency locking
  */
 export async function handleCreateWithdrawal(req, res) {
+    if (isStagingMode()) {
+        return res.status(403).json({
+            success: false,
+            error: {
+                code: 'STAGING_PAYOUTS_DISABLED',
+                message: 'Financial payouts and withdrawals are disabled in the staging review environment.'
+            }
+        });
+    }
+
     const creator = req.creator;
     const { amount, payout_method_id, payout_method, payout_details, idempotency_key } = req.body || {};
 
@@ -1600,6 +1611,14 @@ export async function dispatchRazorpayXPayout({
     idempotencyKey,
     fetcher = fetch
 }) {
+    if (isStagingMode()) {
+        return {
+            success: false,
+            code: 'STAGING_PAYOUTS_DISABLED',
+            message: 'Financial payouts and disbursements are disabled in the staging review environment.'
+        };
+    }
+
     const isLive = (process.env.RAZORPAYX_MODE || '').toLowerCase() === 'live' || (process.env.RAZORPAY_PAYOUT_MODE || '').toLowerCase() === 'live';
     const payoutMode = isLive ? 'live' : (process.env.RAZORPAYX_MODE || process.env.RAZORPAY_PAYOUT_MODE || 'sandbox').toLowerCase();
 

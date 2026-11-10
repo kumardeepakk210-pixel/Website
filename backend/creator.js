@@ -47,7 +47,10 @@ import {
     getOAuthSigningSecret,
     getMetaConfig,
     validateMetaConfig,
-    getPublicMetaConfig
+    getPublicMetaConfig,
+    isStagingMode,
+    isAllowedStagingCreatorEmail,
+    getAllowedStagingCreatorEmails
 } from './meta-config.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -760,6 +763,21 @@ export async function requireCreatorAuth(req, res, next) {
             });
         }
 
+        // Staging Mode Security Guard:
+        // Enforce strict allowlist for QA creator email addresses
+        if (isStagingMode()) {
+            const verifiedEmail = (matchedAccount?.email || matchedCreator?.email || '').trim().toLowerCase();
+            if (!isAllowedStagingCreatorEmail(verifiedEmail)) {
+                return res.status(403).json({
+                    success: false,
+                    error: {
+                        code: 'STAGING_CREATOR_ACCESS_DENIED',
+                        message: 'This staging environment is restricted to authorized QA creator accounts.'
+                    }
+                });
+            }
+        }
+
         // CRITICAL AUTHORIZATION RULE:
         // Bind authenticated creator directly to the request object.
         // Frontend parameter `influencer_id` is NEVER used.
@@ -918,6 +936,22 @@ export async function handleCreatorLogin(req, res) {
                     message: 'Your Creator Club access is currently unavailable. Please contact WishRite support.'
                 }
             });
+        }
+
+        // Staging Mode Security Guard:
+        // Enforce strict allowlist for QA creator email addresses
+        if (isStagingMode()) {
+            const verifiedEmail = (matchedAccount?.email || matchedCreator?.email || '').trim().toLowerCase();
+            if (!isAllowedStagingCreatorEmail(verifiedEmail)) {
+                recordFailedLogin(rateLimitKey);
+                return res.status(403).json({
+                    success: false,
+                    error: {
+                        code: 'STAGING_CREATOR_ACCESS_DENIED',
+                        message: 'This staging environment is restricted to authorized QA creator accounts.'
+                    }
+                });
+            }
         }
 
         // Record last_login_at
@@ -2936,6 +2970,9 @@ export function ensureDefaultContest(local) {
  */
 export async function addContestPoints(influencer_id, pointsToAdd, reason = '') {
     if (!influencer_id || !pointsToAdd) return;
+    if (isStagingMode()) {
+        return; // Staging guard: Never mutate contest scores or leaderboard in staging mode
+    }
     const local = readLocalStore();
     ensureDefaultContest(local);
     const activeContest = (local.contests || []).find(c => c.status === 'active');
@@ -3018,8 +3055,8 @@ export async function calculateContestLeaderboard(contestId = null, currentInflu
     const daysRemaining = Math.max(0, Math.ceil((endMs - now) / (1000 * 60 * 60 * 24)));
     const daysUntilStart = Math.max(0, Math.ceil((startMs - now) / (1000 * 60 * 60 * 24)));
 
-    // Ensure current creator has an enrolled score if authenticated
-    if (currentInfluencerId) {
+    // Ensure current creator has an enrolled score if authenticated (disabled in staging mode to protect production leaderboard)
+    if (currentInfluencerId && !isStagingMode()) {
         let meScore = (local.contest_scores || []).find(s => s.contest_id === contest.id && s.influencer_id === currentInfluencerId);
         if (!meScore) {
             meScore = {
@@ -3811,6 +3848,28 @@ export async function handleInstagramOAuthCallback(req, res) {
         }
 
         const redirectUri = stateData.redirectUri;
+
+        // Staging Mode Security Guard:
+        // Enforce that OAuth callback updates only allowlisted QA creator accounts
+        if (isStagingMode()) {
+            let infEmail = '';
+            try {
+                const queryOpts = { useAdmin: hasServerAdminCredential() };
+                const dbInfs = await dbQuery('influencers', `influencer_id=eq.${encodeURIComponent(creatorId)}&limit=1`, queryOpts);
+                if (Array.isArray(dbInfs) && dbInfs.length > 0) {
+                    infEmail = dbInfs[0].email_id || dbInfs[0].email || '';
+                }
+            } catch (_) {}
+            if (!infEmail) {
+                const local = readLocalStore();
+                const localInf = (local.influencers || []).find(i => i.id === creatorId);
+                infEmail = localInf?.email || '';
+            }
+            if (!isAllowedStagingCreatorEmail(infEmail)) {
+                console.warn(`[Meta OAuth Callback Staging Guard] Blocked callback for non-QA creator: ${creatorId} (${infEmail})`);
+                return res.status(403).send('Staging access denied: This environment is restricted to authorized QA creators.');
+            }
+        }
 
         // 1. Exchange authorization code for short-lived access token
         const tokenBaseUrl = process.env.META_OAUTH_TOKEN_URL || 'https://graph.facebook.com/oauth/access_token';
@@ -4622,6 +4681,9 @@ export async function handleUpdateCreatorNiche(req, res) {
 export {
     getPublicMetaConfig,
     validateMetaConfig,
-    getMetaConfig
+    getMetaConfig,
+    isStagingMode,
+    isAllowedStagingCreatorEmail,
+    getAllowedStagingCreatorEmails
 };
 

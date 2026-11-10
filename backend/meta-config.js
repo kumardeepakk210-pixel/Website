@@ -14,9 +14,40 @@ export const WISHRITE_OFFICIAL_IG_ACCOUNT_ID = '17841445671263800';
 export const WISHRITE_OFFICIAL_PAGE_ID = '591667860696059';
 export const WISHRITE_OFFICIAL_PAGE_NAME = 'funnwith.ai';
 
-// Production and Local Development Callback Endpoints
+// Production, Staging and Local Development Callback Endpoints
 export const PRODUCTION_OAUTH_CALLBACK = 'https://www.wishrite.in/api/creator/instagram/oauth/callback';
+export const STAGING_OAUTH_CALLBACK = 'https://review.wishrite.in/api/creator/instagram/oauth/callback';
 export const LOCAL_OAUTH_CALLBACK = 'http://localhost:8085/api/creator/instagram/oauth/callback';
+
+/**
+ * Checks whether Staging Mode is explicitly enabled via environment variable
+ */
+export function isStagingMode() {
+    return process.env.WISHRITE_STAGING_MODE === 'true';
+}
+
+/**
+ * Parses and returns the list of allowed QA creator emails in staging mode
+ */
+export function getAllowedStagingCreatorEmails() {
+    const raw = process.env.WISHRITE_STAGING_ALLOWED_CREATOR_EMAILS || '';
+    return raw
+        .split(',')
+        .map(e => e.trim().toLowerCase())
+        .filter(Boolean);
+}
+
+/**
+ * Validates whether an email belongs to an allowed QA creator in staging mode.
+ * In production mode (WISHRITE_STAGING_MODE !== 'true'), returns true (unrestricted).
+ */
+export function isAllowedStagingCreatorEmail(email) {
+    if (!isStagingMode()) return true;
+    if (!email || typeof email !== 'string') return false;
+    const allowed = getAllowedStagingCreatorEmails();
+    if (allowed.length === 0) return false;
+    return allowed.includes(email.trim().toLowerCase());
+}
 
 /**
  * Returns the active Meta configuration object
@@ -106,6 +137,7 @@ export function getPublicMetaConfig() {
         system_user_token_configured: Boolean(cfg.systemUserToken),
         oauth_signing_secret_configured: Boolean(process.env.META_OAUTH_SIGNING_SECRET || process.env.META_APP_SECRET || process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.CREATOR_SESSION_SECRET),
         graph_api_version: cfg.graphApiVersion,
-        official_handle: WISHRITE_OFFICIAL_IG_HANDLE
+        official_handle: WISHRITE_OFFICIAL_IG_HANDLE,
+        staging_mode: isStagingMode()
     };
 }
