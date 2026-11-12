@@ -4,9 +4,21 @@
 // Keeps all secrets strictly server-side. Never exposes tokens or secrets to client.
 // ==============================================================================
 
-export const META_APP_ID = process.env.META_APP_ID || '439894570032149';
-export const META_GRAPH_API_VERSION = process.env.META_GRAPH_API_VERSION || 'v26.0';
-export const META_CONFIG_ID = process.env.META_CONFIG_ID || '1112681211580113';
+export const DEFAULT_META_APP_ID = '4398945700321494';
+export const DEFAULT_META_GRAPH_API_VERSION = 'v26.0';
+export const DEFAULT_META_CONFIG_ID = '1112681211580113';
+
+/**
+ * Normalizes Meta Graph API version strings to lowercase (e.g. 'V26.0' -> 'v26.0')
+ */
+export function normalizeGraphApiVersion(version) {
+    const raw = String(version || '').trim();
+    return raw ? raw.toLowerCase() : DEFAULT_META_GRAPH_API_VERSION;
+}
+
+export const META_APP_ID = (process.env.META_APP_ID || '').trim() || DEFAULT_META_APP_ID;
+export const META_GRAPH_API_VERSION = normalizeGraphApiVersion(process.env.META_GRAPH_API_VERSION);
+export const META_CONFIG_ID = (process.env.META_CONFIG_ID || '').trim() || DEFAULT_META_CONFIG_ID;
 
 // Official WishRite Meta & Instagram Brand Assets
 export const WISHRITE_OFFICIAL_IG_HANDLE = 'wishrite.in';
@@ -50,6 +62,31 @@ export function isAllowedStagingCreatorEmail(email) {
 }
 
 /**
+ * Resolves active Meta App ID from environment with canonical fallback
+ */
+export function getMetaAppId() {
+    return (process.env.META_APP_ID || '').trim() || META_APP_ID;
+}
+
+/**
+ * Resolves normalized lowercase Meta Graph API version
+ */
+export function getMetaGraphApiVersion() {
+    const envVersion = (process.env.META_GRAPH_API_VERSION || '').trim();
+    return envVersion ? normalizeGraphApiVersion(envVersion) : META_GRAPH_API_VERSION;
+}
+
+/**
+ * Resolves Facebook Login for Business config_id (empty string disables config_id flow)
+ */
+export function getMetaConfigId() {
+    if (process.env.META_CONFIG_ID !== undefined) {
+        return String(process.env.META_CONFIG_ID || '').trim();
+    }
+    return META_CONFIG_ID;
+}
+
+/**
  * Returns the active Meta configuration object
  */
 export function getMetaConfig() {
@@ -58,10 +95,10 @@ export function getMetaConfig() {
     const configuredRedirect = (process.env.META_OAUTH_REDIRECT_URI || process.env.META_REDIRECT_URI || '').trim();
 
     return {
-        appId: META_APP_ID,
+        appId: getMetaAppId(),
         appSecret,
-        graphApiVersion: META_GRAPH_API_VERSION,
-        configId: META_CONFIG_ID,
+        graphApiVersion: getMetaGraphApiVersion(),
+        configId: getMetaConfigId(),
         systemUserToken,
         configuredRedirect,
         official: {

@@ -15,12 +15,13 @@ import {
     getOAuthRedirectUri,
     validateMetaConfig,
     getPublicMetaConfig,
-    getOAuthSigningSecret
+    getOAuthSigningSecret,
+    normalizeGraphApiVersion
 } from '../backend/meta-config.js';
 
 describe('WishRite Centralized Meta Configuration Module', () => {
     test('1. Exports verified Meta Constants and brand assets', () => {
-        assert.equal(META_APP_ID, '439894570032149');
+        assert.equal(META_APP_ID, '4398945700321494');
         assert.equal(META_GRAPH_API_VERSION, 'v26.0');
         assert.equal(WISHRITE_OFFICIAL_IG_HANDLE, 'wishrite.in');
         assert.equal(WISHRITE_OFFICIAL_IG_ACCOUNT_ID, '17841445671263800');
@@ -33,7 +34,7 @@ describe('WishRite Centralized Meta Configuration Module', () => {
     test('2. getMetaConfig returns active configuration without leaking secrets to public', () => {
         const config = getMetaConfig();
         assert.ok(config);
-        assert.equal(config.appId, '439894570032149');
+        assert.equal(config.appId, '4398945700321494');
         assert.equal(config.graphApiVersion, 'v26.0');
         assert.equal(config.official.handle, 'wishrite.in');
         assert.equal(config.official.accountId, '17841445671263800');
@@ -99,5 +100,19 @@ describe('WishRite Centralized Meta Configuration Module', () => {
     test('6. getOAuthSigningSecret provides HMAC key in test environment', () => {
         const secret = getOAuthSigningSecret();
         assert.ok(secret && typeof secret === 'string' && secret.length >= 16);
+    });
+
+    test('7. normalizeGraphApiVersion and getMetaConfig normalize uppercase Graph API versions to lowercase', () => {
+        assert.equal(normalizeGraphApiVersion('V26.0'), 'v26.0');
+        assert.equal(normalizeGraphApiVersion(' v26.0 '), 'v26.0');
+        const origVersion = process.env.META_GRAPH_API_VERSION;
+        try {
+            process.env.META_GRAPH_API_VERSION = 'V26.0';
+            assert.equal(getMetaConfig().graphApiVersion, 'v26.0');
+            assert.equal(getPublicMetaConfig().graph_api_version, 'v26.0');
+        } finally {
+            if (origVersion !== undefined) process.env.META_GRAPH_API_VERSION = origVersion;
+            else delete process.env.META_GRAPH_API_VERSION;
+        }
     });
 });

@@ -322,61 +322,100 @@ describe('WishRite Creator — Instagram Content List & Official Insights Sync',
       });
     });
 
-    test('GET /api/creator/instagram/oauth/start returns unversioned Meta dialog URL', async () => {
-      process.env.META_APP_ID = '439894570032149';
-      const res = await makeRequest({
-        path: '/api/creator/instagram/oauth/start?json=true',
-        method: 'GET',
-        headers: authHeadersA
-      });
+    test('GET /api/creator/instagram/oauth/start returns unversioned Meta dialog URL with config_id and override_default_response_type without scope', async () => {
+      const origAppId = process.env.META_APP_ID;
+      const origConfigId = process.env.META_CONFIG_ID;
+      process.env.META_APP_ID = '4398945700321494';
+      delete process.env.META_CONFIG_ID;
 
-      assert.equal(res.statusCode, 200);
-      assert.equal(res.data.success, true);
-      assert.ok(res.data.redirect_url, 'redirect_url must be provided');
+      try {
+        const res = await makeRequest({
+          path: '/api/creator/instagram/oauth/start?json=true',
+          method: 'GET',
+          headers: authHeadersA
+        });
 
-      const redirectUrl = res.data.redirect_url;
-      // Assert unversioned Meta OAuth dialog endpoint
-      assert.ok(
-        redirectUrl.startsWith('https://www.facebook.com/dialog/oauth'),
-        'OAuth dialog endpoint must start with https://www.facebook.com/dialog/oauth'
-      );
-      assert.equal(
-        redirectUrl.includes('/v26.0/dialog/oauth'),
-        false,
-        'OAuth dialog endpoint must NOT contain /v26.0/dialog/oauth'
-      );
-      assert.ok(
-        redirectUrl.includes('client_id=439894570032149'),
-        'Must contain configured client_id'
-      );
-      assert.ok(
-        redirectUrl.includes('response_type=code'),
-        'Must contain response_type=code'
-      );
-      assert.ok(
-        redirectUrl.includes('instagram_basic'),
-        'Must contain instagram_basic scope'
-      );
-      assert.ok(
-        redirectUrl.includes('instagram_manage_insights'),
-        'Must contain instagram_manage_insights scope'
-      );
-      assert.ok(
-        redirectUrl.includes('pages_show_list'),
-        'Must contain pages_show_list scope'
-      );
-      assert.ok(
-        redirectUrl.includes('pages_read_engagement'),
-        'Must contain pages_read_engagement scope'
-      );
-      assert.ok(
-        redirectUrl.includes('config_id=1112681211580113'),
-        'Must contain config_id=1112681211580113 for Facebook Login for Business'
-      );
-      assert.ok(
-        redirectUrl.includes('state='),
-        'Must contain signed state parameter'
-      );
+        assert.equal(res.statusCode, 200);
+        assert.equal(res.data.success, true);
+        assert.ok(res.data.redirect_url, 'redirect_url must be provided');
+
+        const redirectUrl = res.data.redirect_url;
+        const parsed = new URL(redirectUrl);
+        // Assert unversioned Meta OAuth dialog endpoint
+        assert.ok(
+          redirectUrl.startsWith('https://www.facebook.com/dialog/oauth'),
+          'OAuth dialog endpoint must start with https://www.facebook.com/dialog/oauth'
+        );
+        assert.equal(
+          redirectUrl.includes('/v26.0/dialog/oauth'),
+          false,
+          'OAuth dialog endpoint must NOT contain /v26.0/dialog/oauth'
+        );
+        assert.equal(
+          parsed.searchParams.get('client_id'),
+          '4398945700321494',
+          'Must contain configured client_id'
+        );
+        assert.equal(
+          parsed.searchParams.get('response_type'),
+          'code',
+          'Must contain response_type=code'
+        );
+        assert.equal(
+          parsed.searchParams.get('config_id'),
+          '1112681211580113',
+          'Must contain config_id=1112681211580113 for Facebook Login for Business'
+        );
+        assert.equal(
+          parsed.searchParams.get('override_default_response_type'),
+          'true',
+          'Must contain override_default_response_type=true when config_id is supplied'
+        );
+        assert.equal(
+          parsed.searchParams.has('scope'),
+          false,
+          'Must NOT send scope when config_id is supplied'
+        );
+        assert.ok(
+          parsed.searchParams.get('state'),
+          'Must contain signed state parameter'
+        );
+      } finally {
+        if (origAppId !== undefined) process.env.META_APP_ID = origAppId;
+        else delete process.env.META_APP_ID;
+        if (origConfigId !== undefined) process.env.META_CONFIG_ID = origConfigId;
+        else delete process.env.META_CONFIG_ID;
+      }
+    });
+
+    test('GET /api/creator/instagram/oauth/start falls back to scope-based flow only when config_id is absent', async () => {
+      const origAppId = process.env.META_APP_ID;
+      const origConfigId = process.env.META_CONFIG_ID;
+      process.env.META_APP_ID = '4398945700321494';
+      process.env.META_CONFIG_ID = '';
+
+      try {
+        const res = await makeRequest({
+          path: '/api/creator/instagram/oauth/start?json=true',
+          method: 'GET',
+          headers: authHeadersA
+        });
+
+        assert.equal(res.statusCode, 200);
+        const parsed = new URL(res.data.redirect_url);
+        assert.equal(parsed.searchParams.has('config_id'), false, 'config_id must be omitted');
+        assert.equal(parsed.searchParams.has('override_default_response_type'), false, 'override_default_response_type must be omitted without config_id');
+        const scope = parsed.searchParams.get('scope') || '';
+        assert.ok(scope.includes('instagram_basic'), 'Must contain instagram_basic scope');
+        assert.ok(scope.includes('instagram_manage_insights'), 'Must contain instagram_manage_insights scope');
+        assert.ok(scope.includes('pages_show_list'), 'Must contain pages_show_list scope');
+        assert.ok(scope.includes('pages_read_engagement'), 'Must contain pages_read_engagement scope');
+      } finally {
+        if (origAppId !== undefined) process.env.META_APP_ID = origAppId;
+        else delete process.env.META_APP_ID;
+        if (origConfigId !== undefined) process.env.META_CONFIG_ID = origConfigId;
+        else delete process.env.META_CONFIG_ID;
+      }
     });
 
     test('Meta OAuth token exchange URL targets unversioned oauth/access_token endpoint without leakage', () => {

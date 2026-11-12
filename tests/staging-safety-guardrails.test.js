@@ -67,7 +67,7 @@ describe('WishRite Staging Safety & QA Creator Isolation Guardrails', () => {
         process.env.CREATOR_USE_LOCAL_STORE = 'true';
         process.env.CREATOR_SESSION_SECRET = 'test-creator-session-secret-32b-key!';
         process.env.META_APP_SECRET = 'test-meta-app-secret-32b-length!!';
-        process.env.META_APP_ID = '439894570032149';
+        process.env.META_APP_ID = '4398945700321494';
 
         // Seed clean local test database
         const store = readLocalStore();

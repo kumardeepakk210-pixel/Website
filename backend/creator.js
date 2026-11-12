@@ -43,6 +43,8 @@ import {
     META_GRAPH_API_VERSION,
     META_CONFIG_ID,
     WISHRITE_OFFICIAL_PAGE_NAME,
+    getMetaAppId,
+    getMetaConfigId,
     getOAuthRedirectUri,
     getOAuthSigningSecret,
     getMetaConfig,
@@ -3602,7 +3604,7 @@ export async function handleGetInstagramStatus(req, res) {
             profile_synced_at: profileSyncedAt,
             last_synced_at: lastSyncedAt,
             insights_status: insightsStatus,
-            meta_configured: !!(process.env.META_APP_ID && process.env.META_APP_SECRET),
+            meta_configured: Boolean(getMetaAppId() && process.env.META_APP_SECRET),
             instagram_connection: {
                 connected: isConnected,
                 api_authorized: isApiAuthorized,
@@ -3776,7 +3778,7 @@ export async function handleInstagramOAuthStart(req, res) {
         }
 
         const creatorId = creator.id || creator.influencer_id;
-        const appId = META_APP_ID || process.env.META_APP_ID;
+        const appId = getMetaAppId();
         if (!appId) {
             return res.status(400).json({
                 success: false,
@@ -3788,7 +3790,7 @@ export async function handleInstagramOAuthStart(req, res) {
         const redirectUri = getOAuthRedirectUri(req);
 
         const state = createOAuthState(creatorId, redirectUri);
-        const configId = META_CONFIG_ID || process.env.META_CONFIG_ID || '1112681211580113';
+        const configId = getMetaConfigId();
         const scopes = [
             'instagram_basic',
             'pages_show_list',
@@ -3796,13 +3798,20 @@ export async function handleInstagramOAuthStart(req, res) {
             'pages_read_engagement'
         ].join(',');
 
-        let metaAuthUrl = `https://www.facebook.com/dialog/oauth?client_id=${encodeURIComponent(appId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&state=${encodeURIComponent(state)}`;
+        const authParams = new URLSearchParams({
+            client_id: appId,
+            redirect_uri: redirectUri,
+            response_type: 'code',
+            state
+        });
         if (configId) {
-            metaAuthUrl += `&config_id=${encodeURIComponent(configId)}`;
+            authParams.set('config_id', configId);
+            authParams.set('override_default_response_type', 'true');
+        } else if (scopes) {
+            authParams.set('scope', scopes);
         }
-        if (scopes) {
-            metaAuthUrl += `&scope=${encodeURIComponent(scopes)}`;
-        }
+
+        const metaAuthUrl = `https://www.facebook.com/dialog/oauth?${authParams.toString()}`;
 
         // If client requested JSON via query or accept header, return JSON URL
         if (req.query?.json === 'true' || req.headers?.accept?.includes('application/json')) {
@@ -3840,7 +3849,7 @@ export async function handleInstagramOAuthCallback(req, res) {
         }
 
         const creatorId = stateData.creatorId;
-        const appId = process.env.META_APP_ID;
+        const appId = getMetaAppId();
         const appSecret = process.env.META_APP_SECRET;
 
         if (!appId || !appSecret) {
