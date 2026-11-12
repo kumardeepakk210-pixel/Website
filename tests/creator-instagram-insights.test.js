@@ -1067,4 +1067,820 @@ describe('WishRite Creator — Instagram Content List & Official Insights Sync',
       assert.equal(result.total_interactions_count, 1);
     });
   });
+
+  describe('8. Meta OAuth Callback Resolution & Safeguards', () => {
+    test('selectInstagramAccountCandidate prefers exact targetUsername and rejects ambiguous multi-account lists', async () => {
+      const { selectInstagramAccountCandidate } = await import('../backend/creator.js');
+
+      // Single account succeeds even without targetUsername
+      const singleRes = selectInstagramAccountCandidate(
+        [{ id: '178414001', username: 'only_account' }],
+        ''
+      );
+      assert.equal(singleRes.ambiguous, false);
+      assert.equal(singleRes.matchedBy, 'single_authorized_account');
+      assert.equal(singleRes.selected?.id, '178414001');
+
+      // Duplicate copies of same account deduplicate cleanly
+      const dedupRes = selectInstagramAccountCandidate(
+        [
+          { id: '178414001', username: 'only_account' },
+          { id: '178414001', username: 'only_account' }
+        ],
+        ''
+      );
+      assert.equal(dedupRes.ambiguous, false);
+      assert.equal(dedupRes.selected?.id, '178414001');
+      assert.equal(dedupRes.candidates.length, 1);
+
+      // Multiple accounts with exact targetUsername match picks matching account
+      const matchedRes = selectInstagramAccountCandidate(
+        [
+          { id: '178414001', username: 'first_brand' },
+          { id: '178414002', username: 'target_creator' }
+        ],
+        '@Target_Creator'
+      );
+      assert.equal(matchedRes.ambiguous, false);
+      assert.equal(matchedRes.matchedBy, 'target_username');
+      assert.equal(matchedRes.selected?.id, '178414002');
+
+      // Multiple accounts without exact match MUST fail safely as ambiguous (never pick candidates[0])
+      const ambiguousRes = selectInstagramAccountCandidate(
+        [
+          { id: '178414001', username: 'first_brand' },
+          { id: '178414002', username: 'second_brand' }
+        ],
+        'unrelated_handle'
+      );
+      assert.equal(ambiguousRes.ambiguous, true);
+      assert.equal(ambiguousRes.selected, null);
+      assert.equal(ambiguousRes.reason, 'multiple_accounts_no_username_match');
+      assert.equal(ambiguousRes.candidates.length, 2);
+    });
+
+    test('handleInstagramOAuthCallback follows bounded paging.next across /me/assigned_instagram_accounts without INSTAGRAM_SYSTEM_USER_TOKEN', async () => {
+      const creatorMod = await import('../backend/creator.js');
+      const { handleInstagramOAuthCallback, createOAuthState, readLocalStore, writeLocalStore } = creatorMod;
+
+      const origFetch = global.fetch;
+      const origEnv = { ...process.env };
+      const storeBackup = JSON.parse(JSON.stringify(readLocalStore()));
+      const testCreatorId = '00000000-0000-4000-a000-000000000801';
+
+      try {
+        delete process.env.INSTAGRAM_SYSTEM_USER_TOKEN;
+        process.env.META_APP_ID = '4398945700321494';
+        process.env.META_APP_SECRET = 'test-meta-app-secret-32b-length!!';
+        process.env.CREATOR_SESSION_SECRET = 'test-creator-session-secret-32b-key!';
+        delete process.env.META_OAUTH_TOKEN_URL;
+
+        const store = readLocalStore();
+        store.influencers = (store.influencers || []).filter(i => i.id !== testCreatorId);
+        store.influencers.push({
+          id: testCreatorId,
+          name: 'Paginated Creator',
+          email: 'paginated@wishrite.test',
+          instagram_id: 'creator_page2',
+          status: 'active'
+        });
+        writeLocalStore(store);
+
+        const calledUrls = [];
+        global.fetch = async (url) => {
+          const urlStr = String(url);
+          calledUrls.push(urlStr);
+
+          if (urlStr.includes('/oauth/access_token')) {
+            if (urlStr.includes('fb_exchange_token')) {
+              return { status: 200, json: async () => ({ access_token: 'long_tok_801', token_type: 'bearer', expires_in: 5184000 }) };
+            }
+            return { status: 200, json: async () => ({ access_token: 'short_tok_801', token_type: 'bearer', expires_in: 3600 }) };
+          }
+          if (urlStr.includes('/me/permissions')) {
+            return {
+              status: 200,
+              json: async () => ({
+                data: [
+                  { permission: 'instagram_basic', status: 'granted' },
+                  { permission: 'instagram_manage_insights', status: 'granted' },
+                  { permission: 'pages_show_list', status: 'granted' }
+                ]
+              })
+            };
+          }
+          if (urlStr.includes('/me/assigned_instagram_accounts') && urlStr.includes('after=CURSOR_PAGE_2')) {
+            return {
+              status: 200,
+              json: async () => ({
+                data: [{ id: '1784140000802', username: 'creator_page2', name: 'Page 2 Creator' }]
+              })
+            };
+          }
+          if (urlStr.includes('/me/assigned_instagram_accounts')) {
+            return {
+              status: 200,
+              json: async () => ({
+                data: [{ id: '1784140000801', username: 'other_account', name: 'Other Account' }],
+                paging: { next: 'https://graph.facebook.com/v26.0/me/assigned_instagram_accounts?fields=id,username,name&after=CURSOR_PAGE_2' }
+              })
+            };
+          }
+          if (urlStr.includes('/1784140000802/media')) {
+            return { status: 200, json: async () => ({ data: [] }) };
+          }
+          if (urlStr.includes('/1784140000802')) {
+            return {
+              status: 200,
+              json: async () => ({
+                id: '1784140000802',
+                username: 'creator_page2',
+                name: 'Page 2 Creator',
+                followers_count: 1500,
+                follows_count: 120,
+                media_count: 18
+              })
+            };
+          }
+          return { status: 200, json: async () => ({ data: [] }) };
+        };
+
+        const state = createOAuthState(testCreatorId, 'https://review.wishrite.in/api/creator/instagram/oauth/callback');
+        let redirectTarget = '';
+        const req = { query: { code: 'auth_code_801', state }, headers: {} };
+        const res = {
+          status: () => res,
+          send: () => res,
+          redirect: (loc) => { redirectTarget = loc; }
+        };
+
+        await handleInstagramOAuthCallback(req, res);
+
+        assert.ok(redirectTarget.includes('instagram=connected'), `Expected connected redirect, got: ${redirectTarget}`);
+        assert.ok(calledUrls.some(u => u.includes('after=CURSOR_PAGE_2')), 'Must follow paging.next cursor');
+
+        const updatedStore = readLocalStore();
+        const updated = updatedStore.influencers.find(i => i.id === testCreatorId);
+        assert.equal(updated.instagram_connection?.account_id, '1784140000802');
+        assert.equal(updated.instagram_connection?.username, 'creator_page2');
+      } finally {
+        global.fetch = origFetch;
+        process.env = origEnv;
+        writeLocalStore(storeBackup);
+      }
+    });
+
+    test('handleInstagramOAuthCallback resolves connected_instagram_account on /me/accounts with pagination', async () => {
+      const { handleInstagramOAuthCallback, createOAuthState, readLocalStore, writeLocalStore } = await import('../backend/creator.js');
+
+      const origFetch = global.fetch;
+      const origEnv = { ...process.env };
+      const storeBackup = JSON.parse(JSON.stringify(readLocalStore()));
+      const testCreatorId = '00000000-0000-4000-a000-000000000802';
+
+      try {
+        delete process.env.INSTAGRAM_SYSTEM_USER_TOKEN;
+        process.env.META_APP_ID = '4398945700321494';
+        process.env.META_APP_SECRET = 'test-meta-app-secret-32b-length!!';
+        process.env.CREATOR_SESSION_SECRET = 'test-creator-session-secret-32b-key!';
+        delete process.env.META_OAUTH_TOKEN_URL;
+
+        const store = readLocalStore();
+        store.influencers = (store.influencers || []).filter(i => i.id !== testCreatorId);
+        store.influencers.push({
+          id: testCreatorId,
+          name: 'Connected IG Creator',
+          email: 'connectedig@wishrite.test',
+          instagram_id: 'connected_creator',
+          status: 'active'
+        });
+        writeLocalStore(store);
+
+        global.fetch = async (url) => {
+          const urlStr = String(url);
+          if (urlStr.includes('/oauth/access_token')) {
+            return { status: 200, json: async () => ({ access_token: 'tok_802', token_type: 'bearer', expires_in: 3600 }) };
+          }
+          if (urlStr.includes('/me/permissions')) {
+            return {
+              status: 200,
+              json: async () => ({
+                data: [
+                  { permission: 'instagram_basic', status: 'granted' },
+                  { permission: 'instagram_manage_insights', status: 'granted' },
+                  { permission: 'pages_show_list', status: 'granted' }
+                ]
+              })
+            };
+          }
+          if (urlStr.includes('/me/accounts') && urlStr.includes('after=PAGES_2')) {
+            return {
+              status: 200,
+              json: async () => ({
+                data: [{
+                  id: 'page_2',
+                  name: 'Creator Page 2',
+                  access_token: 'page_tok_2',
+                  connected_instagram_account: { id: '1784140000809', username: 'connected_creator', name: 'Connected Creator' }
+                }]
+              })
+            };
+          }
+          if (urlStr.includes('/me/accounts')) {
+            return {
+              status: 200,
+              json: async () => ({
+                data: [{ id: 'page_1', name: 'Empty Page', access_token: 'page_tok_1' }],
+                paging: { next: 'https://graph.facebook.com/v26.0/me/accounts?after=PAGES_2' }
+              })
+            };
+          }
+          if (urlStr.includes('/1784140000809/media')) {
+            return { status: 200, json: async () => ({ data: [] }) };
+          }
+          if (urlStr.includes('/1784140000809')) {
+            return {
+              status: 200,
+              json: async () => ({
+                id: '1784140000809',
+                username: 'connected_creator',
+                name: 'Connected Creator',
+                followers_count: 800,
+                follows_count: 50,
+                media_count: 10
+              })
+            };
+          }
+          return { status: 200, json: async () => ({ data: [] }) };
+        };
+
+        const state = createOAuthState(testCreatorId, 'https://review.wishrite.in/api/creator/instagram/oauth/callback');
+        let redirectTarget = '';
+        const req = { query: { code: 'auth_code_802', state }, headers: {} };
+        const res = {
+          status: () => res,
+          send: () => res,
+          redirect: (loc) => { redirectTarget = loc; }
+        };
+
+        await handleInstagramOAuthCallback(req, res);
+
+        assert.ok(redirectTarget.includes('instagram=connected'), `Expected connected redirect, got: ${redirectTarget}`);
+        const updated = readLocalStore().influencers.find(i => i.id === testCreatorId);
+        assert.equal(updated.instagram_connection?.account_id, '1784140000809');
+        assert.equal(updated.instagram_connection?.username, 'connected_creator');
+      } finally {
+        global.fetch = origFetch;
+        process.env = origEnv;
+        writeLocalStore(storeBackup);
+      }
+    });
+
+    test('handleInstagramOAuthCallback fails safely on ambiguous multiple accounts without selecting accounts[0]', async () => {
+      const { handleInstagramOAuthCallback, createOAuthState, readLocalStore, writeLocalStore } = await import('../backend/creator.js');
+
+      const origFetch = global.fetch;
+      const origEnv = { ...process.env };
+      const storeBackup = JSON.parse(JSON.stringify(readLocalStore()));
+      const testCreatorId = '00000000-0000-4000-a000-000000000803';
+
+      try {
+        process.env.META_APP_ID = '4398945700321494';
+        process.env.META_APP_SECRET = 'test-meta-app-secret-32b-length!!';
+        process.env.CREATOR_SESSION_SECRET = 'test-creator-session-secret-32b-key!';
+        delete process.env.META_OAUTH_TOKEN_URL;
+
+        const store = readLocalStore();
+        store.influencers = (store.influencers || []).filter(i => i.id !== testCreatorId);
+        store.influencers.push({
+          id: testCreatorId,
+          name: 'Ambiguous Creator',
+          email: 'ambiguous@wishrite.test',
+          instagram_id: 'target_unmatched',
+          status: 'active'
+        });
+        writeLocalStore(store);
+
+        global.fetch = async (url) => {
+          const urlStr = String(url);
+          if (urlStr.includes('/oauth/access_token')) {
+            return { status: 200, json: async () => ({ access_token: 'tok_803', token_type: 'bearer', expires_in: 3600 }) };
+          }
+          if (urlStr.includes('/me/permissions')) {
+            return {
+              status: 200,
+              json: async () => ({
+                data: [
+                  { permission: 'instagram_basic', status: 'granted' },
+                  { permission: 'instagram_manage_insights', status: 'granted' },
+                  { permission: 'pages_show_list', status: 'granted' }
+                ]
+              })
+            };
+          }
+          if (urlStr.includes('/me/assigned_instagram_accounts')) {
+            return {
+              status: 200,
+              json: async () => ({
+                data: [
+                  { id: '1784140000811', username: 'brand_alpha' },
+                  { id: '1784140000812', username: 'brand_beta' }
+                ]
+              })
+            };
+          }
+          return { status: 200, json: async () => ({ data: [] }) };
+        };
+
+        const state = createOAuthState(testCreatorId, 'https://review.wishrite.in/api/creator/instagram/oauth/callback');
+        let redirectTarget = '';
+        const req = { query: { code: 'auth_code_803', state }, headers: {} };
+        const res = {
+          status: () => res,
+          send: () => res,
+          redirect: (loc) => { redirectTarget = loc; }
+        };
+
+        await handleInstagramOAuthCallback(req, res);
+
+        assert.ok(redirectTarget.includes('instagram=error'), `Expected error redirect for ambiguity, got: ${redirectTarget}`);
+        assert.match(decodeURIComponent(redirectTarget), /multiple instagram/i);
+
+        const unchanged = readLocalStore().influencers.find(i => i.id === testCreatorId);
+        assert.equal(unchanged.instagram_connection, undefined, 'Ambiguous selection must NOT write accounts[0]');
+      } finally {
+        global.fetch = origFetch;
+        process.env = origEnv;
+        writeLocalStore(storeBackup);
+      }
+    });
+
+    test('Removed hardcoded Business ID 1788557671719960 and deprecated /me?fields=id,name,username fallback', async () => {
+      const backendCreatorCode = fs.readFileSync(path.join(__dirname, '..', 'backend', 'creator.js'), 'utf8');
+      assert.equal(backendCreatorCode.includes('1788557671719960'), false, 'Hardcoded personal Business ID must be removed');
+      assert.equal(backendCreatorCode.includes('/me?fields=id,name,username'), false, 'Deprecated /me?fields=id,name,username fallback must be removed');
+
+      const { handleInstagramOAuthCallback, createOAuthState, readLocalStore, writeLocalStore } = await import('../backend/creator.js');
+      const origFetch = global.fetch;
+      const origEnv = { ...process.env };
+      const storeBackup = JSON.parse(JSON.stringify(readLocalStore()));
+      const testCreatorId = '00000000-0000-4000-a000-000000000804';
+
+      try {
+        process.env.META_APP_ID = '4398945700321494';
+        process.env.META_APP_SECRET = 'test-meta-app-secret-32b-length!!';
+        process.env.CREATOR_SESSION_SECRET = 'test-creator-session-secret-32b-key!';
+        delete process.env.META_OAUTH_TOKEN_URL;
+
+        const store = readLocalStore();
+        store.influencers = (store.influencers || []).filter(i => i.id !== testCreatorId);
+        store.influencers.push({
+          id: testCreatorId,
+          name: 'No IG Linked Creator',
+          email: 'noig@wishrite.test',
+          instagram_id: 'no_ig_linked',
+          status: 'active'
+        });
+        writeLocalStore(store);
+
+        const calledUrls = [];
+        global.fetch = async (url) => {
+          const urlStr = String(url);
+          calledUrls.push(urlStr);
+          if (urlStr.includes('/oauth/access_token')) {
+            return { status: 200, json: async () => ({ access_token: 'tok_804', token_type: 'bearer', expires_in: 3600 }) };
+          }
+          if (urlStr.includes('/me/permissions')) {
+            return {
+              status: 200,
+              json: async () => ({
+                data: [
+                  { permission: 'instagram_basic', status: 'granted' },
+                  { permission: 'instagram_manage_insights', status: 'granted' },
+                  { permission: 'pages_show_list', status: 'granted' }
+                ]
+              })
+            };
+          }
+          return { status: 200, json: async () => ({ data: [] }) };
+        };
+
+        const state = createOAuthState(testCreatorId, 'https://review.wishrite.in/api/creator/instagram/oauth/callback');
+        let redirectTarget = '';
+        const req = { query: { code: 'auth_code_804', state }, headers: {} };
+        const res = {
+          status: () => res,
+          send: () => res,
+          redirect: (loc) => { redirectTarget = loc; }
+        };
+
+        await handleInstagramOAuthCallback(req, res);
+
+        assert.ok(redirectTarget.includes('instagram=error'), `Expected error redirect when no IG business account resolved, got: ${redirectTarget}`);
+        assert.equal(calledUrls.some(u => u.includes('1788557671719960')), false, 'Must never query hardcoded Business ID');
+        assert.equal(calledUrls.some(u => u.includes('/me?fields=id,name,username')), false, 'Must never query deprecated /me fallback');
+      } finally {
+        global.fetch = origFetch;
+        process.env = origEnv;
+        writeLocalStore(storeBackup);
+      }
+    });
+
+    test('Page-token fallback persists OAuth user token on eligible permission error and preserves Page & IG IDs', async () => {
+      const { handleInstagramOAuthCallback, createOAuthState, readLocalStore, writeLocalStore, isEligiblePageTokenFallbackError } = await import('../backend/creator.js');
+      const { decryptToken } = await import('../backend/services/instagram-sync.js');
+
+      // Unit check on eligible error classifier
+      assert.equal(isEligiblePageTokenFallbackError({ code: 190, type: 'OAuthException' }), true);
+      assert.equal(isEligiblePageTokenFallbackError({ code: 10, type: 'OAuthException' }), true);
+      assert.equal(isEligiblePageTokenFallbackError({ code: 200, type: 'OAuthException' }), true);
+      assert.equal(isEligiblePageTokenFallbackError({ code: 2500, type: 'OAuthException' }), true);
+      assert.equal(isEligiblePageTokenFallbackError({ code: 100, error_subcode: 33 }), true);
+      assert.equal(isEligiblePageTokenFallbackError({ code: 4, type: 'OAuthException' }), false);
+      assert.equal(isEligiblePageTokenFallbackError({ code: 17, type: 'OAuthException' }), false);
+      assert.equal(isEligiblePageTokenFallbackError({ code: 32, type: 'OAuthException' }), false);
+      assert.equal(isEligiblePageTokenFallbackError({ code: 613 }), false);
+      assert.equal(isEligiblePageTokenFallbackError({ code: 1 }), false);
+      assert.equal(isEligiblePageTokenFallbackError({ code: 2 }), false);
+      assert.equal(isEligiblePageTokenFallbackError({ code: 100 }), false);
+      assert.equal(isEligiblePageTokenFallbackError({ message: 'ECONNRESET' }), false);
+
+      const origFetch = global.fetch;
+      const origEnv = { ...process.env };
+      const storeBackup = JSON.parse(JSON.stringify(readLocalStore()));
+      const testCreatorId = '00000000-0000-4000-a000-000000000805';
+
+      try {
+        delete process.env.INSTAGRAM_SYSTEM_USER_TOKEN;
+        process.env.META_APP_ID = '4398945700321494';
+        process.env.META_APP_SECRET = 'test-meta-app-secret-32b-length!!';
+        process.env.CREATOR_SESSION_SECRET = 'test-creator-session-secret-32b-key!';
+        delete process.env.META_OAUTH_TOKEN_URL;
+
+        const store = readLocalStore();
+        store.influencers = (store.influencers || []).filter(i => i.id !== testCreatorId);
+        store.influencers.push({
+          id: testCreatorId,
+          name: 'Fallback Persist Creator',
+          email: 'fallback-persist@wishrite.test',
+          instagram_id: 'fallback_ig',
+          status: 'active'
+        });
+        writeLocalStore(store);
+
+        const profileLookupTokens = [];
+        global.fetch = async (url) => {
+          const urlStr = String(url);
+          if (urlStr.includes('/oauth/access_token')) {
+            if (urlStr.includes('fb_exchange_token')) {
+              return { status: 200, json: async () => ({ access_token: 'USER_OAUTH_LONG_TOK_805', token_type: 'bearer', expires_in: 5184000 }) };
+            }
+            return { status: 200, json: async () => ({ access_token: 'SHORT_TOK_805', token_type: 'bearer', expires_in: 3600 }) };
+          }
+          if (urlStr.includes('/me/permissions')) {
+            return {
+              status: 200,
+              json: async () => ({
+                data: [
+                  { permission: 'instagram_basic', status: 'granted' },
+                  { permission: 'instagram_manage_insights', status: 'granted' },
+                  { permission: 'pages_show_list', status: 'granted' }
+                ]
+              })
+            };
+          }
+          if (urlStr.includes('/me/accounts')) {
+            return {
+              status: 200,
+              json: async () => ({
+                data: [{
+                  id: 'page_805',
+                  name: 'Creator Page 805',
+                  access_token: 'PAGE_TOK_FAILS_805',
+                  instagram_business_account: { id: '1784140000805', username: 'fallback_ig', name: 'Fallback IG' }
+                }]
+              })
+            };
+          }
+          if (urlStr.includes('/1784140000805/media')) {
+            return { status: 200, json: async () => ({ data: [] }) };
+          }
+          if (urlStr.includes('/1784140000805?')) {
+            const tok = new URL(urlStr).searchParams.get('access_token');
+            profileLookupTokens.push(tok);
+            if (tok === 'PAGE_TOK_FAILS_805') {
+              return {
+                status: 400,
+                json: async () => ({
+                  error: { message: '(#10) Application does not have permission for this action', type: 'OAuthException', code: 10 }
+                })
+              };
+            }
+            return {
+              status: 200,
+              json: async () => ({
+                id: '1784140000805',
+                username: 'fallback_ig',
+                name: 'Fallback IG',
+                followers_count: 2100,
+                follows_count: 150,
+                media_count: 30
+              })
+            };
+          }
+          if (urlStr.includes('/page_805?')) {
+            return { status: 200, json: async () => ({ id: 'page_805', category: 'Digital creator' }) };
+          }
+          return { status: 200, json: async () => ({ data: [] }) };
+        };
+
+        const state = createOAuthState(testCreatorId, 'https://review.wishrite.in/api/creator/instagram/oauth/callback');
+        let redirectTarget = '';
+        await handleInstagramOAuthCallback(
+          { query: { code: 'auth_code_805', state }, headers: {} },
+          { status() { return this; }, send() { return this; }, redirect: (loc) => { redirectTarget = loc; } }
+        );
+
+        assert.ok(redirectTarget.includes('instagram=connected'), `Expected connected redirect, got: ${redirectTarget}`);
+        assert.deepEqual(profileLookupTokens, ['PAGE_TOK_FAILS_805', 'USER_OAUTH_LONG_TOK_805']);
+
+        const updated = readLocalStore().influencers.find(i => i.id === testCreatorId);
+        assert.equal(updated.instagram_connection?.account_id, '1784140000805');
+        assert.equal(updated.instagram_connection?.facebook_page_id, 'page_805');
+        assert.ok(updated.instagram_connection?.access_token?.startsWith('enc:'));
+        assert.equal(
+          decryptToken(updated.instagram_connection.access_token),
+          'USER_OAUTH_LONG_TOK_805',
+          'Persisted token MUST be the succeeding OAuth user token, never the failed Page token'
+        );
+      } finally {
+        global.fetch = origFetch;
+        process.env = origEnv;
+        writeLocalStore(storeBackup);
+      }
+    });
+
+    test('Page-token success persists Page token without falling back to OAuth user token', async () => {
+      const { handleInstagramOAuthCallback, createOAuthState, readLocalStore, writeLocalStore } = await import('../backend/creator.js');
+      const { decryptToken } = await import('../backend/services/instagram-sync.js');
+
+      const origFetch = global.fetch;
+      const origEnv = { ...process.env };
+      const storeBackup = JSON.parse(JSON.stringify(readLocalStore()));
+      const testCreatorId = '00000000-0000-4000-a000-000000000806';
+
+      try {
+        delete process.env.INSTAGRAM_SYSTEM_USER_TOKEN;
+        process.env.META_APP_ID = '4398945700321494';
+        process.env.META_APP_SECRET = 'test-meta-app-secret-32b-length!!';
+        process.env.CREATOR_SESSION_SECRET = 'test-creator-session-secret-32b-key!';
+        delete process.env.META_OAUTH_TOKEN_URL;
+
+        const store = readLocalStore();
+        store.influencers = (store.influencers || []).filter(i => i.id !== testCreatorId);
+        store.influencers.push({
+          id: testCreatorId,
+          name: 'Page Token Creator',
+          email: 'pagetok@wishrite.test',
+          instagram_id: 'pagetok_ig',
+          status: 'active'
+        });
+        writeLocalStore(store);
+
+        const profileLookupTokens = [];
+        global.fetch = async (url) => {
+          const urlStr = String(url);
+          if (urlStr.includes('/oauth/access_token')) {
+            return { status: 200, json: async () => ({ access_token: 'USER_OAUTH_TOK_806', token_type: 'bearer', expires_in: 3600 }) };
+          }
+          if (urlStr.includes('/me/permissions')) {
+            return {
+              status: 200,
+              json: async () => ({
+                data: [
+                  { permission: 'instagram_basic', status: 'granted' },
+                  { permission: 'instagram_manage_insights', status: 'granted' },
+                  { permission: 'pages_show_list', status: 'granted' }
+                ]
+              })
+            };
+          }
+          if (urlStr.includes('/me/accounts')) {
+            return {
+              status: 200,
+              json: async () => ({
+                data: [{
+                  id: 'page_806',
+                  name: 'Creator Page 806',
+                  access_token: 'PAGE_TOK_OK_806',
+                  instagram_business_account: { id: '1784140000806', username: 'pagetok_ig', name: 'PageTok IG' }
+                }]
+              })
+            };
+          }
+          if (urlStr.includes('/1784140000806/media')) {
+            return { status: 200, json: async () => ({ data: [] }) };
+          }
+          if (urlStr.includes('/1784140000806?')) {
+            profileLookupTokens.push(new URL(urlStr).searchParams.get('access_token'));
+            return {
+              status: 200,
+              json: async () => ({
+                id: '1784140000806',
+                username: 'pagetok_ig',
+                name: 'PageTok IG',
+                followers_count: 900,
+                follows_count: 90,
+                media_count: 15
+              })
+            };
+          }
+          return { status: 200, json: async () => ({ data: [] }) };
+        };
+
+        const state = createOAuthState(testCreatorId, 'https://review.wishrite.in/api/creator/instagram/oauth/callback');
+        let redirectTarget = '';
+        await handleInstagramOAuthCallback(
+          { query: { code: 'auth_code_806', state }, headers: {} },
+          { status() { return this; }, send() { return this; }, redirect: (loc) => { redirectTarget = loc; } }
+        );
+
+        assert.ok(redirectTarget.includes('instagram=connected'), `Expected connected redirect, got: ${redirectTarget}`);
+        assert.deepEqual(profileLookupTokens, ['PAGE_TOK_OK_806']);
+
+        const updated = readLocalStore().influencers.find(i => i.id === testCreatorId);
+        assert.equal(updated.instagram_connection?.facebook_page_id, 'page_806');
+        assert.equal(decryptToken(updated.instagram_connection.access_token), 'PAGE_TOK_OK_806');
+      } finally {
+        global.fetch = origFetch;
+        process.env = origEnv;
+        writeLocalStore(storeBackup);
+      }
+    });
+
+    test('Rate-limit error (code 4) and network error do NOT trigger OAuth user-token fallback', async () => {
+      const { handleInstagramOAuthCallback, createOAuthState, readLocalStore, writeLocalStore } = await import('../backend/creator.js');
+
+      const origFetch = global.fetch;
+      const origEnv = { ...process.env };
+      const storeBackup = JSON.parse(JSON.stringify(readLocalStore()));
+      const testCreatorId = '00000000-0000-4000-a000-000000000807';
+
+      try {
+        process.env.META_APP_ID = '4398945700321494';
+        process.env.META_APP_SECRET = 'test-meta-app-secret-32b-length!!';
+        process.env.CREATOR_SESSION_SECRET = 'test-creator-session-secret-32b-key!';
+        delete process.env.META_OAUTH_TOKEN_URL;
+
+        const store = readLocalStore();
+        store.influencers = (store.influencers || []).filter(i => i.id !== testCreatorId);
+        store.influencers.push({
+          id: testCreatorId,
+          name: 'NonRetry Creator',
+          email: 'nonretry@wishrite.test',
+          instagram_id: 'nonretry_ig',
+          status: 'active'
+        });
+        writeLocalStore(store);
+
+        let profileFailureMode = 'rate_limit';
+        let profileLookupCount = 0;
+
+        global.fetch = async (url) => {
+          const urlStr = String(url);
+          if (urlStr.includes('/oauth/access_token')) {
+            return { status: 200, json: async () => ({ access_token: 'USER_OAUTH_TOK_807', token_type: 'bearer', expires_in: 3600 }) };
+          }
+          if (urlStr.includes('/me/permissions')) {
+            return {
+              status: 200,
+              json: async () => ({
+                data: [
+                  { permission: 'instagram_basic', status: 'granted' },
+                  { permission: 'instagram_manage_insights', status: 'granted' },
+                  { permission: 'pages_show_list', status: 'granted' }
+                ]
+              })
+            };
+          }
+          if (urlStr.includes('/me/accounts')) {
+            return {
+              status: 200,
+              json: async () => ({
+                data: [{
+                  id: 'page_807',
+                  name: 'Creator Page 807',
+                  access_token: 'PAGE_TOK_807',
+                  instagram_business_account: { id: '1784140000807', username: 'nonretry_ig' }
+                }]
+              })
+            };
+          }
+          if (urlStr.includes('/1784140000807?')) {
+            profileLookupCount += 1;
+            if (profileFailureMode === 'rate_limit') {
+              return {
+                status: 429,
+                json: async () => ({
+                  error: { message: 'Application request limit reached', type: 'OAuthException', code: 4 }
+                })
+              };
+            }
+            throw new Error('ECONNRESET network failure');
+          }
+          return { status: 200, json: async () => ({ data: [] }) };
+        };
+
+        // Case 1: Rate-limit error code 4
+        profileLookupCount = 0;
+        profileFailureMode = 'rate_limit';
+        const state1 = createOAuthState(testCreatorId, 'https://review.wishrite.in/api/creator/instagram/oauth/callback');
+        let redirect1 = '';
+        await handleInstagramOAuthCallback(
+          { query: { code: 'code_rl', state: state1 }, headers: {} },
+          { status() { return this; }, send() { return this; }, redirect: (loc) => { redirect1 = loc; } }
+        );
+        assert.ok(redirect1.includes('instagram=error'), `Rate limit must fail cleanly; got: ${redirect1}`);
+        assert.equal(profileLookupCount, 1, 'Rate limit MUST NOT retry with OAuth user token');
+
+        // Case 2: Network failure
+        profileLookupCount = 0;
+        profileFailureMode = 'network';
+        const state2 = createOAuthState(testCreatorId, 'https://review.wishrite.in/api/creator/instagram/oauth/callback');
+        let redirect2 = '';
+        await handleInstagramOAuthCallback(
+          { query: { code: 'code_net', state: state2 }, headers: {} },
+          { status() { return this; }, send() { return this; }, redirect: (loc) => { redirect2 = loc; } }
+        );
+        assert.ok(redirect2.includes('instagram=error'), `Network error must fail cleanly; got: ${redirect2}`);
+        assert.equal(profileLookupCount, 1, 'Network error MUST NOT retry with OAuth user token');
+
+        const unchanged = readLocalStore().influencers.find(i => i.id === testCreatorId);
+        assert.equal(unchanged.instagram_connection, undefined);
+      } finally {
+        global.fetch = origFetch;
+        process.env = origEnv;
+        writeLocalStore(storeBackup);
+      }
+    });
+
+    test('fetchPaginatedGraphList enforces maxPages ceiling and rejects malformed or non-Graph paging.next URLs', async () => {
+      const { fetchPaginatedGraphList } = await import('../backend/creator.js');
+      const origFetch = global.fetch;
+
+      try {
+        // 1. Ceiling at maxPages = 10
+        let pageCounter = 0;
+        global.fetch = async () => {
+          pageCounter += 1;
+          return {
+            status: 200,
+            json: async () => ({
+              data: [{ id: `ig_${pageCounter}`, username: `u_${pageCounter}` }],
+              paging: { next: `https://graph.facebook.com/v26.0/me/accounts?after=page_${pageCounter + 1}` }
+            })
+          };
+        };
+        const boundedRes = await fetchPaginatedGraphList('https://graph.facebook.com/v26.0/me/accounts');
+        assert.equal(boundedRes.pagesFetched, 10);
+        assert.equal(boundedRes.items.length, 10);
+        assert.equal(boundedRes.hasMore, true);
+
+        // 2. Malformed paging.next string stops safely
+        let calls = 0;
+        global.fetch = async () => {
+          calls += 1;
+          return {
+            status: 200,
+            json: async () => ({
+              data: [{ id: 'ig_1', username: 'u_1' }],
+              paging: { next: 'not-a-valid-url' }
+            })
+          };
+        };
+        const malformedRes = await fetchPaginatedGraphList('https://graph.facebook.com/v26.0/me/accounts');
+        assert.equal(calls, 1);
+        assert.equal(malformedRes.items.length, 1);
+        assert.equal(malformedRes.hasMore, false);
+
+        // 3. External non-Graph host in paging.next is rejected
+        calls = 0;
+        global.fetch = async () => {
+          calls += 1;
+          return {
+            status: 200,
+            json: async () => ({
+              data: [{ id: 'ig_2', username: 'u_2' }],
+              paging: { next: 'https://evil.example.com/steal?access_token=abc' }
+            })
+          };
+        };
+        const externalHostRes = await fetchPaginatedGraphList('https://graph.facebook.com/v26.0/me/accounts');
+        assert.equal(calls, 1);
+        assert.equal(externalHostRes.hasMore, false);
+      } finally {
+        global.fetch = origFetch;
+      }
+    });
+  });
 });

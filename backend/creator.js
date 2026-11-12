@@ -3767,6 +3767,175 @@ export function verifyOAuthState(stateStr) {
 }
 
 /**
+ * Fetches paginated Meta Graph API list responses (`data` + `paging.next`) up to `maxPages`.
+ * Rejects malformed or non-Graph `paging.next` URLs and never logs full URLs or access tokens.
+ */
+export async function fetchPaginatedGraphList(initialUrl, maxPages = 10) {
+    const items = [];
+    let nextUrl = initialUrl;
+    let pagesFetched = 0;
+    let lastStatus = null;
+    let error = null;
+
+    while (nextUrl && pagesFetched < maxPages) {
+        const res = await fetch(nextUrl);
+        lastStatus = res?.status ?? 200;
+        const json = await res.json();
+        pagesFetched += 1;
+
+        if (json?.error) {
+            error = json.error;
+            break;
+        }
+
+        if (Array.isArray(json?.data)) {
+            items.push(...json.data);
+        }
+
+        const rawNext = typeof json?.paging?.next === 'string' ? json.paging.next.trim() : '';
+        if (rawNext) {
+            try {
+                const parsedNext = new URL(rawNext);
+                nextUrl = (parsedNext.protocol === 'https:' && parsedNext.hostname === 'graph.facebook.com')
+                    ? parsedNext.toString()
+                    : null;
+            } catch (_) {
+                nextUrl = null;
+            }
+        } else {
+            nextUrl = null;
+        }
+    }
+
+    return {
+        items,
+        pagesFetched,
+        lastStatus,
+        error,
+        hasMore: Boolean(nextUrl)
+    };
+}
+
+/**
+ * Deduplicates discovered Instagram Business/Creator candidates by ID and selects a single
+ * unambiguous account (preferring exact `targetUsername` match). Never blindly picks index 0
+ * when multiple accounts are present.
+ */
+export function selectInstagramAccountCandidate(candidates, targetUsername = '') {
+    const byId = new Map();
+    for (const raw of (candidates || [])) {
+        const id = raw?.id ? String(raw.id).trim() : '';
+        if (!id) continue;
+        const existing = byId.get(id);
+        if (!existing) {
+            byId.set(id, {
+                id,
+                username: raw.username ? String(raw.username).trim() : null,
+                name: raw.name ? String(raw.name).trim() : null,
+                pageId: raw.pageId ? String(raw.pageId).trim() : null,
+                pageName: raw.pageName ? String(raw.pageName).trim() : null,
+                pageAccessToken: raw.pageAccessToken || null,
+                accountType: raw.accountType || 'instagram_business_account',
+                source: raw.source || null
+            });
+        } else {
+            if (!existing.username && raw.username) existing.username = String(raw.username).trim();
+            if (!existing.name && raw.name) existing.name = String(raw.name).trim();
+            if (!existing.pageId && raw.pageId) existing.pageId = String(raw.pageId).trim();
+            if (!existing.pageName && raw.pageName) existing.pageName = String(raw.pageName).trim();
+            if (!existing.pageAccessToken && raw.pageAccessToken) existing.pageAccessToken = raw.pageAccessToken;
+        }
+    }
+
+    const unique = Array.from(byId.values());
+    if (unique.length === 0) {
+        return { selected: null, ambiguous: false, reason: 'no_candidates', candidates: [] };
+    }
+
+    const normalizedTarget = String(targetUsername || '').replace(/^@/, '').toLowerCase().trim();
+    if (normalizedTarget) {
+        const exactMatches = unique.filter(c => (c.username || '').toLowerCase().trim() === normalizedTarget);
+        if (exactMatches.length === 1) {
+            return { selected: exactMatches[0], ambiguous: false, matchedBy: 'target_username', candidates: unique };
+        }
+        if (exactMatches.length > 1) {
+            return { selected: null, ambiguous: true, reason: 'multiple_exact_username_matches', candidates: unique };
+        }
+        if (unique.length === 1) {
+            return { selected: unique[0], ambiguous: false, matchedBy: 'single_authorized_account', candidates: unique };
+        }
+        return { selected: null, ambiguous: true, reason: 'multiple_accounts_no_username_match', candidates: unique };
+    }
+
+    if (unique.length === 1) {
+        return { selected: unique[0], ambiguous: false, matchedBy: 'single_authorized_account', candidates: unique };
+    }
+
+    return { selected: null, ambiguous: true, reason: 'multiple_accounts_ambiguous', candidates: unique };
+}
+
+/**
+ * Positively identifies synthetic test fixture rows so staging OAuth does not falsely collide
+ * with seeded test rows, while preserving ownership checks for all genuine production and staging creators.
+ */
+export function isPositivelyIdentifiedSyntheticFixture(row) {
+    if (!row || typeof row !== 'object') return false;
+    const email = String(row.email_id || row.email || '').trim().toLowerCase();
+    if (email && isStagingMode() && isAllowedStagingCreatorEmail(email)) {
+        return false;
+    }
+    if (email.endsWith('@wishrite.test') || email.endsWith('@example.com')) {
+        return true;
+    }
+
+    const conn = row.instagram_connection && typeof row.instagram_connection === 'object' ? row.instagram_connection : null;
+    if (conn?.account_id === 'non_existent_ig_acc_99999') {
+        return true;
+    }
+
+    // Positively identify synthetic Pooja Hegde / pooja_h fixtures seeded with no email, slug, or OAuth username
+    const infName = String(row.influencer_name || row.name || '').trim();
+    const igHandle = String(row.instagram_id || '').trim().toLowerCase();
+    const slug = String(row.public_slug || '').trim();
+    if (!email && !slug && infName === 'Pooja Hegde' && igHandle === 'pooja_h' && !conn?.username) {
+        return true;
+    }
+
+    return false;
+}
+
+/**
+ * Returns true only for Meta authentication, permission, or capability errors where retrying
+ * the Instagram node lookup with the user OAuth token instead of a Page token is appropriate.
+ * Explicitly rejects rate limits, transient server errors, and network failures.
+ */
+export function isEligiblePageTokenFallbackError(err) {
+    if (!err || typeof err !== 'object') return false;
+    const code = Number(err.code);
+    if (!Number.isFinite(code)) return false;
+
+    // Never retry rate-limit or transient server errors with an alternate token
+    if ([1, 2, 4, 17, 32, 613, 80001, 80002, 80004].includes(code)) {
+        return false;
+    }
+
+    // Auth / permission / capability error codes:
+    // - 10: Application does not have permission for this action
+    // - 190: Invalid/unsupported OAuth access token for this endpoint
+    // - 200..299: Permissions error range
+    // - 2500: Active access token / token type error
+    // - 100 with error_subcode 33: Unsupported get request / missing object permissions
+    if (code === 10 || code === 190 || code === 2500 || (code >= 200 && code < 300)) {
+        return true;
+    }
+    if (code === 100 && Number(err.error_subcode) === 33) {
+        return true;
+    }
+
+    return false;
+}
+
+/**
  * GET /api/creator/instagram/oauth/start
  * Initiates the Meta/Instagram OAuth authorization flow
  */
@@ -3813,6 +3982,15 @@ export async function handleInstagramOAuthStart(req, res) {
 
         const metaAuthUrl = `https://www.facebook.com/dialog/oauth?${authParams.toString()}`;
 
+        console.log('[Meta OAuth Diagnostic] OAuth start parameters:', {
+            clientIdEnding: String(appId).slice(-6),
+            redirectUri,
+            configId: configId || null,
+            overrideDefaultResponseType: Boolean(configId),
+            hasScope: !configId,
+            stagingMode: isStagingMode()
+        });
+
         // If client requested JSON via query or accept header, return JSON URL
         if (req.query?.json === 'true' || req.headers?.accept?.includes('application/json')) {
             return res.json({ success: true, redirect_url: metaAuthUrl });
@@ -3832,10 +4010,26 @@ export async function handleInstagramOAuthStart(req, res) {
  */
 export async function handleInstagramOAuthCallback(req, res) {
     try {
-        const { code, state, error, error_reason, error_description } = req.query || {};
+        const queryObj = req.query || {};
+        const { code, state, error, error_code, error_reason, error_description } = queryObj;
+
+        console.log('[Meta OAuth Diagnostic] Callback received:', {
+            queryParamNames: Object.keys(queryObj),
+            hasCode: Boolean(code),
+            hasState: Boolean(state),
+            error: error || null,
+            errorCode: error_code || null,
+            errorReason: error_reason || null,
+            stagingMode: isStagingMode()
+        });
 
         if (error) {
-            console.warn('[Meta OAuth Callback] User cancelled or error:', error, error_description);
+            console.warn('[Meta OAuth Callback] User cancelled or error:', {
+                error,
+                errorCode: error_code || null,
+                errorReason: error_reason || null,
+                errorDescription: error_description || null
+            });
             return res.redirect(`/account?tab=creator&instagram=error&msg=${encodeURIComponent(error_description || error)}`);
         }
 
@@ -3886,8 +4080,22 @@ export async function handleInstagramOAuthCallback(req, res) {
         const tokenRes = await fetch(tokenUrl);
         const tokenData = await tokenRes.json();
 
+        console.log('[Meta OAuth Diagnostic] Short-lived token exchange:', {
+            httpStatus: tokenRes?.status ?? null,
+            responseKeys: Object.keys(tokenData || {}),
+            hasAccessToken: Boolean(tokenData?.access_token),
+            tokenType: tokenData?.token_type || null,
+            hasExpiresIn: typeof tokenData?.expires_in === 'number',
+            errorCode: tokenData?.error?.code || null,
+            errorSubcode: tokenData?.error?.error_subcode || null
+        });
+
         if (tokenData.error || !tokenData.access_token) {
-            console.error('[Meta OAuth Callback] Token exchange failed:', tokenData.error);
+            console.error('[Meta OAuth Callback] Token exchange failed:', {
+                message: tokenData.error?.message || 'No access token returned',
+                code: tokenData.error?.code || null,
+                type: tokenData.error?.type || null
+            });
             return res.redirect(`/account?tab=creator&instagram=error&msg=${encodeURIComponent(tokenData.error?.message || 'Token exchange failed')}`);
         }
 
@@ -3899,6 +4107,14 @@ export async function handleInstagramOAuthCallback(req, res) {
             const exchangeUrl = `${exchangeBaseUrl}?grant_type=fb_exchange_token&client_id=${encodeURIComponent(appId)}&client_secret=${encodeURIComponent(appSecret)}&fb_exchange_token=${encodeURIComponent(accessToken)}`;
             const exchangeRes = await fetch(exchangeUrl);
             const exchangeData = await exchangeRes.json();
+            console.log('[Meta OAuth Diagnostic] Long-lived token exchange:', {
+                httpStatus: exchangeRes?.status ?? null,
+                responseKeys: Object.keys(exchangeData || {}),
+                hasAccessToken: Boolean(exchangeData?.access_token),
+                tokenType: exchangeData?.token_type || null,
+                hasExpiresIn: typeof exchangeData?.expires_in === 'number',
+                errorCode: exchangeData?.error?.code || null
+            });
             if (exchangeData.access_token) {
                 accessToken = exchangeData.access_token;
             }
@@ -3928,274 +4144,357 @@ export async function handleInstagramOAuthCallback(req, res) {
         }
 
         const targetUsername = (existingCreator?.instagram_connection?.username || existingCreator?.instagram_id || '').replace(/^@/, '').toLowerCase().trim();
+        let ambiguousSelection = null;
+
+        const summarizeCandidates = (candidates) => (candidates || []).map(c => ({
+            idEnding: String(c.id).slice(-4),
+            username: c.username || null,
+            accountType: c.accountType || null,
+            source: c.source || null
+        }));
+
+        const applySelectionResult = (result, sourceLabel) => {
+            if (result.ambiguous) {
+                ambiguousSelection = {
+                    source: sourceLabel,
+                    reason: result.reason,
+                    candidates: result.candidates
+                };
+                console.warn(`[Meta OAuth Diagnostic] Ambiguous Instagram selection from ${sourceLabel}:`, {
+                    reason: result.reason,
+                    targetUsername: targetUsername || null,
+                    candidateCount: result.candidates.length,
+                    candidates: summarizeCandidates(result.candidates)
+                });
+                return false;
+            }
+            if (result.selected && result.selected.id) {
+                instagramAccountId = result.selected.id;
+                if (result.selected.username) {
+                    instagramUsername = result.selected.username;
+                }
+                if (result.selected.pageId) {
+                    resolvedPageId = result.selected.pageId;
+                }
+                if (result.selected.pageAccessToken) {
+                    resolvedPageAccessToken = result.selected.pageAccessToken;
+                }
+                console.log(`[Meta OAuth Diagnostic] Resolved Instagram account via ${sourceLabel}:`, {
+                    matchedBy: result.matchedBy || null,
+                    accountType: result.selected.accountType || null,
+                    instagramAccountIdEnding: String(instagramAccountId).slice(-4),
+                    username: instagramUsername || null,
+                    pageIdEnding: resolvedPageId ? String(resolvedPageId).slice(-4) : null
+                });
+                return true;
+            }
+            return false;
+        };
 
         // 3a. Meta Facebook Login for Business: Assigned Instagram Accounts (/me/assigned_instagram_accounts)
         try {
             const assignedUrl = `https://graph.facebook.com/${META_GRAPH_API_VERSION}/me/assigned_instagram_accounts?fields=id,username,name&access_token=${encodeURIComponent(accessToken)}`;
-            const assignedRes = await fetch(assignedUrl);
-            const assignedData = await assignedRes.json();
+            const assignedPaged = await fetchPaginatedGraphList(assignedUrl);
+            console.log('[Meta OAuth Diagnostic] /me/assigned_instagram_accounts:', {
+                httpStatus: assignedPaged.lastStatus,
+                pagesFetched: assignedPaged.pagesFetched,
+                hasMorePages: assignedPaged.hasMore,
+                returnedCount: assignedPaged.items.length,
+                errorCode: assignedPaged.error?.code || null,
+                errorMessage: assignedPaged.error?.message || null
+            });
 
-            if (assignedData.data && Array.isArray(assignedData.data) && assignedData.data.length > 0) {
-                const accounts = assignedData.data;
-                let selectedAccount = null;
-
-                if (targetUsername) {
-                    selectedAccount = accounts.find(a => (a.username || '').toLowerCase().trim() === targetUsername);
-                }
-
-                // If exactly 1 account assigned and no direct username match, use that account
-                if (!selectedAccount && accounts.length === 1) {
-                    selectedAccount = accounts[0];
-                }
-
-                if (selectedAccount && selectedAccount.id) {
-                    instagramAccountId = selectedAccount.id;
-                    if (selectedAccount.username) {
-                        instagramUsername = selectedAccount.username;
-                    }
-                }
+            if (assignedPaged.items.length > 0) {
+                const assignedCandidates = assignedPaged.items.map(a => ({
+                    id: a.id,
+                    username: a.username || null,
+                    name: a.name || null,
+                    accountType: 'assigned_instagram_accounts',
+                    source: '/me/assigned_instagram_accounts'
+                }));
+                applySelectionResult(
+                    selectInstagramAccountCandidate(assignedCandidates, targetUsername),
+                    '/me/assigned_instagram_accounts'
+                );
             }
         } catch (assignedErr) {
             console.warn('[Meta OAuth Callback] Assigned accounts query warning:', assignedErr.message);
         }
 
-        // 3b. Meta Business Portfolio Asset Discovery (e.g. Business ID 1788557671719960 "Deepak Kumar")
-        if (!instagramAccountId) {
+        // 3b. Meta Business Portfolio Asset Discovery (/me/businesses)
+        if (!instagramAccountId && !ambiguousSelection) {
             try {
-                const busRes = await fetch(`https://graph.facebook.com/${META_GRAPH_API_VERSION}/me/businesses?fields=id,name&access_token=${encodeURIComponent(accessToken)}`);
-                const busData = await busRes.json();
-                console.log('[Meta OAuth Diagnostic] /me/businesses status:', busRes.status, 'returned:', busData.data?.length || 0, 'error:', busData.error?.message || null);
+                const busPaged = await fetchPaginatedGraphList(
+                    `https://graph.facebook.com/${META_GRAPH_API_VERSION}/me/businesses?fields=id,name&access_token=${encodeURIComponent(accessToken)}`
+                );
+                console.log('[Meta OAuth Diagnostic] /me/businesses:', {
+                    httpStatus: busPaged.lastStatus,
+                    pagesFetched: busPaged.pagesFetched,
+                    hasMorePages: busPaged.hasMore,
+                    returnedCount: busPaged.items.length,
+                    errorCode: busPaged.error?.code || null,
+                    errorMessage: busPaged.error?.message || null
+                });
 
-                const businesses = (busData.data && Array.isArray(busData.data)) ? busData.data : [];
-                // Check discovered businesses, or check specific business ID if known
-                const targetBusinessIds = businesses.map(b => b.id);
-                if (!targetBusinessIds.includes('1788557671719960')) {
-                    targetBusinessIds.push('1788557671719960');
-                }
+                const businessCandidates = [];
+                for (const business of busPaged.items) {
+                    const bId = business?.id;
+                    if (!bId) continue;
 
-                for (const bId of targetBusinessIds) {
-                    if (instagramAccountId) break;
+                    // A) owned_instagram_accounts, B) client_instagram_accounts, C) instagram_accounts
+                    for (const edgeName of ['owned_instagram_accounts', 'client_instagram_accounts', 'instagram_accounts']) {
+                        try {
+                            const edgePaged = await fetchPaginatedGraphList(
+                                `https://graph.facebook.com/${META_GRAPH_API_VERSION}/${encodeURIComponent(bId)}/${edgeName}?fields=id,username,name&access_token=${encodeURIComponent(accessToken)}`
+                            );
+                            console.log(`[Meta OAuth Diagnostic] /${bId}/${edgeName}:`, {
+                                httpStatus: edgePaged.lastStatus,
+                                pagesFetched: edgePaged.pagesFetched,
+                                returnedCount: edgePaged.items.length,
+                                errorCode: edgePaged.error?.code || null
+                            });
+                            for (const acc of edgePaged.items) {
+                                if (acc?.id) {
+                                    businessCandidates.push({
+                                        id: acc.id,
+                                        username: acc.username || null,
+                                        name: acc.name || null,
+                                        accountType: edgeName,
+                                        source: `/me/businesses/${edgeName}`
+                                    });
+                                }
+                            }
+                        } catch (e) {
+                            console.warn(`[Meta OAuth Diagnostic] /${bId}/${edgeName} error:`, e.message);
+                        }
+                    }
 
-                    // A) owned_instagram_accounts
+                    // D) owned_pages -> Page -> instagram_business_account / connected_instagram_account
                     try {
-                        const ownedRes = await fetch(`https://graph.facebook.com/${META_GRAPH_API_VERSION}/${bId}/owned_instagram_accounts?fields=id,username,name&access_token=${encodeURIComponent(accessToken)}`);
-                        const ownedData = await ownedRes.json();
-                        console.log(`[Meta OAuth Diagnostic] /${bId}/owned_instagram_accounts status:`, ownedRes.status, 'returned:', ownedData.data?.length || 0, 'error:', ownedData.error?.message || null);
-                        if (ownedData.data && Array.isArray(ownedData.data)) {
-                            const match = ownedData.data.find(a => targetUsername ? (a.username || '').toLowerCase().trim() === targetUsername : true);
-                            if (match && match.id) {
-                                instagramAccountId = match.id;
-                                instagramUsername = match.username || targetUsername;
-                                console.log('[Meta OAuth Diagnostic] Selected from owned_instagram_accounts ID ending in:', String(match.id).slice(-4), 'username:', instagramUsername);
-                                break;
+                        const busPagesPaged = await fetchPaginatedGraphList(
+                            `https://graph.facebook.com/${META_GRAPH_API_VERSION}/${encodeURIComponent(bId)}/owned_pages?fields=id,name,access_token,instagram_business_account{id,username,name},connected_instagram_account{id,username,name}&access_token=${encodeURIComponent(accessToken)}`
+                        );
+                        console.log(`[Meta OAuth Diagnostic] /${bId}/owned_pages:`, {
+                            httpStatus: busPagesPaged.lastStatus,
+                            pagesFetched: busPagesPaged.pagesFetched,
+                            returnedCount: busPagesPaged.items.length,
+                            errorCode: busPagesPaged.error?.code || null
+                        });
+                        for (const page of busPagesPaged.items) {
+                            if (page.instagram_business_account?.id) {
+                                businessCandidates.push({
+                                    id: page.instagram_business_account.id,
+                                    username: page.instagram_business_account.username || null,
+                                    name: page.instagram_business_account.name || null,
+                                    pageId: page.id || null,
+                                    pageName: page.name || null,
+                                    pageAccessToken: page.access_token || null,
+                                    accountType: 'instagram_business_account',
+                                    source: '/me/businesses/owned_pages'
+                                });
+                            }
+                            if (page.connected_instagram_account?.id) {
+                                businessCandidates.push({
+                                    id: page.connected_instagram_account.id,
+                                    username: page.connected_instagram_account.username || null,
+                                    name: page.connected_instagram_account.name || null,
+                                    pageId: page.id || null,
+                                    pageName: page.name || null,
+                                    pageAccessToken: page.access_token || null,
+                                    accountType: 'connected_instagram_account',
+                                    source: '/me/businesses/owned_pages'
+                                });
+                            }
+                            if (!page.instagram_business_account?.id && !page.connected_instagram_account?.id && page.id) {
+                                try {
+                                    const pageDirectRes = await fetch(`https://graph.facebook.com/${META_GRAPH_API_VERSION}/${encodeURIComponent(page.id)}?fields=id,name,instagram_business_account{id,username,name},connected_instagram_account{id,username,name}&access_token=${encodeURIComponent(page.access_token || accessToken)}`);
+                                    const pageDirect = await pageDirectRes.json();
+                                    const directIg = pageDirect.instagram_business_account || pageDirect.connected_instagram_account;
+                                    if (directIg?.id) {
+                                        businessCandidates.push({
+                                            id: directIg.id,
+                                            username: directIg.username || null,
+                                            name: directIg.name || null,
+                                            pageId: page.id || null,
+                                            pageName: page.name || null,
+                                            pageAccessToken: page.access_token || null,
+                                            accountType: pageDirect.instagram_business_account?.id ? 'instagram_business_account' : 'connected_instagram_account',
+                                            source: '/me/businesses/owned_pages/direct'
+                                        });
+                                    }
+                                } catch (_) {}
                             }
                         }
                     } catch (e) {
-                        console.warn(`[Meta OAuth Diagnostic] /${bId}/owned_instagram_accounts error:`, e.message);
+                        console.warn(`[Meta OAuth Diagnostic] /${bId}/owned_pages error:`, e.message);
                     }
+                }
 
-                    // B) client_instagram_accounts
-                    if (!instagramAccountId) {
-                        try {
-                            const clientRes = await fetch(`https://graph.facebook.com/${META_GRAPH_API_VERSION}/${bId}/client_instagram_accounts?fields=id,username,name&access_token=${encodeURIComponent(accessToken)}`);
-                            const clientData = await clientRes.json();
-                            console.log(`[Meta OAuth Diagnostic] /${bId}/client_instagram_accounts status:`, clientRes.status, 'returned:', clientData.data?.length || 0, 'error:', clientData.error?.message || null);
-                            if (clientData.data && Array.isArray(clientData.data)) {
-                                const match = clientData.data.find(a => targetUsername ? (a.username || '').toLowerCase().trim() === targetUsername : true);
-                                if (match && match.id) {
-                                    instagramAccountId = match.id;
-                                    instagramUsername = match.username || targetUsername;
-                                    console.log('[Meta OAuth Diagnostic] Selected from client_instagram_accounts ID ending in:', String(match.id).slice(-4), 'username:', instagramUsername);
-                                    break;
-                                }
-                            }
-                        } catch (e) {
-                            console.warn(`[Meta OAuth Diagnostic] /${bId}/client_instagram_accounts error:`, e.message);
-                        }
-                    }
-
-                    // C) instagram_accounts
-                    if (!instagramAccountId) {
-                        try {
-                            const igRes = await fetch(`https://graph.facebook.com/${META_GRAPH_API_VERSION}/${bId}/instagram_accounts?fields=id,username,name&access_token=${encodeURIComponent(accessToken)}`);
-                            const igData = await igRes.json();
-                            console.log(`[Meta OAuth Diagnostic] /${bId}/instagram_accounts status:`, igRes.status, 'returned:', igData.data?.length || 0, 'error:', igData.error?.message || null);
-                            if (igData.data && Array.isArray(igData.data)) {
-                                const match = igData.data.find(a => targetUsername ? (a.username || '').toLowerCase().trim() === targetUsername : true);
-                                if (match && match.id) {
-                                    instagramAccountId = match.id;
-                                    instagramUsername = match.username || targetUsername;
-                                    console.log('[Meta OAuth Diagnostic] Selected from instagram_accounts ID ending in:', String(match.id).slice(-4), 'username:', instagramUsername);
-                                    break;
-                                }
-                            }
-                        } catch (e) {
-                            console.warn(`[Meta OAuth Diagnostic] /${bId}/instagram_accounts error:`, e.message);
-                        }
-                    }
-
-                    // D) owned_pages -> Page -> instagram_business_account
-                    if (!instagramAccountId) {
-                        try {
-                            const pagesRes = await fetch(`https://graph.facebook.com/${META_GRAPH_API_VERSION}/${bId}/owned_pages?fields=id,name,access_token,instagram_business_account{id,username,name}&access_token=${encodeURIComponent(accessToken)}`);
-                            const pagesData = await pagesRes.json();
-                            console.log(`[Meta OAuth Diagnostic] /${bId}/owned_pages status:`, pagesRes.status, 'returned:', pagesData.data?.length || 0, 'error:', pagesData.error?.message || null);
-                            if (pagesData.data && Array.isArray(pagesData.data)) {
-                                for (const page of pagesData.data) {
-                                    if (page.instagram_business_account?.id) {
-                                        const igAcc = page.instagram_business_account;
-                                        if (!targetUsername || (igAcc.username || '').toLowerCase().trim() === targetUsername) {
-                                            instagramAccountId = igAcc.id;
-                                            instagramUsername = igAcc.username || targetUsername;
-                                            resolvedPageId = page.id || null;
-                                            if (page.access_token) resolvedPageAccessToken = page.access_token;
-                                            console.log('[Meta OAuth Diagnostic] Selected from owned_pages ID ending in:', String(igAcc.id).slice(-4), 'username:', instagramUsername);
-                                            break;
-                                        }
-                                    } else if (page.id) {
-                                        // Query Page direct fields
-                                        try {
-                                            const pageDirectRes = await fetch(`https://graph.facebook.com/${META_GRAPH_API_VERSION}/${page.id}?fields=id,name,instagram_business_account{id,username,name}&access_token=${encodeURIComponent(page.access_token || accessToken)}`);
-                                            const pageDirect = await pageDirectRes.json();
-                                            console.log(`[Meta OAuth Diagnostic] Page direct /${page.id} status:`, pageDirectRes.status, 'ig_account:', !!pageDirect.instagram_business_account);
-                                            if (pageDirect.instagram_business_account?.id) {
-                                                const igAcc = pageDirect.instagram_business_account;
-                                                if (!targetUsername || (igAcc.username || '').toLowerCase().trim() === targetUsername) {
-                                                    instagramAccountId = igAcc.id;
-                                                    instagramUsername = igAcc.username || targetUsername;
-                                                    resolvedPageId = page.id || null;
-                                                    if (page.access_token) resolvedPageAccessToken = page.access_token;
-                                                    console.log('[Meta OAuth Diagnostic] Selected from Page direct query ID ending in:', String(igAcc.id).slice(-4), 'username:', instagramUsername);
-                                                    break;
-                                                }
-                                            }
-                                        } catch (_) {}
-                                    }
-                                }
-                            }
-                        } catch (e) {
-                            console.warn(`[Meta OAuth Diagnostic] /${bId}/owned_pages error:`, e.message);
-                        }
-                    }
+                if (businessCandidates.length > 0) {
+                    applySelectionResult(
+                        selectInstagramAccountCandidate(businessCandidates, targetUsername),
+                        '/me/businesses'
+                    );
                 }
             } catch (busErr) {
                 console.warn('[Meta OAuth Diagnostic] Business portfolio discovery error:', busErr.message);
             }
         }
 
-        // 3c. Fallback: Facebook Pages connected to Instagram Business Accounts (/me/accounts)
-        if (!instagramAccountId) {
+        // 3c. Facebook Pages connected to Instagram Business Accounts (/me/accounts with bounded pagination)
+        if (!instagramAccountId && !ambiguousSelection) {
             try {
-                const pagesUrl = `https://graph.facebook.com/${META_GRAPH_API_VERSION}/me/accounts?fields=id,name,access_token,instagram_business_account{id,username,name}&access_token=${encodeURIComponent(accessToken)}`;
-                const pagesRes = await fetch(pagesUrl);
-                const pagesData = await pagesRes.json();
-                console.log('[Meta OAuth Diagnostic] /me/accounts status:', pagesRes.status, 'returned:', pagesData.data?.length || 0, 'error:', pagesData.error?.message || null);
+                const pagesUrl = `https://graph.facebook.com/${META_GRAPH_API_VERSION}/me/accounts?fields=id,name,access_token,instagram_business_account{id,username,name},connected_instagram_account{id,username,name}&access_token=${encodeURIComponent(accessToken)}`;
+                const pagesPaged = await fetchPaginatedGraphList(pagesUrl);
+                console.log('[Meta OAuth Diagnostic] /me/accounts:', {
+                    httpStatus: pagesPaged.lastStatus,
+                    pagesFetched: pagesPaged.pagesFetched,
+                    hasMorePages: pagesPaged.hasMore,
+                    returnedCount: pagesPaged.items.length,
+                    errorCode: pagesPaged.error?.code || null,
+                    errorMessage: pagesPaged.error?.message || null
+                });
 
-                if (pagesData.data && Array.isArray(pagesData.data)) {
-                    for (const page of pagesData.data) {
-                        const pageName = page.name || '';
-                        const pageId = page.id || '';
-                        const hasPageToken = Boolean(page.access_token);
-                        const isExpectedPage = !targetUsername || (WISHRITE_OFFICIAL_PAGE_NAME && pageName.toLowerCase().includes(WISHRITE_OFFICIAL_PAGE_NAME.toLowerCase())) || pagesData.data.length === 1;
+                const pageCandidates = [];
+                for (const page of pagesPaged.items) {
+                    const pageName = page.name || '';
+                    const pageId = page.id || '';
+                    const hasPageToken = Boolean(page.access_token);
 
-                        // Check direct instagram_business_account on page object
-                        let igAccount = page.instagram_business_account || null;
+                    if (page.instagram_business_account?.id) {
+                        pageCandidates.push({
+                            id: page.instagram_business_account.id,
+                            username: page.instagram_business_account.username || null,
+                            name: page.instagram_business_account.name || null,
+                            pageId: pageId || null,
+                            pageName,
+                            pageAccessToken: page.access_token || null,
+                            accountType: 'instagram_business_account',
+                            source: '/me/accounts'
+                        });
+                    }
+                    if (page.connected_instagram_account?.id) {
+                        pageCandidates.push({
+                            id: page.connected_instagram_account.id,
+                            username: page.connected_instagram_account.username || null,
+                            name: page.connected_instagram_account.name || null,
+                            pageId: pageId || null,
+                            pageName,
+                            pageAccessToken: page.access_token || null,
+                            accountType: 'connected_instagram_account',
+                            source: '/me/accounts'
+                        });
+                    }
 
-                        // If direct object is missing but Page has its own access token, query the Page node directly with the Page access token
-                        if (!igAccount?.id && pageId && hasPageToken) {
-                            try {
-                                const pageDetailUrl = `https://graph.facebook.com/${META_GRAPH_API_VERSION}/${encodeURIComponent(pageId)}?fields=id,name,instagram_business_account{id,username,name}&access_token=${encodeURIComponent(page.access_token)}`;
-                                const pageDetailRes = await fetch(pageDetailUrl);
-                                const pageDetailData = await pageDetailRes.json();
-                                console.log(`[Meta OAuth Diagnostic] Page node /${pageId} (with Page Token) status:`, pageDetailRes.status, 'error:', pageDetailData.error?.message || null, 'code:', pageDetailData.error?.code || null);
-                                if (pageDetailData.instagram_business_account?.id) {
-                                    igAccount = pageDetailData.instagram_business_account;
-                                }
-                            } catch (pageDetailErr) {
-                                console.warn(`[Meta OAuth Diagnostic] Page node /${pageId} query error:`, pageDetailErr.message);
+                    // If inline objects are missing and Page has its own access token, query the Page node directly
+                    if (!page.instagram_business_account?.id && !page.connected_instagram_account?.id && pageId && hasPageToken) {
+                        let foundOnPageNode = false;
+                        try {
+                            const pageDetailUrl = `https://graph.facebook.com/${META_GRAPH_API_VERSION}/${encodeURIComponent(pageId)}?fields=id,name,instagram_business_account{id,username,name}&access_token=${encodeURIComponent(page.access_token)}`;
+                            const pageDetailRes = await fetch(pageDetailUrl);
+                            const pageDetailData = await pageDetailRes.json();
+                            console.log(`[Meta OAuth Diagnostic] Page node /${pageId} (with Page Token):`, {
+                                status: pageDetailRes?.status ?? null,
+                                hasInstagramBusinessAccount: Boolean(pageDetailData.instagram_business_account?.id),
+                                errorCode: pageDetailData.error?.code || null
+                            });
+                            if (pageDetailData.instagram_business_account?.id) {
+                                pageCandidates.push({
+                                    id: pageDetailData.instagram_business_account.id,
+                                    username: pageDetailData.instagram_business_account.username || null,
+                                    name: pageDetailData.instagram_business_account.name || null,
+                                    pageId,
+                                    pageName,
+                                    pageAccessToken: page.access_token,
+                                    accountType: 'instagram_business_account',
+                                    source: '/page/instagram_business_account'
+                                });
+                                foundOnPageNode = true;
                             }
+                        } catch (pageDetailErr) {
+                            console.warn(`[Meta OAuth Diagnostic] Page node /${pageId} query error:`, pageDetailErr.message);
                         }
 
-                        // Also query connected_instagram_account on Page node (supported when asset is linked via Meta Business Suite)
-                        if (!igAccount?.id && pageId && hasPageToken) {
+                        if (!foundOnPageNode) {
                             try {
                                 const connDetailUrl = `https://graph.facebook.com/${META_GRAPH_API_VERSION}/${encodeURIComponent(pageId)}?fields=id,name,connected_instagram_account{id,username,name}&access_token=${encodeURIComponent(page.access_token)}`;
                                 const connDetailRes = await fetch(connDetailUrl);
                                 const connDetailData = await connDetailRes.json();
-                                console.log(`[Meta OAuth Diagnostic] Page node /${pageId} connected_instagram_account status:`, connDetailRes.status, 'error:', connDetailData.error?.message || null);
+                                console.log(`[Meta OAuth Diagnostic] Page node /${pageId} connected_instagram_account:`, {
+                                    status: connDetailRes?.status ?? null,
+                                    hasConnectedInstagramAccount: Boolean(connDetailData.connected_instagram_account?.id),
+                                    errorCode: connDetailData.error?.code || null
+                                });
                                 if (connDetailData.connected_instagram_account?.id) {
-                                    igAccount = connDetailData.connected_instagram_account;
+                                    pageCandidates.push({
+                                        id: connDetailData.connected_instagram_account.id,
+                                        username: connDetailData.connected_instagram_account.username || null,
+                                        name: connDetailData.connected_instagram_account.name || null,
+                                        pageId,
+                                        pageName,
+                                        pageAccessToken: page.access_token,
+                                        accountType: 'connected_instagram_account',
+                                        source: '/page/connected_instagram_account'
+                                    });
+                                    foundOnPageNode = true;
                                 }
                             } catch (connErr) {
                                 console.warn(`[Meta OAuth Diagnostic] Page node /${pageId} connected_instagram_account query error:`, connErr.message);
                             }
                         }
 
-                        // Also query /{page-id}/instagram_accounts edge using Page access token
-                        if (!igAccount?.id && pageId && hasPageToken) {
+                        if (!foundOnPageNode) {
                             try {
                                 const edgeUrl = `https://graph.facebook.com/${META_GRAPH_API_VERSION}/${encodeURIComponent(pageId)}/instagram_accounts?fields=id,username,name&access_token=${encodeURIComponent(page.access_token)}`;
-                                const edgeRes = await fetch(edgeUrl);
-                                const edgeData = await edgeRes.json();
-                                console.log(`[Meta OAuth Diagnostic] Page edge /${pageId}/instagram_accounts status:`, edgeRes.status, 'returned:', edgeData.data?.length || 0, 'error:', edgeData.error?.message || null);
-                                if (edgeData.data && Array.isArray(edgeData.data) && edgeData.data.length > 0) {
-                                    const edgeMatch = targetUsername ? edgeData.data.find(a => (a.username || '').toLowerCase().trim() === targetUsername) : edgeData.data[0];
-                                    if (edgeMatch?.id) {
-                                        igAccount = edgeMatch;
+                                const edgePaged = await fetchPaginatedGraphList(edgeUrl);
+                                console.log(`[Meta OAuth Diagnostic] Page edge /${pageId}/instagram_accounts:`, {
+                                    status: edgePaged.lastStatus,
+                                    returnedCount: edgePaged.items.length,
+                                    errorCode: edgePaged.error?.code || null
+                                });
+                                for (const edgeAcc of edgePaged.items) {
+                                    if (edgeAcc?.id) {
+                                        pageCandidates.push({
+                                            id: edgeAcc.id,
+                                            username: edgeAcc.username || null,
+                                            name: edgeAcc.name || null,
+                                            pageId,
+                                            pageName,
+                                            pageAccessToken: page.access_token,
+                                            accountType: 'page_instagram_accounts',
+                                            source: '/page/instagram_accounts'
+                                        });
                                     }
                                 }
                             } catch (edgeErr) {
                                 console.warn(`[Meta OAuth Diagnostic] Page edge /${pageId}/instagram_accounts query error:`, edgeErr.message);
                             }
                         }
-
-                        if (igAccount?.id) {
-                            const igHandle = (igAccount.username || '').toLowerCase().trim();
-                            // Strict matching: If targetUsername is known, require exact username match
-                            const usernameMatches = targetUsername ? igHandle === targetUsername : isExpectedPage;
-
-                            if (usernameMatches) {
-                                instagramAccountId = igAccount.id;
-                                instagramUsername = igAccount.username || targetUsername;
-                                resolvedPageId = page.id || null;
-                                if (page.access_token) {
-                                    resolvedPageAccessToken = page.access_token;
-                                }
-                                console.log('[Meta OAuth Diagnostic] Successfully resolved Instagram Account from Page:', {
-                                    pageIdEnding: String(pageId).slice(-4),
-                                    pageName,
-                                    instagramAccountIdEnding: String(igAccount.id).slice(-4),
-                                    username: instagramUsername
-                                });
-                                break;
-                            }
-                        }
                     }
+                }
+
+                if (pageCandidates.length > 0) {
+                    applySelectionResult(
+                        selectInstagramAccountCandidate(pageCandidates, targetUsername),
+                        '/me/accounts'
+                    );
                 }
             } catch (pageErr) {
                 console.warn('[Meta OAuth Callback] Pages query warning:', pageErr.message);
             }
         }
 
-        // 3d. Fallback: Inspect /me for Instagram professional / direct ID
-        if (!instagramAccountId) {
-            try {
-                const meRes = await fetch(`https://graph.facebook.com/${META_GRAPH_API_VERSION}/me?fields=id,name,username&access_token=${encodeURIComponent(accessToken)}`);
-                const meData = await meRes.json();
-                if (meData?.id) {
-                    instagramAccountId = meData.id;
-                    if (meData.username) instagramUsername = meData.username;
-                }
-            } catch (meErr) {
-                console.warn('[Meta OAuth Callback] Me query warning:', meErr.message);
-            }
-        }
-
-        const finalToken = resolvedPageAccessToken || accessToken;
+        let finalToken = resolvedPageAccessToken || accessToken;
 
         // 4. Verify granted Meta permissions
         try {
             const permCheck = await verifyMetaTokenPermissions(accessToken);
+            console.log('[Meta OAuth Diagnostic] Granted permissions check:', {
+                valid: permCheck.valid,
+                granted: permCheck.granted || [],
+                missing: permCheck.missing || [],
+                error: permCheck.error || null
+            });
             if (!permCheck.valid && permCheck.missing && permCheck.missing.length > 0) {
                 console.warn('[Meta OAuth Callback] Missing required permissions:', permCheck.missing);
                 const missingList = permCheck.missing.join(', ');
@@ -4205,7 +4504,15 @@ export async function handleInstagramOAuthCallback(req, res) {
             console.warn('[Meta OAuth Callback] Permissions check notice:', permErr.message);
         }
 
-        // 5. Guard: Reject if no eligible Instagram Professional Account was resolved
+        // 5. Guard: Reject ambiguous multi-account responses or missing Instagram Professional accounts
+        if (ambiguousSelection) {
+            const handlesList = ambiguousSelection.candidates
+                .map(c => (c.username ? `@${c.username}` : `ID...${String(c.id).slice(-4)}`))
+                .slice(0, 5)
+                .join(', ');
+            return res.redirect(`/account?tab=creator&instagram=error&msg=${encodeURIComponent(`Multiple Instagram accounts were authorized (${handlesList}). Please enter your exact Instagram username or select only one account in Meta and try again.`)}`);
+        }
+
         if (!instagramAccountId) {
             console.warn('[Meta OAuth Callback] Could not resolve an Instagram Business / Creator Account ID for creator:', creatorId);
             if (existingCreator?.instagram_connection?.account_id) {
@@ -4216,24 +4523,46 @@ export async function handleInstagramOAuthCallback(req, res) {
 
         // 6. Cross-creator hijacking prevention: Verify account is not already connected to another creator
         let conflictCreatorId = null;
+        const stagingActive = isStagingMode();
+        const isLocalStoreTestMode = (
+            process.env.NODE_ENV === 'test' &&
+            process.env.CREATOR_USE_LOCAL_STORE === 'true'
+        );
         try {
             const queryOpts = { useAdmin: hasServerAdminCredential() };
-            const existingWithAccount = await dbQuery(
-                'influencers',
-                `instagram_connection->>account_id=eq.${encodeURIComponent(instagramAccountId)}&influencer_id=neq.${encodeURIComponent(creatorId)}&limit=1`,
-                queryOpts
-            );
-            if (Array.isArray(existingWithAccount) && existingWithAccount.length > 0) {
-                conflictCreatorId = existingWithAccount[0].id || existingWithAccount[0].influencer_id;
+            const queryStr = stagingActive
+                ? `instagram_connection->>account_id=eq.${encodeURIComponent(instagramAccountId)}&influencer_id=neq.${encodeURIComponent(creatorId)}&select=influencer_id,influencer_name,email_id,instagram_id,public_slug,instagram_connection&limit=50`
+                : `instagram_connection->>account_id=eq.${encodeURIComponent(instagramAccountId)}&influencer_id=neq.${encodeURIComponent(creatorId)}&limit=1`;
+            const existingWithAccount = await dbQuery('influencers', queryStr, queryOpts);
+            if (!Array.isArray(existingWithAccount)) {
+                throw new Error('Unexpected non-array response during Instagram ownership conflict check');
             }
-        } catch (_) {}
+            if (existingWithAccount.length > 0) {
+                const relevantConflict = stagingActive
+                    ? existingWithAccount.find(row => !isPositivelyIdentifiedSyntheticFixture(row))
+                    : existingWithAccount[0];
+                if (relevantConflict) {
+                    conflictCreatorId = relevantConflict.id || relevantConflict.influencer_id;
+                }
+            }
+        } catch (conflictErr) {
+            if (stagingActive && !isLocalStoreTestMode) {
+                console.error('[Meta OAuth Callback Staging Guard] Conflict verification failed:', {
+                    message: conflictErr?.message || 'Database conflict query failed',
+                    status: conflictErr?.status ?? null,
+                    code: conflictErr?.code ?? null
+                });
+                return res.redirect(`/account?tab=creator&instagram=error&msg=${encodeURIComponent('Unable to verify Instagram account ownership safely. Please try again.')}`);
+            }
+        }
 
         if (!conflictCreatorId) {
             const local = readLocalStore();
-            const conflictLocal = (local.influencers || []).find(i => 
-                i.id !== creatorId && 
-                i.instagram_connection && 
-                i.instagram_connection.account_id === instagramAccountId
+            const conflictLocal = (local.influencers || []).find(i =>
+                i.id !== creatorId &&
+                i.instagram_connection &&
+                i.instagram_connection.account_id === instagramAccountId &&
+                (!stagingActive || !isPositivelyIdentifiedSyntheticFixture(i))
             );
             if (conflictLocal) conflictCreatorId = conflictLocal.id;
         }
@@ -4247,6 +4576,28 @@ export async function handleInstagramOAuthCallback(req, res) {
         let profileDetails = null;
         try {
             profileDetails = await fetchInstagramProfileDetails(instagramAccountId, finalToken, resolvedPageId);
+            if (profileDetails?.error && resolvedPageAccessToken && finalToken !== accessToken) {
+                if (isEligiblePageTokenFallbackError(profileDetails.error)) {
+                    console.warn('[Meta OAuth Diagnostic] Retrying IG profile lookup with OAuth token after eligible Page token error:', {
+                        errorCode: profileDetails.error?.code ?? null,
+                        errorSubcode: profileDetails.error?.error_subcode ?? null,
+                        errorType: profileDetails.error?.type || null
+                    });
+                    const fallbackProfile = await fetchInstagramProfileDetails(instagramAccountId, accessToken, resolvedPageId);
+                    if (fallbackProfile && !fallbackProfile.error) {
+                        profileDetails = fallbackProfile;
+                        finalToken = accessToken;
+                    } else if (fallbackProfile?.error) {
+                        profileDetails = fallbackProfile;
+                    }
+                } else {
+                    console.warn('[Meta OAuth Diagnostic] Skipping OAuth token fallback for non-eligible profile lookup error:', {
+                        errorCode: profileDetails.error?.code ?? null,
+                        errorSubcode: profileDetails.error?.error_subcode ?? null,
+                        errorType: profileDetails.error?.type || null
+                    });
+                }
+            }
         } catch (pfErr) {
             console.warn('[Meta OAuth Callback] Profile fetch warning:', pfErr.message);
         }
