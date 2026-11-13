@@ -170,7 +170,49 @@ test('Token Encryption & Decryption Security Suite', async (t) => {
         }
     });
 
-    await t.test('9. Batch legacy plaintext token migration scanner with pagination', async () => {
+    await t.test('9. Batch legacy plaintext token migration scanner counts token mismatch as failure', async () => {
+        const origQuery = _syncDbHooks.dbQuery;
+        const origUpdate = _syncDbHooks.dbUpdate;
+
+        try {
+            // Mock single row returned with legacy plaintext token
+            _syncDbHooks.dbQuery = async () => [
+                {
+                    influencer_id: '00000000-0000-0000-0000-mismatch00001',
+                    instagram_connection: {
+                        connected: true,
+                        username: 'mismatch_creator',
+                        access_token: 'EAAPlaintextTokenToMigrate456'
+                    }
+                }
+            ];
+
+            // Mock database update returning mismatched stored token
+            _syncDbHooks.dbUpdate = async (table, filterCol, filterVal) => ({
+                data: {
+                    influencer_id: filterVal,
+                    instagram_connection: {
+                        connected: true,
+                        username: 'mismatch_creator',
+                        access_token: 'enc:different:corrupted:token' // does not match freshly encrypted token!
+                    }
+                }
+            });
+
+            const stats = await migrateLegacyPlaintextTokens();
+
+            assert.equal(stats.total_creators_scanned, 1);
+            assert.equal(stats.connections_inspected, 1);
+            assert.equal(stats.already_encrypted, 0);
+            assert.equal(stats.migrated_to_encrypted, 0, 'Must NOT count as migrated when stored token does not match');
+            assert.equal(stats.failed_migrations, 1, 'Must count mismatch as failed migration');
+        } finally {
+            _syncDbHooks.dbQuery = origQuery;
+            _syncDbHooks.dbUpdate = origUpdate;
+        }
+    });
+
+    await t.test('10. Batch legacy plaintext token migration scanner with pagination', async () => {
         const stats = await migrateLegacyPlaintextTokens();
         assert.ok(typeof stats.total_creators_scanned === 'number');
         assert.ok(typeof stats.already_encrypted === 'number');

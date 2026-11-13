@@ -902,6 +902,13 @@ export async function migrateLegacyPlaintextTokens() {
                         continue;
                     }
 
+                    const persistedConn = updateRes.data.instagram_connection;
+                    if (!persistedConn || persistedConn.access_token !== encrypted) {
+                        stats.failed_migrations++;
+                        console.error(`[Token Security Migration] Verification mismatch during batch migration: persisted token does not match encrypted token for influencer_id: ${creatorId}`);
+                        continue;
+                    }
+
                     stats.migrated_to_encrypted++;
                     console.log(`[Token Security Migration] Successfully upgraded creator token to AES-256-GCM for influencer_id: ${creatorId}`);
                 } catch (err) {
