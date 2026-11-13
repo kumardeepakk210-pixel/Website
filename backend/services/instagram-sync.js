@@ -212,12 +212,33 @@ export async function getCreatorInstagramConnection(creator) {
 
         if (creatorId) {
             try {
-                const queryOpts = { useAdmin: hasServerAdminCredential() };
+                const queryOpts = {
+                    useAdmin: hasServerAdminCredential(),
+                    returnRepresentation: true
+                };
                 const safeConn = { ...conn, access_token: newlyEncrypted };
                 delete safeConn.decrypted_token;
-                await _syncDbHooks.dbUpdate('influencers', 'influencer_id', creatorId, {
+                const updateRes = await _syncDbHooks.dbUpdate('influencers', 'influencer_id', creatorId, {
                     instagram_connection: safeConn
                 }, queryOpts);
+
+                // Verify that the record was actually found and updated
+                if (!updateRes || !updateRes.data) {
+                    console.error('[Instagram Sync] Automatic legacy token migration update affected zero rows for creatorId:', creatorId);
+                    const err = new Error(`[Legacy Token Migration] No influencer record was updated for influencer_id: ${creatorId}`);
+                    err.code = 'LEGACY_TOKEN_MIGRATION_PERSISTENCE_FAILED';
+                    throw err;
+                }
+
+                // Verify the stored token in the returned record matches newlyEncrypted
+                const persistedConn = updateRes.data.instagram_connection;
+                if (!persistedConn || persistedConn.access_token !== newlyEncrypted) {
+                    console.error('[Instagram Sync] Automatic legacy token migration verification mismatch for creatorId:', creatorId);
+                    const err = new Error(`[Legacy Token Migration] Verification mismatch: persisted token does not match encrypted token for influencer_id: ${creatorId}`);
+                    err.code = 'LEGACY_TOKEN_MIGRATION_PERSISTENCE_FAILED';
+                    throw err;
+                }
+
                 conn.access_token = newlyEncrypted;
             } catch (upErr) {
                 console.error('[Instagram Sync] Automatic legacy token migration update failed:', upErr.message);
@@ -841,7 +862,7 @@ export async function migrateLegacyPlaintextTokens() {
         let hasMore = true;
 
         while (hasMore) {
-            const rows = await dbQuery(
+            const rows = await _syncDbHooks.dbQuery(
                 'influencers',
                 `select=influencer_id,instagram_connection&order=created_at.asc&limit=${pageSize}&offset=${offset}`,
                 queryOpts
@@ -871,9 +892,16 @@ export async function migrateLegacyPlaintextTokens() {
                 try {
                     const encrypted = encryptToken(conn.access_token);
                     const updatedConn = { ...conn, access_token: encrypted };
-                    await dbUpdate('influencers', 'influencer_id', creatorId, {
+                    const updateRes = await _syncDbHooks.dbUpdate('influencers', 'influencer_id', creatorId, {
                         instagram_connection: updatedConn
-                    }, queryOpts);
+                    }, { ...queryOpts, returnRepresentation: true });
+
+                    if (!updateRes || !updateRes.data) {
+                        stats.failed_migrations++;
+                        console.error(`[Token Security Migration] Zero records updated during batch migration for influencer_id: ${creatorId}`);
+                        continue;
+                    }
+
                     stats.migrated_to_encrypted++;
                     console.log(`[Token Security Migration] Successfully upgraded creator token to AES-256-GCM for influencer_id: ${creatorId}`);
                 } catch (err) {

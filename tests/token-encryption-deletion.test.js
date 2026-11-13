@@ -78,10 +78,15 @@ test('Token Encryption & Decryption Security Suite', async (t) => {
     });
 
     await t.test('6. Legacy plaintext token auto-migration in getCreatorInstagramConnection', async () => {
-        // Mock successful dbUpdate for migration
+        // Mock successful dbUpdate returning representation
         const origUpdate = _syncDbHooks.dbUpdate;
         try {
-            _syncDbHooks.dbUpdate = async () => ({ data: { id: 'ok' } });
+            _syncDbHooks.dbUpdate = async (table, filterCol, filterVal, payload) => ({
+                data: {
+                    influencer_id: filterVal,
+                    instagram_connection: payload.instagram_connection
+                }
+            });
 
             const mockCreator = {
                 id: '00000000-0000-0000-0000-legacymig0001',
@@ -133,7 +138,39 @@ test('Token Encryption & Decryption Security Suite', async (t) => {
         }
     });
 
-    await t.test('8. Batch legacy plaintext token migration scanner with pagination', async () => {
+    await t.test('8. Database update returns zero affected rows: migration must fail and not report success', async () => {
+        const origUpdate = _syncDbHooks.dbUpdate;
+        try {
+            // Simulate HTTP 200/204 response from database that updated 0 rows (data: null)
+            _syncDbHooks.dbUpdate = async () => ({
+                data: null,
+                omittedColumns: []
+            });
+
+            const mockCreator = {
+                id: '00000000-0000-0000-0000-zerorows00003',
+                influencer_id: '00000000-0000-0000-0000-zerorows00003',
+                instagram_id: 'zero_rows_creator',
+                instagram_connection: {
+                    connected: true,
+                    username: 'zero_rows_creator',
+                    access_token: 'EAALegacyZeroRowsToken123'
+                }
+            };
+
+            await assert.rejects(async () => {
+                await getCreatorInstagramConnection(mockCreator);
+            }, (err) => {
+                assert.equal(err.code, 'LEGACY_TOKEN_MIGRATION_PERSISTENCE_FAILED');
+                assert.ok(err.message.includes('No influencer record was updated'));
+                return true;
+            }, 'Must reject when database update affects zero rows');
+        } finally {
+            _syncDbHooks.dbUpdate = origUpdate;
+        }
+    });
+
+    await t.test('9. Batch legacy plaintext token migration scanner with pagination', async () => {
         const stats = await migrateLegacyPlaintextTokens();
         assert.ok(typeof stats.total_creators_scanned === 'number');
         assert.ok(typeof stats.already_encrypted === 'number');

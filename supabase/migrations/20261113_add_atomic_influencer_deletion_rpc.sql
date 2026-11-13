@@ -20,7 +20,7 @@ SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
 DECLARE
-    v_found_influencer RECORD;
+    v_target_id UUID;
     v_deleted_counts JSONB := '{}'::jsonb;
     v_count INTEGER;
 BEGIN
@@ -30,8 +30,8 @@ BEGIN
     END IF;
 
     -- 2. Verify target influencer exists (lock for deletion)
-    SELECT influencer_id, influencer_name, email_id, instagram_id
-    INTO v_found_influencer
+    SELECT influencer_id
+    INTO v_target_id
     FROM public.influencers
     WHERE influencer_id = p_influencer_id
     FOR UPDATE;
