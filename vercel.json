@@ -7,6 +7,30 @@
   ],
   "rewrites": [
     {
+      "source": "/terms-of-service",
+      "destination": "/legal/terms-of-service.html"
+    },
+    {
+      "source": "/terms-of-service/",
+      "destination": "/legal/terms-of-service.html"
+    },
+    {
+      "source": "/data-deletion",
+      "destination": "/legal/data-deletion.html"
+    },
+    {
+      "source": "/data-deletion/",
+      "destination": "/legal/data-deletion.html"
+    },
+    {
+      "source": "/privacy-policy",
+      "destination": "/legal/privacy-policy.html"
+    },
+    {
+      "source": "/privacy-policy/",
+      "destination": "/legal/privacy-policy.html"
+    },
+    {
       "source": "/api/creator/:path*",
       "destination": "/api/creator.js"
     },
@@ -167,6 +191,15 @@
     },
     {
       "source": "/js/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/legal/(.*)",
       "headers": [
         {
           "key": "Cache-Control",
