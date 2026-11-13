@@ -980,7 +980,24 @@ export async function handleDeleteInfluencer(req, res) {
             return res.status(404).json({ success: false, error: { message: 'Influencer not found' } });
         }
 
-        // Delete from Supabase
+        // Cascading deletion across child tables in Supabase before deleting parent
+        const childTables = [
+            'creator_content',
+            'influencer_links',
+            'influencer_stats',
+            'influencer_wallets',
+            'influencer_accounts'
+        ];
+
+        for (const table of childTables) {
+            try {
+                await dbDelete(table, 'influencer_id', found.id, { useAdmin: true });
+            } catch (childErr) {
+                console.warn(`[Influencers API] Cascading delete notice for ${table}:`, childErr.message);
+            }
+        }
+
+        // Delete from Supabase influencers table
         try {
             await dbDelete('influencers', 'id', found.id, { useAdmin: true });
         } catch (dbErr) {
@@ -989,9 +1006,12 @@ export async function handleDeleteInfluencer(req, res) {
 
         // Clean local mirror
         const local = readLocalStore();
-        local.influencers = local.influencers.filter(i => i.id !== found.id);
-        local.stats = local.stats.filter(s => s.influencer_id !== found.id);
-        local.links = local.links.filter(l => l.influencer_id !== found.id);
+        local.influencers = (local.influencers || []).filter(i => i.id !== found.id);
+        local.stats = (local.stats || []).filter(s => s.influencer_id !== found.id);
+        local.links = (local.links || []).filter(l => l.influencer_id !== found.id);
+        if (local.creator_content) {
+            local.creator_content = local.creator_content.filter(c => c.influencer_id !== found.id);
+        }
         writeLocalStore(local);
 
         return res.json({

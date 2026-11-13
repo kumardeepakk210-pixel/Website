@@ -72,41 +72,71 @@ export async function validateSystemUserToken() {
 const activeSyncJobs = new Set();
 
 /**
- * Derives a 32-byte key from server secret for token encryption
+ * Derives a 32-byte key from server secret for token encryption.
+ * Strictly requires a server-side encryption key. Throws if missing or invalid.
  */
 function getEncryptionKey() {
-    const secret = process.env.META_APP_SECRET || process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || 'wishrite-meta-sec-fallback-key-32b';
+    const secret = (process.env.META_APP_SECRET ||
+                    process.env.META_OAUTH_SIGNING_SECRET ||
+                    process.env.SUPABASE_SECRET_KEY ||
+                    process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
+
+    if (!secret) {
+        const isTestEnv = process.env.NODE_ENV === 'test' || Boolean(process.env.NODE_TEST_CONTEXT);
+        if (isTestEnv && process.env.ALLOW_TEST_ENCRYPTION_FALLBACK === 'true') {
+            return crypto.createHash('sha256').update('test-mock-secret-key-32b-length!!').digest();
+        }
+        throw new Error('[Token Encryption Error] Missing required server-side encryption secret (META_APP_SECRET, META_OAUTH_SIGNING_SECRET, or SUPABASE_SECRET_KEY). Refusing unencrypted token operation.');
+    }
+
     return crypto.createHash('sha256').update(String(secret)).digest();
 }
 
 /**
- * Encrypts an access token before storage
+ * Encrypts an access token before storage using AES-256-GCM.
+ * Never stores or returns plaintext tokens. Throws on missing key or cipher failure.
  */
 export function encryptToken(token) {
     if (!token) return null;
+    if (typeof token !== 'string') {
+        throw new Error('[Token Encryption Error] Token to encrypt must be a non-empty string.');
+    }
     if (token.startsWith('enc:')) return token; // already encrypted
+
+    const key = getEncryptionKey();
     try {
         const iv = crypto.randomBytes(12);
-        const cipher = crypto.createCipheriv(ENCRYPTION_ALGO, getEncryptionKey(), iv);
+        const cipher = crypto.createCipheriv(ENCRYPTION_ALGO, key, iv);
         let enc = cipher.update(token, 'utf8', 'hex');
         enc += cipher.final('hex');
         const tag = cipher.getAuthTag().toString('hex');
         return `enc:${iv.toString('hex')}:${tag}:${enc}`;
     } catch (err) {
-        console.warn('[Instagram Sync] Token encryption fallback');
-        return token;
+        throw new Error(`[Token Encryption Error] Failed to encrypt access token: ${err.message}`);
     }
 }
 
 /**
- * Decrypts an access token immediately before making Meta API calls
+ * Decrypts an access token immediately before making Meta API calls.
+ * Returns null if decryption of an encrypted payload fails.
+ * Preserves compatibility by returning legacy unencrypted tokens while logging a migration notice.
  */
 export function decryptToken(encrypted) {
     if (!encrypted) return null;
-    if (!encrypted.startsWith('enc:')) return encrypted; // plain token
+    if (typeof encrypted !== 'string') return null;
+
+    // Legacy unencrypted token support: return plaintext for backward compatibility
+    if (!encrypted.startsWith('enc:')) {
+        console.warn('[Instagram Sync] Legacy unencrypted token detected during decryption. Please re-authenticate to upgrade to AES-256-GCM.');
+        return encrypted;
+    }
+
     try {
         const parts = encrypted.split(':');
-        if (parts.length !== 4) return encrypted;
+        if (parts.length !== 4) {
+            console.error('[Instagram Sync] Malformed encrypted token structure');
+            return null;
+        }
         const iv = Buffer.from(parts[1], 'hex');
         const tag = Buffer.from(parts[2], 'hex');
         const encText = parts[3];
@@ -116,7 +146,7 @@ export function decryptToken(encrypted) {
         dec += decipher.final('utf8');
         return dec;
     } catch (err) {
-        console.warn('[Instagram Sync] Token decryption error');
+        console.error('[Instagram Sync] Token decryption error:', err.message);
         return null;
     }
 }

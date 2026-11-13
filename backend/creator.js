@@ -4836,12 +4836,25 @@ export async function handleConnectInstagram(req, res) {
             }
         }
 
+        let encryptedAccessToken = null;
+        if (accessToken) {
+            try {
+                encryptedAccessToken = encryptToken(accessToken);
+            } catch (encErr) {
+                console.error('[handleConnectInstagram] Token encryption failure:', encErr.message);
+                return res.status(500).json({
+                    success: false,
+                    error: { message: 'Failed to securely encrypt Instagram credentials. Operation aborted.' }
+                });
+            }
+        }
+
         const instagramConnPayload = {
             connected: true,
             username: handle,
             account_id: accountId,
             account_type: 'professional',
-            access_token: accessToken ? encryptToken(accessToken) : null, // Encrypted before storage, never exposed
+            access_token: encryptedAccessToken, // Encrypted before storage, never exposed
             last_synced_at: new Date().toISOString(),
             insights_status: verifiedWithMeta ? 'connected' : (accessToken ? 'connected' : 'api_permission_required'),
             updated_at: new Date().toISOString()
@@ -5770,12 +5783,22 @@ export async function handleInstagramOAuthCallback(req, res) {
         const finalUsername = (profileDetails?.username || instagramUsername || existingCreator?.instagram_connection?.username || existingCreator?.instagram_id || 'creator').replace(/^@/, '');
         const now = new Date().toISOString();
 
+        let encryptedFinalToken = null;
+        if (finalToken) {
+            try {
+                encryptedFinalToken = encryptToken(finalToken);
+            } catch (encErr) {
+                console.error('[handleInstagramOAuthCallback] Token encryption failure:', encErr.message);
+                return res.redirect('/account?tab=creator&instagram=error&msg=Encryption+configuration+error.+Credentials+cannot+be+saved.');
+            }
+        }
+
         const instagramConnPayload = {
             connected: true,
             username: finalUsername,
             account_id: instagramAccountId,
             account_type: 'professional',
-            access_token: finalToken ? encryptToken(finalToken) : null,
+            access_token: encryptedFinalToken,
             facebook_page_id: resolvedPageId || null,
             followers_count: profileDetails ? profileDetails.followers_count : (existingCreator?.instagram_connection?.followers_count || 0),
             following_count: profileDetails ? profileDetails.following_count : (existingCreator?.instagram_connection?.following_count || 0),
