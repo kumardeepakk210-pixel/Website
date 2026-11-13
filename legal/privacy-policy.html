@@ -110,7 +110,7 @@
             </ul>
 
             <h2>5. Token Security &amp; Encryption Standards</h2>
-            <p>All Meta OAuth access tokens received during creator account authorization are protected by server-side <strong>AES-256-GCM</strong> authenticated encryption using strong server-side keys. If server-side encryption credentials are unavailable or an encryption error occurs, token persistence fails closed immediately—tokens are never stored or cached in plaintext, never exposed to frontend code, never passed in query parameters, and never logged in client consoles. Decryption occurs exclusively in isolated server-side routines immediately prior to scheduled metrics synchronization.</p>
+            <p>Meta OAuth access tokens received during creator account authorization are protected by server-side <strong>AES-256-GCM</strong> authenticated encryption using strong server-side keys. If server-side encryption credentials are unavailable or an encryption error occurs, token persistence fails closed immediately—new tokens are never stored in plaintext, never exposed to frontend code, never passed in query parameters, and never logged in client consoles. Any legacy tokens encountered in the system undergo automated migration to AES-256-GCM encryption upon retrieval or creator reconnection. Decryption occurs exclusively in isolated server-side routines immediately prior to scheduled metrics synchronization.</p>
 
             <h2>6. Data Retention &amp; User Deletion Rights</h2>
             <p>You have full ownership and control over your personal data:</p>

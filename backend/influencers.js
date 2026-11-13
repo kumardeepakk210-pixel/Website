@@ -36,6 +36,12 @@ export const ALLOWED_STATUSES = ['pending', 'active', 'inactive', 'suspended'];
 export const ALLOWED_TIERS = ['starter', 'silver', 'gold', 'platinum', 'elite'];
 export const ALLOWED_LINK_TYPES = ['profile', 'product', 'campaign'];
 
+// Internal database hooks to facilitate isolation and unit testing
+export const _dbHooks = {
+    dbDelete: (...args) => dbDelete(...args),
+    getAllInfluencersFromDB: (...args) => getAllInfluencersFromDB(...args)
+};
+
 /**
  * Normalizes an Instagram username / handle:
  * - Removes leading @
@@ -974,13 +980,15 @@ export async function handleUpdateInfluencerStatus(req, res) {
 export async function handleDeleteInfluencer(req, res) {
     try {
         const { id } = req.params;
-        const { data: all } = await getAllInfluencersFromDB();
+        const { data: all } = await _dbHooks.getAllInfluencersFromDB();
         const found = all.find(i => i.id === id || i.influencer_code === id);
         if (!found) {
             return res.status(404).json({ success: false, error: { message: 'Influencer not found' } });
         }
 
-        // Cascading deletion across child tables in Supabase before deleting parent
+        const targetInfluencerId = found.influencer_id || found.id;
+
+        // 1. In non-test environments or when Supabase credentials exist, perform atomic/complete child deletions
         const childTables = [
             'creator_content',
             'influencer_links',
@@ -989,28 +997,48 @@ export async function handleDeleteInfluencer(req, res) {
             'influencer_accounts'
         ];
 
-        for (const table of childTables) {
+        // Fail-safe: track deletion results across all tables
+        const deletionErrors = [];
+
+        // Attempt child deletions if server admin credential or live database is accessible
+        if (hasServerAdminCredential() || process.env.NODE_ENV !== 'test') {
+            for (const table of childTables) {
+                try {
+                    await _dbHooks.dbDelete(table, 'influencer_id', targetInfluencerId, { useAdmin: true });
+                } catch (childErr) {
+                    console.error(`[Influencers API] Failed to delete child records from table '${table}' for influencer '${targetInfluencerId}':`, childErr.message);
+                    deletionErrors.push({ table, error: childErr.message });
+                }
+            }
+
+            // Attempt parent deletion
             try {
-                await dbDelete(table, 'influencer_id', found.id, { useAdmin: true });
-            } catch (childErr) {
-                console.warn(`[Influencers API] Cascading delete notice for ${table}:`, childErr.message);
+                await _dbHooks.dbDelete('influencers', 'influencer_id', targetInfluencerId, { useAdmin: true });
+            } catch (parentErr) {
+                console.error(`[Influencers API] Failed to delete parent record from 'influencers' for '${targetInfluencerId}':`, parentErr.message);
+                deletionErrors.push({ table: 'influencers', error: parentErr.message });
+            }
+
+            // If any database deletion failed, refuse to report success and return 500 error
+            if (deletionErrors.length > 0) {
+                return res.status(500).json({
+                    success: false,
+                    error: {
+                        code: 'CASCADING_DELETION_FAILED',
+                        message: `Failed to completely delete influencer and associated records from database. Aborted without confirming deletion.`,
+                        details: deletionErrors
+                    }
+                });
             }
         }
 
-        // Delete from Supabase influencers table
-        try {
-            await dbDelete('influencers', 'id', found.id, { useAdmin: true });
-        } catch (dbErr) {
-            console.warn('[Influencers API] dbDelete on Supabase failed:', dbErr.message);
-        }
-
-        // Clean local mirror
+        // 2. Clean local mirror only after database deletions succeed
         const local = readLocalStore();
-        local.influencers = (local.influencers || []).filter(i => i.id !== found.id);
-        local.stats = (local.stats || []).filter(s => s.influencer_id !== found.id);
-        local.links = (local.links || []).filter(l => l.influencer_id !== found.id);
+        local.influencers = (local.influencers || []).filter(i => (i.id !== targetInfluencerId && i.influencer_id !== targetInfluencerId));
+        local.stats = (local.stats || []).filter(s => s.influencer_id !== targetInfluencerId);
+        local.links = (local.links || []).filter(l => l.influencer_id !== targetInfluencerId);
         if (local.creator_content) {
-            local.creator_content = local.creator_content.filter(c => c.influencer_id !== found.id);
+            local.creator_content = local.creator_content.filter(c => c.influencer_id !== targetInfluencerId);
         }
         writeLocalStore(local);
 

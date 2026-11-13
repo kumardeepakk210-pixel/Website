@@ -133,8 +133,8 @@
                 <li><strong>Step 2: Identity Verification:</strong> We confirm that the request originates from the email address registered on the account. In certain cases, we may request a one-time OTP confirmation.</li>
                 <li><strong>Step 3: Database Purge:</strong> The administrator executes the server-side purge in our Supabase environment:
                     <ul>
-                        <li>Clearing all encrypted tokens (AES-256-GCM tokens purged).</li>
-                        <li>Removing influencer metadata, affiliate links, and campaign content associations.</li>
+                        <li>Clearing all stored Instagram access tokens and connection metadata.</li>
+                        <li>Cascading deletion of child records across <code>creator_content</code>, <code>influencer_links</code>, <code>influencer_stats</code>, <code>influencer_wallets</code>, and <code>influencer_accounts</code> before removing the primary creator profile.</li>
                         <li>De-identifying or deleting the authenticated customer profile.</li>
                     </ul>
                 </li>
