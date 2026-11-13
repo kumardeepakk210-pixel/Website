@@ -4,6 +4,12 @@
 import crypto from 'crypto';
 import { dbQuery, dbInsert, dbUpdate, hasServerAdminCredential } from '../supabase-client.js';
 
+// Internal database hooks to facilitate isolation and unit testing
+export const _syncDbHooks = {
+    dbUpdate: (...args) => dbUpdate(...args),
+    dbQuery: (...args) => dbQuery(...args)
+};
+
 import {
     META_GRAPH_API_VERSION as META_API_VERSION,
     WISHRITE_OFFICIAL_IG_HANDLE,
@@ -194,21 +200,33 @@ export async function getCreatorInstagramConnection(creator) {
     // Detect legacy plaintext token and migrate it to AES-256-GCM in storage
     if (conn.access_token && typeof conn.access_token === 'string' && !conn.access_token.startsWith('enc:')) {
         const legacyPlaintext = conn.access_token;
+        let newlyEncrypted = null;
         try {
-            const newlyEncrypted = encryptToken(legacyPlaintext);
-            conn.access_token = newlyEncrypted;
-            if (creatorId) {
+            newlyEncrypted = encryptToken(legacyPlaintext);
+        } catch (encErr) {
+            console.error('[Instagram Sync] Legacy token encryption failed:', encErr.message);
+            const err = new Error(`[Legacy Token Migration] Failed to encrypt legacy token: ${encErr.message}`);
+            err.code = 'LEGACY_TOKEN_ENCRYPTION_FAILED';
+            throw err;
+        }
+
+        if (creatorId) {
+            try {
                 const queryOpts = { useAdmin: hasServerAdminCredential() };
-                const safeConn = { ...conn };
+                const safeConn = { ...conn, access_token: newlyEncrypted };
                 delete safeConn.decrypted_token;
-                await dbUpdate('influencers', 'influencer_id', creatorId, {
+                await _syncDbHooks.dbUpdate('influencers', 'influencer_id', creatorId, {
                     instagram_connection: safeConn
-                }, queryOpts).catch(upErr => {
-                    console.warn('[Instagram Sync] Automatic legacy token migration update notice:', upErr.message);
-                });
+                }, queryOpts);
+                conn.access_token = newlyEncrypted;
+            } catch (upErr) {
+                console.error('[Instagram Sync] Automatic legacy token migration update failed:', upErr.message);
+                const err = new Error(`[Legacy Token Migration] Database persistence failed for encrypted token: ${upErr.message}`);
+                err.code = 'LEGACY_TOKEN_MIGRATION_PERSISTENCE_FAILED';
+                throw err;
             }
-        } catch (migErr) {
-            console.warn('[Instagram Sync] Legacy token auto-encryption failed:', migErr.message);
+        } else {
+            conn.access_token = newlyEncrypted;
         }
     }
 
@@ -803,8 +821,9 @@ export async function runScheduledInstagramSync() {
 }
 
 /**
- * Scans all creator records in Supabase and migrates any legacy plaintext access tokens
- * to AES-256-GCM. Never logs token contents. Returns migration statistics.
+ * Scans all creator records in Supabase across all pages and migrates any legacy plaintext
+ * access tokens to AES-256-GCM. Uses cursor pagination so no records are missed.
+ * Never logs token contents. Returns migration statistics.
  */
 export async function migrateLegacyPlaintextTokens() {
     const stats = {
@@ -817,37 +836,56 @@ export async function migrateLegacyPlaintextTokens() {
 
     try {
         const queryOpts = { useAdmin: hasServerAdminCredential() };
-        const rows = await dbQuery('influencers', 'select=influencer_id,instagram_connection&limit=1000', queryOpts);
-        if (!Array.isArray(rows)) return stats;
+        const pageSize = 100;
+        let offset = 0;
+        let hasMore = true;
 
-        stats.total_creators_scanned = rows.length;
+        while (hasMore) {
+            const rows = await dbQuery(
+                'influencers',
+                `select=influencer_id,instagram_connection&order=created_at.asc&limit=${pageSize}&offset=${offset}`,
+                queryOpts
+            );
 
-        for (const row of rows) {
-            const creatorId = row.influencer_id;
-            const conn = row.instagram_connection;
-            if (!conn || !conn.access_token || typeof conn.access_token !== 'string') {
-                continue;
+            if (!Array.isArray(rows) || rows.length === 0) {
+                break;
             }
 
-            stats.connections_inspected++;
+            stats.total_creators_scanned += rows.length;
 
-            if (conn.access_token.startsWith('enc:')) {
-                stats.already_encrypted++;
-                continue;
+            for (const row of rows) {
+                const creatorId = row.influencer_id;
+                const conn = row.instagram_connection;
+                if (!conn || !conn.access_token || typeof conn.access_token !== 'string') {
+                    continue;
+                }
+
+                stats.connections_inspected++;
+
+                if (conn.access_token.startsWith('enc:')) {
+                    stats.already_encrypted++;
+                    continue;
+                }
+
+                // Legacy plaintext token encountered: migrate
+                try {
+                    const encrypted = encryptToken(conn.access_token);
+                    const updatedConn = { ...conn, access_token: encrypted };
+                    await dbUpdate('influencers', 'influencer_id', creatorId, {
+                        instagram_connection: updatedConn
+                    }, queryOpts);
+                    stats.migrated_to_encrypted++;
+                    console.log(`[Token Security Migration] Successfully upgraded creator token to AES-256-GCM for influencer_id: ${creatorId}`);
+                } catch (err) {
+                    stats.failed_migrations++;
+                    console.error(`[Token Security Migration] Failed to encrypt or persist legacy token for influencer_id: ${creatorId}:`, err.message);
+                }
             }
 
-            // Legacy plaintext token encountered
-            try {
-                const encrypted = encryptToken(conn.access_token);
-                const updatedConn = { ...conn, access_token: encrypted };
-                await dbUpdate('influencers', 'influencer_id', creatorId, {
-                    instagram_connection: updatedConn
-                }, queryOpts);
-                stats.migrated_to_encrypted++;
-                console.log(`[Token Security Migration] Successfully upgraded creator token to AES-256-GCM for influencer_id: ${creatorId}`);
-            } catch (err) {
-                stats.failed_migrations++;
-                console.error(`[Token Security Migration] Failed to encrypt legacy token for influencer_id: ${creatorId}:`, err.message);
+            if (rows.length < pageSize) {
+                hasMore = false;
+            } else {
+                offset += pageSize;
             }
         }
     } catch (err) {

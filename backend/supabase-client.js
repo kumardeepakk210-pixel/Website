@@ -684,6 +684,47 @@ export async function dbAdminDelete(table, filterKey, filterVal) {
 }
 
 /**
+ * Execute an RPC stored procedure on Supabase (using admin client if available, or direct REST)
+ */
+export async function dbRpc(fnName, params = {}, options = {}) {
+    const useAdmin = options.useAdmin !== false;
+    if (useAdmin && !hasServerAdminCredential()) {
+        requireServerAdminCredential(`A server-side Supabase secret/service-role credential is required to call RPC '${fnName}'.`);
+    }
+
+    if (adminClient && useAdmin) {
+        const { data, error } = await adminClient.rpc(fnName, params);
+        if (error) {
+            const err = new Error(error.message || `RPC ${fnName} failed`);
+            err.code = error.code;
+            err.details = error.details;
+            err.hint = error.hint;
+            throw err;
+        }
+        return data;
+    }
+
+    // Direct PostgREST RPC call fallback
+    const headers = useAdmin ? getAdminHeaders() : getHeaders();
+    const url = `${SUPABASE_URL}/rest/v1/rpc/${fnName}`;
+    const res = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(params)
+    });
+
+    if (!res.ok) {
+        const errData = await res.json().catch(() => ({ message: res.statusText }));
+        const err = new Error(errData.message || `RPC ${fnName} failed with status ${res.status}`);
+        err.code = errData.code;
+        err.status = res.status;
+        throw err;
+    }
+
+    return await res.json().catch(() => null);
+}
+
+/**
  * Storage: Upload file buffer to bucket
  */
 export async function storageUpload(bucket, path, buffer, contentType) {

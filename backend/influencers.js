@@ -13,6 +13,7 @@ import {
     dbInsert, 
     dbUpdate, 
     dbDelete, 
+    dbRpc,
     hasServerAdminCredential 
 } from './supabase-client.js';
 
@@ -39,6 +40,7 @@ export const ALLOWED_LINK_TYPES = ['profile', 'product', 'campaign'];
 // Internal database hooks to facilitate isolation and unit testing
 export const _dbHooks = {
     dbDelete: (...args) => dbDelete(...args),
+    dbRpc: (...args) => dbRpc(...args),
     getAllInfluencersFromDB: (...args) => getAllInfluencersFromDB(...args)
 };
 
@@ -988,51 +990,37 @@ export async function handleDeleteInfluencer(req, res) {
 
         const targetInfluencerId = found.influencer_id || found.id;
 
-        // 1. In non-test environments or when Supabase credentials exist, perform atomic/complete child deletions
-        const childTables = [
-            'creator_content',
-            'influencer_links',
-            'influencer_stats',
-            'influencer_wallets',
-            'influencer_accounts'
-        ];
-
-        // Fail-safe: track deletion results across all tables
-        const deletionErrors = [];
-
-        // Attempt child deletions if server admin credential or live database is accessible
+        // 1. In non-test environments or when Supabase credentials exist, perform atomic deletion via database RPC
         if (hasServerAdminCredential() || process.env.NODE_ENV !== 'test') {
-            for (const table of childTables) {
-                try {
-                    await _dbHooks.dbDelete(table, 'influencer_id', targetInfluencerId, { useAdmin: true });
-                } catch (childErr) {
-                    console.error(`[Influencers API] Failed to delete child records from table '${table}' for influencer '${targetInfluencerId}':`, childErr.message);
-                    deletionErrors.push({ table, error: childErr.message });
-                }
-            }
-
-            // Attempt parent deletion
             try {
-                await _dbHooks.dbDelete('influencers', 'influencer_id', targetInfluencerId, { useAdmin: true });
-            } catch (parentErr) {
-                console.error(`[Influencers API] Failed to delete parent record from 'influencers' for '${targetInfluencerId}':`, parentErr.message);
-                deletionErrors.push({ table: 'influencers', error: parentErr.message });
-            }
+                // Call atomic Supabase PostgreSQL function
+                const rpcRes = await _dbHooks.dbRpc('delete_influencer_atomic', {
+                    p_influencer_id: targetInfluencerId
+                }, { useAdmin: true });
 
-            // If any database deletion failed, refuse to report success and return 500 error
-            if (deletionErrors.length > 0) {
+                if (rpcRes && rpcRes.success === false) {
+                    return res.status(rpcRes.code === 'NOT_FOUND' ? 404 : 500).json({
+                        success: false,
+                        error: {
+                            code: rpcRes.code || 'DELETION_FAILED',
+                            message: rpcRes.message || 'Atomic influencer deletion failed.'
+                        }
+                    });
+                }
+            } catch (rpcErr) {
+                console.error(`[Influencers API] Atomic deletion RPC failed for influencer '${targetInfluencerId}':`, rpcErr.message);
                 return res.status(500).json({
                     success: false,
                     error: {
-                        code: 'CASCADING_DELETION_FAILED',
-                        message: `Failed to completely delete influencer and associated records from database. Aborted without confirming deletion.`,
-                        details: deletionErrors
+                        code: 'ATOMIC_DELETION_FAILED',
+                        message: 'Atomic deletion failed and was rolled back completely by the database.',
+                        details: rpcErr.message
                     }
                 });
             }
         }
 
-        // 2. Clean local mirror only after database deletions succeed
+        // 2. Clean local mirror only after atomic database deletion succeeds
         const local = readLocalStore();
         local.influencers = (local.influencers || []).filter(i => (i.id !== targetInfluencerId && i.influencer_id !== targetInfluencerId));
         local.stats = (local.stats || []).filter(s => s.influencer_id !== targetInfluencerId);

@@ -4,10 +4,12 @@ import {
     encryptToken,
     decryptToken,
     getCreatorInstagramConnection,
-    migrateLegacyPlaintextTokens
+    migrateLegacyPlaintextTokens,
+    _syncDbHooks
 } from '../backend/services/instagram-sync.js';
 import { handleDisconnectInstagram } from '../backend/creator.js';
 import { handleDeleteInfluencer, _dbHooks } from '../backend/influencers.js';
+import * as supabaseClient from '../backend/supabase-client.js';
 
 test('Token Encryption & Decryption Security Suite', async (t) => {
     await t.test('1. Successful encryption and decryption with AES-256-GCM', () => {
@@ -76,23 +78,62 @@ test('Token Encryption & Decryption Security Suite', async (t) => {
     });
 
     await t.test('6. Legacy plaintext token auto-migration in getCreatorInstagramConnection', async () => {
-        const mockCreator = {
-            id: 'legacy-creator-id-5555',
-            instagram_id: 'legacy_creator_handle',
-            instagram_connection: {
-                connected: true,
-                username: 'legacy_creator_handle',
-                access_token: 'EAALegacyPlaintextUnencryptedTokenVal123' // plaintext!
-            }
-        };
+        // Mock successful dbUpdate for migration
+        const origUpdate = _syncDbHooks.dbUpdate;
+        try {
+            _syncDbHooks.dbUpdate = async () => ({ data: { id: 'ok' } });
 
-        const resolved = await getCreatorInstagramConnection(mockCreator);
-        assert.ok(resolved, 'Resolved connection must exist');
-        assert.equal(resolved.decrypted_token, 'EAALegacyPlaintextUnencryptedTokenVal123');
-        assert.ok(resolved.access_token.startsWith('enc:'), 'Access token must have been automatically converted to enc: format');
+            const mockCreator = {
+                id: '00000000-0000-0000-0000-legacymig0001',
+                influencer_id: '00000000-0000-0000-0000-legacymig0001',
+                instagram_id: 'legacy_creator_handle',
+                instagram_connection: {
+                    connected: true,
+                    username: 'legacy_creator_handle',
+                    access_token: 'EAALegacyPlaintextUnencryptedTokenVal123' // plaintext!
+                }
+            };
+
+            const resolved = await getCreatorInstagramConnection(mockCreator);
+            assert.ok(resolved, 'Resolved connection must exist');
+            assert.equal(resolved.decrypted_token, 'EAALegacyPlaintextUnencryptedTokenVal123');
+            assert.ok(resolved.access_token.startsWith('enc:'), 'Access token must have been automatically converted to enc: format');
+        } finally {
+            _syncDbHooks.dbUpdate = origUpdate;
+        }
     });
 
-    await t.test('7. Batch legacy plaintext token migration scanner', async () => {
+    await t.test('7. Controlled error when database persistence fails during legacy token migration', async () => {
+        const origUpdate = _syncDbHooks.dbUpdate;
+        try {
+            _syncDbHooks.dbUpdate = async () => {
+                throw new Error('Supabase network connection timeout during token persistence');
+            };
+
+            const mockCreator = {
+                id: '00000000-0000-0000-0000-failmig000002',
+                influencer_id: '00000000-0000-0000-0000-failmig000002',
+                instagram_id: 'failed_mig_creator',
+                instagram_connection: {
+                    connected: true,
+                    username: 'failed_mig_creator',
+                    access_token: 'EAALegacyUnmigratedToken999'
+                }
+            };
+
+            await assert.rejects(async () => {
+                await getCreatorInstagramConnection(mockCreator);
+            }, (err) => {
+                assert.equal(err.code, 'LEGACY_TOKEN_MIGRATION_PERSISTENCE_FAILED');
+                assert.ok(err.message.includes('Database persistence failed'));
+                return true;
+            }, 'Must throw controlled migration error and not treat as successful');
+        } finally {
+            _syncDbHooks.dbUpdate = origUpdate;
+        }
+    });
+
+    await t.test('8. Batch legacy plaintext token migration scanner with pagination', async () => {
         const stats = await migrateLegacyPlaintextTokens();
         assert.ok(typeof stats.total_creators_scanned === 'number');
         assert.ok(typeof stats.already_encrypted === 'number');
@@ -153,7 +194,7 @@ test('Instagram Disconnect Workflow Security Suite', async (t) => {
     });
 });
 
-test('Cascading Influencer Deletion Integrity & Failure Scenarios', async (t) => {
+test('Atomic Influencer Deletion Integrity & Complete Rollback', async (t) => {
     const testInfId = '00000000-0000-0000-0000-deltest000001';
     const mockFound = {
         id: testInfId,
@@ -162,16 +203,29 @@ test('Cascading Influencer Deletion Integrity & Failure Scenarios', async (t) =>
         name: 'Deletion Test Influencer'
     };
 
-    await t.test('1. Successful cascading deletion when database succeeds', async () => {
-        const deletedTables = [];
-        const origDbDelete = _dbHooks.dbDelete;
+    await t.test('1. Successful atomic deletion when PostgreSQL RPC succeeds', async () => {
+        const origDbRpc = _dbHooks.dbRpc;
         const origGetAll = _dbHooks.getAllInfluencersFromDB;
+        let rpcCalledWith = null;
 
-        // Mock dbDelete hook to capture calls and report success
-        _dbHooks.dbDelete = async (table, filterCol, filterVal) => {
-            deletedTables.push({ table, filterCol, filterVal });
-            return true;
+        // Mock dbRpc hook to return success payload
+        _dbHooks.dbRpc = async (fnName, params, opts) => {
+            rpcCalledWith = { fnName, params, opts };
+            return {
+                success: true,
+                message: 'Influencer and all associated child records deleted atomically.',
+                influencer_id: params.p_influencer_id,
+                deleted_counts: {
+                    creator_content: 2,
+                    influencer_links: 1,
+                    influencer_stats: 1,
+                    influencer_wallets: 1,
+                    influencer_accounts: 1,
+                    influencers: 1
+                }
+            };
         };
+
         _dbHooks.getAllInfluencersFromDB = async () => ({
             data: [mockFound],
             fromDb: true
@@ -201,44 +255,26 @@ test('Cascading Influencer Deletion Integrity & Failure Scenarios', async (t) =>
             assert.equal(responseJson.success, true);
             assert.ok(responseJson.message.includes('deleted successfully'));
 
-            // Verify all child tables were targeted with foreign key 'influencer_id'
-            const expectedChildTables = [
-                'creator_content',
-                'influencer_links',
-                'influencer_stats',
-                'influencer_wallets',
-                'influencer_accounts'
-            ];
-
-            for (const table of expectedChildTables) {
-                const foundDel = deletedTables.find(d => d.table === table);
-                assert.ok(foundDel, `Table ${table} must be deleted`);
-                assert.equal(foundDel.filterCol, 'influencer_id', `${table} must use influencer_id as foreign key`);
-                assert.equal(foundDel.filterVal, testInfId);
-            }
-
-            // Verify parent table deletion targeted influencer_id
-            const parentDel = deletedTables.find(d => d.table === 'influencers');
-            assert.ok(parentDel, 'Parent table influencers must be deleted');
-            assert.equal(parentDel.filterCol, 'influencer_id');
-            assert.equal(parentDel.filterVal, testInfId);
+            // Verify atomic RPC was invoked
+            assert.ok(rpcCalledWith, 'Atomic deletion RPC must be called');
+            assert.equal(rpcCalledWith.fnName, 'delete_influencer_atomic');
+            assert.equal(rpcCalledWith.params.p_influencer_id, testInfId);
+            assert.equal(rpcCalledWith.opts.useAdmin, true);
         } finally {
-            _dbHooks.dbDelete = origDbDelete;
+            _dbHooks.dbRpc = origDbRpc;
             _dbHooks.getAllInfluencersFromDB = origGetAll;
         }
     });
 
-    await t.test('2. Child table deletion failure aborts deletion and returns 500 error', async () => {
-        const origDbDelete = _dbHooks.dbDelete;
+    await t.test('2. Atomic deletion rollback: RPC exception aborts deletion and returns 500 error', async () => {
+        const origDbRpc = _dbHooks.dbRpc;
         const origGetAll = _dbHooks.getAllInfluencersFromDB;
 
-        // Mock dbDelete to simulate a failure in creator_content
-        _dbHooks.dbDelete = async (table) => {
-            if (table === 'creator_content') {
-                throw new Error('Database foreign key deadlock on creator_content');
-            }
-            return true;
+        // Mock dbRpc to simulate a database transaction abort / rollback
+        _dbHooks.dbRpc = async () => {
+            throw new Error('Atomic influencer deletion failed: foreign key deadlock on creator_content (SQLSTATE: 40P01)');
         };
+
         _dbHooks.getAllInfluencersFromDB = async () => ({
             data: [mockFound],
             fromDb: true
@@ -264,63 +300,17 @@ test('Cascading Influencer Deletion Integrity & Failure Scenarios', async (t) =>
         try {
             await handleDeleteInfluencer(req, res);
 
-            assert.equal(statusCode, 500, 'Must return 500 when child table deletion fails');
+            assert.equal(statusCode, 500, 'Must return 500 when atomic deletion rolls back');
             assert.equal(responseJson.success, false);
-            assert.equal(responseJson.error.code, 'CASCADING_DELETION_FAILED');
-            assert.ok(responseJson.error.details.some(d => d.table === 'creator_content'));
+            assert.equal(responseJson.error.code, 'ATOMIC_DELETION_FAILED');
+            assert.ok(responseJson.error.message.includes('rolled back completely'));
         } finally {
-            _dbHooks.dbDelete = origDbDelete;
+            _dbHooks.dbRpc = origDbRpc;
             _dbHooks.getAllInfluencersFromDB = origGetAll;
         }
     });
 
-    await t.test('3. Parent table deletion failure aborts deletion and returns 500 error', async () => {
-        const origDbDelete = _dbHooks.dbDelete;
-        const origGetAll = _dbHooks.getAllInfluencersFromDB;
-
-        // Mock dbDelete to succeed on child tables but fail on influencers
-        _dbHooks.dbDelete = async (table) => {
-            if (table === 'influencers') {
-                throw new Error('Database permission denied on table influencers');
-            }
-            return true;
-        };
-        _dbHooks.getAllInfluencersFromDB = async () => ({
-            data: [mockFound],
-            fromDb: true
-        });
-
-        const req = {
-            params: { id: testInfId }
-        };
-
-        let statusCode = 200;
-        let responseJson = null;
-        const res = {
-            status: (code) => {
-                statusCode = code;
-                return res;
-            },
-            json: (data) => {
-                responseJson = data;
-                return res;
-            }
-        };
-
-        try {
-            await handleDeleteInfluencer(req, res);
-
-            assert.equal(statusCode, 500, 'Must return 500 when parent table deletion fails');
-            assert.equal(responseJson.success, false);
-            assert.equal(responseJson.error.code, 'CASCADING_DELETION_FAILED');
-            assert.ok(responseJson.error.details.some(d => d.table === 'influencers'));
-        } finally {
-            _dbHooks.dbDelete = origDbDelete;
-            _dbHooks.getAllInfluencersFromDB = origGetAll;
-        }
-    });
-
-    await t.test('4. Non-existent influencer returns 404', async () => {
+    await t.test('3. Non-existent influencer returns 404', async () => {
         const req = {
             params: { id: '00000000-0000-0000-0000-nonexistent9999' }
         };
