@@ -5316,7 +5316,18 @@ export async function handleInstagramOAuthCallback(req, res) {
             existingCreator = (local.influencers || []).find(i => i.id === creatorId);
         }
 
-        const targetUsername = (existingCreator?.instagram_connection?.username || existingCreator?.instagram_id || '').replace(/^@/, '').toLowerCase().trim();
+        // Prefer a previously authorized connection only when it has both an account ID
+        // and a stored token. If the connection is incomplete/stale, the creator's
+        // instagram_id is the canonical handle for this OAuth attempt.
+        const storedInstagramConnection = existingCreator?.instagram_connection || null;
+        const hasUsableStoredInstagramConnection = Boolean(
+            storedInstagramConnection?.account_id && storedInstagramConnection?.access_token
+        );
+        const targetUsername = (
+            (hasUsableStoredInstagramConnection
+                ? storedInstagramConnection.username
+                : (existingCreator?.instagram_id || storedInstagramConnection?.username)) || ''
+        ).replace(/^@/, '').toLowerCase().trim();
         let ambiguousSelection = null;
 
         const summarizeCandidates = (candidates) => (candidates || []).map(c => ({
