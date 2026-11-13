@@ -543,6 +543,26 @@ async function loadAllAdminData() {
     ]);
 }
 
+async function getAdminRequestHeaders(extra = {}) {
+    const headers = { ...extra };
+    try {
+        const client = initAdminSupabase();
+        if (client && client.auth) {
+            const { data } = await client.auth.getSession();
+            if (data?.session?.access_token) {
+                headers['Authorization'] = `Bearer ${data.session.access_token}`;
+                return headers;
+            }
+        }
+    } catch (_) {}
+
+    const adminToken = sessionStorage.getItem('wrt_admin_token') || localStorage.getItem('wrt_admin_token');
+    if (adminToken) {
+        headers['Authorization'] = `Bearer ${adminToken}`;
+    }
+    return headers;
+}
+
 let allCreatorContent = [];
 
 async function loadCreatorContentTable() {
@@ -551,13 +571,13 @@ async function loadCreatorContentTable() {
     tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:24px;">Loading creator content…</td></tr>';
 
     try {
-        const res = await fetch('/api/creator/admin/content', {
-            headers: {
-                'x-admin-role': 'true'
-            }
-        });
+        const headers = await getAdminRequestHeaders();
+        const res = await fetch('/api/creator/admin/content', { headers });
+        if (res.status === 401 || res.status === 403) {
+            throw new Error('Admin authorization required. Please sign in with an employee or administrator account.');
+        }
         const data = await res.json();
-        if (!data.success) throw new Error(data.error || 'Failed to load content');
+        if (!data.success) throw new Error(data.error?.message || data.error || 'Failed to load content');
 
         allCreatorContent = data.content || [];
         renderCreatorContentRows(allCreatorContent);
@@ -597,6 +617,13 @@ function renderCreatorContentRows(items) {
 
     tbody.innerHTML = items.map(item => {
         const statusClass = (item.status === 'Approved') ? 'badge-credit' : (item.status === 'Rejected') ? 'badge-debit' : 'badge-status';
+        const campaignLabel = item.contest_name || item.campaign_name || '';
+        const viewsDisplay = item.views_count !== null && item.views_count !== undefined
+            ? Number(item.views_count).toLocaleString('en-IN')
+            : Number(item.views || 0).toLocaleString('en-IN');
+        const reachDisplay = item.reach_count !== null && item.reach_count !== undefined
+            ? Number(item.reach_count).toLocaleString('en-IN')
+            : '—';
         return `
             <tr>
                 <td>
@@ -606,21 +633,26 @@ function renderCreatorContentRows(items) {
                 <td><span style="font-weight:600;">${escapeAdminHtml(item.platform || 'Instagram')}</span></td>
                 <td><span style="font-size:0.75rem;background:#F0EAE4;padding:2px 6px;border-radius:3px;">${escapeAdminHtml(item.content_type || 'post')}</span></td>
                 <td>
+                    ${item.thumbnail_url ? `<img src="${escapeAdminHtml(item.thumbnail_url)}" alt="Preview" style="width:36px;height:36px;object-fit:cover;border-radius:4px;vertical-align:middle;margin-right:6px;">` : ''}
                     <a href="${escapeAdminHtml(item.url || '#')}" target="_blank" rel="noopener noreferrer" style="color:var(--wr-admin-maroon);text-decoration:underline;font-size:0.8rem;">View Link ↗</a>
                 </td>
                 <td>
                     <span style="font-size:0.8rem;font-weight:500;">${escapeAdminHtml(item.product_name || '—')}</span><br>
                     <small style="color:#7A7A7A;">${escapeAdminHtml(item.product_code || '')}</small>
+                    ${campaignLabel ? `<div style="font-size:0.72rem;color:#554453;margin-top:2px;">Contest: ${escapeAdminHtml(campaignLabel)}</div>` : ''}
                 </td>
                 <td><small>${formatAdminDate(item.created_at)}</small></td>
-                <td><span class="${statusClass}">${escapeAdminHtml(item.status || 'Submitted')}</span></td>
-                <td>${Number(item.views || 0).toLocaleString('en-IN')}</td>
+                <td>
+                    <span class="${statusClass}">${escapeAdminHtml(item.status || 'Submitted')}</span>
+                    ${item.status === 'Rejected' && item.rejection_reason ? `<div style="font-size:0.72rem;color:#B91C1C;margin-top:4px;max-width:180px;">${escapeAdminHtml(item.rejection_reason)}</div>` : ''}
+                </td>
+                <td>${viewsDisplay} / ${reachDisplay}</td>
                 <td>${Number(item.clicks || 0)} / ${Number(item.orders || 0)}</td>
                 <td>₹${Number(item.commission_amount || 0).toFixed(2)}</td>
                 <td>
                     <div style="display:flex;gap:6px;">
-                        <button type="button" class="admin-btn admin-btn-sm" style="background:#027A48;color:#fff;padding:4px 8px;font-size:0.75rem;border-radius:4px;border:none;cursor:pointer;" onclick="moderateCreatorContent('${item.id}', 'approve')">Approve</button>
-                        <button type="button" class="admin-btn admin-btn-sm" style="background:#B91C1C;color:#fff;padding:4px 8px;font-size:0.75rem;border-radius:4px;border:none;cursor:pointer;" onclick="moderateCreatorContent('${item.id}', 'reject')">Reject</button>
+                        <button type="button" class="admin-btn admin-btn-sm" style="background:#027A48;color:#fff;padding:4px 8px;font-size:0.75rem;border-radius:4px;border:none;cursor:pointer;" onclick="moderateCreatorContent('${escapeAdminHtml(item.id)}', 'approve')">Approve</button>
+                        <button type="button" class="admin-btn admin-btn-sm" style="background:#B91C1C;color:#fff;padding:4px 8px;font-size:0.75rem;border-radius:4px;border:none;cursor:pointer;" onclick="moderateCreatorContent('${escapeAdminHtml(item.id)}', 'reject')">Reject</button>
                     </div>
                 </td>
             </tr>
@@ -631,24 +663,28 @@ function renderCreatorContentRows(items) {
 async function moderateCreatorContent(contentId, action) {
     let reason = '';
     if (action === 'reject') {
-        reason = prompt('Enter optional rejection reason:') || '';
+        const prompted = prompt('Enter rejection reason:');
+        if (prompted === null) return; // Admin cancelled
+        reason = String(prompted).trim();
     }
 
     try {
+        const headers = await getAdminRequestHeaders({ 'Content-Type': 'application/json' });
         const res = await fetch('/api/creator/admin/content/moderate', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'x-admin-role': 'true'
-            },
+            headers,
             body: JSON.stringify({
                 contentId,
                 action,
+                rejection_reason: reason,
                 rejectionReason: reason
             })
         });
+        if (res.status === 401 || res.status === 403) {
+            throw new Error('Admin authorization required. Please sign in with an employee or administrator account.');
+        }
         const data = await res.json();
-        if (!data.success) throw new Error(data.error || 'Moderation failed');
+        if (!data.success) throw new Error(data.error?.message || data.error || 'Moderation failed');
         alert(`Content ${action === 'approve' ? 'Approved' : 'Rejected'} successfully!`);
         loadCreatorContentTable();
     } catch (err) {

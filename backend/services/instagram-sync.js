@@ -479,21 +479,22 @@ export async function upsertCreatorContentItem(creator, media, insightsResult) {
                 }
 
                 await dbUpdate('creator_content', 'id', rec.id, updatePayload, queryOpts);
-                results.push({ action: 'updated', id: rec.id, ...updatePayload });
+                results.push({ action: 'updated', persisted: true, id: rec.id, ...updatePayload });
             }
             return results[0];
         } else {
-            payload.status = 'Approved'; // Directly discovered from connected account
-            payload.clicks = 0;
-            payload.orders = 0;
-            payload.commission_amount = 0.00;
-            const insertRes = await dbInsert('creator_content', payload, queryOpts);
-            const newId = insertRes?.data?.[0]?.id || mediaId;
-            return { action: 'inserted', id: newId, ...payload };
+            // Do NOT auto-insert discovered Instagram media into creator_content or contests.
+            // Account sync and explicit creator content submissions are strictly separate data flows.
+            return {
+                action: 'discovered_only',
+                persisted: false,
+                id: mediaId,
+                ...payload
+            };
         }
     } catch (err) {
         console.warn('[Instagram Sync] Supabase upsert notice:', err.message);
-        return { action: 'fallback', id: mediaId, ...payload };
+        return { action: 'discovered_only', persisted: false, id: mediaId, ...payload };
     }
 }
 
@@ -555,6 +556,7 @@ export async function syncCreatorInstagram(creator) {
 
         let syncedCount = 0;
         let failedCount = 0;
+        let matchedSubmissionsCount = 0;
         const syncedItems = [];
 
         for (const media of mediaList) {
@@ -562,6 +564,9 @@ export async function syncCreatorInstagram(creator) {
             const insightsRes = await fetchMediaInsights(media.id, media.media_type, media.media_product_type, accessToken);
             const upsertResult = await upsertCreatorContentItem(creator, media, insightsRes);
 
+            if (upsertResult.action === 'updated') {
+                matchedSubmissionsCount++;
+            }
             if (upsertResult.insights_status === 'synced' || upsertResult.insights_status === 'partial') {
                 syncedCount++;
             } else {
@@ -643,9 +648,10 @@ export async function syncCreatorInstagram(creator) {
 
         return {
             success: true,
-            message: `Synchronized ${syncedCount} of ${mediaList.length} Instagram items.`,
+            message: `Synchronized ${syncedCount} of ${mediaList.length} Instagram items (${matchedSubmissionsCount} submitted item(s) updated).`,
             discovered_count: mediaList.length,
             synced_count: syncedCount,
+            matched_submissions_count: matchedSubmissionsCount,
             failed_count: failedCount,
             last_synced_at: now,
             profile: {

@@ -333,6 +333,22 @@ export const tableColumnsCache = {
         'order_id', 'inventory_id', 'influencer_id', 'influencer_code',
         'influencer_attribution_id', 'influencer_commission_rate', 'influencer_commission_amount',
         'created_at'
+    ]),
+    contests: new Set([
+        'id', 'environment', 'name', 'description', 'start_date', 'end_date',
+        'status', 'requires_reels', 'scoring_rules', 'created_at', 'updated_at'
+    ]),
+    contest_participants: new Set([
+        'id', 'contest_id', 'influencer_id', 'environment', 'joined_at',
+        'status', 'metadata', 'created_at', 'updated_at'
+    ]),
+    contest_scores: new Set([
+        'id', 'contest_id', 'influencer_id', 'environment', 'points',
+        'last_activity_at', 'metadata', 'created_at', 'updated_at'
+    ]),
+    contest_score_adjustments: new Set([
+        'id', 'contest_id', 'influencer_id', 'environment', 'content_id',
+        'adjustment_type', 'points_delta', 'reason', 'created_at', 'idempotency_key'
     ])
 };
 

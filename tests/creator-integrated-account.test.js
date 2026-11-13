@@ -27,6 +27,9 @@ after(async () => {
   if (server) {
     await new Promise((resolve) => server.close(resolve));
   }
+  if (backupStoreRaw && fs.existsSync(STORE_PATH)) {
+    fs.writeFileSync(STORE_PATH, backupStoreRaw, 'utf8');
+  }
 });
 
 
@@ -406,9 +409,12 @@ describe('WishRite — Integrated Creator Program Inside My Account', () => {
 
       const targetId = itemSub.data && itemSub.data.data ? itemSub.data.data.id : null;
 
+      const { signAdminSessionToken } = await import('../backend/creator.js');
+      const adminToken = signAdminSessionToken({ role: 'Admin' });
+
       const adminListRes = await makeRequest({
         path: '/api/creator/admin/content',
-        headers: { 'x-admin-role': 'true' }
+        headers: { 'Authorization': `Bearer ${adminToken}` }
       });
 
       assert.equal(adminListRes.statusCode, 200);
@@ -424,7 +430,7 @@ describe('WishRite — Integrated Creator Program Inside My Account', () => {
       const modRes = await makeRequest({
         path: '/api/creator/admin/content/moderate',
         method: 'POST',
-        headers: { 'x-admin-role': 'true' }
+        headers: { 'Authorization': `Bearer ${adminToken}` }
       }, {
         contentId: firstItem.id,
         action: 'approve'

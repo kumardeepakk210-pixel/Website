@@ -309,7 +309,8 @@ export function readLocalStore() {
                 creator_content: data.creator_content || [],
                 contests: data.contests || data.creator_contests || [],
                 contest_participants: data.contest_participants || data.creator_contest_participants || [],
-                contest_scores: data.contest_scores || data.creator_contest_scores || []
+                contest_scores: data.contest_scores || data.creator_contest_scores || [],
+                contest_score_adjustments: data.contest_score_adjustments || []
             };
         }
     } catch (e) {
@@ -2661,6 +2662,215 @@ export async function handleCustomerCreatorOnboard(req, res) {
  * POST /api/creator/content
  * Submits a social media Post or Reel for review
  */
+const WR_CONTENT_META_PREFIX = '__wr_meta:';
+
+/**
+ * Normalizes a social content URL for reliable duplicate detection.
+ */
+export function normalizeContentUrl(rawUrl) {
+    if (!rawUrl) return '';
+    try {
+        const parsed = new URL(String(rawUrl).trim());
+        const host = parsed.hostname.toLowerCase().replace(/^www\./, '');
+        const pathname = parsed.pathname.replace(/\/+$/, '').toLowerCase();
+        return `${host}${pathname}`;
+    } catch {
+        return String(rawUrl).trim().toLowerCase().replace(/[?#].*$/, '').replace(/\/+$/, '');
+    }
+}
+
+/**
+ * Strips internal metadata markers from tags so only user-facing tags are returned.
+ */
+export function getCleanUserTags(rawTags) {
+    if (!Array.isArray(rawTags)) return [];
+    return rawTags.filter(t => {
+        if (typeof t === 'string') return !t.startsWith(WR_CONTENT_META_PREFIX);
+        if (t && typeof t === 'object' && t.__wr_meta) return false;
+        return Boolean(t);
+    });
+}
+
+/**
+ * Extracts structured submission & contest metadata from top-level fields and/or tags JSONB.
+ */
+export function extractContentMeta(item) {
+    const meta = {
+        submission_source: item?.submission_source || null,
+        contest_id: item?.contest_id || null,
+        contest_name: item?.contest_name || null,
+        campaign_id: item?.campaign_id || null,
+        campaign_name: item?.campaign_name || null,
+        product_category: item?.product_category || null,
+        disqualified: Boolean(item?.disqualified),
+        withdrawn: Boolean(item?.withdrawn),
+        points_awarded: Number(item?.points_awarded || 0),
+        points_awarded_contest_id: item?.points_awarded_contest_id || null
+    };
+
+    const tags = Array.isArray(item?.tags) ? item.tags : [];
+    for (const tag of tags) {
+        let parsed = null;
+        if (typeof tag === 'string' && tag.startsWith(WR_CONTENT_META_PREFIX)) {
+            try {
+                parsed = JSON.parse(tag.slice(WR_CONTENT_META_PREFIX.length));
+            } catch (_) {}
+        } else if (tag && typeof tag === 'object' && tag.__wr_meta) {
+            parsed = tag;
+        }
+        if (parsed && typeof parsed === 'object') {
+            if (!meta.submission_source && parsed.submission_source) meta.submission_source = parsed.submission_source;
+            if (!meta.contest_id && parsed.contest_id) meta.contest_id = parsed.contest_id;
+            if (!meta.contest_name && parsed.contest_name) meta.contest_name = parsed.contest_name;
+            if (!meta.campaign_id && parsed.campaign_id) meta.campaign_id = parsed.campaign_id;
+            if (!meta.campaign_name && parsed.campaign_name) meta.campaign_name = parsed.campaign_name;
+            if (!meta.product_category && parsed.product_category) meta.product_category = parsed.product_category;
+            if (parsed.disqualified !== undefined) meta.disqualified = Boolean(parsed.disqualified);
+            if (parsed.withdrawn !== undefined) meta.withdrawn = Boolean(parsed.withdrawn);
+            if (parsed.points_awarded !== undefined) meta.points_awarded = Number(parsed.points_awarded || 0);
+            if (parsed.points_awarded_contest_id) meta.points_awarded_contest_id = parsed.points_awarded_contest_id;
+        }
+    }
+    return meta;
+}
+
+/**
+ * Encodes user tags + internal submission/contest metadata into a Supabase-safe JSONB array.
+ */
+export function buildStoredTags(rawTags, meta = {}) {
+    let userTags = [];
+    if (Array.isArray(rawTags)) {
+        userTags = getCleanUserTags(rawTags);
+    } else if (typeof rawTags === 'string' && rawTags.trim()) {
+        userTags = rawTags.split(',').map(s => s.trim()).filter(Boolean);
+    }
+    const cleanMeta = {
+        submission_source: meta.submission_source || 'platform_submission',
+        contest_id: meta.contest_id || null,
+        contest_name: meta.contest_name || null,
+        campaign_id: meta.campaign_id || null,
+        campaign_name: meta.campaign_name || null,
+        product_category: meta.product_category || null,
+        disqualified: Boolean(meta.disqualified),
+        withdrawn: Boolean(meta.withdrawn),
+        points_awarded: Number(meta.points_awarded || 0),
+        points_awarded_contest_id: meta.points_awarded_contest_id || null
+    };
+    return [...userTags, `${WR_CONTENT_META_PREFIX}${JSON.stringify(cleanMeta)}`];
+}
+
+/**
+ * Returns true only for content explicitly submitted through WishRite (or manual creator fixtures),
+ * filtering out legacy auto-synced Instagram media dumps.
+ */
+export function isExplicitCreatorSubmission(item) {
+    if (!item) return false;
+    const meta = extractContentMeta(item);
+    if (meta.submission_source === 'platform_submission') return true;
+    if (meta.submission_source === 'instagram_sync') return false;
+
+    const hasProductOrCampaign = Boolean(
+        item.product_code || item.product_name || item.product_category || meta.product_category ||
+        meta.contest_id || meta.contest_name || meta.campaign_id || meta.campaign_name
+    );
+    const cleanTags = getCleanUserTags(item.tags);
+    const isUnattributedSyncedDump = Boolean(item.instagram_media_id)
+        && Boolean(item.instagram_permalink)
+        && String(item.status || '').toLowerCase() === 'approved'
+        && !hasProductOrCampaign
+        && cleanTags.length === 0;
+
+    return !isUnattributedSyncedDump;
+}
+
+/**
+ * Checks whether a submission is eligible to appear in a contest participation list.
+ */
+export function isContestSubmissionEligible(item, contest, expectedInfluencerId = null) {
+    if (!item || !contest) return false;
+    if (!isExplicitCreatorSubmission(item)) return false;
+
+    if (expectedInfluencerId && item.influencer_id !== expectedInfluencerId) {
+        return false;
+    }
+
+    const statusNorm = String(item.status || '').toLowerCase();
+    if (statusNorm !== 'approved') return false;
+
+    const meta = extractContentMeta(item);
+    if (meta.disqualified || meta.withdrawn) return false;
+
+    const contestStatus = String(contest.status || '').toLowerCase().trim();
+    if (contestStatus !== 'active') return false;
+
+    if (!contest.start_date || !contest.end_date) return false;
+    const startMs = new Date(contest.start_date).getTime();
+    const endMs = new Date(contest.end_date).getTime();
+    if (Number.isNaN(startMs) || Number.isNaN(endMs) || endMs < startMs) return false;
+
+    const nowMs = Date.now();
+    if (nowMs < startMs || nowMs > endMs) return false;
+
+    if (!meta.contest_id || meta.contest_id !== contest.id) return false;
+
+    const requiresReels = contest.requires_reels !== false;
+    const normContentType = String(item.content_type || '').trim().toLowerCase();
+    if (requiresReels && normContentType !== 'reel') return false;
+
+    return true;
+}
+
+/**
+ * Validates whether a contest is active and accepting the submitted content type.
+ * Enforces start_date, end_date, active status, and Reels-only rules.
+ */
+export function validateContestForSubmission(resolvedContest, contentType = 'post') {
+    if (!resolvedContest || typeof resolvedContest !== 'object') {
+        return { valid: false, code: 'INVALID_CONTEST', message: 'Selected contest was not found.' };
+    }
+
+    if (!resolvedContest.start_date || !resolvedContest.end_date) {
+        return { valid: false, code: 'CONTEST_INVALID_DATES', message: 'Contest start and end dates are required.' };
+    }
+
+    const startMs = new Date(resolvedContest.start_date).getTime();
+    const endMs = new Date(resolvedContest.end_date).getTime();
+
+    if (Number.isNaN(startMs) || Number.isNaN(endMs)) {
+        return { valid: false, code: 'CONTEST_INVALID_DATES', message: 'Contest start or end date is invalid.' };
+    }
+
+    if (endMs < startMs) {
+        return { valid: false, code: 'CONTEST_INVALID_DATES', message: 'Contest end date cannot be earlier than start date.' };
+    }
+
+    const nowMs = Date.now();
+    const contestStatus = String(resolvedContest.status || '').toLowerCase().trim();
+
+    if (contestStatus === 'draft') {
+        return { valid: false, code: 'CONTEST_DRAFT', message: 'This contest is in draft status and not accepting submissions.' };
+    }
+
+    if (contestStatus === 'upcoming' || nowMs < startMs) {
+        return { valid: false, code: 'CONTEST_UPCOMING', message: 'This contest has not started yet.' };
+    }
+
+    if (contestStatus === 'ended' || nowMs > endMs) {
+        return { valid: false, code: 'CONTEST_ENDED', message: 'This contest has already ended.' };
+    }
+
+    if (contestStatus !== 'active') {
+        return { valid: false, code: 'CONTEST_NOT_ACTIVE', message: 'This contest is not currently active.' };
+    }
+
+    const normContentType = String(contentType || '').trim().toLowerCase();
+    if (resolvedContest.requires_reels !== false && normContentType !== 'reel') {
+        return { valid: false, code: 'CONTEST_REEL_REQUIRED', message: 'This contest accepts Instagram Reels only.' };
+    }
+
+    return { valid: true };
+}
+
 export async function handleSubmitCreatorContent(req, res) {
     try {
         const creator = req.creator;
@@ -2714,6 +2924,100 @@ export async function handleSubmitCreatorContent(req, res) {
 
         const local = readLocalStore();
         if (!local.creator_content) local.creator_content = [];
+        ensureDefaultContest(local);
+
+        const requestedContestId = String(body.contest_id || body.contestId || '').trim() || null;
+        let resolvedContest = null;
+        if (requestedContestId) {
+            if (isLocalTestStoreActive()) {
+                resolvedContest = (local.contests || []).find(c => c.id === requestedContestId) || null;
+            } else {
+                const env = getPlatformEnvironment();
+                const contestFilter = `id=eq.${encodeURIComponent(requestedContestId)}&environment=eq.${env}&limit=1`;
+                const contests = await dbQuery('contests', contestFilter, { useAdmin: true });
+                if (Array.isArray(contests) && contests.length > 0) {
+                    resolvedContest = contests[0];
+                }
+            }
+            const validation = validateContestForSubmission(resolvedContest, contentType);
+            if (!validation.valid) {
+                return res.status(400).json({
+                    success: false,
+                    error: { code: validation.code, message: validation.message }
+                });
+            }
+        }
+
+        const resolvedContestId = resolvedContest ? resolvedContest.id : null;
+        const resolvedContestName = resolvedContest
+            ? resolvedContest.name
+            : (sanitizeText(body.contest_name || body.contestName || '') || null);
+        const resolvedCampaignId = sanitizeText(body.campaign_id || body.campaignId || '') || null;
+        const resolvedCampaignName = sanitizeText(body.campaign_name || body.campaignName || body.campaign || '') || resolvedContestName || null;
+        const productCategory = sanitizeText(body.product_category || body.category || '');
+
+        // Duplicate submission prevention (normalized URL or Instagram shortcode)
+        const normUrl = normalizeContentUrl(contentUrl);
+        const shortcode = extractInstagramShortcode(contentUrl);
+        let existingItems = [...(local.creator_content || [])];
+        if (!CREATOR_USE_LOCAL_STORE && process.env.NODE_ENV !== 'test') {
+            try {
+                const dbRows = await dbQuery(
+                    'creator_content',
+                    `influencer_id=eq.${encodeURIComponent(creator.id)}`,
+                    { useAdmin: hasServerAdminCredential() }
+                );
+                if (Array.isArray(dbRows)) {
+                    const seenIds = new Set(existingItems.map(x => x.id));
+                    for (const r of dbRows) {
+                        if (!seenIds.has(r.id)) existingItems.push(r);
+                    }
+                }
+            } catch (_) {}
+        }
+
+        const duplicateMatch = existingItems.find(item => {
+            if (!item || !isExplicitCreatorSubmission(item)) return false;
+            const itemMeta = extractContentMeta(item);
+            if (itemMeta.withdrawn) return false;
+            const statusNorm = String(item.status || '').toLowerCase();
+            if (statusNorm === 'rejected') return false;
+
+            const itemNormUrl = normalizeContentUrl(item.url || item.instagram_permalink || '');
+            const itemShortcode = extractInstagramShortcode(item.url || item.instagram_permalink || '');
+            const sameMedia = (normUrl && itemNormUrl && normUrl === itemNormUrl)
+                || (shortcode && itemShortcode && shortcode === itemShortcode);
+
+            if (!sameMedia) return false;
+            // Block same-creator duplicate, and block claiming another creator's approved/submitted URL
+            if (item.influencer_id === creator.id) return true;
+            return statusNorm === 'approved' || statusNorm === 'submitted';
+        });
+
+        if (duplicateMatch) {
+            return res.status(409).json({
+                success: false,
+                error: {
+                    code: 'DUPLICATE_SUBMISSION',
+                    message: duplicateMatch.influencer_id === creator.id
+                        ? 'You have already submitted this content URL.'
+                        : 'This content URL has already been submitted by another creator.'
+                }
+            });
+        }
+
+        const submissionMeta = {
+            submission_source: 'platform_submission',
+            contest_id: resolvedContestId,
+            contest_name: resolvedContestName,
+            campaign_id: resolvedCampaignId,
+            campaign_name: resolvedCampaignName,
+            product_category: productCategory,
+            disqualified: false,
+            withdrawn: false,
+            points_awarded: 0,
+            points_awarded_contest_id: null
+        };
 
         const newContent = {
             id: randomUUID(),
@@ -2724,12 +3028,19 @@ export async function handleSubmitCreatorContent(req, res) {
             platform,
             url: contentUrl,
             caption: sanitizeText(body.caption || ''),
-            product_category: sanitizeText(body.product_category || body.category || ''),
+            product_category: productCategory,
             product_code: sanitizeText(body.product_code || ''),
             product_name: sanitizeText(body.product_name || ''),
             product_image: isValidHttpUrl(body.product_image) ? body.product_image : null,
             thumbnail_url: isValidHttpUrl(body.thumbnail_url) ? body.thumbnail_url : (isValidHttpUrl(body.product_image) ? body.product_image : null),
-            tags: Array.isArray(body.tags) ? body.tags : (body.tags ? [String(body.tags)] : []),
+            tags: buildStoredTags(body.tags, submissionMeta),
+            submission_source: 'platform_submission',
+            contest_id: resolvedContestId,
+            contest_name: resolvedContestName,
+            campaign_id: resolvedCampaignId,
+            campaign_name: resolvedCampaignName,
+            disqualified: false,
+            withdrawn: false,
             status: 'Submitted',
             rejection_reason: null,
             views: 0,
@@ -2801,7 +3112,7 @@ export async function handleSubmitCreatorContent(req, res) {
 
 /**
  * GET /api/creator/content
- * Returns only the authenticated creator's submitted content (strictly isolated)
+ * Returns only the authenticated creator's explicitly submitted content (strictly isolated)
  */
 export async function handleGetCreatorContent(req, res) {
     try {
@@ -2813,7 +3124,7 @@ export async function handleGetCreatorContent(req, res) {
         if (CREATOR_USE_LOCAL_STORE || process.env.NODE_ENV === 'test') {
             const local = readLocalStore();
             const contentList = (local.creator_content || [])
-                .filter(c => c.influencer_id === creator.id)
+                .filter(c => c.influencer_id === creator.id && isExplicitCreatorSubmission(c))
                 .map(sanitizeContentItem);
 
             return res.json({
@@ -2825,7 +3136,9 @@ export async function handleGetCreatorContent(req, res) {
 
         try {
             const rows = await dbQuery('creator_content', `influencer_id=eq.${encodeURIComponent(creator.id)}&order=created_at.desc`, { useAdmin: hasServerAdminCredential() });
-            const contentList = (Array.isArray(rows) ? rows : []).map(sanitizeContentItem);
+            const contentList = (Array.isArray(rows) ? rows : [])
+                .filter(isExplicitCreatorSubmission)
+                .map(sanitizeContentItem);
             return res.json({
                 success: true,
                 data: contentList,
@@ -2849,16 +3162,249 @@ export async function handleGetCreatorContent(req, res) {
 }
 
 /**
+ * Derives the HMAC secret for employee/admin session tokens.
+ * In production (NODE_ENV === 'production'), strictly requires ADMIN_SESSION_SECRET or server secrets.
+ * Never exposed to frontend code.
+ */
+export function getAdminHmacSecret() {
+    const secret = (process.env.ADMIN_SESSION_SECRET || process.env.ADMIN_API_KEY || '').trim();
+    if (secret) return secret;
+    if (process.env.SUPABASE_SECRET_KEY) return process.env.SUPABASE_SECRET_KEY.trim();
+    if (process.env.SUPABASE_SERVICE_ROLE_KEY) return process.env.SUPABASE_SERVICE_ROLE_KEY.trim();
+    if (process.env.CREATOR_SESSION_SECRET) return process.env.CREATOR_SESSION_SECRET.trim();
+
+    if (process.env.NODE_ENV === 'production') {
+        throw new Error('[ADMIN AUTH CONFIG ERROR] Missing ADMIN_SESSION_SECRET in production environment.');
+    }
+
+    return 'wishrite-admin-session-secret-key-32b';
+}
+
+/**
+ * Issues a cryptographically signed admin/employee session token.
+ * Format: wrt.<base64urlPayload>.<signature>
+ */
+export function signAdminSessionToken(payload = {}) {
+    const secret = getAdminHmacSecret();
+    const cleanPayload = {
+        sub: payload.sub || payload.userId || 'admin-user',
+        email: payload.email || 'admin@wishrite.in',
+        role: payload.role || 'Admin',
+        iat: Date.now(),
+        exp: payload.exp || (Date.now() + 8 * 60 * 60 * 1000) // 8-hour admin session
+    };
+    const payloadB64 = Buffer.from(JSON.stringify(cleanPayload)).toString('base64url');
+    const signature = crypto.createHmac('sha256', secret).update(`wrt.${payloadB64}`).digest('base64url');
+    return `wrt.${payloadB64}.${signature}`;
+}
+
+/**
+ * Verifies a stateless admin session token: wrt.<base64urlPayload>.<signature>
+ */
+export function verifyAdminSessionToken(token) {
+    if (!token || typeof token !== 'string') return null;
+    const parts = token.split('.');
+    if (parts.length !== 3 || parts[0] !== 'wrt') return null;
+
+    const [prefix, payloadB64, signature] = parts;
+    let expectedSig;
+    try {
+        const secret = getAdminHmacSecret();
+        expectedSig = crypto.createHmac('sha256', secret).update(`${prefix}.${payloadB64}`).digest('base64url');
+    } catch (_) {
+        return null;
+    }
+
+    const sigBuf = Buffer.from(signature, 'utf8');
+    const expBuf = Buffer.from(expectedSig, 'utf8');
+    if (sigBuf.length !== expBuf.length || !crypto.timingSafeEqual(sigBuf, expBuf)) {
+        return null;
+    }
+
+    try {
+        const payloadStr = Buffer.from(payloadB64, 'base64url').toString('utf8');
+        const payload = JSON.parse(payloadStr);
+        if (!payload || typeof payload !== 'object') return null;
+        if (payload.exp && payload.exp < Date.now()) {
+            return { expired: true, payload };
+        }
+        return { expired: false, payload };
+    } catch (_) {
+        return null;
+    }
+}
+
+export const ALLOWED_ADMIN_ROLES = new Set(['admin', 'Admin', 'curator', 'Curator', 'employee', 'Employee']);
+
+export function isAuthorizedAdminRole(role) {
+    return Boolean(role && ALLOWED_ADMIN_ROLES.has(String(role).trim()));
+}
+
+export function isAllowlistedAdminEmail(email) {
+    if (!email) return false;
+    const clean = String(email).trim().toLowerCase();
+    const envList = (process.env.ADMIN_EMAIL_ALLOWLIST || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
+    return envList.includes(clean);
+}
+
+/**
+ * Validates admin authorization for creator content moderation routes.
+ * STRICT SECURITY INVARIANTS:
+ * 1. Rejects creator Bearer tokens (crt_... or crt....) or creator sessions with 403 Forbidden.
+ * 2. Rejects client-spoofed headers (e.g. 'x-admin-role') - never trusts client-asserted booleans.
+ * 3. Verifies signed employee token (wrt....), valid Supabase admin JWT, or server admin key.
+ */
+export async function ensureAdminContentAccess(req, res) {
+    const rawAuth = req.headers?.authorization || req.headers?.Authorization || req.headers?.['x-admin-token'] || '';
+    const authHeader = String(rawAuth).trim();
+
+    // Invariant 1: Reject any creator token or creator session from admin moderation endpoints
+    if (authHeader.includes('crt_') || authHeader.includes('crt.') || req.creator) {
+        res.status(403).json({
+            success: false,
+            error: { code: 'FORBIDDEN_ADMIN_ONLY', message: 'Creator accounts are not permitted to access admin moderation.' }
+        });
+        return false;
+    }
+
+    // Extract Bearer token if present
+    let token = '';
+    if (authHeader.startsWith('Bearer ')) {
+        token = authHeader.slice(7).trim();
+    } else if (authHeader) {
+        token = authHeader.trim();
+    }
+
+    // Invariant 2: Check server admin key if supplied via x-admin-key (timing-safe check)
+    const reqAdminKey = String(req.headers?.['x-admin-key'] || '').trim();
+    if (reqAdminKey) {
+        const validKeys = [
+            (process.env.ADMIN_API_KEY || '').trim(),
+            (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim()
+        ].filter(Boolean);
+
+        for (const expected of validKeys) {
+            const bufA = Buffer.from(reqAdminKey, 'utf8');
+            const bufB = Buffer.from(expected, 'utf8');
+            if (bufA.length === bufB.length && crypto.timingSafeEqual(bufA, bufB)) {
+                return true;
+            }
+        }
+    }
+
+    // Invariant 3: Check signed employee/admin token (wrt.<payload>.<sig>)
+    if (token.startsWith('wrt.')) {
+        const verified = verifyAdminSessionToken(token);
+        if (verified) {
+            if (verified.expired) {
+                res.status(401).json({
+                    success: false,
+                    error: { code: 'ADMIN_SESSION_EXPIRED', message: 'Admin session has expired. Please sign in again.' }
+                });
+                return false;
+            }
+            const allowedRoles = ['Admin', 'Curator', 'Employee', 'admin', 'curator', 'employee'];
+            if (allowedRoles.includes(verified.payload?.role)) {
+                req.admin = verified.payload;
+                return true;
+            }
+        }
+        res.status(401).json({
+            success: false,
+            error: { code: 'ADMIN_TOKEN_INVALID', message: 'Invalid admin credentials or signature verification failed.' }
+        });
+        return false;
+    }
+
+    // Invariant 4: Check Supabase Auth JWT (ey...)
+    if (token.startsWith('ey') || token.includes('.')) {
+        if (adminClient?.auth) {
+            try {
+                const { data: userData, error: userError } = await adminClient.auth.getUser(token);
+                if (!userError && userData?.user) {
+                    const role = userData.user.app_metadata?.role || userData.user.user_metadata?.role || userData.user.role;
+                    const email = (userData.user.email || '').toLowerCase();
+                    if (isAuthorizedAdminRole(role) || isAllowlistedAdminEmail(email)) {
+                        req.admin = { sub: userData.user.id, email, role: role || 'Admin' };
+                        return true;
+                    }
+                }
+            } catch (_) {}
+        }
+
+        // Isolated unit test runner fallback decode (strictly disabled in staging and production)
+        if (process.env.NODE_ENV === 'test' && !isStagingMode()) {
+            const payload = decodeJwtPayload(token);
+            if (payload) {
+                const role = payload.role || payload.app_metadata?.role || payload.user_metadata?.role;
+                const email = (payload.email || '').toLowerCase();
+                if (isAuthorizedAdminRole(role) || isAllowlistedAdminEmail(email)) {
+                    req.admin = { sub: payload.sub || 'test-admin', email, role: role || 'Admin' };
+                    return true;
+                }
+            }
+        }
+    }
+
+    // Invariant 5: Internal process callers (e.g. server-side verified employee)
+    if (req.employee || req.user?.role === 'Admin') {
+        return true;
+    }
+
+    // Invariant 6: Reject unauthenticated callers and client-controlled role headers (e.g. x-admin-role: true)
+    res.status(401).json({
+        success: false,
+        error: { code: 'ADMIN_AUTH_REQUIRED', message: 'Admin authentication is required.' }
+    });
+    return false;
+}
+
+/**
  * GET /api/creator/admin/content
- * Admin endpoint: lists all submitted content across all creators
+ * Admin endpoint: lists all explicitly submitted content across all creators
  */
 export async function handleGetAdminCreatorContent(req, res) {
     try {
-        const local = readLocalStore();
+        if (!(await ensureAdminContentAccess(req, res))) return;
+
+        let rawItems = [];
+
+        if (isLocalTestStoreActive()) {
+            const local = readLocalStore();
+            rawItems = local.creator_content || [];
+        } else {
+            try {
+                const rows = await dbQuery('creator_content', 'order=created_at.desc', { useAdmin: true });
+                if (!Array.isArray(rows)) {
+                    return res.status(500).json({
+                        success: false,
+                        error: { code: 'DATABASE_ERROR', message: 'Unexpected response from content store.' }
+                    });
+                }
+                rawItems = rows;
+            } catch (dbErr) {
+                console.error('[handleGetAdminCreatorContent] Database query failed:', dbErr.message);
+                return res.status(500).json({
+                    success: false,
+                    error: { code: 'CONTENT_STORE_UNAVAILABLE', message: `Database query failed: ${dbErr.message}` }
+                });
+            }
+        }
+
+        const explicitItems = rawItems
+            .filter(isExplicitCreatorSubmission)
+            .map(item => ({
+                ...sanitizeContentItem(item),
+                creator_email: item.creator_email || '',
+                clicks: Number(item.clicks || 0),
+                orders: Number(item.orders || 0),
+                commission_amount: Number(item.commission_amount || 0)
+            }));
+
         return res.json({
             success: true,
-            data: local.creator_content || [],
-            content: local.creator_content || []
+            data: explicitItems,
+            content: explicitItems
         });
     } catch (err) {
         return res.status(500).json({ success: false, error: { message: err.message } });
@@ -2872,6 +3418,8 @@ export async function handleGetAdminCreatorContent(req, res) {
  */
 export async function handleModerateCreatorContent(req, res) {
     try {
+        if (!(await ensureAdminContentAccess(req, res))) return;
+
         const body = req.body || {};
         const contentId = String(body.id || body.contentId || '').trim();
         const action = String(body.action || '').toLowerCase().trim();
@@ -2883,8 +3431,31 @@ export async function handleModerateCreatorContent(req, res) {
             });
         }
 
-        const local = readLocalStore();
-        const item = (local.creator_content || []).find(c => c.id === contentId);
+        const isTestMode = isLocalTestStoreActive();
+        let item = null;
+        let local = null;
+        let localMatch = null;
+
+        if (isTestMode) {
+            local = readLocalStore();
+            localMatch = (local.creator_content || []).find(c => c.id === contentId);
+            if (localMatch) {
+                item = localMatch;
+            }
+        } else {
+            try {
+                const rows = await dbQuery('creator_content', `id=eq.${encodeURIComponent(contentId)}&limit=1`, { useAdmin: true });
+                if (Array.isArray(rows) && rows.length > 0) {
+                    item = rows[0];
+                }
+            } catch (queryErr) {
+                console.error('[handleModerateCreatorContent] Database lookup failed:', queryErr.message);
+                return res.status(500).json({
+                    success: false,
+                    error: { code: 'DATABASE_ERROR', message: `Database lookup failed: ${queryErr.message}` }
+                });
+            }
+        }
 
         if (!item) {
             return res.status(404).json({ success: false, error: { message: 'Content submission not found.' } });
@@ -2899,33 +3470,110 @@ export async function handleModerateCreatorContent(req, res) {
             });
         }
 
-        item.status = action === 'approve' ? 'Approved' : 'Rejected';
-        if (action === 'reject') {
-            item.rejection_reason = sanitizeText(body.rejection_reason || 'Does not meet content quality guidelines');
+        const prevMeta = extractContentMeta(item);
+        const now = new Date().toISOString();
+        const rawReason = body.rejection_reason !== undefined ? body.rejection_reason : body.rejectionReason;
+
+        const nextStatus = action === 'approve' ? 'Approved' : 'Rejected';
+        const nextRejectionReason = action === 'reject'
+            ? sanitizeText(String(rawReason || '').trim() || 'Does not meet content quality guidelines')
+            : null;
+
+        const nextMeta = { ...prevMeta, submission_source: prevMeta.submission_source || 'platform_submission' };
+
+        let targetContest = null;
+        if (isTestMode) {
+            ensureDefaultContest(local);
+            targetContest = nextMeta.contest_id
+                ? (local.contests || []).find(c => c.id === nextMeta.contest_id)
+                : (local.contests || []).find(c => c.status === 'active');
         } else {
-            item.rejection_reason = null;
+            const env = getPlatformEnvironment();
+            const contestFilter = nextMeta.contest_id
+                ? `id=eq.${encodeURIComponent(nextMeta.contest_id)}&environment=eq.${env}&limit=1`
+                : `environment=eq.${env}&status=eq.active&limit=1`;
+            const contests = await dbQuery('contests', contestFilter, { useAdmin: true });
+            if (Array.isArray(contests) && contests.length > 0) {
+                targetContest = contests[0];
+            }
         }
-        item.updated_at = new Date().toISOString();
-
-        writeLocalStore(local);
-
-        try {
-            await dbUpdate('creator_content', 'id', item.id, {
-                status: item.status,
-                rejection_reason: item.rejection_reason,
-                updated_at: item.updated_at
-            }, { useAdmin: true }).catch(() => {});
-        } catch (_) {}
 
         if (action === 'approve') {
-            const pts = (item.content_type === 'reel') ? 100 : 50;
-            await addContestPoints(item.influencer_id, pts, `Approved ${item.content_type}`).catch(() => {});
+            if (!nextMeta.points_awarded && !nextMeta.disqualified && !nextMeta.withdrawn && targetContest && targetContest.status === 'active') {
+                const pts = (item.content_type === 'reel') ? 100 : 50;
+                const autoKey = body.idempotency_key || `award:${targetContest.id}:${item.influencer_id}:${item.id}`;
+                const awardRes = await addContestPoints(
+                    item.influencer_id,
+                    pts,
+                    `Approved ${item.content_type}`,
+                    targetContest.id,
+                    item.id,
+                    autoKey
+                );
+                if (!awardRes || !awardRes.success) {
+                    const failErr = new Error(awardRes?.message || 'Failed to award contest points.');
+                    failErr.code = awardRes?.code || 'CONTEST_AWARD_FAILED';
+                    throw failErr;
+                }
+                nextMeta.points_awarded = pts;
+                nextMeta.points_awarded_contest_id = targetContest.id;
+            }
+        } else if (action === 'reject' && nextMeta.points_awarded > 0) {
+            const contestIdForRevocation = nextMeta.points_awarded_contest_id || (targetContest && targetContest.id) || null;
+            const autoKey = body.idempotency_key || `revoke:${contestIdForRevocation}:${item.influencer_id}:${item.id}`;
+            const revokeRes = await revokeContestPoints(
+                item.influencer_id,
+                nextMeta.points_awarded,
+                contestIdForRevocation,
+                item.id,
+                autoKey,
+                `Rejected: ${nextRejectionReason || 'Moderation rejection'}`
+            );
+            if (!revokeRes || !revokeRes.success) {
+                const failErr = new Error(revokeRes?.message || 'Failed to revoke contest points.');
+                failErr.code = revokeRes?.code || 'CONTEST_REVOCATION_FAILED';
+                throw failErr;
+            }
+            nextMeta.points_awarded = 0;
+            nextMeta.points_awarded_contest_id = null;
+        }
+
+        const nextTags = buildStoredTags(item.tags, nextMeta);
+
+        if (isTestMode) {
+            item.status = nextStatus;
+            item.rejection_reason = nextRejectionReason;
+            item.updated_at = now;
+            item.tags = nextTags;
+            if (localMatch) {
+                Object.assign(localMatch, item);
+                writeLocalStore(local);
+            }
+        } else {
+            try {
+                await dbUpdate('creator_content', 'id', item.id, {
+                    status: nextStatus,
+                    rejection_reason: nextRejectionReason,
+                    tags: nextTags,
+                    updated_at: now
+                }, { useAdmin: true });
+            } catch (updateErr) {
+                console.error('[handleModerateCreatorContent] Database update failed:', updateErr.message);
+                return res.status(500).json({
+                    success: false,
+                    error: { code: 'DATABASE_ERROR', message: `Database update failed: ${updateErr.message}` }
+                });
+            }
+            item.status = nextStatus;
+            item.rejection_reason = nextRejectionReason;
+            item.tags = nextTags;
+            item.updated_at = now;
         }
 
         return res.json({
             success: true,
             message: `Content successfully ${item.status}.`,
-            data: item
+            data: sanitizeContentItem(item)
         });
     } catch (err) {
         return res.status(500).json({ success: false, error: { message: err.message } });
@@ -2937,9 +3585,32 @@ export async function handleModerateCreatorContent(req, res) {
 // ==============================================================================
 
 /**
+ * Resolves active platform execution environment (production, staging, test)
+ */
+export function getPlatformEnvironment() {
+    if (isStagingMode()) return 'staging';
+    if (process.env.NODE_ENV === 'test') return 'test';
+    return 'production';
+}
+
+/**
+ * Checks if running in isolated offline test mode using local JSON fixtures.
+ * Explicitly prevents local test-store activation in staging and production,
+ * regardless of CREATOR_USE_LOCAL_STORE.
+ */
+export function isLocalTestStoreActive() {
+    if (isStagingMode() || process.env.NODE_ENV === 'production') {
+        return false;
+    }
+    return Boolean(process.env.NODE_ENV === 'test' || CREATOR_USE_LOCAL_STORE);
+}
+
+/**
  * Ensures a default active creator contest exists with realistic leaderboard seeding
+ * (Strictly for local unit test fixtures - never runs on live production or staging databases)
  */
 export function ensureDefaultContest(local) {
+    if (!local || typeof local !== 'object') return;
     local.contests = local.contests || [];
     local.contest_participants = local.contest_participants || [];
     local.contest_scores = local.contest_scores || [];
@@ -2952,6 +3623,7 @@ export function ensureDefaultContest(local) {
             start_date: '2026-10-15T00:00:00.000Z',
             end_date: '2026-11-26T23:59:59.000Z',
             status: 'active',
+            requires_reels: true,
             scoring_rules: {
                 post_points: 50,
                 reel_points: 100,
@@ -2968,62 +3640,9 @@ export function ensureDefaultContest(local) {
 }
 
 /**
- * Adds contest points to an influencer in the active contest
+ * Formats and ranks leaderboard participants from authoritative datasets
  */
-export async function addContestPoints(influencer_id, pointsToAdd, reason = '') {
-    if (!influencer_id || !pointsToAdd) return;
-    if (isStagingMode()) {
-        return; // Staging guard: Never mutate contest scores or leaderboard in staging mode
-    }
-    const local = readLocalStore();
-    ensureDefaultContest(local);
-    const activeContest = (local.contests || []).find(c => c.status === 'active');
-    if (!activeContest) return;
-
-    local.contest_scores = local.contest_scores || [];
-    let score = local.contest_scores.find(s => s.contest_id === activeContest.id && s.influencer_id === influencer_id);
-    if (!score) {
-        score = {
-            id: randomUUID(),
-            contest_id: activeContest.id,
-            influencer_id,
-            points: 0,
-            updated_at: new Date().toISOString()
-        };
-        local.contest_scores.push(score);
-    }
-    score.points += Math.max(0, Number(pointsToAdd) || 0);
-    score.updated_at = new Date().toISOString();
-
-    // Ensure participant record
-    local.contest_participants = local.contest_participants || [];
-    if (!local.contest_participants.some(p => p.contest_id === activeContest.id && p.influencer_id === influencer_id)) {
-        local.contest_participants.push({
-            id: randomUUID(),
-            contest_id: activeContest.id,
-            influencer_id,
-            joined_at: new Date().toISOString(),
-            status: 'active'
-        });
-    }
-
-    writeLocalStore(local);
-}
-
-/**
- * Authoritatively calculates contest leaderboard and current creator position
- */
-export async function calculateContestLeaderboard(contestId = null, currentInfluencerId = null) {
-    const local = readLocalStore();
-    ensureDefaultContest(local);
-
-    let contest = null;
-    if (contestId) {
-        contest = (local.contests || []).find(c => c.id === contestId);
-    } else {
-        contest = (local.contests || []).find(c => c.status === 'active') || (local.contests || [])[0];
-    }
-
+export function formatLeaderboardFromDatasets({ contest, scores = [], influencers = [], content = [], currentInfluencerId = null }) {
     if (!contest) {
         return {
             contest: null,
@@ -3035,7 +3654,6 @@ export async function calculateContestLeaderboard(contestId = null, currentInflu
         };
     }
 
-    // Dynamic date calculations
     const now = Date.now();
     const startMs = new Date(contest.start_date).getTime();
     const endMs = new Date(contest.end_date).getTime();
@@ -3057,42 +3675,11 @@ export async function calculateContestLeaderboard(contestId = null, currentInflu
     const daysRemaining = Math.max(0, Math.ceil((endMs - now) / (1000 * 60 * 60 * 24)));
     const daysUntilStart = Math.max(0, Math.ceil((startMs - now) / (1000 * 60 * 60 * 24)));
 
-    // Ensure current creator has an enrolled score if authenticated (disabled in staging mode to protect production leaderboard)
-    if (currentInfluencerId && !isStagingMode()) {
-        let meScore = (local.contest_scores || []).find(s => s.contest_id === contest.id && s.influencer_id === currentInfluencerId);
-        if (!meScore) {
-            meScore = {
-                id: randomUUID(),
-                contest_id: contest.id,
-                influencer_id: currentInfluencerId,
-                points: 0,
-                updated_at: new Date().toISOString()
-            };
-            local.contest_scores = local.contest_scores || [];
-            local.contest_scores.push(meScore);
-
-            local.contest_participants = local.contest_participants || [];
-            if (!local.contest_participants.some(p => p.contest_id === contest.id && p.influencer_id === currentInfluencerId)) {
-                local.contest_participants.push({
-                    id: randomUUID(),
-                    contest_id: contest.id,
-                    influencer_id: currentInfluencerId,
-                    joined_at: new Date().toISOString(),
-                    status: 'active'
-                });
-            }
-            writeLocalStore(local);
-        }
-    }
-
-    // Filter scores for this contest
-    const contestScores = (local.contest_scores || []).filter(s => s.contest_id === contest.id);
-
     // Join with influencer public profile
-    const influencerMap = new Map((local.influencers || []).map(i => [i.id, i]));
+    const influencerMap = new Map((influencers || []).map(i => [i.id, i]));
     const participants = [];
 
-    for (const sc of contestScores) {
+    for (const sc of (scores || [])) {
         const inf = influencerMap.get(sc.influencer_id);
         if (!inf) continue; // Skip orphaned records
         participants.push({
@@ -3146,7 +3733,7 @@ export async function calculateContestLeaderboard(contestId = null, currentInflu
     let nearby = [];
 
     if (currentInfluencerId) {
-        const inf = (local.influencers || []).find(i => i.id === currentInfluencerId);
+        const inf = (influencers || []).find(i => i.id === currentInfluencerId);
         const myRankedIndex = rankedParticipants.findIndex(p => p.influencer_id === currentInfluencerId);
         if (myRankedIndex !== -1) {
             const me = rankedParticipants[myRankedIndex];
@@ -3210,12 +3797,23 @@ export async function calculateContestLeaderboard(contestId = null, currentInflu
         }
     }
 
+    // Compute contest-eligible submissions for the logged-in creator
+    let eligibleSubmissions = [];
+    if (currentInfluencerId && computedStatus === 'active') {
+        const effectiveContest = { ...contest, status: computedStatus };
+        eligibleSubmissions = (content || [])
+            .filter(item => isContestSubmissionEligible(item, effectiveContest, currentInfluencerId))
+            .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))
+            .map(sanitizeContentItem);
+    }
+
     return {
         contest: {
             id: contest.id,
             name: contest.name,
             description: contest.description,
             status: computedStatus,
+            requires_reels: contest.requires_reels !== false,
             start_date: contest.start_date,
             end_date: contest.end_date,
             endsAt: formattedEndsAt,
@@ -3227,8 +3825,561 @@ export async function calculateContestLeaderboard(contestId = null, currentInflu
         currentCreator: currentCreatorData,
         leaderboard: top10,
         nearby,
-        totalParticipants
+        totalParticipants,
+        eligibleSubmissions
     };
+}
+
+/**
+ * Adds contest points to an influencer in the active contest
+ */
+export async function addContestPoints(influencer_id, pointsToAdd, reason = '', contestId = null, contentId = null, idempotencyKey = null) {
+    if (!influencer_id || !pointsToAdd) return { success: false, code: 'INVALID_INPUT' };
+
+    const env = getPlatformEnvironment();
+
+    // Isolated offline test mode (only if NODE_ENV === 'test' and CREATOR_USE_LOCAL_STORE is explicitly set)
+    if (isLocalTestStoreActive()) {
+        const local = readLocalStore();
+        ensureDefaultContest(local);
+        const activeContest = contestId
+            ? (local.contests || []).find(c => c.id === contestId)
+            : (local.contests || []).find(c => c.status === 'active');
+        if (!activeContest) return { success: false, code: 'CONTEST_NOT_FOUND' };
+
+        local.contest_score_adjustments = local.contest_score_adjustments || [];
+        const cleanContentId = contentId ? String(contentId).trim() : null;
+        const cleanReason = reason ? String(reason).trim().toLowerCase().replace(/\s+/g, '_') : 'default';
+
+        if (idempotencyKey) {
+            const existingByKey = local.contest_score_adjustments.find(a => a.idempotency_key === idempotencyKey);
+            if (existingByKey) {
+                if (existingByKey.contest_id !== activeContest.id
+                    || existingByKey.influencer_id !== influencer_id
+                    || existingByKey.environment !== env
+                    || (cleanContentId && existingByKey.content_id !== cleanContentId)
+                    || existingByKey.adjustment_type !== 'award'
+                    || existingByKey.points_delta !== Number(pointsToAdd)) {
+                    const conflictErr = new Error('The provided idempotency key has already been used with different request parameters.');
+                    conflictErr.code = 'IDEMPOTENCY_KEY_CONFLICT';
+                    throw conflictErr;
+                }
+                return {
+                    success: true,
+                    idempotent: true,
+                    action: 'award',
+                    points_delta: existingByKey.points_delta,
+                    approval_cycle: existingByKey.approval_cycle || 1,
+                    idempotency_key: existingByKey.idempotency_key
+                };
+            }
+        }
+
+        // Check content award lifecycle
+        let targetCycle = 1;
+        if (cleanContentId) {
+            const awards = local.contest_score_adjustments.filter(a =>
+                a.contest_id === activeContest.id &&
+                a.influencer_id === influencer_id &&
+                a.content_id === cleanContentId &&
+                a.adjustment_type === 'award'
+            );
+            const revokes = local.contest_score_adjustments.filter(a =>
+                a.contest_id === activeContest.id &&
+                a.influencer_id === influencer_id &&
+                a.content_id === cleanContentId &&
+                a.adjustment_type === 'revoke'
+            );
+            if (awards.length > revokes.length) {
+                const latestAward = awards[awards.length - 1];
+                if (latestAward && latestAward.points_delta === Number(pointsToAdd)) {
+                    return {
+                        success: true,
+                        idempotent: true,
+                        action: 'award',
+                        points_delta: latestAward.points_delta,
+                        approval_cycle: latestAward.approval_cycle || 1,
+                        idempotency_key: latestAward.idempotency_key
+                    };
+                }
+                const dupErr = new Error('Points have already been awarded for this content submission.');
+                dupErr.code = 'CONTENT_ALREADY_AWARDED';
+                throw dupErr;
+            }
+            targetCycle = awards.length + 1;
+        }
+
+        const autoKey = idempotencyKey || `award:${activeContest.id}:${influencer_id}:${env}:${cleanContentId ? cleanContentId + ':c' + targetCycle : 'manual:' + cleanReason}`;
+
+        if (!idempotencyKey) {
+            const existingByKey = local.contest_score_adjustments.find(a => a.idempotency_key === autoKey);
+            if (existingByKey) {
+                if (existingByKey.contest_id !== activeContest.id
+                    || existingByKey.influencer_id !== influencer_id
+                    || existingByKey.environment !== env
+                    || (cleanContentId && existingByKey.content_id !== cleanContentId)
+                    || existingByKey.adjustment_type !== 'award'
+                    || existingByKey.points_delta !== Number(pointsToAdd)) {
+                    const conflictErr = new Error('The provided idempotency key has already been used with different request parameters.');
+                    conflictErr.code = 'IDEMPOTENCY_KEY_CONFLICT';
+                    throw conflictErr;
+                }
+                return {
+                    success: true,
+                    idempotent: true,
+                    action: 'award',
+                    points_delta: existingByKey.points_delta,
+                    approval_cycle: existingByKey.approval_cycle || 1,
+                    idempotency_key: existingByKey.idempotency_key
+                };
+            }
+        }
+
+        local.contest_scores = local.contest_scores || [];
+        let score = local.contest_scores.find(s => s.contest_id === activeContest.id && s.influencer_id === influencer_id);
+        if (!score) {
+            score = {
+                id: randomUUID(),
+                contest_id: activeContest.id,
+                influencer_id,
+                points: 0,
+                updated_at: new Date().toISOString()
+            };
+            local.contest_scores.push(score);
+        }
+        score.points += Math.max(0, Number(pointsToAdd) || 0);
+        score.updated_at = new Date().toISOString();
+
+        local.contest_participants = local.contest_participants || [];
+        if (!local.contest_participants.some(p => p.contest_id === activeContest.id && p.influencer_id === influencer_id)) {
+            local.contest_participants.push({
+                id: randomUUID(),
+                contest_id: activeContest.id,
+                influencer_id,
+                joined_at: new Date().toISOString(),
+                status: 'active'
+            });
+        }
+
+        const adjRecord = {
+            id: randomUUID(),
+            contest_id: activeContest.id,
+            influencer_id,
+            environment: env,
+            content_id: cleanContentId,
+            adjustment_type: 'award',
+            points_delta: Math.max(0, Number(pointsToAdd) || 0),
+            approval_cycle: targetCycle,
+            reason,
+            created_at: new Date().toISOString(),
+            idempotency_key: autoKey
+        };
+        local.contest_score_adjustments.push(adjRecord);
+
+        writeLocalStore(local);
+        return {
+            success: true,
+            idempotent: false,
+            action: 'award',
+            points_delta: adjRecord.points_delta,
+            approval_cycle: targetCycle,
+            new_points: score.points,
+            idempotency_key: autoKey
+        };
+    }
+
+    // Authoritative Supabase atomic RPC for staging and production (fail-closed if unavailable)
+    try {
+        const contestFilter = contestId
+            ? `id=eq.${encodeURIComponent(contestId)}&environment=eq.${env}&limit=1`
+            : `environment=eq.${env}&status=eq.active&limit=1`;
+        const contests = await dbQuery('contests', contestFilter, { useAdmin: true });
+        const activeContest = Array.isArray(contests) && contests.length > 0 ? contests[0] : null;
+        if (!activeContest) {
+            const notFoundErr = new Error(`Active contest not found in environment '${env}'`);
+            notFoundErr.code = 'CONTEST_NOT_FOUND';
+            throw notFoundErr;
+        }
+
+        if (!adminClient?.rpc) {
+            const noRpcErr = new Error('Supabase adminClient.rpc is unavailable');
+            noRpcErr.code = 'CONTEST_STORE_UNAVAILABLE';
+            throw noRpcErr;
+        }
+
+        const autoKey = idempotencyKey || `award:${activeContest.id}:${influencer_id}:${env}:${contentId || 'manual'}`;
+
+        const { data: rpcRes, error: rpcErr } = await adminClient.rpc('adjust_contest_score', {
+            p_contest_id: activeContest.id,
+            p_influencer_id: influencer_id,
+            p_environment: env,
+            p_adjustment_type: 'award',
+            p_points_delta: Math.max(0, Number(pointsToAdd) || 0),
+            p_content_id: contentId || null,
+            p_reason: reason || null,
+            p_idempotency_key: autoKey
+        });
+
+        if (rpcErr) {
+            const err = new Error(rpcErr.message);
+            err.code = rpcErr.code || 'CONTEST_STORE_UNAVAILABLE';
+            throw err;
+        }
+
+        if (!rpcRes?.success) {
+            const err = new Error(rpcRes?.message || 'Contest score adjustment rejected');
+            err.code = rpcRes?.code || 'ADJUSTMENT_REJECTED';
+            throw err;
+        }
+
+        return rpcRes;
+    } catch (err) {
+        console.error('[addContestPoints Supabase Error]:', err.message);
+        const persistenceErr = new Error(`Failed to persist contest points in Supabase: ${err.message}`);
+        persistenceErr.code = err.code || 'CONTEST_STORE_UNAVAILABLE';
+        throw persistenceErr;
+    }
+}
+
+/**
+ * Revokes previously awarded contest points when a submission is rejected or disqualified.
+ */
+export async function revokeContestPoints(influencer_id, pointsToDeduct, contestId = null, contentId = null, idempotencyKey = null, reason = '') {
+    if (!influencer_id || !pointsToDeduct) return { success: false, code: 'INVALID_INPUT' };
+
+    const env = getPlatformEnvironment();
+
+    // Isolated offline test mode (only if NODE_ENV === 'test' and CREATOR_USE_LOCAL_STORE is explicitly set)
+    if (isLocalTestStoreActive()) {
+        const local = readLocalStore();
+        ensureDefaultContest(local);
+        const targetContest = contestId
+            ? (local.contests || []).find(c => c.id === contestId)
+            : (local.contests || []).find(c => c.status === 'active');
+        if (!targetContest) return { success: false, code: 'CONTEST_NOT_FOUND' };
+
+        local.contest_score_adjustments = local.contest_score_adjustments || [];
+        const cleanContentId = contentId ? String(contentId).trim() : null;
+        const cleanReason = reason ? String(reason).trim().toLowerCase().replace(/\s+/g, '_') : 'default';
+        const deduction = Math.max(0, Number(pointsToDeduct) || 0);
+
+        if (idempotencyKey) {
+            const existingByKey = local.contest_score_adjustments.find(a => a.idempotency_key === idempotencyKey);
+            if (existingByKey) {
+                if (existingByKey.contest_id !== targetContest.id
+                    || existingByKey.influencer_id !== influencer_id
+                    || existingByKey.environment !== env
+                    || (cleanContentId && existingByKey.content_id !== cleanContentId)
+                    || existingByKey.adjustment_type !== 'revoke'
+                    || existingByKey.points_delta !== deduction) {
+                    const conflictErr = new Error('The provided idempotency key has already been used with different request parameters.');
+                    conflictErr.code = 'IDEMPOTENCY_KEY_CONFLICT';
+                    throw conflictErr;
+                }
+                return {
+                    success: true,
+                    idempotent: true,
+                    action: 'revoke',
+                    points_delta: existingByKey.points_delta,
+                    approval_cycle: existingByKey.approval_cycle || 1,
+                    idempotency_key: existingByKey.idempotency_key
+                };
+            }
+        }
+
+        local.contest_scores = local.contest_scores || [];
+        const score = local.contest_scores.find(s => s.contest_id === targetContest.id && s.influencer_id === influencer_id);
+        const currentPoints = score ? Number(score.points || 0) : 0;
+
+        // Validate prior award & cycle if content_id given
+        let targetCycle = 1;
+
+        if (cleanContentId) {
+            const awards = local.contest_score_adjustments.filter(a =>
+                a.contest_id === targetContest.id &&
+                a.influencer_id === influencer_id &&
+                a.content_id === cleanContentId &&
+                a.adjustment_type === 'award'
+            );
+            const revokes = local.contest_score_adjustments.filter(a =>
+                a.contest_id === targetContest.id &&
+                a.influencer_id === influencer_id &&
+                a.content_id === cleanContentId &&
+                a.adjustment_type === 'revoke'
+            );
+
+            if (awards.length === 0) {
+                const err = new Error('Cannot revoke points for content that was never awarded points.');
+                err.code = 'NO_PRIOR_AWARD';
+                throw err;
+            }
+
+            if (awards.length <= revokes.length) {
+                const latestRevoke = revokes[revokes.length - 1];
+                if (latestRevoke && latestRevoke.points_delta === deduction) {
+                    return {
+                        success: true,
+                        idempotent: true,
+                        action: 'revoke',
+                        points_delta: latestRevoke.points_delta,
+                        approval_cycle: latestRevoke.approval_cycle || 1,
+                        idempotency_key: latestRevoke.idempotency_key
+                    };
+                }
+                const err = new Error('Points for this content have already been revoked.');
+                err.code = 'ALREADY_REVOKED';
+                throw err;
+            }
+
+            const latestAward = awards[awards.length - 1];
+            if (latestAward.points_delta !== deduction) {
+                const err = new Error(`Revocation points delta (${deduction}) must match original award points delta (${latestAward.points_delta}).`);
+                err.code = 'REVOCATION_AMOUNT_MISMATCH';
+                throw err;
+            }
+
+            targetCycle = awards.length;
+        }
+
+        if (currentPoints < deduction) {
+            const err = new Error(`Cannot deduct ${deduction} points from score of ${currentPoints} points.`);
+            err.code = 'EXCESSIVE_REVOCATION';
+            throw err;
+        }
+
+        const autoKey = idempotencyKey || `revoke:${targetContest.id}:${influencer_id}:${env}:${cleanContentId ? cleanContentId + ':c' + targetCycle : 'manual:' + cleanReason}`;
+
+        if (!idempotencyKey) {
+            const existingByKey = local.contest_score_adjustments.find(a => a.idempotency_key === autoKey);
+            if (existingByKey) {
+                if (existingByKey.contest_id !== targetContest.id
+                    || existingByKey.influencer_id !== influencer_id
+                    || existingByKey.environment !== env
+                    || (cleanContentId && existingByKey.content_id !== cleanContentId)
+                    || existingByKey.adjustment_type !== 'revoke'
+                    || existingByKey.points_delta !== deduction) {
+                    const conflictErr = new Error('The provided idempotency key has already been used with different request parameters.');
+                    conflictErr.code = 'IDEMPOTENCY_KEY_CONFLICT';
+                    throw conflictErr;
+                }
+                return {
+                    success: true,
+                    idempotent: true,
+                    action: 'revoke',
+                    points_delta: existingByKey.points_delta,
+                    approval_cycle: existingByKey.approval_cycle || 1,
+                    idempotency_key: existingByKey.idempotency_key
+                };
+            }
+        }
+
+        local.contest_scores = local.contest_scores || [];
+
+        if (score) {
+            score.points = currentPoints - deduction;
+            score.updated_at = new Date().toISOString();
+        }
+
+        const adjRecord = {
+            id: randomUUID(),
+            contest_id: targetContest.id,
+            influencer_id,
+            environment: env,
+            content_id: cleanContentId,
+            adjustment_type: 'revoke',
+            points_delta: deduction,
+            approval_cycle: targetCycle,
+            reason,
+            created_at: new Date().toISOString(),
+            idempotency_key: autoKey
+        };
+        local.contest_score_adjustments.push(adjRecord);
+
+        writeLocalStore(local);
+        return {
+            success: true,
+            idempotent: false,
+            action: 'revoke',
+            points_delta: deduction,
+            approval_cycle: targetCycle,
+            new_points: score ? score.points : 0,
+            idempotency_key: autoKey
+        };
+    }
+
+    // Authoritative Supabase atomic RPC for staging and production (fail-closed if unavailable)
+    try {
+        const contestFilter = contestId
+            ? `id=eq.${encodeURIComponent(contestId)}&environment=eq.${env}&limit=1`
+            : `environment=eq.${env}&status=eq.active&limit=1`;
+        const contests = await dbQuery('contests', contestFilter, { useAdmin: true });
+        const targetContest = Array.isArray(contests) && contests.length > 0 ? contests[0] : null;
+        if (!targetContest) {
+            const notFoundErr = new Error(`Target contest not found in environment '${env}'`);
+            notFoundErr.code = 'CONTEST_NOT_FOUND';
+            throw notFoundErr;
+        }
+
+        if (!adminClient?.rpc) {
+            const noRpcErr = new Error('Supabase adminClient.rpc is unavailable');
+            noRpcErr.code = 'CONTEST_STORE_UNAVAILABLE';
+            throw noRpcErr;
+        }
+
+        const autoKey = idempotencyKey || `revoke:${targetContest.id}:${influencer_id}:${env}:${contentId || 'manual'}`;
+
+        const { data: rpcRes, error: rpcErr } = await adminClient.rpc('adjust_contest_score', {
+            p_contest_id: targetContest.id,
+            p_influencer_id: influencer_id,
+            p_environment: env,
+            p_adjustment_type: 'revoke',
+            p_points_delta: Math.max(0, Number(pointsToDeduct) || 0),
+            p_content_id: contentId || null,
+            p_reason: reason || null,
+            p_idempotency_key: autoKey
+        });
+
+        if (rpcErr) {
+            const err = new Error(rpcErr.message);
+            err.code = rpcErr.code || 'CONTEST_STORE_UNAVAILABLE';
+            throw err;
+        }
+
+        if (!rpcRes?.success) {
+            const err = new Error(rpcRes?.message || 'Contest score revocation rejected');
+            err.code = rpcRes?.code || 'ADJUSTMENT_REJECTED';
+            throw err;
+        }
+
+        return rpcRes;
+    } catch (err) {
+        console.error('[revokeContestPoints Supabase Error]:', err.message);
+        const persistenceErr = new Error(`Failed to revoke contest points in Supabase: ${err.message}`);
+        persistenceErr.code = err.code || 'CONTEST_STORE_UNAVAILABLE';
+        throw persistenceErr;
+    }
+}
+
+/**
+ * Authoritatively calculates contest leaderboard and current creator position
+ */
+export async function calculateContestLeaderboard(contestId = null, currentInfluencerId = null) {
+    const env = getPlatformEnvironment();
+
+    // Isolated offline test mode (only if NODE_ENV === 'test' and CREATOR_USE_LOCAL_STORE is explicitly set)
+    if (isLocalTestStoreActive()) {
+        const local = readLocalStore();
+        ensureDefaultContest(local);
+
+        let contest = null;
+        if (contestId) {
+            contest = (local.contests || []).find(c => c.id === contestId);
+        } else {
+            contest = (local.contests || []).find(c => c.status === 'active') || (local.contests || [])[0];
+        }
+
+        if (!contest) {
+            return {
+                contest: null,
+                currentCreator: null,
+                leaderboard: [],
+                nearby: [],
+                totalParticipants: 0,
+                message: 'No active contest right now.'
+            };
+        }
+
+        // Ensure current creator has an enrolled score if authenticated (disabled in staging mode to protect production leaderboard)
+        if (currentInfluencerId && !isStagingMode()) {
+            let meScore = (local.contest_scores || []).find(s => s.contest_id === contest.id && s.influencer_id === currentInfluencerId);
+            if (!meScore) {
+                meScore = {
+                    id: randomUUID(),
+                    contest_id: contest.id,
+                    influencer_id: currentInfluencerId,
+                    points: 0,
+                    updated_at: new Date().toISOString()
+                };
+                local.contest_scores = local.contest_scores || [];
+                local.contest_scores.push(meScore);
+
+                local.contest_participants = local.contest_participants || [];
+                if (!local.contest_participants.some(p => p.contest_id === contest.id && p.influencer_id === currentInfluencerId)) {
+                    local.contest_participants.push({
+                        id: randomUUID(),
+                        contest_id: contest.id,
+                        influencer_id: currentInfluencerId,
+                        joined_at: new Date().toISOString(),
+                        status: 'active'
+                    });
+                }
+                writeLocalStore(local);
+            }
+        }
+
+        return formatLeaderboardFromDatasets({
+            contest,
+            scores: (local.contest_scores || []).filter(s => s.contest_id === contest.id),
+            influencers: local.influencers || [],
+            content: local.creator_content || [],
+            currentInfluencerId
+        });
+    }
+
+    // Authoritative Supabase retrieval for staging and production (fail-closed on DB failure)
+    try {
+        const contestFilter = contestId
+            ? `id=eq.${encodeURIComponent(contestId)}&environment=eq.${env}&limit=1`
+            : `environment=eq.${env}&status=eq.active&limit=1`;
+        const contests = await dbQuery('contests', contestFilter, { useAdmin: true });
+        const contest = Array.isArray(contests) && contests.length > 0 ? contests[0] : null;
+
+        if (!contest) {
+            return {
+                contest: null,
+                currentCreator: null,
+                leaderboard: [],
+                nearby: [],
+                totalParticipants: 0,
+                message: 'No active contest right now.'
+            };
+        }
+
+        const scoreFilter = `contest_id=eq.${encodeURIComponent(contest.id)}&environment=eq.${env}&points=gt.0&order=points.desc,updated_at.asc`;
+        const scores = await dbQuery('contest_scores', scoreFilter, { useAdmin: true });
+
+        const influencerIds = Array.from(new Set([
+            ...(Array.isArray(scores) ? scores.map(s => s.influencer_id) : []),
+            ...(currentInfluencerId ? [currentInfluencerId] : [])
+        ])).filter(Boolean);
+
+        let influencers = [];
+        if (influencerIds.length > 0) {
+            const infFilter = `influencer_id=in.(${influencerIds.map(encodeURIComponent).join(',')})`;
+            const infRows = await dbQuery('influencers', infFilter, { useAdmin: true });
+            if (Array.isArray(infRows)) influencers = infRows.map(normalizeInfluencerRecord);
+        }
+
+        let content = [];
+        if (currentInfluencerId) {
+            const contentFilter = `influencer_id=eq.${encodeURIComponent(currentInfluencerId)}&order=created_at.desc`;
+            const contentRows = await dbQuery('creator_content', contentFilter, { useAdmin: true });
+            if (Array.isArray(contentRows)) content = contentRows;
+        }
+
+        return formatLeaderboardFromDatasets({
+            contest,
+            scores: Array.isArray(scores) ? scores : [],
+            influencers,
+            content,
+            currentInfluencerId
+        });
+    } catch (err) {
+        console.error('[calculateContestLeaderboard Supabase Error]:', err.message);
+        const persistenceErr = new Error(`Failed to query contest leaderboard from Supabase: ${err.message}`);
+        persistenceErr.code = 'CONTEST_STORE_UNAVAILABLE';
+        throw persistenceErr;
+    }
 }
 
 /**
@@ -3290,6 +4441,7 @@ export function extractInstagramShortcode(url) {
  * Sanitizes a creator content item so no private or internal server fields leak
  */
 export function sanitizeContentItem(item) {
+    const meta = extractContentMeta(item);
     return {
         id: item.id,
         influencer_id: item.influencer_id,
@@ -3298,11 +4450,19 @@ export function sanitizeContentItem(item) {
         platform: item.platform || 'instagram',
         url: item.url,
         caption: item.caption || '',
-        product_category: item.product_category || '',
+        product_category: item.product_category || meta.product_category || '',
         product_code: item.product_code || '',
         product_name: item.product_name || '',
         product_image: item.product_image || null,
         thumbnail_url: item.thumbnail_url || null,
+        tags: getCleanUserTags(item.tags),
+        contest_id: meta.contest_id || null,
+        contest_name: meta.contest_name || null,
+        campaign_id: meta.campaign_id || null,
+        campaign_name: meta.campaign_name || null,
+        submission_source: meta.submission_source || null,
+        disqualified: Boolean(meta.disqualified),
+        withdrawn: Boolean(meta.withdrawn),
         status: item.status || 'Submitted',
         rejection_reason: item.rejection_reason || null,
         views_count: item.views_count !== undefined ? item.views_count : (typeof item.views === 'number' && item.views > 0 ? item.views : null),
@@ -4830,14 +5990,17 @@ export async function handleSyncAllInstagramContent(req, res) {
             contentList = (local.creator_content || []).filter(c => c.influencer_id === creatorId);
         }
 
+        const explicitContentList = contentList.filter(isExplicitCreatorSubmission);
+
         return res.json({
             success: syncResult.success,
             message: syncResult.message,
             synced_count: syncResult.synced_count || 0,
             discovered_count: syncResult.discovered_count || 0,
+            matched_submissions_count: syncResult.matched_submissions_count || 0,
             last_synced_at: syncResult.last_synced_at || new Date().toISOString(),
             profile: syncResult.profile || null,
-            items: contentList.map(sanitizeContentItem)
+            items: explicitContentList.map(sanitizeContentItem)
         });
     } catch (err) {
         return res.status(500).json({ success: false, error: { message: err.message } });

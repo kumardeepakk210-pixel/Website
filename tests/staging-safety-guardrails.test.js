@@ -359,14 +359,30 @@ describe('WishRite Staging Safety & QA Creator Isolation Guardrails', () => {
     it('10. Staging prevents QA accounts from auto-joining contests or modifying leaderboard data', async () => {
         process.env.WISHRITE_STAGING_MODE = 'true';
 
-        // 1. addContestPoints should be a no-op in staging
-        await addContestPoints(QA_CREATOR_ID, 500, 'Staging Test Reel');
+        // 1. addContestPoints in staging routes to Supabase and fails closed if offline, never mutating local store
+        let pointsError = null;
+        try {
+            await addContestPoints(QA_CREATOR_ID, 500, 'Staging Test Reel');
+        } catch (err) {
+            pointsError = err;
+        }
+        if (pointsError) {
+            assert.equal(pointsError.code, 'CONTEST_STORE_UNAVAILABLE');
+        }
         const store = readLocalStore();
         const score = (store.contest_scores || []).find(s => s.influencer_id === QA_CREATOR_ID);
-        assert.equal(score, undefined, 'QA creator must not receive contest scores in staging');
+        assert.equal(score, undefined, 'QA creator must not receive contest scores in local JSON store in staging');
 
-        // 2. calculateContestLeaderboard should not auto-enroll QA creator in staging
-        await calculateContestLeaderboard(null, QA_CREATOR_ID);
+        // 2. calculateContestLeaderboard routes to Supabase and fails closed without local store enrollment
+        let leaderboardError = null;
+        try {
+            await calculateContestLeaderboard(null, QA_CREATOR_ID);
+        } catch (err) {
+            leaderboardError = err;
+        }
+        if (leaderboardError) {
+            assert.equal(leaderboardError.code, 'CONTEST_STORE_UNAVAILABLE');
+        }
         const storeAfter = readLocalStore();
         const participant = (storeAfter.contest_participants || []).find(p => p.influencer_id === QA_CREATOR_ID);
         assert.equal(participant, undefined, 'QA creator must not be enrolled as a participant in staging');

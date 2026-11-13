@@ -2582,6 +2582,8 @@ async function loadCreatorContent(statusFilter = 'all') {
                 items = items.filter(i => (i.status || '').toLowerCase() !== 'approved' && (i.status || '').toLowerCase() !== 'rejected');
             } else if (normFilter === 'approved') {
                 items = items.filter(i => (i.status || '').toLowerCase() === 'approved');
+            } else if (normFilter === 'rejected') {
+                items = items.filter(i => (i.status || '').toLowerCase() === 'rejected');
             }
         }
 
@@ -2627,19 +2629,20 @@ function renderCreatorContentList(items, container) {
             <table class="content-list-table">
                 <thead>
                     <tr>
-                        <th style="min-width:240px;">Content</th>
-                        <th>Platform</th>
-                        <th style="min-width:140px;">Product</th>
-                        <th>Category</th>
-                        <th>Status</th>
-                        <th style="text-align:right;">Views</th>
-                        <th style="text-align:right;">Reach</th>
-                        <th style="text-align:right;">Likes</th>
-                        <th style="text-align:right;">Comments</th>
-                        <th style="text-align:right;">Saves</th>
-                        <th style="text-align:right;">Shares</th>
-                        <th>Submitted</th>
-                        <th style="text-align:right; min-width:130px;">Link / Actions</th>
+                        <th scope="col" style="min-width:240px;">Content</th>
+                        <th scope="col">Platform</th>
+                        <th scope="col" style="min-width:140px;">Product</th>
+                        <th scope="col">Category</th>
+                        <th scope="col">Campaign / Contest</th>
+                        <th scope="col">Status</th>
+                        <th scope="col" style="text-align:right;">Views</th>
+                        <th scope="col" style="text-align:right;">Reach</th>
+                        <th scope="col" style="text-align:right;">Likes</th>
+                        <th scope="col" style="text-align:right;">Comments</th>
+                        <th scope="col" style="text-align:right;">Saves</th>
+                        <th scope="col" style="text-align:right;">Shares</th>
+                        <th scope="col">Submitted</th>
+                        <th scope="col" style="text-align:right; min-width:130px;">Link / Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -2648,12 +2651,15 @@ function renderCreatorContentList(items, container) {
     items.forEach(item => {
         const isReel = isReelContentItem(item);
         const typeLabel = isReel ? 'Reel' : 'Post';
-        const statusClass = (item.status || '').toLowerCase() === 'approved' ? 'verified' : ((item.status || '').toLowerCase() === 'rejected' ? 'rejected' : 'pending');
-        const statusLabel = (item.status || '').toLowerCase() === 'approved' ? '✓ Approved' : ((item.status || '').toLowerCase() === 'rejected' ? '✕ Rejected' : '⧖ Under Review');
+        const statusNorm = (item.status || '').toLowerCase();
+        const statusClass = statusNorm === 'approved' ? 'verified' : (statusNorm === 'rejected' ? 'rejected' : 'pending');
+        const statusLabel = statusNorm === 'approved' ? '✓ Approved' : (statusNorm === 'rejected' ? '✕ Rejected' : '⧖ Pending Review');
         const thumbImg = item.thumbnail_url || item.product_image || 'https://images.wishrite.in/products/WR-ER-002.jpg';
-        const safeUrl = (item.url || '').replace(/"/g, '&quot;');
-        const safeName = (item.product_name || 'WishRite Piece').replace(/"/g, '&quot;');
-        const safeCat = (item.product_category || 'Jewellery').replace(/"/g, '&quot;');
+        const safeUrl = escapeContestHtml(item.url || '');
+        const safeName = escapeContestHtml(item.product_name || 'WishRite Piece');
+        const safeCat = escapeContestHtml(item.product_category || 'Jewellery');
+        const safeCampaign = escapeContestHtml(item.contest_name || item.campaign_name || 'General Feature');
+        const safeReason = statusNorm === 'rejected' && item.rejection_reason ? escapeContestHtml(item.rejection_reason) : '';
 
         tableHtml += `
             <tr data-content-id="${item.id}">
@@ -2664,7 +2670,7 @@ function renderCreatorContentList(items, container) {
                         </a>
                         <div>
                             <span class="content-table-type">Instagram ${typeLabel}</span>
-                            <a href="${safeUrl}" target="_blank" rel="noopener" class="content-table-url" title="${safeUrl}">${item.url}</a>
+                            <a href="${safeUrl}" target="_blank" rel="noopener" class="content-table-url" title="${safeUrl}">${safeUrl}</a>
                         </div>
                     </div>
                 </td>
@@ -2673,13 +2679,17 @@ function renderCreatorContentList(items, container) {
                 </td>
                 <td>
                     <span class="content-product-name">${safeName}</span>
-                    ${item.product_code ? `<span class="content-product-code">${item.product_code}</span>` : ''}
+                    ${item.product_code ? `<span class="content-product-code">${escapeContestHtml(item.product_code)}</span>` : ''}
                 </td>
                 <td>
                     <span style="color:#5E3435; font-size:0.8rem;">${safeCat}</span>
                 </td>
                 <td>
+                    <span style="color:#5E3435; font-size:0.78rem; font-weight:500;">${safeCampaign}</span>
+                </td>
+                <td>
                     <span class="content-status-badge ${statusClass}">${statusLabel}</span>
+                    ${safeReason ? `<div class="content-rejection-reason" style="margin-top:4px; font-size:0.74rem; color:#B91C1C; line-height:1.3;">Reason: ${safeReason}</div>` : ''}
                 </td>
                 <td>${formatContentMetric(item.views_count)}</td>
                 <td>${formatContentMetric(item.reach_count)}</td>
@@ -2711,12 +2721,15 @@ function renderCreatorContentList(items, container) {
     items.forEach(item => {
         const isReel = isReelContentItem(item);
         const typeLabel = isReel ? 'Reel' : 'Post';
-        const statusClass = (item.status || '').toLowerCase() === 'approved' ? 'verified' : ((item.status || '').toLowerCase() === 'rejected' ? 'rejected' : 'pending');
-        const statusLabel = (item.status || '').toLowerCase() === 'approved' ? '✓ Approved' : ((item.status || '').toLowerCase() === 'rejected' ? '✕ Rejected' : '⧖ Under Review');
+        const statusNorm = (item.status || '').toLowerCase();
+        const statusClass = statusNorm === 'approved' ? 'verified' : (statusNorm === 'rejected' ? 'rejected' : 'pending');
+        const statusLabel = statusNorm === 'approved' ? '✓ Approved' : (statusNorm === 'rejected' ? '✕ Rejected' : '⧖ Pending Review');
         const thumbImg = item.thumbnail_url || item.product_image || 'https://images.wishrite.in/products/WR-ER-002.jpg';
-        const safeUrl = (item.url || '').replace(/"/g, '&quot;');
-        const safeName = (item.product_name || 'WishRite Piece').replace(/"/g, '&quot;');
-        const safeCat = (item.product_category || 'Jewellery').replace(/"/g, '&quot;');
+        const safeUrl = escapeContestHtml(item.url || '');
+        const safeName = escapeContestHtml(item.product_name || 'WishRite Piece');
+        const safeCat = escapeContestHtml(item.product_category || 'Jewellery');
+        const safeCampaign = escapeContestHtml(item.contest_name || item.campaign_name || 'General Feature');
+        const safeReason = statusNorm === 'rejected' && item.rejection_reason ? escapeContestHtml(item.rejection_reason) : '';
 
         mobileCardsHtml += `
             <div class="content-mobile-card" data-content-id="${item.id}">
@@ -2724,6 +2737,7 @@ function renderCreatorContentList(items, container) {
                     <span style="font-size:0.75rem; font-weight:700; color:#5E3435; text-transform:uppercase; letter-spacing:0.5px;">📸 Instagram ${typeLabel}</span>
                     <span class="content-status-badge ${statusClass}">${statusLabel}</span>
                 </div>
+                ${safeReason ? `<div class="content-rejection-reason" style="margin:6px 0; padding:6px 10px; background:#FEF2F2; border:1px solid #FECACA; border-radius:4px; font-size:0.76rem; color:#B91C1C;">Rejection reason: ${safeReason}</div>` : ''}
                 <div class="content-mobile-card-product">
                     <a href="${safeUrl}" target="_blank" rel="noopener">
                         <img src="${thumbImg}" alt="${typeLabel}" class="content-mobile-thumb" onerror="handleMediaThumbError(this)" />
@@ -2731,10 +2745,11 @@ function renderCreatorContentList(items, container) {
                     <div>
                         <div style="font-weight:600; font-size:0.9rem; color:var(--wr-text);">${safeName}</div>
                         <div style="font-size:0.78rem; color:#5E3435;">Category: ${safeCat}</div>
+                        <div style="font-size:0.75rem; color:var(--wr-text-muted);">Campaign: ${safeCampaign}</div>
                     </div>
                 </div>
                 <div class="content-mobile-url-row">
-                    <a href="${safeUrl}" target="_blank" rel="noopener">${item.url}</a>
+                    <a href="${safeUrl}" target="_blank" rel="noopener">${safeUrl}</a>
                 </div>
                 <div class="content-mobile-metrics-grid">
                     <div class="content-mobile-metric-item">
@@ -2983,6 +2998,34 @@ function handleProductChange(type) {
 }
 window.handleProductChange = handleProductChange;
 
+let latestContestCache = null;
+
+function populateContestPickers() {
+    const postContestSelect = document.getElementById('share-post-contest');
+    const reelContestSelect = document.getElementById('share-reel-contest');
+    const activeContest = latestContestCache && latestContestCache.status === 'active' ? latestContestCache : null;
+
+    if (postContestSelect) {
+        const currentVal = postContestSelect.value;
+        let opts = '<option value="">General WishRite Feature</option>';
+        if (activeContest && activeContest.requires_reels === false) {
+            opts += `<option value="${escapeContestHtml(activeContest.id)}">${escapeContestHtml(activeContest.name)}</option>`;
+        }
+        postContestSelect.innerHTML = opts;
+        if (currentVal) postContestSelect.value = currentVal;
+    }
+
+    if (reelContestSelect) {
+        const currentVal = reelContestSelect.value;
+        let opts = '<option value="">General WishRite Feature (No Contest)</option>';
+        if (activeContest) {
+            opts += `<option value="${escapeContestHtml(activeContest.id)}">${escapeContestHtml(activeContest.name)}</option>`;
+        }
+        reelContestSelect.innerHTML = opts;
+        if (currentVal) reelContestSelect.value = currentVal;
+    }
+}
+
 /**
  * Open Share Post / Reel Modals
  */
@@ -2990,6 +3033,7 @@ function openSharePostModal() {
     const modal = document.getElementById('modal-share-post');
     if (modal) modal.style.display = 'flex';
     fetchLiveProductsForPicker();
+    populateContestPickers();
 }
 window.openSharePostModal = openSharePostModal;
 
@@ -3003,6 +3047,7 @@ function openShareReelModal() {
     const modal = document.getElementById('modal-share-reel');
     if (modal) modal.style.display = 'flex';
     fetchLiveProductsForPicker();
+    populateContestPickers();
 }
 window.openShareReelModal = openShareReelModal;
 
@@ -3085,6 +3130,10 @@ async function handleSharePostSubmit(e) {
         return;
     }
 
+    const contestSelect = document.getElementById('share-post-contest');
+    const selectedContestId = contestSelect?.value?.trim() || null;
+    const selectedContestName = (selectedContestId && contestSelect?.selectedOptions?.[0]?.textContent) || null;
+
     const payload = {
         content_type: 'post',
         platform: (platformSelect?.value || 'instagram').toLowerCase(),
@@ -3095,7 +3144,8 @@ async function handleSharePostSubmit(e) {
         product_name: productName,
         product_image: productImg,
         thumbnail_url: imgInput?.value?.trim() || productImg || '',
-        tags: tagsInput?.value?.trim() || ''
+        tags: tagsInput?.value?.trim() || '',
+        ...(selectedContestId ? { contest_id: selectedContestId, contest_name: selectedContestName } : {})
     };
 
     try {
@@ -3214,6 +3264,10 @@ async function handleShareReelSubmit(e) {
         return;
     }
 
+    const contestSelect = document.getElementById('share-reel-contest');
+    const selectedContestId = contestSelect?.value?.trim() || null;
+    const selectedContestName = (selectedContestId && contestSelect?.selectedOptions?.[0]?.textContent) || null;
+
     const payload = {
         content_type: 'reel',
         platform: (platformSelect?.value || 'instagram').toLowerCase(),
@@ -3224,7 +3278,8 @@ async function handleShareReelSubmit(e) {
         product_name: productName,
         product_image: productImg,
         thumbnail_url: imgInput?.value?.trim() || productImg || '',
-        tags: tagsInput?.value?.trim() || ''
+        tags: tagsInput?.value?.trim() || '',
+        ...(selectedContestId ? { contest_id: selectedContestId, contest_name: selectedContestName } : {})
     };
 
     try {
@@ -3421,6 +3476,8 @@ function renderCreatorContest(data) {
     if (!container) return;
 
     const contest = data && data.contest;
+    latestContestCache = contest || null;
+    populateContestPickers();
     if (!contest) {
         // Section 20 Empty state:
         // "No active contest right now. New Creator contests will appear here when available."
@@ -3646,6 +3703,51 @@ function renderCreatorContest(data) {
             </div>
         `;
     }
+
+    // 5. QUALIFYING CONTEST REEL SUBMISSIONS (explicitly submitted, admin-approved, contest-linked)
+    const eligibleSubmissions = Array.isArray(data.eligibleSubmissions) ? data.eligibleSubmissions : [];
+    html += `
+        <div class="contest-eligible-submissions-card" id="contest-eligible-submissions-card" style="margin-top:16px; background:#fff; border:1px solid rgba(94,52,53,0.14); border-radius:8px; padding:16px 18px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:10px;">
+                <div>
+                    <h4 style="margin:0; font-size:0.9rem; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; color:#5E3435;">YOUR QUALIFYING CONTEST ENTRIES</h4>
+                    <span style="font-size:0.76rem; color:var(--wr-text-muted);">Only admin-approved Reels submitted for this contest appear here.</span>
+                </div>
+                <span style="font-size:0.75rem; font-weight:600; color:#5E3435; background:#F8F4F0; padding:3px 10px; border-radius:12px;">${eligibleSubmissions.length} Approved ${eligibleSubmissions.length === 1 ? 'Entry' : 'Entries'}</span>
+            </div>
+    `;
+
+    if (eligibleSubmissions.length === 0) {
+        html += `
+            <p style="margin:0; font-size:0.82rem; color:var(--wr-text-muted); line-height:1.45;">
+                No approved contest Reels yet. Submit an Instagram Reel linked to this contest via <strong>Share a Reel</strong>; once approved by our team, it will appear here.
+            </p>
+        `;
+    } else {
+        html += `<div style="display:grid; gap:10px;">`;
+        eligibleSubmissions.forEach(entry => {
+            const safeEntryUrl = escapeContestHtml(entry.url || '#');
+            const safeThumb = escapeContestHtml(entry.thumbnail_url || entry.product_image || 'https://images.wishrite.in/products/WR-ER-002.jpg');
+            const safeProduct = escapeContestHtml(entry.product_name || entry.caption || 'WishRite Contest Reel');
+            const viewsVal = entry.views_count !== null && entry.views_count !== undefined ? Number(entry.views_count).toLocaleString() : '—';
+            const reachVal = entry.reach_count !== null && entry.reach_count !== undefined ? Number(entry.reach_count).toLocaleString() : '—';
+            html += `
+                <div class="contest-eligible-entry" data-entry-id="${escapeContestHtml(entry.id)}" style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 12px; border:1px solid rgba(94,52,53,0.1); border-radius:6px; background:#FDFBF9;">
+                    <div style="display:flex; align-items:center; gap:10px; min-width:0;">
+                        <img src="${safeThumb}" alt="Contest Reel" style="width:44px; height:44px; object-fit:cover; border-radius:4px; flex-shrink:0;" onerror="handleMediaThumbError(this)" />
+                        <div style="min-width:0;">
+                            <div style="font-size:0.84rem; font-weight:600; color:#5E3435; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${safeProduct}</div>
+                            <div style="font-size:0.75rem; color:var(--wr-text-muted);">Submitted: ${formatSubmissionDate(entry.created_at)} &bull; Views: ${viewsVal} &bull; Reach: ${reachVal}</div>
+                        </div>
+                    </div>
+                    <a href="${safeEntryUrl}" target="_blank" rel="noopener" class="btn btn-outline btn-xs" style="padding:4px 10px; font-size:0.75rem; text-decoration:none; white-space:nowrap;">View Reel ↗</a>
+                </div>
+            `;
+        });
+        html += `</div>`;
+    }
+
+    html += `</div>`;
 
     container.innerHTML = html;
 }

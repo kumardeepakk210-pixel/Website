@@ -1,10 +1,16 @@
+process.env.NODE_ENV = 'test';
+process.env.CREATOR_USE_LOCAL_STORE = 'true';
+
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import http from 'node:http';
+import { createRequire } from 'node:module';
 
-const BASE_URL = process.env.TEST_BASE_URL || 'http://localhost:8085';
+const require = createRequire(import.meta.url);
+let server = null;
+let BASE_URL = process.env.TEST_BASE_URL || '';
 
 async function fetchJson(url, options = {}) {
     const res = await fetch(url, options);
@@ -73,8 +79,25 @@ function teardownTestFixture() {
     }
 }
 
-test('Creator Contest Leaderboard — Comprehensive Validation Suite', async (t) => {
+test.before(async () => {
     setupTestFixture();
+    if (!process.env.TEST_BASE_URL) {
+        const serverModule = require('../server.js');
+        const handler = serverModule.listeners('request')[0];
+        server = http.createServer(handler);
+        await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+        BASE_URL = `http://127.0.0.1:${server.address().port}`;
+    }
+});
+
+test.after(async () => {
+    if (server) {
+        await new Promise((resolve) => server.close(resolve));
+    }
+    teardownTestFixture();
+});
+
+test('Creator Contest Leaderboard — Comprehensive Validation Suite', async (t) => {
 
     await t.test('1. CONTEST SYSTEM & API ENDPOINT', async (st) => {
         await st.test('GET /api/creator/contest returns active contest data', async () => {

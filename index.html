@@ -2588,12 +2588,13 @@
                                 <span style="font-size:0.8rem; color:var(--wr-text-muted);">Your submitted posts and reels</span>
                             </div>
                             <div class="creator-content-controls" style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
-                                <div class="creator-content-filters" style="display:flex; gap:6px;">
+                                <div class="creator-content-filters" style="display:flex; gap:6px; flex-wrap:wrap;">
                                     <button type="button" class="content-filter-btn active" onclick="filterCreatorContent('all', this)">All</button>
                                     <button type="button" class="content-filter-btn" onclick="filterCreatorContent('post', this)">Posts</button>
                                     <button type="button" class="content-filter-btn" onclick="filterCreatorContent('reel', this)">Reels</button>
                                     <button type="button" class="content-filter-btn" onclick="filterCreatorContent('pending', this)">Pending</button>
                                     <button type="button" class="content-filter-btn" onclick="filterCreatorContent('approved', this)">Approved</button>
+                                    <button type="button" class="content-filter-btn" onclick="filterCreatorContent('rejected', this)">Rejected</button>
                                 </div>
                                 <div class="creator-content-sorting" style="display:flex; align-items:center; gap:6px;">
                                     <label for="creator-content-sort" style="font-size:0.75rem; color:var(--wr-text-muted); text-transform:uppercase; font-weight:600;">Sort:</label>
@@ -2721,6 +2722,12 @@
                     <label for="share-post-image" class="form-label" style="display:block;font-size:0.85rem;font-weight:500;margin-bottom:6px;">Optional Image URL</label>
                     <input type="url" id="share-post-image" class="form-input" placeholder="https://..." style="width:100%;padding:10px 12px;border:1px solid var(--wr-border);border-radius:4px;font-size:0.92rem;">
                 </div>
+                <div class="form-group" style="margin-bottom:14px;">
+                    <label for="share-post-contest" class="form-label" style="display:block;font-size:0.85rem;font-weight:500;margin-bottom:6px;">Campaign / Contest (Optional)</label>
+                    <select id="share-post-contest" class="form-input" style="width:100%;padding:10px 12px;border:1px solid var(--wr-border);border-radius:4px;font-size:0.92rem;">
+                        <option value="">General WishRite Feature</option>
+                    </select>
+                </div>
                 <div class="form-group" style="margin-bottom:16px;">
                     <label for="share-post-tags" class="form-label" style="display:block;font-size:0.85rem;font-weight:500;margin-bottom:6px;">Tags (Comma separated)</label>
                     <input type="text" id="share-post-tags" class="form-input" placeholder="#wishrite, #silverjewellery, #styling" style="width:100%;padding:10px 12px;border:1px solid var(--wr-border);border-radius:4px;font-size:0.92rem;">
@@ -2780,6 +2787,12 @@
                 <div class="form-group" style="margin-bottom:14px;">
                     <label for="share-reel-thumbnail" class="form-label" style="display:block;font-size:0.85rem;font-weight:500;margin-bottom:6px;">Optional Thumbnail URL</label>
                     <input type="url" id="share-reel-thumbnail" class="form-input" placeholder="https://..." style="width:100%;padding:10px 12px;border:1px solid var(--wr-border);border-radius:4px;font-size:0.92rem;">
+                </div>
+                <div class="form-group" style="margin-bottom:14px;">
+                    <label for="share-reel-contest" class="form-label" style="display:block;font-size:0.85rem;font-weight:500;margin-bottom:6px;">Contest / Campaign (Optional)</label>
+                    <select id="share-reel-contest" class="form-input" style="width:100%;padding:10px 12px;border:1px solid var(--wr-border);border-radius:4px;font-size:0.92rem;">
+                        <option value="">General WishRite Feature (No Contest)</option>
+                    </select>
                 </div>
                 <div class="form-group" style="margin-bottom:16px;">
                     <label for="share-reel-tags" class="form-label" style="display:block;font-size:0.85rem;font-weight:500;margin-bottom:6px;">Tags (Comma separated)</label>
