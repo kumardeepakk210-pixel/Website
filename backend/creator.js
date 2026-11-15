@@ -3756,7 +3756,8 @@ export async function handleInstagramOAuthStart(req, res) {
             'instagram_basic',
             'pages_show_list',
             'instagram_manage_insights',
-            'pages_read_engagement'
+            'pages_read_engagement',
+            'business_management'
         ].join(',');
 
         let metaAuthUrl = `https://www.facebook.com/dialog/oauth?client_id=${encodeURIComponent(appId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&state=${encodeURIComponent(state)}`;
