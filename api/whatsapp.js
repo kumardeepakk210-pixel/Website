@@ -7,14 +7,38 @@
 const crypto = require('crypto');
 
 // Standard Webhooks / Supabase Auth Hook Verification Helper.
-// Supabase sends secrets as "v1,whsec_<base64>" and supports rotation with "|" separators.
+// Supabase sends secrets as "v1,whsec_<base64>" and supports rotation with "|" or comma separators.
 function parseHookSecrets(value) {
-    return String(value || '')
-        .split('|')
-        .map((entry) => entry.trim())
-        .filter(Boolean)
+    if (!value) return [];
+    if (Buffer.isBuffer(value)) return [value];
+    const rawList = Array.isArray(value) ? value : [value];
+    const entries = [];
+    for (const item of rawList) {
+        if (Buffer.isBuffer(item)) {
+            entries.push(item);
+            continue;
+        }
+        if (typeof item !== 'string') continue;
+        const parts = item.split('|');
+        for (const part of parts) {
+            const sub = part.split(',');
+            for (let i = 0; i < sub.length; i++) {
+                const token = sub[i].trim();
+                if (token === 'v1' && i + 1 < sub.length && sub[i + 1].trim().startsWith('whsec_')) {
+                    entries.push(`v1,${sub[i + 1].trim()}`);
+                    i++;
+                } else if (token) {
+                    entries.push(token);
+                }
+            }
+        }
+    }
+
+    return entries
         .map((entry) => {
-            const normalized = entry.startsWith('v1,') ? entry.slice(3) : entry;
+            if (Buffer.isBuffer(entry)) return entry;
+            const str = String(entry).trim();
+            const normalized = str.startsWith('v1,') ? str.slice(3) : str;
             if (normalized.startsWith('whsec_')) {
                 const encoded = normalized.slice('whsec_'.length);
                 if (!encoded) return null;
@@ -23,7 +47,7 @@ function parseHookSecrets(value) {
             }
             // Backward compatibility for deployments that stored the decoded
             // signing secret directly. Prefer the official v1,whsec_ format.
-            return Buffer.from(normalized, 'utf8');
+            return Buffer.from(str, 'utf8');
         })
         .filter(Boolean);
 }
@@ -55,18 +79,15 @@ function verifyStandardWebhook(rawBody, headers, secrets) {
         return { valid: false, reason: 'timestamp_out_of_tolerance' };
     }
 
-    // The handler passes already-decoded Buffers; direct callers/tests may pass
-    // the original Supabase secret string.
-    const secretBytesList = Array.isArray(secrets)
-        ? secrets.filter((secret) => Buffer.isBuffer(secret))
-        : parseHookSecrets(secrets);
+    // Supports already-decoded Buffers, array of secret strings, or delimited string
+    const secretBytesList = parseHookSecrets(secrets);
 
     if (secretBytesList.length === 0) {
         return { valid: false, reason: 'no_secrets_configured' };
     }
 
     const signedContent = Buffer.from(`${msgId}.${timestamp}.${rawBody}`, 'utf8');
-    const signatures = String(signature).trim().split(/\\s+/);
+    const signatures = String(signature).trim().split(/\s+/);
 
     for (const secretBytes of secretBytesList) {
         const expected = crypto.createHmac('sha256', secretBytes).update(signedContent).digest();
@@ -206,8 +227,8 @@ module.exports = async function handler(req, res) {
                     if (isTestEnv || isExplicitLocalMock) {
                         const authHeader = req.headers['authorization'] || '';
                         const incomingBearer = authHeader.replace(/^Bearer\s+/i, '').trim();
-                        const isBearerMatched = incomingBearer && configuredSecrets.includes(incomingBearer);
-                        if (!isBearerMatched && hasWebhookHeaders) {
+                        const isBearerMatched = incomingBearer && configuredSecrets.some(sec => sec.toString('utf8') === incomingBearer || sec.toString('base64') === incomingBearer);
+                        if (!isBearerMatched) {
                             console.warn('[WhatsApp Auth Hook] Rejected request with invalid Standard Webhook signature:', verification.reason);
                             return res.status(401).json({ error: { message: 'Invalid webhook signature', code: verification.reason } });
                         }
