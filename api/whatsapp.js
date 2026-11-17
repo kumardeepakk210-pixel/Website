@@ -55,8 +55,10 @@ function verifyStandardWebhook(rawBody, headers, secrets) {
         return { valid: false, reason: 'timestamp_out_of_tolerance' };
     }
 
+    // The handler passes already-decoded Buffers; direct callers/tests may pass
+    // the original Supabase secret string.
     const secretBytesList = Array.isArray(secrets)
-        ? secrets.flatMap((secret) => parseHookSecrets(secret))
+        ? secrets.filter((secret) => Buffer.isBuffer(secret))
         : parseHookSecrets(secrets);
 
     if (secretBytesList.length === 0) {
