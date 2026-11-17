@@ -6,68 +6,110 @@
 
 const crypto = require('crypto');
 
-// Standard Webhooks / Supabase Auth Hook Verification Helper
-// Reference: https://supabase.com/docs/guides/auth/auth-hooks & https://github.com/standard-webhooks/standard-webhooks
+// Standard Webhooks / Supabase Auth Hook Verification Helper.
+// Supabase sends secrets as "v1,whsec_<base64>" and supports rotation with "|" separators.
+function parseHookSecrets(value) {
+    return String(value || '')
+        .split('|')
+        .map((entry) => entry.trim())
+        .filter(Boolean)
+        .map((entry) => {
+            const normalized = entry.startsWith('v1,') ? entry.slice(3) : entry;
+            if (normalized.startsWith('whsec_')) {
+                const encoded = normalized.slice('whsec_'.length);
+                if (!encoded) return null;
+                const decoded = Buffer.from(encoded, 'base64');
+                return decoded.length ? decoded : null;
+            }
+            // Backward compatibility for deployments that stored the decoded
+            // signing secret directly. Prefer the official v1,whsec_ format.
+            return Buffer.from(normalized, 'utf8');
+        })
+        .filter(Boolean);
+}
+
+function getHeader(headers, name) {
+    const target = name.toLowerCase();
+    if (!headers) return undefined;
+    if (typeof headers.get === 'function') return headers.get(target) || undefined;
+    const key = Object.keys(headers).find((item) => item.toLowerCase() === target);
+    return key ? headers[key] : undefined;
+}
+
 function verifyStandardWebhook(rawBody, headers, secrets) {
-    if (!rawBody || typeof rawBody !== 'string') {
+    if (typeof rawBody !== 'string') {
         return { valid: false, reason: 'missing_raw_body' };
     }
 
-    const msgId = headers['webhook-id'] || headers['x-webhook-id'];
-    const timestamp = headers['webhook-timestamp'] || headers['x-webhook-timestamp'];
-    const signature = headers['webhook-signature'] || headers['x-webhook-signature'];
+    const msgId = getHeader(headers, 'webhook-id');
+    const timestamp = getHeader(headers, 'webhook-timestamp');
+    const signature = getHeader(headers, 'webhook-signature');
 
     if (!msgId || !timestamp || !signature) {
         return { valid: false, reason: 'missing_webhook_headers' };
     }
 
-    // Tolerance window: 5 minutes (300 seconds)
+    const ts = Number(timestamp);
     const now = Math.floor(Date.now() / 1000);
-    const ts = parseInt(timestamp, 10);
-    if (isNaN(ts) || Math.abs(now - ts) > 300) {
+    if (!Number.isInteger(ts) || Math.abs(now - ts) > 300) {
         return { valid: false, reason: 'timestamp_out_of_tolerance' };
     }
 
-    const secretList = Array.isArray(secrets) ? secrets : [secrets].filter(Boolean);
-    if (secretList.length === 0) {
+    const secretBytesList = Array.isArray(secrets)
+        ? secrets.flatMap((secret) => parseHookSecrets(secret))
+        : parseHookSecrets(secrets);
+
+    if (secretBytesList.length === 0) {
         return { valid: false, reason: 'no_secrets_configured' };
     }
 
-    const toSign = `${msgId}.${timestamp}.${rawBody}`;
-    const passedSigs = String(signature).split(' ');
+    const signedContent = Buffer.from(`${msgId}.${timestamp}.${rawBody}`, 'utf8');
+    const signatures = String(signature).trim().split(/\\s+/);
 
-    for (const secret of secretList) {
-        if (!secret) continue;
-        let secretBytes;
-        if (secret.startsWith('whsec_')) {
-            try {
-                secretBytes = Buffer.from(secret.slice(6), 'base64');
-            } catch (_) {
-                secretBytes = Buffer.from(secret, 'utf8');
-            }
-        } else {
-            secretBytes = Buffer.from(secret, 'utf8');
-        }
-
-        const expectedSig = crypto.createHmac('sha256', secretBytes).update(toSign).digest('base64');
-
-        for (const item of passedSigs) {
-            const parts = item.split(',');
-            const version = parts[0];
-            const sig = parts[1];
-            if (version === 'v1' && sig) {
-                try {
-                    const sigBuf = Buffer.from(sig, 'base64');
-                    const expBuf = Buffer.from(expectedSig, 'base64');
-                    if (sigBuf.length === expBuf.length && crypto.timingSafeEqual(sigBuf, expBuf)) {
-                        return { valid: true };
-                    }
-                } catch (_) {}
+    for (const secretBytes of secretBytesList) {
+        const expected = crypto.createHmac('sha256', secretBytes).update(signedContent).digest();
+        for (const item of signatures) {
+            const match = /^v1,([A-Za-z0-9+/]+={0,2})$/.exec(item);
+            if (!match) continue;
+            const received = Buffer.from(match[1], 'base64');
+            if (received.length === expected.length && crypto.timingSafeEqual(received, expected)) {
+                return { valid: true };
             }
         }
     }
 
     return { valid: false, reason: 'invalid_signature' };
+}
+
+// Vercel's default JSON parser changes the body representation. Disable it so
+// the exact bytes Supabase signed can be verified before parsing JSON.
+async function readRawRequestBody(req, allowParsedFallback = false) {
+    if (typeof req.rawBody === 'string') return req.rawBody;
+    if (Buffer.isBuffer(req.rawBody)) return req.rawBody.toString('utf8');
+    if (typeof req.body === 'string') return req.body;
+
+    if (req && typeof req[Symbol.asyncIterator] === 'function') {
+        const chunks = [];
+        for await (const chunk of req) {
+            chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+        }
+        return Buffer.concat(chunks).toString('utf8');
+    }
+
+    // Unit tests and explicit local mocks may supply an already-parsed body.
+    if (allowParsedFallback && req.body && typeof req.body === 'object') {
+        return JSON.stringify(req.body);
+    }
+    return null;
+}
+
+function parseJsonBody(rawBody) {
+    if (typeof rawBody !== 'string' || !rawBody.length) return null;
+    try {
+        return JSON.parse(rawBody);
+    } catch (_) {
+        return null;
+    }
 }
 
 module.exports = async function handler(req, res) {
@@ -106,7 +148,8 @@ module.exports = async function handler(req, res) {
     // 2. POST /api/whatsapp/webhook — Meta WhatsApp Event Notification
     if (subPath === '/webhook' && method === 'POST') {
         try {
-            const body = req.body || {};
+            const rawBody = await readRawRequestBody(req, process.env.NODE_ENV === 'test');
+            const body = parseJsonBody(rawBody) || {};
 
             // Meta WhatsApp webhook payloads always contain { object: 'whatsapp_business_account', entry: [...] }
             if (body.object === 'whatsapp_business_account' || Array.isArray(body.entry)) {
@@ -134,9 +177,10 @@ module.exports = async function handler(req, res) {
             const isTestEnv = process.env.NODE_ENV === 'test';
             const isExplicitLocalMock = (process.env.LOCAL_WHATSAPP_MOCK === 'true' || process.env.LOCAL_WHATSAPP_MOCK === true);
 
-            // Hook signing secrets: official Supabase SEND_SMS_HOOK_SECRETS or SUPABASE_SMS_HOOK_SECRET (supports secret rotation comma-separated)
+            // Supabase format: "v1,whsec_<base64>".
+            // Multiple active secrets for rotation are separated with "|", not commas.
             const configuredSecretsRaw = process.env.SEND_SMS_HOOK_SECRETS || process.env.SUPABASE_SMS_HOOK_SECRET || '';
-            const configuredSecrets = configuredSecretsRaw.split(',').map(s => s.trim()).filter(Boolean);
+            const configuredSecrets = parseHookSecrets(configuredSecretsRaw);
 
             // In production, reject if no secret is configured (fail-closed)
             if (!isTestEnv && !isExplicitLocalMock && configuredSecrets.length === 0) {
@@ -144,9 +188,14 @@ module.exports = async function handler(req, res) {
                 return res.status(500).json({ error: { message: 'Server security configuration error' } });
             }
 
-            // Standard Webhooks signature verification
-            const rawBody = req.rawBody || (typeof req.body === 'string' ? req.body : JSON.stringify(req.body || {}));
-            const hasWebhookHeaders = !!(req.headers['webhook-id'] || req.headers['x-webhook-id']);
+            // Preserve and verify the exact raw payload before parsing it.
+            const rawBody = await readRawRequestBody(req, isTestEnv || isExplicitLocalMock);
+            const hasWebhookHeaders = !!getHeader(req.headers, 'webhook-id');
+
+            if (!rawBody) {
+                console.warn('[WhatsApp Auth Hook] Request body unavailable for signature verification.');
+                return res.status(400).json({ error: { message: 'Missing raw webhook body' } });
+            }
 
             if (configuredSecrets.length > 0) {
                 const verification = verifyStandardWebhook(rawBody, req.headers, configuredSecrets);
@@ -170,7 +219,7 @@ module.exports = async function handler(req, res) {
                 return res.status(401).json({ error: { message: 'Unauthorized' } });
             }
 
-            const body = req.body || {};
+            const body = parseJsonBody(rawBody) || (isTestEnv || isExplicitLocalMock ? (req.body || {}) : {});
             // Supabase Send SMS hook sends: { user: { id, phone }, sms: { otp } }
             // Direct mock payload: { phone, otp }
             const rawPhone = body.user?.phone || body.phone;
@@ -295,3 +344,6 @@ module.exports = async function handler(req, res) {
 };
 
 module.exports.verifyStandardWebhook = verifyStandardWebhook;
+
+// Vercel: disable automatic parsing so webhook signatures use the original body bytes.
+module.exports.config = { api: { bodyParser: false } };
