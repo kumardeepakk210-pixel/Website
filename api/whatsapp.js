@@ -6,6 +6,33 @@
 
 const crypto = require('crypto');
 
+/**
+ * Normalizes Meta Graph API version string (e.g., 'v21.0', '21.0', 'V21.0', '/v21.0/').
+ * Guarantees a safe lowercase format 'vXX.X' with fallback to 'v21.0'.
+ */
+function normalizeGraphApiVersion(versionRaw) {
+    const raw = String(versionRaw ?? '').trim().replace(/^\/+|\/+$/g, '');
+    if (!raw) return 'v21.0';
+    if (/^\d+(\.\d+)?$/.test(raw)) {
+        return `v${raw}`;
+    }
+    if (/^v\d+(\.\d+)?$/i.test(raw)) {
+        return raw.toLowerCase();
+    }
+    return 'v21.0';
+}
+
+/**
+ * Builds the canonical Meta WhatsApp Cloud API messages endpoint:
+ * https://graph.facebook.com/{API_VERSION}/{PHONE_NUMBER_ID}/messages
+ * Strips any stray leading/trailing slashes or whitespace to prevent path corruption.
+ */
+function buildMetaMessagesEndpoint(graphApiVersionRaw, phoneNumberIdRaw) {
+    const version = normalizeGraphApiVersion(graphApiVersionRaw);
+    const phoneId = String(phoneNumberIdRaw ?? '').trim().replace(/^\/+|\/+$/g, '');
+    return `https://graph.facebook.com/${version}/${phoneId}/messages`;
+}
+
 // Standard Webhooks / Supabase Auth Hook Verification Helper.
 // Supabase sends secrets as "v1,whsec_<base64>" and supports rotation with "|" or comma separators.
 function parseHookSecrets(value) {
@@ -287,8 +314,7 @@ module.exports = async function handler(req, res) {
                 });
             }
 
-            const graphApiVersion = process.env.META_GRAPH_API_VERSION || 'v21.0';
-            const metaEndpoint = `https://graph.facebook.com/${graphApiVersion}/${phoneNumberId}/messages`;
+            const metaEndpoint = buildMetaMessagesEndpoint(process.env.META_GRAPH_API_VERSION, phoneNumberId);
 
             // Build components according to Meta Authentication template guidelines:
             // Body parameter: { type: 'text', text: otp }
@@ -367,6 +393,8 @@ module.exports = async function handler(req, res) {
 };
 
 module.exports.verifyStandardWebhook = verifyStandardWebhook;
+module.exports.normalizeGraphApiVersion = normalizeGraphApiVersion;
+module.exports.buildMetaMessagesEndpoint = buildMetaMessagesEndpoint;
 
 // Vercel: disable automatic parsing so webhook signatures use the original body bytes.
 module.exports.config = { api: { bodyParser: false } };

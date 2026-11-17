@@ -414,6 +414,53 @@ async function runUnifiedSuite() {
             }
         }
 
+        // 4b4. URL Construction & Graph API Version Normalization Regression Test
+        {
+            const { buildMetaMessagesEndpoint, normalizeGraphApiVersion } = await import('../api/whatsapp.js');
+
+            assert.equal(typeof buildMetaMessagesEndpoint, 'function', 'buildMetaMessagesEndpoint must be exported');
+            assert.equal(typeof normalizeGraphApiVersion, 'function', 'normalizeGraphApiVersion must be exported');
+
+            // Test cases for version normalization
+            assert.equal(normalizeGraphApiVersion('v21.0'), 'v21.0');
+            assert.equal(normalizeGraphApiVersion('V21.0'), 'v21.0');
+            assert.equal(normalizeGraphApiVersion('21.0'), 'v21.0');
+            assert.equal(normalizeGraphApiVersion('/v21.0/'), 'v21.0');
+            assert.equal(normalizeGraphApiVersion(''), 'v21.0');
+            assert.equal(normalizeGraphApiVersion(null), 'v21.0');
+            assert.equal(normalizeGraphApiVersion(undefined), 'v21.0');
+            assert.equal(normalizeGraphApiVersion('   '), 'v21.0');
+            assert.equal(normalizeGraphApiVersion('v22.0'), 'v22.0');
+
+            // Test cases for buildMetaMessagesEndpoint: Must never produce //1481161675077194/messages
+            const phoneId = '1481161675077194';
+            assert.equal(
+                buildMetaMessagesEndpoint('', phoneId),
+                'https://graph.facebook.com/v21.0/1481161675077194/messages',
+                'Empty version must default to v21.0 and never produce double slash'
+            );
+            assert.equal(
+                buildMetaMessagesEndpoint('   ', `  ${phoneId}  `),
+                'https://graph.facebook.com/v21.0/1481161675077194/messages',
+                'Whitespace in version or phone ID must be trimmed cleanly'
+            );
+            assert.equal(
+                buildMetaMessagesEndpoint('/v21.0/', `/${phoneId}/`),
+                'https://graph.facebook.com/v21.0/1481161675077194/messages',
+                'Stray leading/trailing slashes must be stripped'
+            );
+            assert.equal(
+                buildMetaMessagesEndpoint('21.0', phoneId),
+                'https://graph.facebook.com/v21.0/1481161675077194/messages',
+                'Numeric version string must have v prepended'
+            );
+            assert.equal(
+                buildMetaMessagesEndpoint('v26.0', phoneId),
+                'https://graph.facebook.com/v26.0/1481161675077194/messages',
+                'Specific valid Graph API version must be preserved'
+            );
+        }
+
         console.log('✔ 4b. Invalid/Expired OTP rejection and Meta API payload formatting verified');
     }
 
