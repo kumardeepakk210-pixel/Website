@@ -1,11 +1,5 @@
 {
-  "crons": [
-    {
-      "path": "/api/creator/instagram/cron-sync",
-      "schedule": "0 2 * * *"
-    }
-  ],
-  "rewrites": [
+"rewrites": [
     {
       "source": "/terms-of-service",
       "destination": "/legal/terms-of-service.html"
