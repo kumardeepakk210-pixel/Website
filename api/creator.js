@@ -215,7 +215,10 @@ module.exports = async function handler(req, res) {
             });
         }
         if (subPath === '/instagram/status' && method === 'GET') {
-            return await withAuth(creator.handleGetInstagramStatus);
+            return res.status(410).json({
+                success: false,
+                error: { code: 'INSTAGRAM_INSIGHTS_PAUSED', message: 'Live Instagram profile and insights status refresh is currently paused.' }
+            });
         }
         if (subPath === '/instagram/config' && method === 'GET') {
             return res.json({ success: true, ...creator.getPublicMetaConfig() });
