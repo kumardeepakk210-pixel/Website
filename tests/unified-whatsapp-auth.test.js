@@ -418,10 +418,20 @@ async function runUnifiedSuite() {
 
         // 4b4. URL Construction & Graph API Version Normalization Regression Test
         {
-            const { buildMetaMessagesEndpoint, normalizeGraphApiVersion } = await import('../api/whatsapp.js');
+            const { buildMetaMessagesEndpoint, normalizeGraphApiVersion, normalizeIndianMobileNumber } = await import('../api/whatsapp.js');
 
             assert.equal(typeof buildMetaMessagesEndpoint, 'function', 'buildMetaMessagesEndpoint must be exported');
             assert.equal(typeof normalizeGraphApiVersion, 'function', 'normalizeGraphApiVersion must be exported');
+            assert.equal(typeof normalizeIndianMobileNumber, 'function', 'normalizeIndianMobileNumber must be exported');
+
+            // Hook-side phone normalization must match the frontend's Indian mobile validation.
+            assert.equal(normalizeIndianMobileNumber('9876543210'), '919876543210');
+            assert.equal(normalizeIndianMobileNumber('+91 98765 43210'), '919876543210');
+            assert.equal(normalizeIndianMobileNumber('09876543210'), '919876543210');
+            assert.equal(normalizeIndianMobileNumber('919876543210'), '919876543210');
+            assert.equal(normalizeIndianMobileNumber('+1 415 555 2671'), null);
+            assert.equal(normalizeIndianMobileNumber('5123456789'), null);
+            assert.equal(normalizeIndianMobileNumber('12345'), null);
 
             // Test cases for version normalization
             assert.equal(normalizeGraphApiVersion('v21.0'), 'v21.0');
