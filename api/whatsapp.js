@@ -33,6 +33,18 @@ function buildMetaMessagesEndpoint(graphApiVersionRaw, phoneNumberIdRaw) {
     return `https://graph.facebook.com/${version}/${phoneId}/messages`;
 }
 
+/**
+ * Converts a supported Indian mobile input to Meta's country-code + national-number format.
+ * Returns null for invalid or non-Indian numbers.
+ */
+function normalizeIndianMobileNumber(rawPhone) {
+    const digits = String(rawPhone ?? '').replace(/\D/g, '');
+    const national = digits.length === 11 && digits.startsWith('0') ? digits.slice(1) : digits;
+    if (national.length === 10 && /^[6-9]/.test(national)) return '91' + national;
+    if (national.length === 12 && national.startsWith('91') && /^[6-9]/.test(national.slice(2))) return national;
+    return null;
+}
+
 // Standard Webhooks / Supabase Auth Hook Verification Helper.
 // Supabase sends secrets as "v1,whsec_<base64>" and supports rotation with "|" or comma separators.
 function parseHookSecrets(value) {
@@ -282,16 +294,8 @@ module.exports = async function handler(req, res) {
             }
 
             // Normalize and validate an Indian mobile number before sending to Meta.
-            const phoneDigits = String(rawPhone).replace(/\D/g, '');
-            const normalizedDigits = phoneDigits.length === 11 && phoneDigits.startsWith('0')
-                ? phoneDigits.slice(1)
-                : phoneDigits;
-            let destinationPhone = '';
-            if (normalizedDigits.length === 10 && /^[6-9]/.test(normalizedDigits)) {
-                destinationPhone = '91' + normalizedDigits;
-            } else if (normalizedDigits.length === 12 && normalizedDigits.startsWith('91') && /^[6-9]/.test(normalizedDigits.slice(2))) {
-                destinationPhone = normalizedDigits;
-            } else {
+            const destinationPhone = normalizeIndianMobileNumber(rawPhone);
+            if (!destinationPhone) {
                 return res.status(400).json({ error: { message: 'Invalid Indian mobile number.' } });
             }
 
@@ -406,6 +410,7 @@ module.exports = async function handler(req, res) {
 module.exports.verifyStandardWebhook = verifyStandardWebhook;
 module.exports.normalizeGraphApiVersion = normalizeGraphApiVersion;
 module.exports.buildMetaMessagesEndpoint = buildMetaMessagesEndpoint;
+module.exports.normalizeIndianMobileNumber = normalizeIndianMobileNumber;
 
 // Vercel: disable automatic parsing so webhook signatures use the original body bytes.
 module.exports.config = { api: { bodyParser: false } };
