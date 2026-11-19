@@ -116,9 +116,7 @@ function initCreatorRealtimeSync(influencerId) {
                     },
                     (payload) => {
                         console.log('[WishRite Creator] Realtime update on influencers:', payload.eventType);
-                        if (typeof loadInstagramConnection === 'function') {
-                            loadInstagramConnection();
-                        }
+                        // Profile events no longer trigger Instagram API refreshes.
                         loadCustomerCreatorStatus();
                     }
                 );
@@ -1271,8 +1269,7 @@ function renderCreatorDashboard(data) {
     // 4. Load Contest Leaderboard
     loadCreatorContest();
 
-    // 5. Load Instagram Connection
-    loadInstagramConnection();
+    // Live Instagram profile/insights synchronization is paused; submitted content still loads.
 }
 
 /**
@@ -1719,8 +1716,8 @@ function renderReelInsightsGrid() {
         const thumbImg = reel.thumbnail_url || reel.product_image || 'https://placehold.co/180x240/5E3435/FFF?text=WishRite+Reel';
         const platformName = reel.platform === 'youtube' ? 'YouTube Short' : (reel.platform === 'facebook' ? 'Facebook Reel' : 'Instagram Reel');
 
-        // Note: strictly no fabricated or random numbers. Only display social metrics if genuine API data is connected.
-        const hasConnectedSocialApi = typeof reel.views === 'number' && reel.social_likes !== undefined;
+        // Live Instagram insights are paused; keep this card focused on submission and review status.
+        const hasConnectedSocialApi = false;
 
         return `
             <div class="reel-insights-card">
@@ -2049,7 +2046,7 @@ function renderInstagramConnectionCard(conn) {
                             </button>
                             <button type="button" class="btn btn-secondary btn-sm" onclick="syncAllInstagramInsights()" id="btn-sync-all-ig" style="display:inline-flex; align-items:center; gap:6px; padding:6px 12px; font-size:0.75rem;">
                                 <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" id="icon-sync-all-ig"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-                                <span>SYNC INSIGHTS</span>
+                                <span>INSIGHTS PAUSED</span>
                             </button>
                             <button type="button" class="btn btn-ghost btn-sm" onclick="disconnectInstagramAccount()" style="padding:6px 10px; font-size:0.75rem; color:#dc2626;">
                                 <span>DISCONNECT</span>
@@ -2693,7 +2690,7 @@ function renderCreatorContentList(items, container) {
                 <td>
                     <div class="content-table-actions">
                         <a href="${safeUrl}" target="_blank" rel="noopener" class="btn btn-outline btn-xs btn-view-content" style="padding:4px 8px; font-size:0.75rem; text-decoration:none; white-space:nowrap;">View ${typeLabel} ↗</a>
-                        <button type="button" class="btn btn-ghost btn-xs btn-sync-content" onclick="syncContentInsights('${item.id}', this)" title="Sync Insights" style="padding:4px 8px; font-size:0.75rem;">↻ Sync</button>
+                        
                     </div>
                 </td>
             </tr>
@@ -2769,7 +2766,7 @@ function renderCreatorContentList(items, container) {
                     </div>
                     <div class="content-mobile-actions">
                         <a href="${safeUrl}" target="_blank" rel="noopener" class="btn btn-outline btn-xs" style="padding:4px 8px; font-size:0.75rem; text-decoration:none;">View ${typeLabel} ↗</a>
-                        <button type="button" class="btn btn-primary btn-xs" onclick="syncContentInsights('${item.id}', this)" style="padding:4px 8px; font-size:0.75rem;">↻ Sync</button>
+                        
                     </div>
                 </div>
             </div>
