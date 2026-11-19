@@ -222,6 +222,8 @@ async function runUnifiedSuite() {
         const inv = detect('12345');
         assert.equal(inv.type, 'invalid');
         assert.ok(inv.error.includes('valid 10-digit mobile number'));
+        assert.equal(detect('+14155552671').type, 'invalid');
+        assert.equal(detect('5123456789').type, 'invalid');
         console.log('✔ 2. detectAuthIdentifier parses emails and Indian mobile variants accurately');
     }
 
