@@ -2355,7 +2355,7 @@ async function loadCreatorContent(statusFilter = 'all') {
                     <div style="text-align:center; padding:36px 20px; background:#fff; border:1px solid rgba(94,52,53,0.12); border-radius:8px; color:var(--wr-text-muted);">
                         <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.5" style="margin-bottom:8px; color:#5E3435;"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>
                         <h4 style="margin:0 0 4px 0; color:#5E3435; font-size:1rem;">No Content Submitted Yet</h4>
-                        <p style="margin:0; font-size:0.82rem;">Share a WishRite Instagram Reel or Post to track its performance metrics here.</p>
+                        <p style="margin:0; font-size:0.82rem;">Submit a WishRite Reel or Post here and follow its review status.</p>
                     </div>
                 `;
             }
@@ -2383,19 +2383,8 @@ async function loadCreatorContent(statusFilter = 'all') {
             }
         }
 
-        // Apply sorting
-        if (currentContentSort === 'views') {
-            items.sort((a, b) => (Number(b.views_count || b.views || -1)) - (Number(a.views_count || a.views || -1)));
-        } else if (currentContentSort === 'likes') {
-            items.sort((a, b) => (Number(b.likes_count || -1)) - (Number(a.likes_count || -1)));
-        } else if (currentContentSort === 'comments') {
-            items.sort((a, b) => (Number(b.comments_count || -1)) - (Number(a.comments_count || -1)));
-        } else if (currentContentSort === 'shares') {
-            items.sort((a, b) => (Number(b.shares_count || -1)) - (Number(a.shares_count || -1)));
-        } else {
-            // Newest default
-            items.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
-        }
+        // Keep submitted content ordered by submission time while live social metrics are paused.
+        items.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
 
         if (items.length === 0) {
             container.innerHTML = `
@@ -2430,12 +2419,6 @@ function renderCreatorContentList(items, container) {
                         <th style="min-width:140px;">Product</th>
                         <th>Category</th>
                         <th>Status</th>
-                        <th style="text-align:right;">Views</th>
-                        <th style="text-align:right;">Reach</th>
-                        <th style="text-align:right;">Likes</th>
-                        <th style="text-align:right;">Comments</th>
-                        <th style="text-align:right;">Saves</th>
-                        <th style="text-align:right;">Shares</th>
                         <th>Submitted</th>
                         <th style="text-align:right; min-width:130px;">Link / Actions</th>
                     </tr>
@@ -2479,12 +2462,6 @@ function renderCreatorContentList(items, container) {
                 <td>
                     <span class="content-status-badge ${statusClass}">${statusLabel}</span>
                 </td>
-                <td>${formatContentMetric(item.views_count)}</td>
-                <td>${formatContentMetric(item.reach_count)}</td>
-                <td>${formatContentMetric(item.likes_count)}</td>
-                <td>${formatContentMetric(item.comments_count)}</td>
-                <td>${formatContentMetric(item.saves_count)}</td>
-                <td>${formatContentMetric(item.shares_count)}</td>
                 <td>
                     <span style="font-size:0.78rem; color:var(--wr-text-muted);">${formatSubmissionDate(item.created_at)}</span>
                 </td>
@@ -2534,36 +2511,9 @@ function renderCreatorContentList(items, container) {
                 <div class="content-mobile-url-row">
                     <a href="${safeUrl}" target="_blank" rel="noopener">${item.url}</a>
                 </div>
-                <div class="content-mobile-metrics-grid">
-                    <div class="content-mobile-metric-item">
-                        <span>${formatMobileMetricText(item.views_count)}</span>
-                        <span>Views</span>
-                    </div>
-                    <div class="content-mobile-metric-item">
-                        <span>${formatMobileMetricText(item.reach_count)}</span>
-                        <span>Reach</span>
-                    </div>
-                    <div class="content-mobile-metric-item">
-                        <span>${formatMobileMetricText(item.likes_count)}</span>
-                        <span>Likes</span>
-                    </div>
-                    <div class="content-mobile-metric-item">
-                        <span>${formatMobileMetricText(item.comments_count)}</span>
-                        <span>Comments</span>
-                    </div>
-                    <div class="content-mobile-metric-item">
-                        <span>${formatMobileMetricText(item.saves_count)}</span>
-                        <span>Saves</span>
-                    </div>
-                    <div class="content-mobile-metric-item">
-                        <span>${formatMobileMetricText(item.shares_count)}</span>
-                        <span>Shares</span>
-                    </div>
-                </div>
                 <div class="content-mobile-card-footer">
                     <div style="font-size:0.72rem; color:var(--wr-text-muted);">
-                        Submitted: ${formatSubmissionDate(item.created_at)}<br />
-                        ${item.last_synced_at ? `Last synced: ${formatSyncTime(item.last_synced_at)}` : 'Not synced yet'}
+                        Submitted: ${formatSubmissionDate(item.created_at)}
                     </div>
                     <div class="content-mobile-actions">
                         <a href="${safeUrl}" target="_blank" rel="noopener" class="btn btn-outline btn-xs" style="padding:4px 8px; font-size:0.75rem; text-decoration:none;">View ${typeLabel} ↗</a>
@@ -2587,8 +2537,8 @@ function filterCreatorContent(filter, btn) {
 window.filterCreatorContent = filterCreatorContent;
 window.setContentFilter = filterCreatorContent;
 
-function sortCreatorContent(sortVal) {
-    currentContentSort = sortVal;
+function sortCreatorContent() {
+    currentContentSort = 'newest';
     loadCreatorContent(currentContentFilter);
 }
 window.sortCreatorContent = sortCreatorContent;
