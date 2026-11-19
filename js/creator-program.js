@@ -1806,54 +1806,30 @@ function formatSubmissionDate(isoStr) {
 }
 
 /**
- * Loads Instagram Connection status and renders the connection card
+ * Instagram insights/profile polling is paused. This handler only consumes the
+ * OAuth redirect result so a successful/failed authorization notice is not lost.
+ * It deliberately makes no Instagram status or Graph API request.
  */
 async function loadInstagramConnection() {
-    const cardEl = document.getElementById('creator-instagram-conn-card');
-    if (!cardEl) return;
-
     try {
-        // Check URL params for oauth return
-        try {
-            const urlParams = new URLSearchParams(window.location.search);
-            const igParam = urlParams.get('instagram');
-            if (igParam === 'connected') {
-                if (typeof showToast === 'function') {
-                    showToast('Instagram connected successfully!', 'success');
-                }
-                const newUrl = window.location.pathname + '?tab=creator';
-                window.history.replaceState({}, document.title, newUrl);
-            } else if (igParam === 'error') {
-                const msg = urlParams.get('msg') || 'Failed to authorize with Meta.';
-                if (typeof showToast === 'function') {
-                    showToast(decodeURIComponent(msg), 'error');
-                } else {
-                    alert('Meta Authorization Notice: ' + decodeURIComponent(msg));
-                }
-                const newUrl = window.location.pathname + '?tab=creator';
-                window.history.replaceState({}, document.title, newUrl);
+        const urlParams = new URLSearchParams(window.location.search);
+        const igParam = urlParams.get('instagram');
+        if (igParam === 'connected') {
+            if (typeof showToast === 'function') {
+                showToast('Instagram connected. Live insights are currently paused.', 'info');
             }
-        } catch (_) {}
-
-        // If currentCreatorData already has verified brand connection, pre-render immediately to prevent flash
-        if (currentCreatorData?.creator?.instagram_connection || currentCreatorData?.creator?.instagram_id === 'wishrite.in') {
-            renderInstagramConnectionCard(currentCreatorData.creator.instagram_connection || {
-                connected: true,
-                username: 'wishrite.in',
-                account_id: '17841445671263800',
-                api_authorized: true,
-                is_system_user: true
-            });
+            window.history.replaceState({}, document.title, window.location.pathname + '?tab=creator');
+        } else if (igParam === 'error') {
+            const msg = urlParams.get('msg') || 'Failed to authorize with Meta.';
+            if (typeof showToast === 'function') {
+                showToast(decodeURIComponent(msg), 'error');
+            } else {
+                alert('Meta Authorization Notice: ' + decodeURIComponent(msg));
+            }
+            window.history.replaceState({}, document.title, window.location.pathname + '?tab=creator');
         }
-
-        const headers = await getAuthHeaders();
-        const res = await fetch('/api/creator/instagram/status', { headers });
-        const json = await res.json();
-        currentInstagramConnection = json;
-        renderInstagramConnectionCard(json);
-    } catch (e) {
-        console.warn('Could not load Instagram connection status:', e);
-    }
+    } catch (_) {}
+    currentInstagramConnection = null;
 }
 window.loadInstagramConnection = loadInstagramConnection;
 
@@ -1998,22 +1974,7 @@ function renderInstagramConnectionCard(conn) {
                     </div>
 
                     <div class="ig-conn-body" style="padding-top:4px; border-top:1px solid rgba(94, 52, 53, 0.08);">
-                        <div style="font-size:0.75rem; color:#71717A;">
-                            Reels & metrics automatically discovered from official Meta connection.
-                        </div>
-                        <div class="ig-conn-actions">
-                            <button type="button" class="btn btn-secondary btn-sm" onclick="refreshInstagramProfile(this)" id="btn-refresh-ig-profile" style="display:inline-flex; align-items:center; gap:6px; padding:6px 12px; font-size:0.75rem;">
-                                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-                                <span>REFRESH PROFILE</span>
-                            </button>
-                            <button type="button" class="btn btn-secondary btn-sm" onclick="syncAllInstagramInsights()" id="btn-sync-all-ig" style="display:inline-flex; align-items:center; gap:6px; padding:6px 12px; font-size:0.75rem;">
-                                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" id="icon-sync-all-ig"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-                                <span>INSIGHTS PAUSED</span>
-                            </button>
-                            <button type="button" class="btn btn-ghost btn-sm" onclick="disconnectInstagramAccount()" style="padding:6px 10px; font-size:0.75rem; color:#dc2626;">
-                                <span>DISCONNECT</span>
-                            </button>
-                        </div>
+                        <span style="font-size:0.75rem; color:#71717A;">Live Instagram insights and profile refresh are paused.</span>
                     </div>
                 </div>
             `;
@@ -2246,55 +2207,31 @@ async function disconnectInstagramAccount() {
 window.disconnectInstagramAccount = disconnectInstagramAccount;
 
 /**
- * Manually refreshes influencer profile information (followers, following, posts, picture, category)
+ * Compatibility guards: manual Instagram profile/insights refreshes are paused.
  */
-async function refreshInstagramProfile(btnEl) {
-    if (btnEl) {
-        btnEl.disabled = true;
-        btnEl.innerHTML = `<span class="spinner-border spinner-border-sm" style="display:inline-block; width:12px; height:12px; border:2px solid currentColor; border-right-color:transparent; border-radius:50%; animation:spin 0.75s linear infinite; vertical-align:middle; margin-right:4px;"></span> <span>REFRESHING...</span>`;
+async function refreshInstagramProfile() {
+    if (typeof showToast === 'function') {
+        showToast('Instagram profile and insights refresh are paused.', 'info');
     }
-
-    try {
-        const headers = await getAuthHeaders();
-        const res = await fetch('/api/creator/instagram/profile/refresh', {
-            method: 'POST',
-            headers
-        });
-        const json = await res.json();
-
-        if (json.success) {
-            if (typeof showToast === 'function') {
-                showToast('Instagram profile refreshed successfully.', 'success');
-            }
-            await loadInstagramConnection();
-        } else {
-            const errMsg = json.error?.message || 'Failed to refresh Instagram profile.';
-            if (typeof showToast === 'function') {
-                showToast(errMsg, 'error');
-            } else {
-                alert(errMsg);
-            }
-            if (json.error?.is_auth_expired) {
-                await loadInstagramConnection();
-            }
-        }
-    } catch (e) {
-        if (typeof showToast === 'function') {
-            showToast('Network error refreshing profile: ' + e.message, 'error');
-        } else {
-            alert('Network error refreshing profile: ' + e.message);
-        }
-    } finally {
-        if (btnEl) {
-            btnEl.disabled = false;
-            btnEl.innerHTML = `
-                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-                <span>REFRESH PROFILE</span>
-            `;
-        }
-    }
+    return false;
 }
 window.refreshInstagramProfile = refreshInstagramProfile;
+
+async function syncContentInsights() {
+    if (typeof showToast === 'function') {
+        showToast('Instagram insights synchronization is paused. Submitted Reel status continues to update.', 'info');
+    }
+    return false;
+}
+window.syncContentInsights = syncContentInsights;
+
+async function syncAllInstagramInsights() {
+    if (typeof showToast === 'function') {
+        showToast('Instagram insights synchronization is paused. Submitted Reel status continues to update.', 'info');
+    }
+    return false;
+}
+window.syncAllInstagramInsights = syncAllInstagramInsights;
 
 /**
  * Updates the creator's selected niche
