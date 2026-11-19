@@ -235,25 +235,18 @@ describe('Creator OAuth & Realtime Hardening Suite', () => {
             assert.equal(result, true);
         });
 
-        it('verifies Realtime filter columns in js/creator-program.js source match Supabase schema', () => {
+        it('verifies creator-content is the only remaining Realtime subscription', () => {
             const creatorJsCode = fs.readFileSync('js/creator-program.js', 'utf8');
+            const realtimeStart = creatorJsCode.indexOf('function initCreatorRealtimeSync(influencerId)');
+            const realtimeEnd = creatorJsCode.indexOf('window.initCreatorRealtimeSync = initCreatorRealtimeSync;', realtimeStart);
+            assert.ok(realtimeStart >= 0 && realtimeEnd > realtimeStart, 'Realtime initializer must exist');
 
-            // 1. influencers must filter on influencer_id (never id)
-            assert.ok(
-                creatorJsCode.includes("filter: `influencer_id=eq.${influencerId}`"),
-                'influencers filter must use column influencer_id, matching schema'
-            );
-            assert.ok(
-                !creatorJsCode.includes("filter: `id=eq.${influencerId}`"),
-                'influencers filter must NOT use non-existent column "id"'
-            );
-
-            // 2. creator_content must filter on influencer_id
-            assert.ok(
-                creatorJsCode.includes("table: 'creator_content',\n                        filter: `influencer_id=eq.${influencerId}`") ||
-                creatorJsCode.includes("filter: `influencer_id=eq.${influencerId}`"),
-                'creator_content filter must use column influencer_id'
-            );
+            const realtimeCode = creatorJsCode.slice(realtimeStart, realtimeEnd);
+            assert.ok(realtimeCode.includes("table: 'creator_content'"), 'Submitted content realtime updates must remain enabled');
+            assert.ok(realtimeCode.includes("filter: `influencer_id=eq.${influencerId}`"), 'Submitted content must be scoped to the creator');
+            assert.ok(!realtimeCode.includes("table: 'influencers'"), 'Instagram/profile live updates must be disabled');
+            assert.ok(!realtimeCode.includes("table: 'influencer_wallets'"), 'Wallet realtime refreshes must be disabled');
+            assert.ok(!realtimeCode.includes("table: 'customers'"), 'Customer realtime refreshes must be disabled');
         });
 
         it('verifies duplicate channel prevention logic when called with same influencerId', () => {
