@@ -2715,12 +2715,7 @@ export async function handleSubmitCreatorContent(req, res) {
             updated_at: new Date().toISOString()
         };
 
-        // If creator has connected Instagram, attempt initial sync via official Meta Graph API
-        try {
-            await syncInstagramMediaMetrics(newContent, creator);
-        } catch (_) {}
-
-        if (CREATOR_USE_LOCAL_STORE || process.env.NODE_ENV === 'test') {
+if (CREATOR_USE_LOCAL_STORE || process.env.NODE_ENV === 'test') {
             local.creator_content.unshift(newContent);
             writeLocalStore(local);
 
