@@ -41,94 +41,56 @@ function handleProductThumbError(img) {
 window.handleProductThumbError = handleProductThumbError;
 
 /**
- * Initializes Supabase Realtime listener for creator financial & profile updates
+ * Initializes the one permitted creator Realtime stream:
+ * submitted content inserts/updates/deletes (including review status changes).
+ * Instagram profile/insights, wallet, and customer live refreshes are intentionally paused.
  */
 let creatorRealtimeInfluencerId = null;
 function initCreatorRealtimeSync(influencerId) {
     const client = window.supabaseClient || (typeof supabaseClient !== 'undefined' ? supabaseClient : null);
     if (!client || typeof client.channel !== 'function') return null;
 
-    // Prevent duplicate subscriptions for the same creator
+    // Prevent duplicate subscriptions for the same creator.
     if (creatorRealtimeChannel && creatorRealtimeInfluencerId === influencerId) {
         return creatorRealtimeChannel;
     }
 
-    // Clean up existing subscription if influencerId changed
     if (creatorRealtimeChannel) {
         cleanUpCreatorRealtimeSync();
     }
 
     try {
         creatorRealtimeInfluencerId = influencerId;
-        const channelName = influencerId ? `wishrite-creator-sync-${influencerId}` : 'wishrite-creator-realtime-sync';
-        
-        let chan = client.channel(channelName)
-            .on(
+        const channelName = influencerId
+            ? `wishrite-submitted-content-${influencerId}`
+            : 'wishrite-submitted-content';
+
+        let chan = client.channel(channelName);
+        if (influencerId) {
+            chan = chan.on(
                 'postgres_changes',
                 {
                     event: '*',
                     schema: 'public',
-                    table: 'influencer_wallets'
+                    table: 'creator_content',
+                    filter: `influencer_id=eq.${influencerId}`
                 },
                 (payload) => {
-                    console.log('[WishRite Creator] Realtime update on influencer_wallets:', payload.eventType);
-                    loadCustomerCreatorStatus();
-                }
-            )
-            .on(
-                'postgres_changes',
-                {
-                    event: '*',
-                    schema: 'public',
-                    table: 'customers'
-                },
-                (payload) => {
-                    console.log('[WishRite Creator] Realtime update on customers:', payload.eventType);
-                    loadCustomerCreatorStatus();
+                    console.log('[WishRite Creator] Submitted content realtime update:', payload.eventType);
+                    if (typeof loadCreatorContent === 'function') {
+                        loadCreatorContent();
+                    }
                 }
             );
-
-        // Creator-scoped subscriptions if influencerId is provided
-        if (influencerId) {
-            chan = chan
-                .on(
-                    'postgres_changes',
-                    {
-                        event: '*',
-                        schema: 'public',
-                        table: 'creator_content',
-                        filter: `influencer_id=eq.${influencerId}`
-                    },
-                    (payload) => {
-                        console.log('[WishRite Creator] Realtime update on creator_content:', payload.eventType);
-                        if (typeof loadCreatorContent === 'function') {
-                            loadCreatorContent();
-                        }
-                    }
-                )
-                .on(
-                    'postgres_changes',
-                    {
-                        event: '*',
-                        schema: 'public',
-                        table: 'influencers',
-                        filter: `influencer_id=eq.${influencerId}`
-                    },
-                    (payload) => {
-                        console.log('[WishRite Creator] Realtime update on influencers:', payload.eventType);
-                        // Profile events no longer trigger Instagram API refreshes.
-                        loadCustomerCreatorStatus();
-                    }
-                );
         }
 
         creatorRealtimeChannel = chan.subscribe((status) => {
             if (status === 'SUBSCRIBED') {
-                console.log('[WishRite Creator] Subscribed to creator realtime updates.');
+                console.log('[WishRite Creator] Subscribed to submitted-content updates only.');
             }
         });
     } catch (err) {
-        console.warn('[WishRite Creator] Realtime subscription notice:', err);
+        console.warn('[WishRite Creator] Submitted-content realtime subscription notice:', err);
     }
     return creatorRealtimeChannel;
 }
