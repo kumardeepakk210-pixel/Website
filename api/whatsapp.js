@@ -281,12 +281,23 @@ module.exports = async function handler(req, res) {
                 });
             }
 
-            // Clean & normalize phone number
+            // Normalize and validate an Indian mobile number before sending to Meta.
             const phoneDigits = String(rawPhone).replace(/\D/g, '');
-            let destinationPhone = phoneDigits;
-            // For Indian numbers without country code (10 digits), prepend 91
-            if (phoneDigits.length === 10) {
-                destinationPhone = '91' + phoneDigits;
+            const normalizedDigits = phoneDigits.length === 11 && phoneDigits.startsWith('0')
+                ? phoneDigits.slice(1)
+                : phoneDigits;
+            let destinationPhone = '';
+            if (normalizedDigits.length === 10 && /^[6-9]/.test(normalizedDigits)) {
+                destinationPhone = '91' + normalizedDigits;
+            } else if (normalizedDigits.length === 12 && normalizedDigits.startsWith('91') && /^[6-9]/.test(normalizedDigits.slice(2))) {
+                destinationPhone = normalizedDigits;
+            } else {
+                return res.status(400).json({ error: { message: 'Invalid Indian mobile number.' } });
+            }
+
+            // Supabase phone OTPs are six numeric digits.
+            if (!/^\d{6}$/.test(String(otp))) {
+                return res.status(400).json({ error: { message: 'Invalid OTP format.' } });
             }
 
             // Mock delivery check (only in test environment or explicit local mock)
