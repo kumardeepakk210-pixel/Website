@@ -207,21 +207,12 @@ module.exports = async function handler(req, res) {
             return await creator.handleGetCreatorContest(req, res);
         }
 
-        // 8. Instagram Insights & Content Sync
+        // Instagram insights synchronization is intentionally paused.
         if (subPath === '/instagram/cron-sync' && (method === 'GET' || method === 'POST')) {
-            const authHeader = req.headers['authorization'] || '';
-            const cronSecret = process.env.CRON_SECRET;
-            // Allow Vercel cron invocation via Authorization header or Vercel cron internal header
-            const isVercelCron = req.headers['x-vercel-cron'] === '1';
-            const isAuthorized = !cronSecret || authHeader === `Bearer ${cronSecret}` || isVercelCron;
-
-            if (!isAuthorized) {
-                return res.status(401).json({ success: false, error: { message: 'Unauthorized cron request.' } });
-            }
-
-            const syncService = await import('../backend/services/instagram-sync.js');
-            const cronResult = await syncService.runScheduledInstagramSync();
-            return res.json({ success: true, cron: cronResult });
+            return res.status(410).json({
+                success: false,
+                error: { code: 'INSTAGRAM_INSIGHTS_PAUSED', message: 'Live Instagram insights synchronization is currently paused.' }
+            });
         }
         if (subPath === '/instagram/status' && method === 'GET') {
             return await withAuth(creator.handleGetInstagramStatus);
@@ -241,20 +232,20 @@ module.exports = async function handler(req, res) {
         if (subPath === '/instagram/disconnect' && method === 'POST') {
             return await withAuth(creator.handleDisconnectInstagram);
         }
-        if (subPath === '/instagram/sync' && method === 'POST') {
-            return await withAuth(creator.handleSyncAllInstagramContent);
-        }
-        if (subPath === '/instagram/profile/refresh' && method === 'POST') {
-            return await withAuth(creator.handleRefreshInstagramProfile);
+        // Live Instagram insights/profile synchronization is paused. Submission and review routes remain active.
+        if (
+            (subPath === '/instagram/sync' ||
+             subPath === '/instagram/profile/refresh' ||
+             /^\/content\/[^\/]+\/sync$/.test(subPath)) &&
+            method === 'POST'
+        ) {
+            return res.status(410).json({
+                success: false,
+                error: { code: 'INSTAGRAM_INSIGHTS_PAUSED', message: 'Live Instagram insights synchronization is paused. Submitted Reel review and status tracking remain available.' }
+            });
         }
         if (subPath === '/instagram/profile/niche' && method === 'POST') {
             return await withAuth(creator.handleUpdateCreatorNiche);
-        }
-
-        const syncMatch = subPath.match(/^\/content\/([^\/]+)\/sync$/);
-        if (syncMatch && method === 'POST') {
-            const contentId = syncMatch[1];
-            return await withAuth((req, res) => creator.handleSyncCreatorContent(req, res, contentId));
         }
 
         // Route Not Found
