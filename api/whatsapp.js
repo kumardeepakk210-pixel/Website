@@ -45,6 +45,54 @@ function normalizeIndianMobileNumber(rawPhone) {
     return null;
 }
 
+/**
+ * Builds the Meta WhatsApp Cloud API template payload for authentication OTP delivery.
+ * For an approved Meta Authentication template configured with a Copy Code OTP button,
+ * the button component must use sub_type: "url", index: "0", and pass the OTP as a text parameter.
+ */
+function buildMetaAuthTemplatePayload({
+    destinationPhone,
+    templateName = 'wishrite_auth_otp',
+    templateLang = 'en',
+    otp
+}) {
+    const otpText = String(otp);
+    return {
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to: destinationPhone,
+        type: 'template',
+        template: {
+            name: templateName,
+            language: {
+                code: templateLang
+            },
+            components: [
+                {
+                    type: 'body',
+                    parameters: [
+                        {
+                            type: 'text',
+                            text: otpText
+                        }
+                    ]
+                },
+                {
+                    type: 'button',
+                    sub_type: 'url',
+                    index: '0',
+                    parameters: [
+                        {
+                            type: 'text',
+                            text: otpText
+                        }
+                    ]
+                }
+            ]
+        }
+    };
+}
+
 // Standard Webhooks / Supabase Auth Hook Verification Helper.
 // Supabase sends secrets as "v1,whsec_<base64>" and supports rotation with "|" or comma separators.
 function parseHookSecrets(value) {
@@ -331,46 +379,12 @@ module.exports = async function handler(req, res) {
 
             const metaEndpoint = buildMetaMessagesEndpoint(process.env.META_GRAPH_API_VERSION, phoneNumberId);
 
-            // Build components according to Meta Authentication template guidelines:
-            // Body parameter: { type: 'text', text: otp }
-            // Button parameter: for copy_code -> sub_type: 'copy_code', parameter: { type: 'text', text: otp }
-            // For url/one-tap -> sub_type: 'url'
-            const buttonComponent = {
-                type: 'button',
-                sub_type: buttonType === 'copy_code' ? 'copy_code' : (buttonType === 'one_tap' ? 'url' : 'copy_code'),
-                index: '0',
-                parameters: [
-                    {
-                        type: 'text',
-                        text: String(otp)
-                    }
-                ]
-            };
-
-            const metaPayload = {
-                messaging_product: 'whatsapp',
-                recipient_type: 'individual',
-                to: destinationPhone,
-                type: 'template',
-                template: {
-                    name: templateName,
-                    language: {
-                        code: templateLang
-                    },
-                    components: [
-                        {
-                            type: 'body',
-                            parameters: [
-                                {
-                                    type: 'text',
-                                    text: String(otp)
-                                }
-                            ]
-                        },
-                        buttonComponent
-                    ]
-                }
-            };
+            const metaPayload = buildMetaAuthTemplatePayload({
+                destinationPhone,
+                templateName,
+                templateLang,
+                otp
+            });
 
             const metaRes = await fetch(metaEndpoint, {
                 method: 'POST',
@@ -384,11 +398,19 @@ module.exports = async function handler(req, res) {
             const metaData = await metaRes.json();
 
             if (!metaRes.ok) {
-                console.error('[WhatsApp Auth Hook] Meta API Error:', metaData?.error?.message || metaRes.statusText);
+                const metaErr = metaData?.error || {};
+                const errLogObj = {
+                    message: metaErr.message || metaRes.statusText,
+                    code: metaErr.code,
+                    error_subcode: metaErr.error_subcode,
+                    details: metaErr.error_data?.details,
+                    fbtrace_id: metaErr.fbtrace_id
+                };
+                console.error('[WhatsApp Auth Hook] Meta API Error:', JSON.stringify(errLogObj));
                 return res.status(502).json({
                     error: {
                         message: 'WhatsApp delivery failed',
-                        details: metaData?.error?.message
+                        details: metaErr.message || 'Meta API returned an error.'
                     }
                 });
             }
@@ -411,6 +433,7 @@ module.exports.verifyStandardWebhook = verifyStandardWebhook;
 module.exports.normalizeGraphApiVersion = normalizeGraphApiVersion;
 module.exports.buildMetaMessagesEndpoint = buildMetaMessagesEndpoint;
 module.exports.normalizeIndianMobileNumber = normalizeIndianMobileNumber;
+module.exports.buildMetaAuthTemplatePayload = buildMetaAuthTemplatePayload;
 
 // Vercel: disable automatic parsing so webhook signatures use the original body bytes.
 module.exports.config = { api: { bodyParser: false } };

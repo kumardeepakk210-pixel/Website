@@ -406,7 +406,25 @@ async function runUnifiedSuite() {
                 assert.ok(capturedMetaUrl.includes('987654321098765/messages'));
                 assert.equal(capturedMetaHeaders['Authorization'], 'Bearer mock_whatsapp_access_token_123');
                 assert.equal(capturedMetaBody.to, '919876543210');
+                assert.equal(capturedMetaBody.template.name, 'wishrite_auth_otp');
+                assert.equal(capturedMetaBody.template.language.code, 'en');
+
+                // Body component checks
+                assert.equal(capturedMetaBody.template.components[0].type, 'body');
+                assert.equal(capturedMetaBody.template.components[0].parameters[0].type, 'text');
                 assert.equal(capturedMetaBody.template.components[0].parameters[0].text, '852963');
+
+                // Button component checks (Copy Code OTP button requirement)
+                assert.equal(capturedMetaBody.template.components[1].type, 'button');
+                assert.equal(capturedMetaBody.template.components[1].sub_type, 'url');
+                assert.equal(capturedMetaBody.template.components[1].index, '0');
+                assert.equal(capturedMetaBody.template.components[1].parameters[0].type, 'text');
+                assert.equal(capturedMetaBody.template.components[1].parameters[0].text, '852963');
+                assert.equal(
+                    capturedMetaBody.template.components[0].parameters[0].text,
+                    capturedMetaBody.template.components[1].parameters[0].text,
+                    'Body and button must receive the exact same six-digit OTP'
+                );
             } finally {
                 global.fetch = originalFetch;
                 process.env.NODE_ENV = savedNodeEnv;
@@ -471,6 +489,38 @@ async function runUnifiedSuite() {
                 'https://graph.facebook.com/v26.0/1481161675077194/messages',
                 'Specific valid Graph API version must be preserved'
             );
+            // Test cases for buildMetaAuthTemplatePayload
+            const { buildMetaAuthTemplatePayload } = await import('../api/whatsapp.js');
+            assert.equal(typeof buildMetaAuthTemplatePayload, 'function', 'buildMetaAuthTemplatePayload must be exported');
+
+            const generatedPayload = buildMetaAuthTemplatePayload({
+                destinationPhone: '919874935701',
+                templateName: 'wishrite_auth_otp',
+                templateLang: 'en',
+                otp: '654321'
+            });
+
+            assert.equal(generatedPayload.messaging_product, 'whatsapp');
+            assert.equal(generatedPayload.to, '919874935701');
+            assert.equal(generatedPayload.type, 'template');
+            assert.equal(generatedPayload.template.name, 'wishrite_auth_otp');
+            assert.equal(generatedPayload.template.language.code, 'en');
+            assert.equal(generatedPayload.template.components.length, 2);
+
+            // Component 0: Body with OTP
+            const bodyComp = generatedPayload.template.components[0];
+            assert.equal(bodyComp.type, 'body');
+            assert.equal(bodyComp.parameters[0].type, 'text');
+            assert.equal(bodyComp.parameters[0].text, '654321');
+
+            // Component 1: Copy Code button with sub_type: "url" and index: "0"
+            const btnComp = generatedPayload.template.components[1];
+            assert.equal(btnComp.type, 'button');
+            assert.equal(btnComp.sub_type, 'url', 'Copy Code button component must use sub_type url');
+            assert.equal(btnComp.index, '0', 'Button index must be 0');
+            assert.equal(btnComp.parameters[0].type, 'text');
+            assert.equal(btnComp.parameters[0].text, '654321');
+            assert.equal(bodyComp.parameters[0].text, btnComp.parameters[0].text, 'Both body and button must receive the same OTP');
         }
 
         console.log('✔ 4b. Invalid/Expired OTP rejection and Meta API payload formatting verified');
